@@ -1419,3 +1419,7 @@ msgstr ""
 msgid ""
 "One of your photos is no longer available. Please upload it again."
 msgstr ""
+
+#: src/backend/apps/ads/views/edit.py
+msgid "This ad cannot be edited in its current status."
+msgstr ""

@@ -33,6 +33,21 @@ from apps.currencies.services.price_normalizer import normalize_price_to_eur
 logger = logging.getLogger(__name__)
 
 
+#: Statuses whose ad may be edited by a direct save (no status transition).
+#:
+#: This is the single source of truth for the ``ad_edit`` direct-save branch
+#: and for the dashboard's Edit-link gate. The set is deliberately explicit:
+#: previously the catch-all ``else:`` admitted DRAFT, ON_MODERATION,
+#: ON_MODERATION_FAILED, REJECTED, DELETED, and (conditionally) ARCHIVED, so
+#: every status silently took the same write path. Naming the two coherent
+#: statuses — an unsubmitted DRAFT and a pending ON_MODERATION ad — makes every
+#: other status a defined refusal and turns any future re-broadening into a
+#: one-line, auditable diff (finding AD-002, BLOCK 8A).
+EDITABLE_DIRECT_SAVE_STATUSES: frozenset[AdStatus] = frozenset(
+    {AdStatus.DRAFT, AdStatus.ON_MODERATION}
+)
+
+
 def _apply_price_change(
     ad: Ad,
     price_amount: Decimal,
@@ -85,7 +100,8 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
         - PUBLISHED + price/photo edit: stays PUBLISHED, public within 5s
         - PUBLISHED + mixed edit: follows text rule
         - ARCHIVED + reactivate: text re-checked, hidden until pass
-        - Other statuses: direct save (ON_MODERATION, ON_MODERATION_FAILED)
+        - DRAFT or ON_MODERATION: direct save, status unchanged
+        - Any other status: refused, the ad is left completely unchanged
 
     Args:
         request: HTTP request (authenticated user required)
@@ -264,23 +280,46 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                 return redirect("ads:dashboard")
 
             else:
-                # Other statuses (ON_MODERATION, ON_MODERATION_FAILED): direct save
-                ad.title = dto.title
-                ad.description = dto.description
-                ad = _apply_price_change(ad, dto.price_amount, price_currency_value)
-                ad.save(
-                    update_fields=[
-                        "title",
-                        "description",
-                        "price_amount",
-                        "price_currency",
-                        "price_normalized_eur",
-                        "updated_at",
-                    ]
-                )
-                logger.info("Ad %s edited in status %s", ad_id, ad.status)
+                # Explicit allow-list. The former ``else:`` catch-all admitted
+                # DRAFT, ON_MODERATION, ON_MODERATION_FAILED, REJECTED, DELETED,
+                # and (without a ``reactivate`` key) ARCHIVED, silently writing
+                # content for every one of them (finding AD-002). Only DRAFT and
+                # ON_MODERATION have a coherent direct save; every other status
+                # is refused below and the row is left untouched.
+                if ad.status in EDITABLE_DIRECT_SAVE_STATUSES:
+                    ad.title = dto.title
+                    ad.description = dto.description
+                    ad = _apply_price_change(ad, dto.price_amount, price_currency_value)
+                    ad.save(
+                        update_fields=[
+                            "title",
+                            "description",
+                            "price_amount",
+                            "price_currency",
+                            "price_normalized_eur",
+                            "updated_at",
+                        ]
+                    )
+                    logger.info("Ad %s edited in status %s", ad_id, ad.status)
+                    return redirect("ads:dashboard")
 
-                return redirect("ads:dashboard")
+                # Defined refusal: no field is written. Rendering the edit form
+                # with the actionable message (HTTP 200) matches the moderation
+                # failure paths above and makes the dead end explicit rather
+                # than silently rewriting content. The product rule for what a
+                # seller may do to a failed ad is Q5 and remains open (BLOCK 8B).
+                logger.info(
+                    "Ad %s edit refused in status %s", ad_id, ad.status
+                )
+                ad = Ad.objects.prefetch_related("images").get(id=ad_id)
+                return render(
+                    request,
+                    "ads/edit.html",
+                    {
+                        "ad": ad,
+                        "error": _("This ad cannot be edited in its current status."),
+                    },
+                )
     except OperationalError as exc:
         if not is_lock_timeout(exc):
             raise

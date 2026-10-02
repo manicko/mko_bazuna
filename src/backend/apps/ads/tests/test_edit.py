@@ -30,7 +30,7 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
-from apps.ads.views.edit import _apply_price_change
+from apps.ads.views.edit import EDITABLE_DIRECT_SAVE_STATUSES, _apply_price_change
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.services.price_normalizer import PriceNormalizer
@@ -977,26 +977,117 @@ class TestAdReactivateDirect:
 
 
 # ---------------------------------------------------------------------------
-# TST-008: Other-status direct-save branch (ON_MODERATION, ON_MODERATION_FAILED)
+# TST-008: Other-status direct-save branch — explicit allow-list (AD-002 / 8A)
 # ---------------------------------------------------------------------------
 
 
 class TestEditOtherStatusDirectSave:
-    """TST-008: ON_MODERATION/ON_MODERATION_FAILED ads use direct-save branch.
+    """The direct-save branch is an explicit allow-list, not a catch-all.
 
-    The view saves fields directly without a status transition (no auto-moderation).
+    ``ad_edit`` saves directly (no status transition, no auto-moderation) only
+    for statuses in ``EDITABLE_DIRECT_SAVE_STATUSES`` (``DRAFT``,
+    ``ON_MODERATION``). Every other status is refused and left untouched.
+
+    History: this class previously claimed coverage of ``ON_MODERATION`` *and*
+    ``ON_MODERATION_FAILED`` while containing a single test that asserted an
+    ``ON_MODERATION`` ad was saved directly. The former ``else:`` catch-all in
+    ``edit.py`` admitted five of seven statuses, so any allow-list or
+    re-moderation fix broke it. Rewritten for finding AD-002 (BLOCK 8A). Reason
+    (project rule 2 — production code is king): the old test encoded the
+    defect — it treated a silent direct save for a non-editable status as
+    correct behavior.
     """
 
-    def test_edit_on_moderation_direct_save(
+    @pytest.mark.parametrize(
+        "status",
+        [
+            AdStatus.ON_MODERATION_FAILED,
+            AdStatus.REJECTED,
+            AdStatus.DELETED,
+            AdStatus.ARCHIVED,
+        ],
+    )
+    def test_edit_non_editable_status_is_refused(
         self,
         seller,
         category,
         city,
+        status: AdStatus,
     ) -> None:
-        """POSTing an edit to an ON_MODERATION ad updates fields without
-        changing status (direct-save branch)."""
-        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
-        new_title = "Updated In Moderation"
+        """POSTing an edit to a non-editable status is refused and the ad is
+        left byte-identical on a fresh re-fetch.
+
+        ``ARCHIVED`` here carries no ``reactivate`` key in the POST, so it takes
+        the refusal path rather than the reactivation branch. The response must
+        not be a success redirect that implies persistence, and the actionable
+        message must be rendered.
+        """
+        ad = create_test_ad(seller, category, city, status=status, price=100)
+        Ad.objects.filter(pk=ad.pk).update(
+            title="Untouched Title",
+            description="Untouched description body.",
+        )
+        before = Ad.objects.get(pk=ad.pk)
+        snapshot = (
+            before.title,
+            before.description,
+            before.price_amount,
+            before.price_currency,
+            before.price_normalized_eur,
+            before.updated_at,
+        )
+
+        client = Client()
+        client.force_login(seller)
+        response = client.post(
+            reverse("ads:edit", args=[ad.id]),
+            data={
+                "title": "Changed Title",
+                "description": "Changed description body.",
+                "price_amount": "999",
+                "price_currency": CurrencyCode.EUR.value,
+            },
+        )
+
+        # Not a redirect that implies the edit was persisted.
+        assert response.status_code == 200
+        assert response.context["error"] == (
+            "This ad cannot be edited in its current status."
+        )
+
+        # Freshly re-fetched instance is byte-identical on every field the
+        # former catch-all used to write.
+        after = Ad.objects.get(pk=ad.pk)
+        after_snapshot = (
+            after.title,
+            after.description,
+            after.price_amount,
+            after.price_currency,
+            after.price_normalized_eur,
+            after.updated_at,
+        )
+        assert after_snapshot == snapshot
+        assert after.status == status
+
+    @pytest.mark.parametrize(
+        "status",
+        [AdStatus.DRAFT, AdStatus.ON_MODERATION],
+    )
+    def test_edit_allow_listed_status_saves_directly(
+        self,
+        seller,
+        category,
+        city,
+        status: AdStatus,
+    ) -> None:
+        """``DRAFT`` and ``ON_MODERATION`` still take the direct save: fields
+        are written, status and ``moderation_failed_at`` are untouched.
+
+        This is the positive half of the allow-list guard — without it an empty
+        allow-list would satisfy the refusal tests.
+        """
+        ad = create_test_ad(seller, category, city, status=status, price=100)
+        new_title = "Updated Allow-Listed Title"
         client = Client()
         client.force_login(seller)
 
@@ -1014,7 +1105,173 @@ class TestEditOtherStatusDirectSave:
         assert "dashboard" in response.url
         ad.refresh_from_db()
         assert ad.title == new_title
-        assert ad.status == AdStatus.ON_MODERATION  # unchanged
+        assert ad.status == status  # unchanged
+        assert ad.moderation_failed_at is None  # untouched
+
+
+# ---------------------------------------------------------------------------
+# AD-002 / 8A: every one of the seven statuses has a defined outcome
+# ---------------------------------------------------------------------------
+
+
+class TestEditStatusAllowListEnumeration:
+    """Structural guard: each of the seven ``AdStatus`` values has a defined
+    ``ad_edit`` outcome, driven by the named ``EDITABLE_DIRECT_SAVE_STATUSES``
+    allowance.
+
+    A future re-broadening of the direct-save branch (adding back a catch-all)
+    fails this enumeration.
+    """
+
+    def test_allow_list_constant_is_the_named_two_statuses(self) -> None:
+        """The allow-list is the named ``frozenset`` of exactly DRAFT and
+        ON_MODERATION — not a broadened set.
+        """
+        assert EDITABLE_DIRECT_SAVE_STATUSES == frozenset(
+            {AdStatus.DRAFT, AdStatus.ON_MODERATION}
+        )
+
+    @pytest.mark.parametrize(
+        ("status", "expected_outcome"),
+        [
+            (AdStatus.DRAFT, "direct_save"),
+            (AdStatus.ON_MODERATION, "direct_save"),
+            (AdStatus.PUBLISHED, "published_branch"),
+            (AdStatus.ON_MODERATION_FAILED, "refused"),
+            (AdStatus.REJECTED, "refused"),
+            (AdStatus.DELETED, "refused"),
+            (AdStatus.ARCHIVED, "refused"),
+        ],
+    )
+    def test_every_status_has_a_defined_outcome(
+        self,
+        seller,
+        category,
+        city,
+        status: AdStatus,
+        expected_outcome: str,
+    ) -> None:
+        """Every ``AdStatus`` maps to exactly one defined outcome.
+
+        - ``direct_save``: 302 redirect and the new title persisted.
+        - ``refused``: HTTP 200, actionable error, title unchanged.
+        - ``published_branch``: 302 redirect to dashboard (price-only edit;
+          title is unchanged so the price/photo branch is taken).
+        """
+        ad = create_test_ad(seller, category, city, status=status, price=100)
+        Ad.objects.filter(pk=ad.pk).update(title="Original Title")
+        new_title = "Enumerated New Title"
+        client = Client()
+        client.force_login(seller)
+
+        response = client.post(
+            reverse("ads:edit", args=[ad.id]),
+            data={
+                # Title change routes PUBLISHED to the text branch; for the
+                # price-only published case below we override this.
+                "title": new_title,
+                "description": ad.description,
+                "price_amount": "100",
+                "price_currency": CurrencyCode.EUR.value,
+            },
+        )
+
+        ad.refresh_from_db()
+        if expected_outcome == "direct_save":
+            assert response.status_code == 302
+            assert ad.title == new_title
+        elif expected_outcome == "refused":
+            assert response.status_code == 200
+            assert response.context["error"] == (
+                "This ad cannot be edited in its current status."
+            )
+            assert ad.title == "Original Title"
+
+    def test_published_takes_its_own_branch(self, seller, category, city) -> None:
+        """PUBLISHED is handled by its own branch, never the allow-list.
+
+        A price-only edit on a PUBLISHED ad stays PUBLISHED (the price/photo
+        sub-branch), proving the allow-list refused/enumerated statuses do not
+        capture PUBLISHED.
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED, price=100)
+        client = Client()
+        client.force_login(seller)
+
+        response = client.post(
+            reverse("ads:edit", args=[ad.id]),
+            data={
+                "title": ad.title,
+                "description": ad.description,
+                "price_amount": "200",
+                "price_currency": CurrencyCode.EUR.value,
+            },
+        )
+
+        assert response.status_code == 302
+        assert "dashboard" in response.url
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED
+
+
+# ---------------------------------------------------------------------------
+# AD-002 / 8A: dashboard Edit link is gated by the same allow-list
+# ---------------------------------------------------------------------------
+
+
+class TestDashboardEditLinkGate:
+    """The dashboard renders the Edit link exactly for allow-listed statuses.
+
+    The link must be present for ``DRAFT``/``ON_MODERATION`` and absent for
+    ``ON_MODERATION_FAILED``/``REJECTED``/``ARCHIVED``, matching
+    ``EDITABLE_DIRECT_SAVE_STATUSES``.
+    """
+
+    def _edit_url(self, ad: Ad) -> str:
+        return reverse("ads:edit", args=[ad.id])
+
+    @pytest.mark.parametrize(
+        ("status", "expected"),
+        [
+            (AdStatus.ON_MODERATION, True),
+            (AdStatus.PUBLISHED, False),
+            (AdStatus.ON_MODERATION_FAILED, False),
+            (AdStatus.REJECTED, False),
+            (AdStatus.ARCHIVED, False),
+        ],
+    )
+    def test_edit_link_presence_per_status(
+        self,
+        seller,
+        category,
+        city,
+        status: AdStatus,
+        expected: bool,
+    ) -> None:
+        """The Edit link is present iff the status is in the allow-list.
+
+        The gate is driven by the **same** ``EDITABLE_DIRECT_SAVE_STATUSES``
+        set the view enforces, so among the dashboard's buckets only
+        ``ON_MODERATION`` shows the link. ``PUBLISHED`` and ``ARCHIVED`` retain
+        their own action affordances (price/photo edits and reactivation) and
+        the view branches for them are untouched; the link gate itself follows
+        the allow-list exactly, per AD-002 / BLOCK 8A acceptance criterion 4.
+        ``DRAFT`` is not a dashboard bucket, so it is covered by the view tests
+        instead of the rendered dashboard.
+        """
+        ad = create_test_ad(seller, category, city, status=status, price=100)
+        client = Client()
+        client.force_login(seller)
+
+        response = client.get(reverse("ads:dashboard"))
+        assert response.status_code == 200
+        rendered = response.content.decode()
+        edit_url = self._edit_url(ad)
+
+        if expected:
+            assert f'href="{edit_url}"' in rendered
+        else:
+            assert f'href="{edit_url}"' not in rendered
 
 
 # ---------------------------------------------------------------------------

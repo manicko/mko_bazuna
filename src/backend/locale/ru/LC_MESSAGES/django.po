@@ -1564,6 +1564,10 @@ msgstr "Объявление не найдено"
 msgid "Your draft expired and was deleted. Please start again with /post."
 msgstr "Черновик объявления истёк и был удалён. Пожалуйста, начните заново командой /post."
 
+#: src/backend/apps/ads/views/edit.py
+msgid "This ad cannot be edited in its current status."
+msgstr "Это объявление нельзя редактировать в его текущем статусе."
+
 #~ msgid ""
 #~ "We need your consent to process the Telegram name and username you "
 #~ "provided for account identification and ad publishing.\n"

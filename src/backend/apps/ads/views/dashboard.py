@@ -13,6 +13,7 @@ from django.shortcuts import render
 from django.utils.translation import gettext_lazy as _
 
 from apps.ads.models import Ad
+from apps.ads.views.edit import EDITABLE_DIRECT_SAVE_STATUSES
 from apps.analytics.services.seller_stats import SellerStats
 from apps.core.enums import AdStatus, TimeRange
 
@@ -90,6 +91,9 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         "per_ad_stats_dict": per_ad_stats_dict,
         "selected_time_range": time_range.value,
         "time_range_options": TimeRange.choices(),
+        # Gate the Edit link on the same allow-list ``ad_edit`` enforces, so the
+        # dashboard never advertises an edit that cannot succeed (AD-002, BLOCK 8A).
+        "editable_statuses": EDITABLE_DIRECT_SAVE_STATUSES,
     }
 
     return render(request, "ads/dashboard.html", context)

@@ -1545,6 +1545,10 @@ msgstr "Oglas nije pronađen"
 msgid "Your draft expired and was deleted. Please start again with /post."
 msgstr "Vaš nacrt oglasa je istekao i obrisan. Molimo ponovo pokrenite /post."
 
+#: src/backend/apps/ads/views/edit.py
+msgid "This ad cannot be edited in its current status."
+msgstr "Ovaj oglas se ne može uređivati u trenutnom statusu."
+
 #~ msgid ""
 #~ "We need your consent to process the Telegram name and username you "
 #~ "provided for account identification and ad publishing.\n"

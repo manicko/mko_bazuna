@@ -99,10 +99,12 @@
                                         {% endwith %}
                                     {% endif %}
                                     <div class="flex flex-wrap gap-2 text-xs">
-                                        <a href="{% url 'ads:edit' ad.id %}"
-                                           class="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
-                                            {% trans "Edit" %}
-                                        </a>
+                                        {% if status in editable_statuses %}
+                                            <a href="{% url 'ads:edit' ad.id %}"
+                                               class="px-3 py-1 bg-blue-100 text-blue-700 rounded hover:bg-blue-200">
+                                                {% trans "Edit" %}
+                                            </a>
+                                        {% endif %}
                                         {% if status == 'published' %}
                                             <form method="post" action="{% url 'ads:archive' ad.id %}" class="inline">
                                                 {% csrf_token %}
