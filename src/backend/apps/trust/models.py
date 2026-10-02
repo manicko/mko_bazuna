@@ -36,14 +36,13 @@ class SellerTrustScore(models.Model):
 
 
 class SellerVerification(models.Model):
-    """Seller verification status (admin and phone)."""
+    """Seller verification status (admin-verified)."""
 
     user = models.OneToOneField(
         "users.User",
         on_delete=models.CASCADE,
         related_name="verification",
     )
-    phone_number = models.CharField(max_length=20, blank=True, null=True)
     verified_by_admin = models.BooleanField(default=False)
     verified_at = models.DateTimeField(blank=True, null=True)
 

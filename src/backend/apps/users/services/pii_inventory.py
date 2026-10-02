@@ -253,16 +253,6 @@ PII_ERASURE_ENTRIES: tuple[tuple[str, str, ErasureAction, str], ...] = (
         "owner and deferral (BLOCK 11, 06-PII-109, Q-D3). DECLARATION-ONLY.",
     ),
     (
-        "trust.SellerVerification",
-        "phone_number",
-        ErasureAction.DROP_COLUMN,
-        "NOT implemented today: nothing in src/ writes it — four tree-wide hits "
-        "are the field itself, trust/migrations/0001_initial.py, and two "
-        "unrelated test assertions; apps/trust/ has no admin.py; the column is "
-        "permanently NULL. The fix is schema removal, not a row erasure "
-        "(06-PII-111, BLOCK 17).",
-    ),
-    (
         "moderation.ModeratorActionLog",
         "reason",
         ErasureAction.RETAIN,

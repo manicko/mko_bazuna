@@ -752,7 +752,6 @@ Tracks seller verification status (admin and Telegram Premium).
 ```
 id (PK)
 user_id (FK → users.id, ONE_TO_ONE, CASCADE)
-phone_number (VARCHAR(20), nullable)
 verified_by_admin (BOOL, default False)
 verified_at (TIMESTAMP, nullable)
 
