@@ -933,6 +933,36 @@ through a peer gate, not by trusting forwarding headers blindly:
   fronts Django with a proxy that sends `X-Forwarded-For` but omits `X-Real-IP`
   would expose it.
 
+### Applying a Change to the Nginx Configuration
+
+`docker/nginx/nginx.conf` is a **read-only bind mount** into the nginx
+container, taken from the host's own `/app/docker/nginx/nginx.conf`. The
+deployment workflow does **not** update it or reload nginx: `deploy.yml`
+recreates only the `web` and `bot` services, and its SSH script contains no
+`git` command at all, so the pipeline performs **none** of the steps below.
+Applying an nginx configuration change is therefore entirely manual:
+
+1. **Pull on the host.** Run `git -C /app pull` on the production host itself.
+   `deploy.yml` never runs `git` — `actions/checkout@v4` runs on the ephemeral
+   `ubuntu-latest` runner, which never touches the host, so the host's working
+   tree is only updated by this manual `git -C /app pull`.
+2. **Validate inside the container.** Run `docker compose exec nginx nginx -t`.
+   The container is what reads the bind-mounted file, so validation must happen
+   there — a host-side `nginx -t` would test a different binary and file.
+3. **Reload nginx.** Run `docker compose exec nginx nginx -s reload`.
+   `docker compose up -d` alone is **insufficient**: the config is a `:ro` bind
+   mount, so the service definition is unchanged and Compose does **not**
+   recreate the container — the running nginx keeps serving the old file.
+4. **Verify through nginx from outside.** Exercise a real request
+   (`https://<host>/…`) and confirm the new behaviour. Do not rely on the
+   container-internal `/health/ready/` probe: it talks to `web` directly and
+   **passes with nginx stopped**, so it cannot detect a stale or broken nginx
+   configuration.
+5. **Rollback is manual.** If the change must be undone, revert the file on the
+   host (`git -C /app checkout -- docker/nginx/nginx.conf`), re-run steps 2–4.
+   There is no automated rollback for nginx: `deploy.yml`'s rollback path
+   recreates `web` and `bot` only and never touches the `nginx` service.
+
 ## Database Operations
 
 ### Backup
