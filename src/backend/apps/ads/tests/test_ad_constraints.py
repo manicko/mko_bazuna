@@ -108,6 +108,37 @@ class TestStatusTimestampConstraints:
 
 
 # ---------------------------------------------------------------------------
+# Reactivation clears archived_at (AD-011)
+# ---------------------------------------------------------------------------
+
+
+class TestReactivationClearsArchivedAt:
+    """``ARCHIVED -> PUBLISHED`` must persist ``archived_at = None``."""
+
+    def test_reactivation_clears_archived_at(self, seller: User, category, city) -> None:
+        """Reactivating an archived ad stores a NULL ``archived_at``.
+
+        ``ck_ads_archived_at_if_archived`` is one-directional
+        (``~Q(status=ARCHIVED) | Q(archived_at__isnull=False)``): the database
+        accepts a PUBLISHED row carrying a stale ``archived_at``, so there is
+        no DB-level guard. This test is the guard — and it re-reads the row to
+        prove the value reached the database; an in-memory assertion on
+        ``ad.archived_at`` passes even when ``update_fields`` omits the field.
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        ad.transition_to(AdStatus.ARCHIVED)
+        ad.refresh_from_db()
+        assert ad.archived_at is not None
+
+        ad.transition_to(AdStatus.PUBLISHED)
+
+        # A second, independent fetch — not refresh_from_db() on the same object.
+        reloaded = Ad.objects.get(pk=ad.pk)
+        assert reloaded.status == AdStatus.PUBLISHED
+        assert reloaded.archived_at is None
+
+
+# ---------------------------------------------------------------------------
 # Mutual-exclusivity constraint (G-01)
 # ---------------------------------------------------------------------------
 

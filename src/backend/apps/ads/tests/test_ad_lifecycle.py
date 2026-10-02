@@ -5,6 +5,7 @@ Tests the Ad.transition_to() state machine directly, including:
 - Transition matrix validation (valid and invalid transitions)
 - ON_MODERATION_FAILED -> REJECTED (new matrix edge)
 - ARCHIVED -> REJECTED (forbidden)
+- The module-level ALLOWED_TRANSITIONS matrix
 
 All tests use the real ORM against PostgreSQL.
 """
@@ -13,10 +14,40 @@ from __future__ import annotations
 
 import pytest
 
+from apps.ads.models import ALLOWED_TRANSITIONS
 from apps.core.enums import AdStatus
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
+
+
+# ---------------------------------------------------------------------------
+# Tests: module-level transition matrix (AD-013)
+# ---------------------------------------------------------------------------
+
+
+class TestAllowedTransitionsModuleConstant:
+    """``ALLOWED_TRANSITIONS`` is module-level and matches the shipped matrix."""
+
+    def test_module_constant_matches_shipped_matrix(self) -> None:
+        """The seven source keys and their targets match the matrix exactly."""
+        expected: dict[AdStatus, set[AdStatus]] = {
+            AdStatus.DRAFT: {AdStatus.ON_MODERATION},
+            AdStatus.ON_MODERATION: {
+                AdStatus.PUBLISHED,
+                AdStatus.REJECTED,
+                AdStatus.ON_MODERATION_FAILED,
+            },
+            AdStatus.PUBLISHED: {AdStatus.ARCHIVED, AdStatus.ON_MODERATION},
+            AdStatus.ARCHIVED: {AdStatus.PUBLISHED, AdStatus.ON_MODERATION},
+            AdStatus.REJECTED: set(),
+            AdStatus.ON_MODERATION_FAILED: {AdStatus.REJECTED},
+            AdStatus.DELETED: set(),
+        }
+
+        assert set(ALLOWED_TRANSITIONS) == set(expected)
+        for source, targets in expected.items():
+            assert ALLOWED_TRANSITIONS[source] == targets
 
 
 # ---------------------------------------------------------------------------

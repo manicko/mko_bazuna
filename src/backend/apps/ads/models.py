@@ -22,6 +22,23 @@ from apps.currencies.enums import CurrencyCode
 from apps.lookups.enums import LookupGroupCode
 from apps.media.services.filesystem import KEY_FORMAT_REGEX
 
+# Define allowed transitions as a mapping
+ALLOWED_TRANSITIONS: dict[AdStatus, set[AdStatus]] = {
+    AdStatus.DRAFT: {AdStatus.ON_MODERATION},
+    AdStatus.ON_MODERATION: {
+        AdStatus.PUBLISHED,
+        AdStatus.REJECTED,
+        AdStatus.ON_MODERATION_FAILED,
+    },
+    AdStatus.PUBLISHED: {AdStatus.ARCHIVED, AdStatus.ON_MODERATION},
+    AdStatus.ARCHIVED: {AdStatus.PUBLISHED, AdStatus.ON_MODERATION},
+    AdStatus.REJECTED: set(),  # Terminal
+    AdStatus.ON_MODERATION_FAILED: {
+        AdStatus.REJECTED
+    },  # only human review may reject an auto-failed ad
+    AdStatus.DELETED: set(),  # Terminal
+}
+
 
 class Ad(models.Model):
     """
@@ -391,23 +408,6 @@ class Ad(models.Model):
         Raises:
             ValueError: If the transition is not allowed.
         """
-        # Define allowed transitions as a mapping
-        ALLOWED_TRANSITIONS: dict[AdStatus, set[AdStatus]] = {
-            AdStatus.DRAFT: {AdStatus.ON_MODERATION},
-            AdStatus.ON_MODERATION: {
-                AdStatus.PUBLISHED,
-                AdStatus.REJECTED,
-                AdStatus.ON_MODERATION_FAILED,
-            },
-            AdStatus.PUBLISHED: {AdStatus.ARCHIVED, AdStatus.ON_MODERATION},
-            AdStatus.ARCHIVED: {AdStatus.PUBLISHED, AdStatus.ON_MODERATION},
-            AdStatus.REJECTED: set(),  # Terminal
-            AdStatus.ON_MODERATION_FAILED: {
-                AdStatus.REJECTED
-            },  # manual review of auto-failed ads (AD-001)
-            AdStatus.DELETED: set(),  # Terminal
-        }
-
         # re-read from DB to defeat stale-state races (DB vs. bot
         # process, concurrent sweeps). Raises Ad.DoesNotExist if a hard-delete
         # sweep removed the row between caller fetch and transition.
@@ -427,7 +427,7 @@ class Ad(models.Model):
                 self.status = AdStatus.DELETED
                 self.deleted_at = timezone.now()
                 # Refresh updated_at so DELETED rows don't retain a stale
-                # "last modified" timestamp (AD-001). auto_now fields are only
+                # "last modified" timestamp. auto_now fields are only
                 # written when present in update_fields.
                 self.updated_at = timezone.now()
                 self.save(update_fields=["status", "deleted_at", "updated_at"])
@@ -459,6 +459,11 @@ class Ad(models.Model):
             if moderator_id is not None:
                 self.published_by_id = moderator_id
                 update_fields.append("published_by")
+
+            # Clear archived_at when reactivating from ARCHIVED
+            if self.archived_at is not None:
+                self.archived_at = None
+                update_fields.append("archived_at")
 
         elif target == AdStatus.ARCHIVED:
             self.archived_at = now_val
