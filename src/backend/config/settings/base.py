@@ -168,8 +168,13 @@ SESSION_COOKIE_SECURE = True
 # session id through the DOM.
 SESSION_COOKIE_HTTPONLY = True
 # Session cookie: "Lax" withholds the cookie from cross-site subrequests (a CSRF
-# defence) while still allowing top-level navigations such as the Telegram login
-# return.
+# defence) while still permitting top-level GET navigations. The Telegram login
+# return does NOT depend on that allowance: login_status is @require_POST and the
+# page's return is a same-origin fetch() POST from login_issue.html, so it is
+# same-site and the cookie is sent under any SameSite value (GET /login/status/
+# is pinned 405). The only cross-site top-level navigation in the flow is the tap
+# out to t.me, which carries no site cookies. "Lax" matches Django's default and
+# remains a deliberate choice; SameSite=Strict or False would change nothing here.
 SESSION_COOKIE_SAMESITE = "Lax"
 # Session lifetime and refresh policy, declared explicitly so the policy is
 # visible rather than implicit. 60 * 60 * 24 * 14 = 1209600 seconds (14 days),
@@ -203,9 +208,12 @@ SESSION_SAVE_EVERY_REQUEST = False
 # CSRF token cookie: sent only over HTTPS, so the token cannot be replayed from
 # a plain-HTTP downgrade.
 CSRF_COOKIE_SECURE = True
-# CSRF token cookie: hidden from document.cookie; templates pass the token to
-# forms through {% csrf_token %} rather than client-side reads. Left this way
-# because CSRF_USE_SESSIONS is unset: the token stays a cookie, not session state.
+# CSRF token cookie: hidden from document.cookie, so the token is never readable
+# from the DOM. The template delivers it instead — into forms via {% csrf_token %}
+# and into login_issue.html's poll request as the X-CSRFToken header (the masked
+# csrfmiddlewaretoken form field also rides the POST body), never via
+# document.cookie. Left this way because CSRF_USE_SESSIONS is unset: the token
+# stays a cookie, not session state.
 CSRF_COOKIE_HTTPONLY = True
 # CSRF token cookie: "Lax" allows the token on top-level cross-site navigations
 # and withholds it on cross-site subrequests.
@@ -230,9 +238,8 @@ CSRF_COOKIE_SAMESITE = "Lax"
 # Why the ``__Host-`` prefix matters: without it a sibling host on the same
 # registrable domain could set a ``Domain``-scoped cookie of the same name and
 # supply the client-chosen value the binding gate compares against. The prefix
-# restricts the cookie to a host-only, ``Secure``, ``Path=/`` origin, which the
-# full rationale in login_token.py documents; this setting is the single switch
-# that turns it on.
+# restricts the cookie to a host-only, ``Secure``, ``Path=/`` origin; the full
+# rationale is in login_token.py.
 LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX = True
 
 # Trusted origins for CSRF protection (Origin/Referer header validation).
