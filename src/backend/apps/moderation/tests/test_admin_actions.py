@@ -500,7 +500,7 @@ class TestBulkOperations:
             self_ad: Ad,
             target: AdStatus,
             moderator_id: int | None = None,
-        ) -> None:
+        ) -> AdStatus:
             if self_ad.pk == vanished_pk:
                 raise Ad.DoesNotExist("Ad matching query does not exist.")
             return original_transition_to(self_ad, target, moderator_id=moderator_id)

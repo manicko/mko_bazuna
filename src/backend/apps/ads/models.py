@@ -396,7 +396,7 @@ class Ad(models.Model):
         self,
         target: AdStatus,
         moderator_id: int | None = None,
-    ) -> None:
+    ) -> AdStatus:
         """
         Transition ad to target status with validation and timer side-effects.
 
@@ -416,9 +416,17 @@ class Ad(models.Model):
         - -> REJECTED: rejected_at = now()
         - -> ON_MODERATION: clears moderation_failed_at, rejected_at, archived_at
 
+        Returns the **source** status read at the top of the call (after
+        ``refresh_from_db``). Callers that need to detect a no-op — the status
+        was already the target when the transition ran — compare the returned
+        source against ``target``; no audit row is written on an equality.
+
         Args:
             target: The target AdStatus to transition to.
             moderator_id: Optional moderator ID for PUBLISHED/REJECTED transitions.
+
+        Returns:
+            The source ``AdStatus`` the ad held before the transition.
 
         Raises:
             ValueError: If the transition is not allowed.
@@ -438,15 +446,14 @@ class Ad(models.Model):
 
         # any -> DELETED is always allowed
         if target == AdStatus.DELETED:
-            if current != AdStatus.DELETED:
-                self.status = AdStatus.DELETED
-                self.deleted_at = timezone.now()
-                # Refresh updated_at so DELETED rows don't retain a stale
-                # "last modified" timestamp. auto_now fields are only
-                # written when present in update_fields.
-                self.updated_at = timezone.now()
-                self.save(update_fields=["status", "deleted_at", "updated_at"])
-            return
+            self.status = AdStatus.DELETED
+            self.deleted_at = timezone.now()
+            # Refresh updated_at so DELETED rows don't retain a stale
+            # "last modified" timestamp. auto_now fields are only
+            # written when present in update_fields.
+            self.updated_at = timezone.now()
+            self.save(update_fields=["status", "deleted_at", "updated_at"])
+            return current
 
         # Validate transition against allowed matrix
         allowed_targets = ALLOWED_TRANSITIONS.get(current, set())
@@ -520,6 +527,7 @@ class Ad(models.Model):
 
         self.status = target
         self.save(update_fields=update_fields)
+        return current
 
     def get_title(self, locale: str = LanguageLocale.RUSSIAN) -> str:
         """Return localized title for *locale* with a fallback to the Russian base.
