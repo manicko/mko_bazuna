@@ -421,9 +421,10 @@ def login_status(request: HttpRequest) -> HttpResponse:
     Returns:
         HttpResponse 200 — token consumed, session established (session cookie set)
         HttpResponse 204 — pending (bot has not claimed the token yet)
-        HttpResponse 410 — gone (token invalid, expired, already consumed, user
-            banned, account disabled, or the presented browser binding does not
-            match the issuing one — ``UNBOUND``, which shares this status
+        HttpResponse 410 — gone (token invalid, expired, already consumed,
+            superseded by a later issue from the same browser, user banned,
+            account disabled, or the presented browser binding does not match
+            the issuing one — ``UNBOUND``, which shares this status
             deliberately so the response is not an oracle for *which* cause)
     """
     raw_token = request.POST.get("token", "")

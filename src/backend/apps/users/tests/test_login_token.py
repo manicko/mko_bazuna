@@ -24,6 +24,7 @@ Honest limits (stated, not skipped):
 from __future__ import annotations
 
 import hashlib
+import logging
 import re
 from datetime import timedelta
 from pathlib import Path
@@ -185,11 +186,13 @@ class TestIssueTokenSupersession:
     def test_second_token_stays_claimable_and_consumable(self) -> None:
         """The token created *after* the UPDATE must survive it.
 
-        This is the only test that catches an ``UPDATE`` mistakenly placed
-        *after* the ``create``: a later ``UPDATE`` can only burn rows that
-        already existed, so the just-created row would itself be
-        superseded — the second token would read ``GONE`` rather than
-        ``CONSUMED``, and every login would break.
+        Its distinctive failure mode is ``the freshly created token is already
+        dead``: a later ``UPDATE`` can only burn rows that already existed, so
+        the just-created row would itself be superseded and read ``GONE``
+        rather than ``CONSUMED``. Reversing the order fails several of the new
+        tests, so this is not the only order-sensitive test — it is the one
+        that isolates *that* consequence (the surviving token being burned by
+        the issue that minted it), which the others do not.
         """
         from apps.users.services.login_token import (
             ConsumeOutcome,
@@ -252,11 +255,40 @@ class TestIssueTokenSupersession:
         assert result.outcome is ConsumeOutcome.CONSUMED
         assert result.telegram_id == 700000103
 
-    def test_supersession_ignores_null_bindings(self) -> None:
-        """A ``NULL``-binding row is not burned: no ``OR browser_binding IS NULL``.
+    def test_supersession_leaves_a_live_null_binding_row_claimable(self) -> None:
+        """An *unclaimed* ``NULL``-binding row survives an issue.
+
+        This is the assertion that pins ``G-4g`` and genuinely discriminates a
+        forbidden ``OR browser_binding IS NULL`` disjunct: such a disjunct would
+        burn this row, so the post-issue ``claim_token`` would return ``None``.
+
+        The observation is deliberately ``claim_token(...) is not None`` after
+        the issue, *not* ``consume_token``: an unclaimed ``NULL`` row reads
+        ``PENDING`` (the binding gate sits after the ``PENDING`` check), so it
+        never reaches ``UNBOUND`` and cannot be asserted through
+        ``consume_token``. Claiming the row first would make the ``UNBOUND``
+        assertion possible but destroy the discriminating power, because
+        ``telegram_id__isnull=True`` shields a claimed row from any
+        ``browser_binding`` disjunct.
+        """
+        from apps.users.services.login_token import claim_token, issue_token
+
+        raw = "o" * 32
+        unbound = _make_token(raw)
+        LoginToken.objects.filter(pk=unbound.pk).update(browser_binding=None)
+
+        issue_token(browser_id=_BROWSER_ID)
+
+        # The live NULL-binding row was not burned: the bot can still claim it.
+        assert claim_token(unbound.token_hash, 700000104, timezone.now()) is not None
+
+    def test_supersession_does_not_burn_a_claimed_null_binding_row(self) -> None:
+        """A *claimed* ``NULL``-binding row is not burned by an issue.
 
         Supersession is scoped to the issuing browser only; a legacy/unbound
-        row is already unredeemable (``UNBOUND``) and must be left as-is.
+        row is already unredeemable (``UNBOUND``) and must be left as-is. This
+        row is claimed first so ``consume_token`` reaches the binding gate (an
+        unclaimed row would read ``PENDING`` before the gate is consulted).
         """
         from apps.users.services.login_token import (
             ConsumeOutcome,
@@ -280,6 +312,43 @@ class TestIssueTokenSupersession:
         assert result.outcome is ConsumeOutcome.UNBOUND
         unbound.refresh_from_db()
         assert unbound.consumed_at is None
+
+    def test_supersession_log_leaks_no_raw_identifiers(self, caplog) -> None:
+        """The supersession ``logger.info`` line carries no raw identifiers.
+
+        The line ships to production (``prod.py`` sets the ``apps`` logger to
+        ``INFO``) but emits nothing under test (``test.py`` defines no
+        ``LOGGING`` dict, so the root logger is ``WARNING``). Forcing the
+        service logger's level makes that production-visible line observable on
+        an unauthenticated, rate-limit-only endpoint. It is placed here, not in
+        ``test_consent.py::TestLoginStatusNoPii``: the emitter is
+        ``apps.users.services.login_token``'s ``issue_token``, not the view, so
+        coupling the assertion to a ``login_status`` HTTP round trip would
+        misattribute the guard.
+        """
+        from apps.users.services.login_token import issue_token
+
+        known_telegram_id = 700000105
+        # A claimed row on this binding: it exists (and carries a raw
+        # ``telegram_id``) but must never be superseded or named in the line.
+        claimed = _make_token("p" * 32, telegram_id=known_telegram_id)
+        assert claimed.telegram_id == known_telegram_id
+
+        # One live unclaimed row for this binding, so the issue supersedes one.
+        live = issue_token(browser_id=_BROWSER_ID)
+
+        with caplog.at_level(
+            logging.INFO, logger="apps.users.services.login_token"
+        ):
+            superseding = issue_token(browser_id=_BROWSER_ID)
+
+        # The line is emitted and reports exactly the one superseded row.
+        assert "superseded 1 prior unclaimed token(s)" in caplog.text
+        # Neither raw token, nor the raw browser id, nor any telegram_id leaks.
+        assert live.raw_token not in caplog.text
+        assert superseding.raw_token not in caplog.text
+        assert _BROWSER_ID not in caplog.text
+        assert str(known_telegram_id) not in caplog.text
 
 
 # ---------------------------------------------------------------------------

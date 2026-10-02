@@ -466,7 +466,10 @@ The predicate is bounded by `TOKEN_TTL_SECONDS` (≤300 s): at most one unclaime
 row per browser can be live at a time, and any row the supersession misses
 expires within the window. The framing is **one live unclaimed token per browser
 profile**, not "one live token per user": `telegram_id` is `NULL` at issue time,
-so a per-user invariant is not expressible here.
+so a per-user invariant is not expressible here. The likeliest real-world
+trigger is a **second tab of the same profile**: opening `/login/issue/` there
+silently supersedes the first tab's still-live unclaimed token, so only the
+second tab's deep-link stays redeemable.
 
 ## Bot Command Menu
 
