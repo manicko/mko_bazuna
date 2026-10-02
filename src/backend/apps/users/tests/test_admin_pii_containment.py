@@ -5,6 +5,15 @@ Guards PII-001 / VAL-001: no admin list_display helper may render the raw
 external ``telegram_id`` identifier. All four affected helpers must instead
 render a non-identifying value (``str(obj.user)`` = "User <pk>" for the
 User-FK helpers; ``mask_telegram_id(...)`` for the standalone LoginToken).
+
+Residual limit of this guard (06-PII-106): it enumerates masking helpers and
+asserts what each one *does*, so it cannot catch a future admin that renders a
+raw identity column **without** a helper — a new raw column added directly to
+``list_display`` is simply not enumerated. This is the same class of limit the
+PII-001 guard already has. Do not "simplify" this module into a blanket ban on
+the ``telegram_id`` token: docstrings here legitimately name the field in prose
+and ``SupportContactAdmin.telegram_id`` is a configured support-channel id, not
+a data subject's, so a token ban would false-positive on correct code.
 """
 
 from __future__ import annotations
@@ -65,6 +74,28 @@ def test_login_token_list_display_masks_telegram_id() -> None:
     assert "telegram_id_display" in LoginTokenAdmin.list_display
     # The display method delegates to mask_telegram_id (VAL-001)
     source = inspect.getsource(LoginTokenAdmin.telegram_id_display)
+    assert "mask_telegram_id" in source
+    assert "obj.telegram_id" in source
+
+
+def test_support_ticket_chat_id_display_masks_identifier() -> None:
+    """``SupportTicketAdmin.chat_id_display`` delegates to the mask helper (06-PII-106)."""
+    from apps.core.admin import SupportTicketAdmin
+
+    assert "chat_id" not in SupportTicketAdmin.list_display
+    assert "chat_id_display" in SupportTicketAdmin.list_display
+    source = inspect.getsource(SupportTicketAdmin.chat_id_display)
+    assert "mask_telegram_id" in source
+    assert "obj.chat_id" in source
+
+
+def test_support_ticket_telegram_id_display_masks_identifier() -> None:
+    """``SupportTicketAdmin.telegram_id_display`` delegates to the mask helper (06-PII-106)."""
+    from apps.core.admin import SupportTicketAdmin
+
+    assert "telegram_id" not in SupportTicketAdmin.list_display
+    assert "telegram_id_display" in SupportTicketAdmin.list_display
+    source = inspect.getsource(SupportTicketAdmin.telegram_id_display)
     assert "mask_telegram_id" in source
     assert "obj.telegram_id" in source
 

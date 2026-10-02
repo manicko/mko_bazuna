@@ -7,6 +7,7 @@ SiteConfig singleton editing with add/delete disabled.
 from django.contrib import admin
 
 from apps.core.models import SiteConfig, SupportContact, SupportTicket
+from apps.core.utils.sanitize import mask_telegram_id
 
 
 @admin.register(SiteConfig)
@@ -53,9 +54,9 @@ class SupportTicketAdmin(admin.ModelAdmin):
     filter them. Add/delete are disabled to preserve the audit trail.
     """
 
-    list_display = ["ticket_ref", "status", "user", "chat_id", "telegram_id", "created_at"]
+    list_display = ["ticket_ref", "status", "user", "chat_id_display", "telegram_id_display", "created_at"]
     list_filter = ["status", "created_at"]
-    search_fields = ["ticket_ref", "telegram_id", "username", "text"]
+    search_fields = ["ticket_ref", "telegram_id", "username"]
     readonly_fields = [
         "ticket_ref",
         "chat_id",
@@ -73,3 +74,13 @@ class SupportTicketAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None) -> bool:
         # Audit trail preservation
         return False
+
+    @admin.display(description="Chat ID (masked)", ordering="chat_id")
+    def chat_id_display(self, obj: SupportTicket) -> str:
+        """Render the masked Telegram chat ID of the requester (06-PII-106)."""
+        return mask_telegram_id(obj.chat_id)
+
+    @admin.display(description="Telegram ID (masked)", ordering="telegram_id")
+    def telegram_id_display(self, obj: SupportTicket) -> str:
+        """Render the masked Telegram ID of the requester (06-PII-106)."""
+        return mask_telegram_id(obj.telegram_id)
