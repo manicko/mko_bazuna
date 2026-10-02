@@ -1568,6 +1568,31 @@ msgstr "Черновик объявления истёк и был удалён.
 msgid "This ad cannot be edited in its current status."
 msgstr "Это объявление нельзя редактировать в его текущем статусе."
 
+#: src/telegram_bot/handlers/ad_create/submit.py
+msgid ""
+"Your draft was no longer available, so it was replaced with a fresh one. "
+"Press confirm again to submit."
+msgstr ""
+"Ваш черновик больше недоступен, поэтому он был заменён новым. Нажмите "
+"«подтвердить» ещё раз, чтобы отправить."
+
+#: src/telegram_bot/handlers/ad_create/submit.py
+msgid ""
+"Your ad could not be submitted from its current state. A fresh draft was "
+"prepared — press confirm again to submit."
+msgstr ""
+"Ваше объявление не удалось отправить из текущего состояния. Подготовлен "
+"новый черновик — нажмите «подтвердить» ещё раз, чтобы отправить."
+
+#: src/telegram_bot/handlers/ad_create/submit.py
+msgid ""
+"One of your photos is no longer available. A fresh draft was prepared — "
+"please upload the missing photo again, then send 'done'."
+msgstr ""
+"Одна из ваших фотографий больше недоступна. Подготовлен новый черновик — "
+"загрузите отсутствующую фотографию снова, затем отправьте «done»."
+
+
 #~ msgid ""
 #~ "We need your consent to process the Telegram name and username you "
 #~ "provided for account identification and ad publishing.\n"

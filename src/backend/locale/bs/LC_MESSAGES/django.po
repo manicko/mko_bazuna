@@ -1549,6 +1549,31 @@ msgstr "Vaš nacrt oglasa je istekao i obrisan. Molimo ponovo pokrenite /post."
 msgid "This ad cannot be edited in its current status."
 msgstr "Ovaj oglas se ne može uređivati u trenutnom statusu."
 
+#: src/telegram_bot/handlers/ad_create/submit.py
+msgid ""
+"Your draft was no longer available, so it was replaced with a fresh one. "
+"Press confirm again to submit."
+msgstr ""
+"Vaš nacrt više nije bio dostupan, pa je zamijenjen novim. Pritisnite "
+"„potvrdi“ ponovo da pošaljete."
+
+#: src/telegram_bot/handlers/ad_create/submit.py
+msgid ""
+"Your ad could not be submitted from its current state. A fresh draft was "
+"prepared — press confirm again to submit."
+msgstr ""
+"Vaš oglas nije bilo moguće poslati iz trenutnog stanja. Pripremljen je novi "
+"nacrt — pritisnite „potvrdi“ ponovo da pošaljete."
+
+#: src/telegram_bot/handlers/ad_create/submit.py
+msgid ""
+"One of your photos is no longer available. A fresh draft was prepared — "
+"please upload the missing photo again, then send 'done'."
+msgstr ""
+"Jedna od vaših fotografija više nije dostupna. Pripremljen je novi nacrt — "
+"ponovo učitajte fotografiju koja nedostaje, zatim pošaljite „done“."
+
+
 #~ msgid ""
 #~ "We need your consent to process the Telegram name and username you "
 #~ "provided for account identification and ad publishing.\n"

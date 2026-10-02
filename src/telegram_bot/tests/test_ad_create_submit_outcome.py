@@ -1,16 +1,23 @@
-"""Bot-level failure branch for ``process_preview`` (AD-016).
+"""Bot-level failure branches for ``process_preview`` (AD-016).
 
 Before AD-016 the bot had no test at all for ``process_preview``'s failure
 branch, and a gone draft was reported as a moderation failure and then
-destroyed the dialog via ``state.clear()``.  These tests pin the fixed
-behaviour:
+destroyed the dialog via ``state.clear()``.  The recovery branch now names three
+distinct non-content outcomes, each with its own accurate reply:
 
-- ``DRAFT_GONE`` does **not** clear the FSM state and **re-points** ``ad_id``
-  at a fresh draft (the typed dialog is the only remaining copy);
-- a genuine content failure still clears the state and renders the moderation
-  message (the fix must not make the bot non-recoverable either way);
-- the expired-draft reply is the already-shipped, already-translated string and
-  does not blame the seller's content.
+- ``DRAFT_GONE`` — the draft row no longer existed;
+- ``INVALID_TRANSITION`` — the row existed but the state machine refused the
+  transition (it is REJECTED/DELETED, not expired);
+- ``PHOTO_UNAVAILABLE`` — the draft still exists; a staged photo file was
+  reaped.
+
+All three keep the FSM data and **re-point** ``ad_id`` at a fresh draft (the
+typed dialog is the only remaining copy).  ``PHOTO_UNAVAILABLE`` additionally
+clears the stale photo list and returns the seller to the photos step, because
+re-confirming with photo keys whose files are gone loops forever.
+
+A genuine content failure still clears the state and renders the moderation
+message (the fix must not make the bot non-recoverable either way).
 """
 
 from __future__ import annotations
@@ -26,6 +33,22 @@ pytestmark = [
     pytest.mark.integration,
     pytest.mark.xdist_group("bot_concurrent"),
 ]
+
+# The exact, source-defined replies.  Pinned here so a silent reword is caught;
+# the catalogs' non-empty ru/bs coverage is guarded repo-wide by
+# ``test_i18n_completeness.py`` (no per-string duplication here).
+_DRAFT_GONE_REPLY = (
+    "Your draft was no longer available, so it was replaced with a fresh one. "
+    "Press confirm again to submit."
+)
+_INVALID_TRANSITION_REPLY = (
+    "Your ad could not be submitted from its current state. A fresh draft was "
+    "prepared — press confirm again to submit."
+)
+_PHOTO_UNAVAILABLE_REPLY = (
+    "One of your photos is no longer available. A fresh draft was prepared — "
+    "please upload the missing photo again, then send 'done'."
+)
 
 
 def _build_message(text: str = "confirm", language_code: str | None = "en-US"):
@@ -48,11 +71,29 @@ def _build_state(data: dict) -> MagicMock:
     state.clear = AsyncMock()
     state.update = AsyncMock()
     state.update_data = AsyncMock()
+    state.set_state = AsyncMock()
     return state
 
 
 async def _mock_translate(text: str, target_locales: list[str]) -> dict[str, str]:
     return {loc: f"{text}-{loc}" for loc in target_locales}
+
+
+def _preview_data(seller, category, city, **overrides) -> dict:
+    """Build the FSM data a preview confirm carries."""
+    data = {
+        "ad_id": 999_999_999,
+        "title": "Naslov oglasa",
+        "description": "Opis oglasa dovoljne dužine za test.",
+        "price_amount": 100,
+        "price_currency": "EUR",
+        "photos": [],
+        "user_id": seller.id,
+        "category_id": category.id,
+        "city_id": city.id,
+    }
+    data.update(overrides)
+    return data
 
 
 class TestProcessPreviewOutcomes:
@@ -70,17 +111,7 @@ class TestProcessPreviewOutcomes:
         """
         from telegram_bot.handlers.ad_create import process_preview
 
-        data = {
-            "ad_id": 999_999_999,  # absent → DRAFT_GONE
-            "title": "Naslov oglasa",
-            "description": "Opis oglasa dovoljne dužine za test.",
-            "price_amount": 100,
-            "price_currency": "EUR",
-            "photos": [],
-            "user_id": seller.id,
-            "category_id": category.id,
-            "city_id": city.id,
-        }
+        data = _preview_data(seller, category, city)  # absent id → DRAFT_GONE
         state = _build_state(data)
         message = _build_message()
 
@@ -104,23 +135,13 @@ class TestProcessPreviewOutcomes:
         assert ad.user_id == seller.id
 
     @pytest.mark.asyncio
-    async def test_draft_gone_reply_is_the_shipped_string_not_a_content_blame(
+    async def test_draft_gone_reply_is_its_own_string_not_a_content_blame(
         self, seller, category, city
     ) -> None:
-        """The expired reply is the shipped message and does not blame content."""
+        """The ``DRAFT_GONE`` reply names the cause and does not blame content."""
         from telegram_bot.handlers.ad_create import process_preview
 
-        data = {
-            "ad_id": 999_999_999,
-            "title": "Naslov oglasa",
-            "description": "Opis oglasa dovoljne dužine za test.",
-            "price_amount": 100,
-            "price_currency": "EUR",
-            "photos": [],
-            "user_id": seller.id,
-            "category_id": category.id,
-            "city_id": city.id,
-        }
+        data = _preview_data(seller, category, city)
         state = _build_state(data)
         message = _build_message()
 
@@ -131,12 +152,125 @@ class TestProcessPreviewOutcomes:
             await process_preview(message, state)
 
         rendered = str(message.answer.await_args.args[0])
-        assert rendered == (
-            "Your draft expired and was deleted. Please start again with /post."
-        )
+        assert rendered == _DRAFT_GONE_REPLY
         # It must not be the moderation blame, nor the raw service reason.
         assert "moderation" not in rendered.lower()
         assert "Ad not found" not in rendered
+
+    @pytest.mark.asyncio
+    async def test_each_non_content_outcome_renders_its_own_message(
+        self, seller, category, city
+    ) -> None:
+        """Each outcome renders a distinct, accurate reply.
+
+        ``DRAFT_GONE`` vs ``INVALID_TRANSITION`` vs ``PHOTO_UNAVAILABLE`` must
+        not collapse onto one string; none of them may claim the draft "was
+        deleted" (false for ``PHOTO_UNAVAILABLE``, which never reaches the
+        transaction, and misleading for ``INVALID_TRANSITION``, whose row is
+        REJECTED/DELETED).
+        """
+        from apps.ads.services.submission import (
+            SubmitAdOutcome,
+            SubmitAdResult,
+        )
+        from telegram_bot.handlers.ad_create import process_preview
+
+        expected = {
+            SubmitAdOutcome.DRAFT_GONE: _DRAFT_GONE_REPLY,
+            SubmitAdOutcome.INVALID_TRANSITION: _INVALID_TRANSITION_REPLY,
+            SubmitAdOutcome.PHOTO_UNAVAILABLE: _PHOTO_UNAVAILABLE_REPLY,
+        }
+
+        for outcome, expected_reply in expected.items():
+            state = _build_state(_preview_data(seller, category, city))
+            message = _build_message()
+
+            with (
+                patch(
+                    "telegram_bot.handlers.ad_create.submit.translate_all_languages",
+                    _mock_translate,
+                ),
+                patch(
+                    "telegram_bot.handlers.ad_create.submit.submit_ad",
+                    return_value=SubmitAdResult(outcome, []),
+                ),
+            ):
+                await process_preview(message, state)
+
+            rendered = str(message.answer.await_args.args[0])
+            assert rendered == expected_reply, (
+                f"{outcome.value!r} rendered the wrong message: {rendered!r}"
+            )
+            assert "was deleted" not in rendered, (
+                f"{outcome.value!r} must not claim the draft was deleted"
+            )
+
+    @pytest.mark.asyncio
+    async def test_photo_unavailable_repeated_confirms_do_not_loop(
+        self, seller, category, city
+    ) -> None:
+        """Repeated confirms on ``PHOTO_UNAVAILABLE`` stay bounded.
+
+        A stale photo list would make every re-confirm hit the missing-file
+        branch again, creating and discarding a DRAFT forever. The fix clears
+        ``photos`` and sends the seller to the photos step, so the second
+        attempt reaches the photo branch (not another preview submission) and
+        the fresh DRAFT is real.
+        """
+        from apps.ads.services.submission import (
+            SubmitAdOutcome,
+            SubmitAdResult,
+        )
+        from telegram_bot.handlers.ad_create import AdCreateForm, process_preview
+
+        data = _preview_data(
+            seller,
+            category,
+            city,
+            photos=[
+                {"storage_key": "staging/gone", "telegram_file_id": "f", "position": 0}
+            ],
+        )
+        state = _build_state(data)
+        message = _build_message()
+
+        with (
+            patch(
+                "telegram_bot.handlers.ad_create.submit.translate_all_languages",
+                _mock_translate,
+            ),
+            patch(
+                "telegram_bot.handlers.ad_create.submit.submit_ad",
+                return_value=SubmitAdResult(SubmitAdOutcome.PHOTO_UNAVAILABLE, []),
+            ),
+        ):
+            await process_preview(message, state)
+            first_update = state.update.await_args.args[0]
+            first_ad_id = first_update["ad_id"]
+            # The stale photo list is cleared and the FSM re-pointed at photos.
+            assert first_update["photos"] == []
+            state.set_state.assert_awaited_with(AdCreateForm.photos)
+
+            # The cleared state is what the next attempt sees: no stale photo
+            # keys, so a re-confirm cannot loop on the missing file.
+            data_after_first = {**data, **first_update}
+            state.get_data = AsyncMock(return_value=data_after_first)
+            state.update.reset_mock()
+            await process_preview(message, state)
+            second_ad_id = state.update.await_args.args[0]["ad_id"]
+
+        assert second_ad_id != first_ad_id, "a fresh draft must be created each time"
+
+        from asgiref.sync import sync_to_async
+
+        from apps.ads.models import Ad
+
+        # Bounded: exactly one live DRAFT for the user (create_draft_ad replaces
+        # the prior one), never an ever-growing tail from an unbounded loop.
+        drafts = await sync_to_async(list)(
+            Ad.objects.filter(user_id=seller.id, status=AdStatus.DRAFT)
+        )
+        assert len(drafts) == 1
 
     @pytest.mark.asyncio
     async def test_moderation_failed_clears_state(
@@ -149,18 +283,7 @@ class TestProcessPreviewOutcomes:
         )
         from telegram_bot.handlers.ad_create import process_preview
 
-        data = {
-            "ad_id": 1,
-            "title": "Valid Title",
-            "description": "Valid description text for the ad.",
-            "price_amount": 100,
-            "price_currency": "EUR",
-            "photos": [],
-            "user_id": seller.id,
-            "category_id": category.id,
-            "city_id": city.id,
-        }
-        state = _build_state(data)
+        state = _build_state(_preview_data(seller, category, city, ad_id=1))
         message = _build_message()
 
         with (
@@ -182,40 +305,22 @@ class TestProcessPreviewOutcomes:
         state.update.assert_not_awaited()
 
 
-class TestExpiredDraftStringIsShipped:
-    """The expired-draft condition reuses the existing, translated msgid."""
+class TestDeprecatedExpiredStringIsNotReintroduced:
+    """The catch-all expired-draft string must not be revived.
 
-    def test_expired_msgid_has_ru_and_bs_translations(self) -> None:
-        """``django.po`` carries non-empty ``ru``/``bs`` for the shipped string.
-
-        Guards against authoring a *second* string for the same condition: the
-        catalog must still hold exactly the one shipped msgid with both
-        non-empty translations.
-        """
-        from pathlib import Path
-
-        from django.conf import settings
-
-        msgid = (
-            "Your draft expired and was deleted. Please start again with /post."
-        )
-        locale_root = Path(settings.LOCALE_PATHS[0])
-        assert locale_root.is_dir(), f"locale root not found: {locale_root}"
-
-        translations = {
-            "ru": "Черновик объявления истёк и был удалён. Пожалуйста, начните заново командой /post.",
-            "bs": "Vaš nacrt oglasa je istekao i obrisan. Molimo ponovo pokrenite /post.",
-        }
-        for locale, expected in translations.items():
-            po_path = locale_root / locale / "LC_MESSAGES" / "django.po"
-            text = po_path.read_text(encoding="utf-8")
-            assert f'msgid "{msgid}"' in text, f"missing msgid in {locale}"
-            assert f'msgstr "{expected}"' in text, (
-                f"missing non-empty {locale} translation for the shipped msgid"
-            )
+    It was replaced by three per-outcome messages. This guard keeps the
+    catalogs from accumulating a *second* expired-draft msgid; the repo-wide
+    ``test_i18n_completeness.py`` already guards ru/bs non-empty coverage, so
+    the per-string translation check is deliberately not duplicated here.
+    """
 
     def test_no_second_expired_string_exists(self) -> None:
-        """Only one msgid mentions 'draft expired' across the catalogs."""
+        """At most one msgid mentions 'draft expired' across the catalogs.
+
+        The deprecated string may still exist as a single orphaned catalog
+        entry (``makemessages`` has not swept it yet); a second one would mean
+        the old catch-all was reintroduced alongside the per-outcome messages.
+        """
         from pathlib import Path
 
         from django.conf import settings
@@ -229,7 +334,8 @@ class TestExpiredDraftStringIsShipped:
                 for line in text.splitlines()
                 if line.startswith("msgid ") and "draft expired" in line.lower()
             ]
-            assert len(active_lines) == 1, (
-                f"expected exactly one expired-draft msgid in {locale}, "
+            assert len(active_lines) <= 1, (
+                f"expected at most one expired-draft msgid in {locale}, "
                 f"found {len(active_lines)}"
             )
+

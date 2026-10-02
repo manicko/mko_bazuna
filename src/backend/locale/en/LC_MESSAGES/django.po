@@ -1423,3 +1423,21 @@ msgstr ""
 #: src/backend/apps/ads/views/edit.py
 msgid "This ad cannot be edited in its current status."
 msgstr ""
+
+#: src/telegram_bot/handlers/ad_create/submit.py
+msgid ""
+"Your draft was no longer available, so it was replaced with a fresh one. "
+"Press confirm again to submit."
+msgstr ""
+
+#: src/telegram_bot/handlers/ad_create/submit.py
+msgid ""
+"Your ad could not be submitted from its current state. A fresh draft was "
+"prepared — press confirm again to submit."
+msgstr ""
+
+#: src/telegram_bot/handlers/ad_create/submit.py
+msgid ""
+"One of your photos is no longer available. A fresh draft was prepared — "
+"please upload the missing photo again, then send 'done'."
+msgstr ""

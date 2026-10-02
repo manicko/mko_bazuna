@@ -17,7 +17,7 @@ from aiogram import types
 from aiogram.fsm.context import FSMContext
 from asgiref.sync import sync_to_async
 from django.db import OperationalError
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, gettext_lazy as _lazy
 
 from apps.ads.services.submission import (
     SubmitAdInput,
@@ -37,6 +37,45 @@ from telegram_bot.services.ad_data import (
 from .entry import cmd_cancel
 
 logger = logging.getLogger(__name__)
+
+
+# One accurate reply per non-content outcome. The outcomes share a recovery
+# shape (the draft is replaced and the FSM is re-pointed), but they are not the
+# same fact, so they do not share one string:
+#
+# * ``DRAFT_GONE``: the draft row no longer exists (reaped by ``sweep_drafts``
+#   or deleted by a concurrent ``/post``).
+# * ``INVALID_TRANSITION``: the row still exists but is REJECTED/DELETED, so the
+#   state machine refuses DRAFT -> ON_MODERATION.
+# * ``PHOTO_UNAVAILABLE``: the draft still exists; the staged photo file was
+#   reaped. This is the one outcome that must send the seller back to the
+#   photos step, because the FSM still holds photo keys whose files are gone —
+#   a plain re-confirm would re-read the missing file and loop.
+#
+# The deprecated single string ("Your draft expired and was deleted. Please
+# start again with /post.") is intentionally dropped from the source: it is
+# false for two of the three outcomes and it told the seller to start over with
+# /post even though the code had just created a fresh DRAFT. Its msgid stays in
+# the catalogs as an orphaned entry until the next ``makemessages`` sweep.
+#
+# ``gettext_lazy`` (not ``gettext``) is required: these are module-level
+# constants evaluated at import time, when no request locale is active. Eager
+# ``gettext`` would freeze every reply to the import-time language; the lazy
+# proxy resolves under the seller's locale when the message is rendered below.
+_NON_CONTENT_REPLIES: dict[SubmitAdOutcome, object] = {
+    SubmitAdOutcome.DRAFT_GONE: _lazy(
+        "Your draft was no longer available, so it was replaced with a fresh "
+        "one. Press confirm again to submit."
+    ),
+    SubmitAdOutcome.INVALID_TRANSITION: _lazy(
+        "Your ad could not be submitted from its current state. A fresh draft "
+        "was prepared — press confirm again to submit."
+    ),
+    SubmitAdOutcome.PHOTO_UNAVAILABLE: _lazy(
+        "One of your photos is no longer available. A fresh draft was prepared "
+        "— please upload the missing photo again, then send 'done'."
+    ),
+}
 
 
 @router.message(AdCreateForm.preview)
@@ -152,19 +191,20 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
             # INVALID_TRANSITION the row is DELETED, not DRAFT. A replaced
             # ad_id makes the next confirm target a live row.
             #
-            # The draft-expired string is the already-shipped, already-
-            # translated message; the row-existence probe it used to require is
-            # gone because submit_ad now names the outcome.
-            new_ad = await create_draft_ad(data["user_id"])
+            # PHOTO_UNAVAILABLE additionally clears the stale photo list: the
+            # FSM still holds keys whose staged files are gone, so a plain
+            # re-confirm would re-read the missing file and loop indefinitely,
+            # creating and discarding a DRAFT each time. Send the seller back to
+            # the photos step instead, where they can re-upload.
+            new_ad = await create_draft_ad(data.get("user_id"))
 
-            await state.update({"ad_id": new_ad.id})
+            if result.outcome is SubmitAdOutcome.PHOTO_UNAVAILABLE:
+                await state.update({"ad_id": new_ad.id, "photos": []})
+                await state.set_state(AdCreateForm.photos)
+            else:
+                await state.update({"ad_id": new_ad.id})
 
-            await message.answer(
-                _(
-                    "Your draft expired and was deleted. "
-                    "Please start again with /post."
-                )
-            )
+            await message.answer(str(_NON_CONTENT_REPLIES[result.outcome]))
 
             return
 

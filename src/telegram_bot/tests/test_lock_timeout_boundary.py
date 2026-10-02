@@ -218,10 +218,10 @@ class TestProcessPreviewLocalisedErrors:
 
         Drives the real ``submit_ad`` against a non-existent ad id (the
         ``DRAFT_GONE`` outcome) through the real ``process_preview``. The seller
-        gets the dedicated, already-translated draft-expired message — asserted
-        here in the Russian catalogue value, and provably not the untranslated
-        literal and not ``"Ad not found"``. The state is NOT cleared; it is
-        re-pointed at a fresh draft instead.
+        gets the dedicated, translated ``DRAFT_GONE`` message — asserted here in
+        the Russian catalogue value, and provably not the untranslated literal
+        and not ``"Ad not found"``. The state is NOT cleared; it is re-pointed at
+        a fresh draft instead.
         """
         from telegram_bot.handlers.ad_create import process_preview
 
@@ -242,8 +242,8 @@ class TestProcessPreviewLocalisedErrors:
         message.answer.assert_awaited()
         rendered = str(message.answer.await_args.args[0])
         assert rendered == (
-            "Черновик объявления истёк и был удалён. "
-            "Пожалуйста, начните заново командой /post."
+            "Ваш черновик больше недоступен, поэтому он был заменён новым. "
+            "Нажмите «подтвердить» ещё раз, чтобы отправить."
         )
         assert rendered != "Ad not found"
         # AD-016: the non-destructive outcome re-points instead of clearing.
@@ -256,7 +256,7 @@ class TestProcessPreviewLocalisedErrors:
     async def test_moderation_failure_is_rendered_in_bosnian(
         self, seller, category, city
     ) -> None:
-        """The same draft-expired message reaches a bs seller in Bosnian."""
+        """The same ``DRAFT_GONE`` message reaches a bs seller in Bosnian."""
         from telegram_bot.handlers.ad_create import process_preview
 
         data = self._payload(seller, category, city)
@@ -275,7 +275,8 @@ class TestProcessPreviewLocalisedErrors:
 
         rendered = str(message.answer.await_args.args[0])
         assert rendered == (
-            "Vaš nacrt oglasa je istekao i obrisan. Molimo ponovo pokrenite /post."
+            "Vaš nacrt više nije bio dostupan, pa je zamijenjen novim. "
+            "Pritisnite „potvrdi“ ponovo da pošaljete."
         )
         assert rendered != "Ad not found"
 
