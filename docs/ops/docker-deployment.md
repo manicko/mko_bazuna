@@ -358,6 +358,7 @@ The production override file (`docker-compose.prod.yml`) includes:
 | `BOT_USERNAME` | Yes (prod) | Telegram handle without `@`; 3-32 chars, `[A-Za-z0-9_]` only. **Required in production**: `prod.py` rejects an empty, placeholder (`<your-bot-username>`) or malformed value at boot, so `web` and `bot` will not start until it is real. It is also a seed value only — migration `0003` copies it into the `SiteConfig` singleton once and no render path reads the env var afterwards, so a value that was wrong at migration time leaves a dead `t.me/` row behind. Correct an already-seeded row with `manage.py repair_bot_username` (or the Django admin) — see [`contact-us.md`](../01-spec/contact-us.md). |
 | `ALLOWED_HOSTS` | Yes (prod) | Comma-separated list of host/domain names the app can serve. `prod.py` raises `ValueError` if empty |
 | `SITE_URL` | Yes* | Public site URL for absolute links in Telegram alerts (no trailing slash). Example: `https://mko-bazuna.example.com` |
+| `EMAIL_HOST` | Yes (prod) | SMTP host for the **one** transactional email the application sends — the Telegram support-ticket notification (`send_support_notification_email`, the sole `send_mail` call site). Required in production (`config/settings/prod.py` fail-fast guard raises `ImproperlyConfigured` if empty) so the message is deliverable; without a reachable host a misconfigured SMTP endpoint turns the support inbox into a silent black hole instead of failing at boot. `EMAIL_BACKEND` is pinned to `smtp.EmailBackend` in production, so SMTP is the only supported transport. |
 | `IMMEDIATE_ALERTS_ENABLED` | No (default: `false`) | Enable near-real-time publish-time Telegram alerts to buyers with matching saved searches. Daily backfill runs regardless |
 | `POSTGRES_USER` | Yes | Database username |
 | `POSTGRES_PASSWORD` | Yes | Database password |
@@ -1024,8 +1025,9 @@ ADMIN_PASSWORD not set, skipping admin user creation
 
 ### Manual Creation
 
-If `ADMIN_PASSWORD` was not set during initial deployment, or you need to create/change the
-password later, use the management command:
+If `ADMIN_PASSWORD` was not set during initial deployment, use the management command to create the
+admin user **for the first time**. This command is for first-time creation only — it is **not** a way
+to change the password of an account that already exists (see [Password Change](#password-change)):
 
 ```bash
 # Create admin user
@@ -1036,15 +1038,6 @@ docker compose --env-file .env.dev \
   -f docker-compose.yml -f docker-compose.dev.override.yml \
   run --rm web uv run python src/backend/manage.py create_admin_user \
     --username admin \
-    --password your_secure_password \
-    --telegram-id -1
-
-# With custom values
-docker compose --env-file .env.dev \
-  -f docker-compose.yml -f docker-compose.dev.override.yml \
-  run --rm web uv run python src/backend/manage.py create_admin_user \
-    --username myadmin \
-    --password new_password \
     --telegram-id -1 \
     --email admin@example.com
 ```
@@ -1114,6 +1107,14 @@ credential already stored under the old recipe stays weak until it is changed he
 > `create_admin_user` is **not** an alternative for changing a password. It is idempotent, which
 > means it returns early — before any password write — as soon as a user with the same
 > `telegram_id` (or `username`) exists, so re-running it with a new `--password` is a no-op.
+
+> **Do not try to change a password from the admin UI.** The user change form at
+> `/admin/users/user/<id>/change/` renders a **Reset password** link that does not work: this
+> project registers its own `UserAdmin` and declares no `get_urls()`, so the link has no route.
+> Following it lands on the admin index with a misleading *"user with ID "1/password" doesn't
+> exist. Perhaps it was deleted?"* message, which reads like data loss. The `changepassword`
+> command above is the way to change a password. The dead link is a known gap owned by phase 15
+> `15-AUTHZ-003`.
 
 ### Changing the Telegram ID Placeholder
 

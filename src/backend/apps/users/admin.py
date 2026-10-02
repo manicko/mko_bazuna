@@ -30,17 +30,29 @@ class UserAdmin(admin.ModelAdmin):
     the same plaintext hole through ``UserCreationForm``.
 
     Known gap (deferred to phase 15 ``15-AUTHZ-003``): ``ReadOnlyPasswordHashWidget``
-    renders a "Reset password" link pointing at ``../password/``, which **404s**.
-    ``django.contrib.auth.admin.UserAdmin`` serves that URL through its own
-    ``get_urls()`` (``<id>/password/`` -> ``auth_user_password_change``), and that
-    hook also injects the ``password_url`` context variable the widget template
-    falls back from. This class declares no ``get_urls()``, so the link has no
-    target. The button did **not** exist before ``B-01``: it arrived only because
-    ``B-01`` switched the change view to ``UserChangeForm``; the pre-``B-01``
-    auto-built form rendered ``password`` as a plain writable ``CharField`` and
-    showed no such button. It is recorded here rather than fixed deliberately —
-    adding ``get_urls()`` would create a credential-write surface owned by phase
-    15, not by this documentation block.
+    renders a "Reset password" link pointing at ``../password/``, which has **no
+    route** to land on. ``django.contrib.auth.admin.UserAdmin`` serves that URL
+    through its own ``get_urls()`` (``<id>/password/`` -> ``auth_user_password_change``),
+    and that hook also injects the ``password_url`` context variable the widget
+    template falls back from. This class declares no ``get_urls()``, so the link
+    has no target: ``admin:auth_user_password_change`` does not resolve and the
+    change view's own URLconf sends ``/admin/users/user/<id>/password/`` to the
+    change route with a literal object id of ``<id>/password``. ``ModelAdmin.get_object``
+    then calls ``pk.to_python("1/password")``, which raises ``ValidationError``,
+    swallows it and returns ``None`` — so following the link is a 302 to the admin
+    index carrying *"user with ID "1/password" doesn't exist. Perhaps it was
+    deleted?"*. That reads as data loss, which is worse than a 404 would have been.
+    The button did **not** exist before ``B-01``: it arrived only because ``B-01``
+    switched the change view to ``UserChangeForm``; the pre-``B-01`` auto-built form
+    rendered ``password`` as a plain writable ``CharField`` and showed no such button.
+
+    The endpoint is **deliberately not built** here. An in-admin password-change
+    view is a credential-write surface, and the gate this class can offer for it —
+    ``has_change_permission`` -> ``is_staff`` — ignores ``obj``, so it would let a
+    plain moderator overwrite a *superuser's* password (a moderator -> superuser
+    takeover). ``get_urls()`` has **no** ``permissions`` hook, so that gate would
+    have to live in the view or be tightened in the predicate; both are owned by
+    phase 15, not by this documentation block.
     """
 
     form = UserChangeForm

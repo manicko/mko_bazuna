@@ -10,13 +10,17 @@ procedure depends on:
   credential is left byte-identical.
 
 ``changepassword`` prompts through ``getpass.getpass`` inside
-``django.contrib.auth.management.commands.changepassword``; the prompt is
-monkeypatched at that module boundary so the command runs non-interactively.
+``django.contrib.auth.management.commands.changepassword``. The command does
+``import getpass``, so its module attribute *is* the stdlib module object — a
+``setattr`` on it would mutate ``stdlib_getpass.getpass`` process-wide. These
+tests instead rebind the module-local ``getpass`` name with a ``SimpleNamespace``
+stub, so the substitution is confined to that one module.
 """
 
 from __future__ import annotations
 
 from collections.abc import Iterator
+from types import SimpleNamespace
 
 import pytest
 from django.contrib.auth.hashers import check_password
@@ -48,7 +52,7 @@ def staff_user() -> User:
 
 @pytest.fixture
 def _stub_getpass(monkeypatch: pytest.MonkeyPatch):
-    """Patch ``getpass.getpass`` in the ``changepassword`` command module.
+    """Replace the ``getpass`` name in the ``changepassword`` command module.
 
     Returns a callable that installs a fixed response sequence, so a test can
     drive the command's prompt loop without a terminal.
@@ -58,7 +62,11 @@ def _stub_getpass(monkeypatch: pytest.MonkeyPatch):
         import django.contrib.auth.management.commands.changepassword as module
 
         iterator: Iterator[str] = iter(responses)
-        monkeypatch.setattr(module.getpass, "getpass", lambda *a, **k: next(iterator))
+        stub = SimpleNamespace(
+            getpass=lambda *a, **k: next(iterator),
+            getuser=lambda *a, **k: _USERNAME,
+        )
+        monkeypatch.setattr(module, "getpass", stub)
 
     return install
 
