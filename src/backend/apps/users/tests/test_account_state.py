@@ -22,6 +22,7 @@ import pytest
 from django.db.models import Q
 
 from apps.ads.models import Ad
+from apps.core.enums import AdStatus
 from apps.search.models import SavedSearch
 from apps.users.models import User
 from apps.users.services import (
@@ -386,8 +387,12 @@ class TestPredicatePrefixRewritesTheList:
         """
         eligible_owner = _state_user(14)
         excluded_owner = _state_user(15, is_declined=True)
-        eligible_ad = create_test_ad(eligible_owner, category, city)
-        excluded_ad = create_test_ad(excluded_owner, category, city)
+        eligible_ad = create_test_ad(
+            eligible_owner, category, city, status=AdStatus.PUBLISHED
+        )
+        excluded_ad = create_test_ad(
+            excluded_owner, category, city, status=AdStatus.PUBLISHED
+        )
 
         matching = set(
             Ad.objects.filter(account_state_q("user__")).values_list("pk", flat=True)
