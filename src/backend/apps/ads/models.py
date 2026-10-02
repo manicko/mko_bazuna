@@ -558,9 +558,13 @@ class Ad(models.Model):
 class AdImage(models.Model):
     """Ad image with UUID v4 storage key for URL anonymity.
 
-    Only compressed Telegram photos accepted. Key contains NO user_id/telegram_id/username.
-    """
+    Only compressed Telegram photos accepted. Key contains NO
+    user_id/telegram_id/username.
 
+    ``position`` is unique per ad but is **not** required to be contiguous:
+    gaps are permitted and preserved (e.g. ``copy_ad`` carries ``[0, 2, 5]``
+    through verbatim). Contiguity is intentionally not enforced.
+    """
     ad = models.ForeignKey(
         Ad,
         on_delete=models.CASCADE,
@@ -635,6 +639,14 @@ class AdImage(models.Model):
         db_table = "ad_images"
         ordering = ["position"]
         constraints = [
+            # Uniqueness only — position must be unique within an ad.
+            # Contiguity is intentionally NOT enforced: gaps are permitted
+            # (copy_ad preserves [0, 2, 5] verbatim), so do not add a
+            # contiguity check here.
+            models.UniqueConstraint(
+                fields=["ad", "position"],
+                name="uq_ad_images_ad_position",
+            ),
             models.CheckConstraint(
                 condition=Q(image__regex=KEY_FORMAT_REGEX),
                 name="ck_ad_images_image_key_format",

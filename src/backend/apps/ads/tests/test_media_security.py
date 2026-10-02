@@ -687,9 +687,9 @@ class TestMediaGateThumbnailResolution:
         conflicting_key = "conflict.jpg"
         ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         # Create two AdImages — one with image=conflict.jpg, one with thumbnail_small=conflict.jpg
-        AdImage.objects.create(ad=ad, image=conflicting_key)
+        AdImage.objects.create(ad=ad, image=conflicting_key, position=0)
         AdImage.objects.create(
-            ad=ad, image="other.jpg", thumbnail_small=conflicting_key
+            ad=ad, image="other.jpg", thumbnail_small=conflicting_key, position=1
         )
 
         client = Client()
