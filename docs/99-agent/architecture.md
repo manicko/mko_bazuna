@@ -543,14 +543,17 @@ Planner does not set the finding's status; this record does.**
 
 ## Account-State and Session Revocation (04-AUT-002)
 
-**Status: `04-AUT-002` is NOT closed.** The web tier has **zero per-request
-account-state enforcement**: `MIDDLEWARE` is a pinned 15-entry list with no gate
-that re-checks `is_banned` / `is_deleted` / `is_declined` on an authenticated
-request. A `django_session` row is therefore never invalidated when account state
-changes.
+**Status: `04-AUT-002` is NOT closed.** The web tier has **no per-request gate
+for `is_banned` / `is_deleted` / `is_declined`**: `MIDDLEWARE` is a pinned
+15-entry list with no gate that re-checks those three flags on an authenticated
+request. A `django_session` row is therefore never invalidated when those flags
+change. (`is_active` is the exception — it *is* re-checked per request by
+Django's own `ModelBackend`, see
+[Operator-Facing Account Kill-Switch](#operator-facing-account-kill-switch-emergent-from-b-01-b-05)
+below.)
 
-Of the five account-state transitions, only one is reachable and it is
-unreachable **for its subject**:
+Of the five **logout-flushable** account-state transitions, only one is
+reachable and it is unreachable **for its subject**:
 
 - `users/views/consent.py::consent_withdraw` is **CLOSED** — it calls
   `logout(request)`, which flushes the withdrawing browser's session.
@@ -575,6 +578,15 @@ unreachable **for its subject**:
   leave the banned seller's session fully live — a trap the five pre-existing
   ban tests structurally cannot detect.
 
+Two further account-state write surfaces were added by plan 18 and are **also
+logout-less**: `users/admin.py::UserAdmin.deactivate_user` /
+`reactivate_user` (delegating to `apps.users.services.deactivation`). They are
+operator-driven, so the subject is never the caller and a `logout()` would be
+the same wrong-target trap as `ban_user`. They are **not** in the list above
+because that list is scoped to transitions a subject can trigger on themselves;
+`deactivate_user` is the one operator transition that **does** revoke the
+subject's live session, and it does so through `ModelBackend`, not a logout.
+
 `django_session` cannot be enumerated cheaply: it has no user column, and
 `session_data` is `signing.dumps(..., compress=True)` — zlib-compressed, base64,
 HMAC-signed, **never encrypted** — so no `LIKE` scan is possible. An O(live
@@ -597,6 +609,18 @@ also what turns `TestConsentBannerGuard::test_banner_hidden_for_deleted_user`
 red; that test currently encodes the defect (`GET /dashboard/` → `200` for a
 soft-deleted user) and phase 15 must budget its rewrite.
 
+**Bot-tier residual (asked-for-here so `04-AUT-002` reads in one place):** the
+Telegram bot tier has **no account-state enforcement at all for `is_active`** —
+the bot holds no web session, resolves identity per message from `chat_id`, and
+its `AccountStateMiddleware` gate reads `is_banned` / `is_deleted` /
+`is_declined` / `consent_revoked` but **never `is_active`**. A deactivated user
+can still reach every bot handler. Probed and pinned by
+`src/telegram_bot/tests/test_account_state_deactivation_probe.py` (plan 18
+`B-3`), which asserts the residual by design. **Owner of the fix: phase 15,
+`15-AUTHZ-001`** (deferred-work `D-2`). This is the third open piece of
+`04-AUT-002`, alongside the unrevoked `is_banned` / `is_deleted` / `is_declined`
+sessions and the absent `django_session` janitor.
+
 **No `django_session` janitor exists:** `clearsessions` appears nowhere in
 `src/`, `docs/`, `docker/`, `.github/`, `Makefile` or `Makefile.ps1`, so the
 table is unbounded in row count. `SESSION_ENGINE` is unset (the backend is the
@@ -608,57 +632,91 @@ retention/row-count control, **not** a session-revocation control
 `G-E`), because adding it to `HOURLY_COMMANDS` (9→10) or `DAILY_COMMANDS` (2→3)
 would break two exact-`==` pinned tests in `apps/core/tests/test_scheduler.py`.
 
-## No Operator-Facing Account Kill-Switch (Emergent from B-01 + B-05)
+## Operator-Facing Account Kill-Switch (Emergent from B-01 + B-05)
 
-**Status: the platform has no operator-facing account kill-switch.** This is
-**not a defect in any single block** — it is an **emergent consequence** of two
-independently-accepted blocks, so no single block's validator could see it.
+**Status: the operator-facing disable path now exists; `04-AUT-002` remains NOT
+closed.** This gap was **not a defect in any single block** — it was an
+**emergent consequence** of two independently-accepted blocks. It is closed by
+plan 18 with an admin action, and the web-session half of `04-AUT-002` on the
+`is_active` flag is now revoked per request.
 
-The two facts:
+The two original facts, and the fix:
 
 - **`B-01` made `User.is_active` read-only in the admin change form.** This was
   **correct**: `UserAdmin.has_change_permission` returns `request.user.is_staff`
   and **ignores `obj`** (verified in
   [`apps/users/admin.py`](../../src/backend/apps/users/admin.py)), so a writable
   `is_active` would have let any moderator disable arbitrary users, including
-  superusers. The change form's writable fields are now exactly
-  `['preferred_city']`, and `is_active in readonly_fields` is `True`.
+  superusers. The change form's writable fields are still exactly
+  `['preferred_city']`, and `is_active in readonly_fields` is still `True`.
 - **`B-05` hardened the issuance point** so a disabled account receives no
   session cookie: `login_status` refuses `is_active = False` with a uniform `410`
   before the first session write (see
   [`technical-specification.md` §H](../01-spec/technical-specification.md)). Also
   correct.
 
-**Net effect: the platform now enforces a disabled state at login, but provides
-no supported way to put a user into it.** No production code path anywhere in
-the repository ever writes `User.is_active = False`: the only writer is
-`apps/seed/generators/users.py`, which sets it `True` at creation. The only way
-to disable an account today is `manage.py shell`, which is not an operator
-affordance.
+**The operator path.** Plan 18 `B-2` registers two named admin actions on
+`UserAdmin` — *Deactivate selected users* and *Reactivate selected users* — gated
+by a new named predicate `UserAdmin.has_deactivate_permission`
+(`is_staff or is_superuser`, i.e. `User.role == ADMIN`). They delegate to
+`apps.users.services.deactivation` (`B-1`), which is the single writer of the
+operator `is_active` lever. A non-superuser actor may act only on **non-privileged**
+targets: the service excludes `is_staff` / `is_superuser` rows and self, and
+reports the refused counts (product decision `18-D1` / `18-Q7`). `manage.py
+shell` is no longer the only writer.
 
-Before phase 04 an accidental moderator click *could* disable a user; **after**
-phase 04 there is no supported way at all. The phase removed a capability while
-correctly closing the vulnerability that made it dangerous.
+**The web-tier revocation is now proven, and an earlier record here was wrong.**
+A `django_session` row is still never **deleted** on an account-state change, but
+`is_active = False` **does revoke an already-authenticated session on the next
+request** — the prior claim that it "only blocks future issuance" was false. The
+mechanism runs per request:
 
-**Compound with `04-AUT-002`, which is NOT closed** (see
+```
+AuthenticationMiddleware.request.user
+  -> django.contrib.auth.get_user(request)
+     -> load_backend(...).get_user(user_id)
+        -> ModelBackend.get_user()  ->  user_can_authenticate(user)  ->  user.is_active
+     -> None becomes AnonymousUser()
+```
+
+Runtime evidence (plan 18 §1; now promoted to a permanent test,
+`test_admin_deactivate_user.py::test_deactivate_user_revokes_an_existing_web_session`):
+an existing session and a fresh issuance are indistinguishable — both are killed.
+This guarantee holds **unconditionally today** because `AUTHENTICATION_BACKENDS`
+is unset in `src/backend/config/settings/`, so Django uses exactly one backend,
+`ModelBackend`, and it consults `user_can_authenticate()`. It is **conditional on
+that staying true**: a second backend that does not consult
+`user_can_authenticate()` would weaken it, so anyone adding an auth backend must
+re-read this note. `is_banned` / `is_deleted` / `is_declined` remain unrevoked
+(`D-1`); this correction is about `is_active` only and must **not** be generalised
+to the other flags.
+
+**The bot (Telegram) tier is NOT revoked.** The bot holds no web session and
+resolves identity per message; `AccountStateMiddleware` reads `is_banned` /
+`is_deleted` / `is_declined` / `consent_revoked`, **never** `is_active`. A
+deactivated user can still reach every bot handler. Probed and pinned by
+`test_account_state_deactivation_probe.py` (plan 18 `B-3`), which asserts the
+residual by design. **Owner of the fix: phase 15, `15-AUTHZ-001`** (`D-2`). The
+operator message names this limit (`18-D2`), so the promise is *"cannot get back
+in to the website"*, not total lockout.
+
+**`04-AUT-002` is NOT closed.** What remains open is enumerated in
 [Account-State and Session Revocation (04-AUT-002)](#account-state-and-session-revocation-04-aut-002)
-above). A `django_session` row is never invalidated on an account-state change,
-so `is_active` was never a revocation tool — it only blocks *future* issuance.
-With no operator path to set it and no per-request enforcement, **the system
-currently has neither a way to disable an account nor a way to revoke a live
-session.**
+above: no per-request gate for `is_banned` / `is_deleted` / `is_declined`, no
+`django_session` janitor, and no bot-tier enforcement.
 
-**Operationally:** a moderator cannot disable an account, and cannot revoke a
-live session. The reachability facts are enumerated in the operator inventory in
+**Operationally:** a moderator **can** disable an ordinary seller and **can**
+revoke their live web session; a moderator **cannot** touch a staff/superuser row;
+the bot tier is unenforced. The reachability facts are enumerated in the operator
+inventory in
 [`docker-deployment.md`](../ops/docker-deployment.md#the-admin-user-change-form-contract-04-aut-005).
 
-**Route it — this needs assignment, and no phase currently owns it.** Resolving
-it is **not a documentation fix**: it requires a **product decision** plus phase
-15 `15-AUTHZ-003` (which owns the permission predicate). Building an operator
-path here would either reintroduce the moderator escalation `B-01` correctly
-closed, or require `15-AUTHZ-003` to own a new superuser-only surface — so it
-must not be built as part of the phase-04 documentation pass. This record
-escalates the finding to a phase-level status; it does not assign it.
+**Ownership.** The remaining work is phase 15: `15-AUTHZ-001` (session revocation
+for the other flags + bot-tier gate) and `15-AUTHZ-003` (the broader moderator
+contract, which must discover `has_deactivate_permission`). This plan is
+**pre-work for BLOCK 9**, not a substitute: it does not resolve the moderator
+contract and its landing must **not** be read as `15-AUTHZ-003` closing.
+
 
 ### Session Lifetime Policy (04-AUT-006)
 

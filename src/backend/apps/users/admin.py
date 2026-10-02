@@ -10,6 +10,35 @@ from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 from apps.core.utils.sanitize import mask_telegram_id
 from apps.users.models import ConsentRecord, LoginToken, User
 from apps.users.services import withdraw_consent
+from apps.users.services.deactivation import (
+    DeactivationResult,
+    deactivate_users,
+    reactivate_users,
+)
+
+# Operator-facing message fragments. These are deliberately English-only
+# literals (like the fieldset headings below) on a staff-only surface, and are
+# named constants so the action tests pin a stable substring. The tests assert
+# **hard-coded** copies of these substrings, not the constants, so a reword that
+# drops the invariant fails the test (the guard must be able to go red).
+#
+# ``WEB_ONLY_ENFORCEMENT`` states the ``18-D2`` limit plainly: the operator
+# promise is "this person cannot get back in" on the **web tier**; the change
+# is **not** enforced in the Telegram bot (the bot holds no session and its
+# per-message gate reads the other flags, never ``is_active``). Operators must
+# not read the toast as "locked out everywhere". The invariant a test pins is
+# ``NOT enforced in the Telegram bot``.
+WEB_ONLY_ENFORCEMENT = (
+    "This takes effect immediately on the website (the account cannot get back "
+    "in), but is NOT enforced in the Telegram bot."
+)
+# Invariant a test pins: the literal ``Skipped:`` label appears whenever rows
+# were dropped for any reason.
+SKIPPED_ROWS_PREFIX = "Skipped:"
+# Invariant a test pins: the ``already in the requested state`` wording appears
+# whenever selected rows were dropped as no-ops, so a partial selection never
+# reads as a full success (finding ``18-D1`` / risk ``R-5``).
+ALREADY_IN_STATE_CLAUSE = "already in the requested state"
 
 
 @admin.register(User)
@@ -159,6 +188,12 @@ class UserAdmin(admin.ModelAdmin):
         "is_superuser",
     ]
     search_fields = ["telegram_id"]
+    # Operator actions. The action strings must stay in sync with the method
+    # names below; ``permissions=["deactivate"]`` routes each one through
+    # ``has_deactivate_permission``. Adding this list is the shape that could
+    # tempt a future editor to also register ``withdraw_consent_action`` — see
+    # the comment at that method.
+    actions = ["deactivate_user", "reactivate_user"]
 
     def get_readonly_fields(self, request, obj=None):  # pyright: ignore[reportIncompatibleMethodOverride] - Django's own UserAdmin overrides this untyped hook the same way
         """
@@ -202,6 +237,76 @@ class UserAdmin(admin.ModelAdmin):
     def has_view_permission(self, request, obj=None) -> bool:
         return request.user.is_staff
 
+    def has_deactivate_permission(self, request) -> bool:
+        """
+        Gate whether the deactivate/reactivate actions may run (``18-D1``).
+
+        Superusers and moderators may both run the actions; this matches
+        ``User.role == ADMIN`` (``is_staff or is_superuser``) — the existing
+        ``staff_required`` answer, not a new divergence. It is a distinct
+        predicate from ``has_delete_permission`` on purpose: widening one must
+        not widen the other, and a named predicate is discoverable by phase
+        15's registry contract test (``15-AUTHZ-003`` / BLOCK 9).
+
+        This predicate answers **"may this actor run the action"**, not **"may
+        this actor act on this row"**. The latter is the target scope and lives
+        in the service (``apps.users.services.deactivation``, ``18-Q7``):
+        Django's ``permissions=`` mechanism cannot express a per-row scope, so
+        a moderator's selection containing a staff/superuser row has that row
+        removed by the service and reported back to the operator.
+        """
+        return request.user.is_staff or request.user.is_superuser
+
+    @admin.action(
+        description="Deactivate selected users", permissions=["deactivate"]
+    )
+    def deactivate_user(self, request, queryset) -> None:
+        """Disable the selected accounts and report what was skipped."""
+        result = deactivate_users(queryset, request.user)
+        self.message_user(request, self._deactivation_message("Deactivated", result))
+
+    @admin.action(
+        description="Reactivate selected users", permissions=["deactivate"]
+    )
+    def reactivate_user(self, request, queryset) -> None:
+        """Re-enable the selected accounts and report what was skipped."""
+        result = reactivate_users(queryset, request.user)
+        self.message_user(request, self._deactivation_message("Reactivated", result))
+
+    def _deactivation_message(self, verb: str, result: DeactivationResult) -> str:
+        """
+        Build the operator toast for a deactivation/reactivation.
+
+        Two requirements are mandatory (``18-D2``, risk ``R-5``): the message
+        must name the **bot-tier limit** (``WEB_ONLY_ENFORCEMENT``), and it
+        must **report dropped rows** so a partial selection does not read as
+        success. Dropped rows are self/privileged refusals plus rows already in
+        the requested state (``already_in_state``); a selection of 10 rows of
+        which 3 were already disabled must not say "Deactivated 7 user(s)" with
+        no hint that 3 were dropped.
+        """
+        message = f"{verb} {result.changed} user(s). {WEB_ONLY_ENFORCEMENT}"
+        dropped: list[str] = []
+        if result.skipped_self:
+            dropped.append(f"{result.skipped_self} self")
+        if result.skipped_privileged:
+            dropped.append(f"{result.skipped_privileged} privileged (not permitted)")
+        if result.already_in_state:
+            dropped.append(f"{result.already_in_state} {ALREADY_IN_STATE_CLAUSE}")
+        if dropped:
+            message += f" {SKIPPED_ROWS_PREFIX} " + ", ".join(dropped) + "."
+        return message
+
+    # ---------------------------------------------------------------------
+    # DO NOT REGISTER THIS ACTION. It is ``@admin.action``-decorated but is
+    # deliberately absent from ``UserAdmin.actions`` above. Gate ``G-B``
+    # (phase 04 / plan 16) refused to register it because ``withdraw_consent``
+    # is an irreversible PII-erasure operation that must not be reachable from
+    # the admin surface. The ``actions = [...]`` list added for
+    # deactivate/reactivate is exactly the shape a future editor might extend
+    # with this method — leave it unregistered (risk ``R-1`` / deferred work
+    # ``D-8``).
+    # ---------------------------------------------------------------------
     @admin.action(description="Withdraw consent for selected users")
     def withdraw_consent_action(self, request, queryset):
         """

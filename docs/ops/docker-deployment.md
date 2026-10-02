@@ -1175,17 +1175,22 @@ so `AUTH_PASSWORD_VALIDATORS` applies to the new account. It is **superuser-only
 |---|---|
 | Ban a user | **Ad** changelist → select ads → *Ban users from selected ads* (`AdAdmin.action_ban_user`); **or** the moderation review page → *Ban* (`moderation/views/review.py::ban_user`, routed at `moderation/urls.py`, `@staff_required`) |
 | **Un-ban** a user | **nowhere in the admin** — there is no unban action and no unban service path. `manage.py shell` (`User.objects.filter(…).update(…)`) |
-| Disable an account (`is_active = False`) | **nowhere in the admin** — `is_active` is read-only on the change form and no other in-repo surface writes it. `manage.py shell` (see [the system-level record](../99-agent/architecture.md#no-operator-facing-account-kill-switch-emergent-from-b-01-b-05)) |
+| Disable an account (`is_active = False`) | **Users** changelist → select users → *Deactivate selected users* (`UserAdmin.deactivate_user`, gated by `has_deactivate_permission` → `is_staff or is_superuser`). **Moderators may deactivate ordinary sellers only** — the target scope lives in `apps.users.services.deactivation` and removes every `is_staff`/`is_superuser` row (and the operator's own row) from the selection, reporting the skips (product decision `18-D1` / `18-Q7`). A superuser's selection is unrestricted. See [the system-level record](../99-agent/architecture.md#operator-facing-account-kill-switch-emergent-from-b-01-b-05) |
+| Re-enable an account (`is_active = True`) | **Users** changelist → select users → *Reactivate selected users* (`UserAdmin.reactivate_user`). Same target restriction: a moderator may not undo a superuser's disable, and self is always excluded |
 | Hard-delete a user | **superuser only** — **Users** changelist → select users → *Delete selected* (`UserAdmin`'s `delete_selected`; `has_delete_permission` → `request.user.is_superuser`). **Irreversible**, and **not** a substitute for `is_active = False` (the row is gone, not disabled) |
 | Grant `is_staff` / `is_superuser` / groups | [`create_admin_user`](#manual-creation); the flag flips themselves are not editable |
 | Change a password | [`changepassword`](#password-change) — the admin's *Reset password* link has no route |
 | Toggle browse-only (`is_declined`) | deliberately unavailable — a form write would skip the `on_commit` search-cache bump, leaving stale listings live |
 | Un-soft-delete / undo an erasure (`is_deleted`) | deliberately unavailable — WITHDRAW is terminal and the PII is already nulled |
 
-Note that disabling an account with `is_active = False` stops **issuance** of a web session
-(`login_status` refuses it) and makes Django's `ModelBackend` reject the identity on every
-subsequent request, but it does **not** invalidate an already-issued session cookie — see
-[`architecture.md` § Account-State and Session Revocation](../99-agent/architecture.md#account-state-and-session-revocation-04-aut-002),
+Disabling an account with `is_active = False` takes effect **immediately on the web tier**:
+`login_status` refuses to issue a new session, **and** the already-issued session is treated as
+anonymous from the next request on (Django's `AuthenticationMiddleware` resolves the identity per
+request, and `ModelBackend` rejects a user whose `is_active` is `False`). The **session cookie
+itself survives** until its `expire_date` — the `django_session` row is inert but retained. The
+**Telegram bot tier is not revoked**: a deactivated user can still message the bot and reach its
+handlers. See
+[`architecture.md`](../99-agent/architecture.md#account-state-and-session-revocation-04-aut-002),
 where `04-AUT-002` is recorded as **NOT closed**.
 
 ### Changing the Telegram ID Placeholder
