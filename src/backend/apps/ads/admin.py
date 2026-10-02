@@ -265,13 +265,28 @@ class AdAdmin(admin.ModelAdmin):
     def save_model(self, request, obj, form, change):
         """Persist the form's fields, then route any status change through the matrix.
 
-        ``Ad.transition_to`` starts with ``refresh_from_db()``, which would
-        discard every in-memory field value the form just cleaned (title,
-        description, price, ...). The safe ordering is therefore:
+        Two clearly separated paths, branched on ``change`` because
+        ``_changeform_view`` calls ``save_form`` (which does **not** assign a pk
+        on add) before ``save_model``:
 
-        1. write the form's data **without** the status change, so the raw
-           ``UPDATE`` can never violate a check constraint, then
-        2. perform the status change through the sanctioned service.
+        * **Add** (``change is False``): there is no stored row and therefore no
+          source status to read. ``user`` is read-only on this form (finding
+          AD-001: a save must not silently transfer ownership), so the acting
+          staff user becomes the owner — the only value that satisfies the
+          ``NOT NULL`` constraint and the one a moderator creating an ad in the
+          admin owns by definition. The requested status is applied through the
+          sanctioned seam **without** a source-status lookup.
+
+        * **Change** (``change is True``): ``Ad.transition_to`` starts with
+          ``refresh_from_db()``, which would discard every in-memory field value
+          the form just cleaned (title, description, price, ...). The safe
+          ordering is therefore: (1) write the form's data **without** the
+          status change, so the raw ``UPDATE`` can never violate a check
+          constraint, then (2) perform the status change through the sanctioned
+          service. Read-only/excluded fields (including
+          ``original_published_at`` and the four ``search_vector*`` columns) are
+          not on the form, so the instance still carries their stored values and
+          the raw UPDATE leaves them untouched.
 
         A status change to a target with an audit service is routed through
         that service (``set_published`` / ``set_rejected`` / ``soft_delete_ad``)
@@ -285,6 +300,15 @@ class AdAdmin(admin.ModelAdmin):
         (``transition_to`` returns the source status). ``MaxAdsExceeded`` on
         publish is surfaced as an admin message rather than a 500.
         """
+        if not change:
+            # Add path: no source status exists yet, so no lookup is possible.
+            # ``user`` is read-only on the form; the acting staff user owns the
+            # row the admin creates.
+            obj.user_id = request.user.id
+            super().save_model(request, obj, form, change)
+            self._route_status_change(request, obj, AdStatus(obj.status))
+            return
+
         status_changed = "status" in form.changed_data
         target_status = AdStatus(obj.status)
 
@@ -295,18 +319,28 @@ class AdAdmin(admin.ModelAdmin):
         # Step 1: persist the non-status form data. ``status`` must be the
         # model's current value so the raw write satisfies every check
         # constraint; ``transition_to`` will set the real target afterwards.
-        # Read-only/excluded fields (including ``original_published_at`` and
-        # the four ``search_vector*`` columns) are not on the form, so the
-        # instance still carries their stored values and the raw UPDATE leaves
-        # them untouched.
         current_status = Ad.objects.values_list("status", flat=True).get(pk=obj.pk)
         obj.status = current_status
 
         super().save_model(request, obj, form, change)
 
         # Step 2: apply the status change through the sanctioned seam.
+        self._route_status_change(request, obj, target_status)
+
+    def _route_status_change(
+        self, request, obj: Ad, target: AdStatus
+    ) -> None:
+        """Apply *target*, surfacing business failures as admin messages.
+
+        ``MaxAdsExceeded`` (the owner hit the active-ads cap) and
+        ``ValueError`` (the state machine refused the transition) are expected
+        business outcomes of a form-driven status change, not faults: render
+        each as an admin message rather than an HTTP 500. Neither branch
+        swallows ``Ad.DoesNotExist`` — that would re-introduce the add-view
+        defect this method's callers exist to prevent.
+        """
         try:
-            self._apply_status_change(request, obj, target_status)
+            self._apply_status_change(request, obj, target)
         except MaxAdsExceeded as exc:
             self.message_user(
                 request,
@@ -315,10 +349,19 @@ class AdAdmin(admin.ModelAdmin):
                 level="error",
             )
         except ValueError as exc:
-            self.message_user(request, f"Ad {obj.pk} status not changed: {exc}", level="error")
+            self.message_user(
+                request, f"Ad {obj.pk} status not changed: {exc}", level="error"
+            )
 
     def _apply_status_change(self, request, obj: Ad, target: AdStatus) -> None:
         """Route a form-driven status change through the sanctioned write path.
+
+        The source status is read from the row once, here, and the write is
+        skipped when it already equals ``target`` — so a concurrent writer that
+        won the race produces no duplicate audit row. This is the consumer of
+        ``Ad.transition_to``'s returned source status: the no-audit-on-no-op
+        guarantee is enforced at this boundary, and the non-service targets read
+        the same ``current`` rather than issuing a second query.
 
         The acting staff user's ID is passed only to the services that accept
         it (``set_published`` / ``set_rejected``). ``soft_delete_ad`` writes its
@@ -333,8 +376,7 @@ class AdAdmin(admin.ModelAdmin):
         )
         if current == target:
             # A concurrent writer already made the change; no audit row is
-            # written for a no-op (the return value of ``transition_to`` is
-            # what earns this).
+            # written for a no-op.
             return
 
         if target == AdStatus.PUBLISHED:
@@ -355,8 +397,15 @@ class AdAdmin(admin.ModelAdmin):
             # ARCHIVED / ON_MODERATION / DRAFT / ON_MODERATION_FAILED have no
             # status+audit service. Run the transition for the matrix guard
             # without inventing a second writer of ModeratorActionLog. This is
-            # the recorded residual for BLOCK 6B.
-            obj.transition_to(target, moderator_id=request.user.id)
+            # the recorded residual for BLOCK 6B. The returned source is the
+            # same value the no-op guard above already consumed.
+            source = obj.transition_to(target, moderator_id=request.user.id)
+            logger.debug(
+                "Admin form transitioned ad %s from %s to %s",
+                obj.pk,
+                source.value,
+                target.value,
+            )
 
     @admin.action(description="Reject selected ads")
     def action_reject(self, request, queryset):

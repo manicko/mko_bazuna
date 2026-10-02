@@ -34,7 +34,8 @@ from django.utils import timezone
 from apps.ads.admin import AdAdmin
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
-from apps.core.enums import AdStatus
+from apps.core.enums import AdSource, AdStatus
+from apps.currencies.enums import CurrencyCode
 from apps.moderation.models import ModerationCriteria, ModeratorActionLog
 from apps.users.models import User
 from conftest import create_test_ad
@@ -54,6 +55,24 @@ def staff_user() -> User:
         chat_id=930000111,
         password="x",
         is_staff=True,
+    )
+
+
+@pytest.fixture
+def superuser() -> User:
+    """A superuser — the only actor with the add permission.
+
+    ``AdAdmin`` does not override ``has_add_permission``; Django's default
+    grants add to any user with ``add_<model>`` permission, and a plain staff
+    user has none. The add view is therefore reached as a superuser, mirroring
+    ``apps/users/tests/test_admin_change_form.py``'s ``superuser`` fixture.
+    """
+    return User.objects.create(
+        telegram_id=930000113,
+        chat_id=930000113,
+        password="x",
+        is_staff=True,
+        is_superuser=True,
     )
 
 
@@ -416,4 +435,91 @@ def test_search_vector_fields_are_not_in_the_form(staff_user: User, seller, cate
     assert "title" in form.base_fields, "the form must not have collapsed to empty"
     assert form.base_fields["title"].disabled is False, (
         "title must remain writable on the change form"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Add view — the branch ``save_model`` shipped without (the add-view 500)
+# ---------------------------------------------------------------------------
+
+
+def _add_data(seller: User, category, city, **overrides: object) -> dict[str, object]:
+    """Build a complete add-form POST payload.
+
+    Unlike ``_change_data`` there is no stored row, so every required field is
+    supplied explicitly from the fixture values rather than read back from an
+    ``Ad``. ``status`` defaults to the model default (``DRAFT``) and is
+    overridden by callers that exercise a non-default target.
+    """
+    data: dict[str, object] = {
+        "title": "New ad via the admin add view",
+        "description": "Created through the admin add view.",
+        "price_amount": "100",
+        "price_currency": CurrencyCode.EUR.value,
+        "source": AdSource.TELEGRAM,
+        "status": AdStatus.DRAFT,
+        "category": category.pk,
+        "city": city.pk,
+        "user": seller.pk,
+        "_save": "Save",
+    }
+    data.update(overrides)
+    return data
+
+
+def test_add_view_default_draft_succeeds(
+    superuser: User, seller, category, city
+) -> None:
+    """A staff POST of the default ``DRAFT`` to the add view creates the ad.
+
+    The add path has no source status to read, so ``save_model`` must not
+    perform a source-status lookup on ``obj.pk is None``. Pre-change that
+    lookup raised ``Ad.DoesNotExist`` for a non-``DRAFT`` target; this default
+    case is the positive control that the add path itself works.
+    """
+    client = Client()
+    client.force_login(superuser)
+
+    response = client.post(reverse("admin:ads_ad_add"), data=_add_data(seller, category, city))
+
+    _assert_saved(response)
+    created = Ad.objects.get(title="New ad via the admin add view")
+    assert created.status == AdStatus.DRAFT
+    # ``user`` is read-only on the form, so the add path assigns the acting
+    # staff user as owner (the only value that can satisfy the NOT NULL
+    # constraint without weakening the field contract).
+    assert created.user_id == superuser.pk
+
+
+def test_add_view_status_published_is_not_a_500(
+    superuser: User, seller, category, city
+) -> None:
+    """A staff POST of ``status=published`` to the add view is not an HTTP 500.
+
+    ``_changeform_view`` calls ``save_form(..., change=False)`` (which does not
+    assign a pk) before ``save_model``. The pre-change source-status lookup read
+    ``Ad.objects.values_list(...).get(pk=None)`` -> ``Ad.DoesNotExist`` -> 500.
+    The add path must route the requested status without a source lookup, so the
+    created ad satisfies ``ck_ads_published_at_if_published``.
+    """
+    client = Client()
+    client.force_login(superuser)
+
+    response = client.post(
+        reverse("admin:ads_ad_add"),
+        data=_add_data(
+            seller,
+            category,
+            city,
+            status=AdStatus.PUBLISHED,
+            **_split_dt("published_at", timezone.now()),
+        ),
+    )
+
+    assert response.status_code != 500, "the add view must not raise on add"
+    _assert_saved(response)
+    created = Ad.objects.get(title="New ad via the admin add view")
+    assert created.status == AdStatus.PUBLISHED
+    assert created.published_at is not None, (
+        "ck_ads_published_at_if_published requires published_at for PUBLISHED"
     )

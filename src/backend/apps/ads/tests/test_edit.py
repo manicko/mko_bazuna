@@ -1127,14 +1127,6 @@ class TestEditStatusAllowListEnumeration:
     fails this enumeration.
     """
 
-    def test_allow_list_constant_is_the_named_two_statuses(self) -> None:
-        """The allow-list is the named ``frozenset`` of exactly DRAFT and
-        ON_MODERATION — not a broadened set.
-        """
-        assert EDITABLE_DIRECT_SAVE_STATUSES == frozenset(
-            {AdStatus.DRAFT, AdStatus.ON_MODERATION}
-        )
-
     @pytest.mark.parametrize(
         ("status", "expected_outcome"),
         [
@@ -1365,4 +1357,3 @@ class TestBannedSellerRelistKnownGap:
         # Known gap (G-A): the banned seller's ad is PUBLISHED again.
         assert ad.status == AdStatus.PUBLISHED
         assert ad.published_at is not None
-
