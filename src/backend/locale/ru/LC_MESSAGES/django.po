@@ -1628,3 +1628,97 @@ msgstr ""
 
 #~ msgid "Login to Mko Bazuna"
 #~ msgstr "Вход в Mko Bazuna"
+
+#: src/backend/templates/privacy.html
+msgid ""
+"When you withdraw consent, your account and its advertisements are "
+"soft-deleted immediately. Full erasure of the remaining personal data follows "
+"within 30 days of withdrawal. The sections below explain what is erased and "
+"when, and what is retained and why."
+msgstr ""
+"Когда вы отзываете согласие, ваша учётная запись и её объявления сразу "
+"помечаются как удалённые. Полное удаление оставшихся персональных данных "
+"происходит в течение 30 дней после отзыва. Ниже описано, что и когда "
+"удаляется, а что сохраняется и почему."
+
+#: src/backend/templates/privacy.html
+msgid "Erased immediately on withdrawal"
+msgstr "Удаляется сразу при отзыве"
+
+#: src/backend/templates/privacy.html
+msgid ""
+"Your account and its advertisements are soft-deleted and hidden from the site."
+msgstr ""
+"Ваша учётная запись и её объявления помечаются как удалённые и скрываются с "
+"сайта."
+
+#: src/backend/templates/privacy.html
+msgid ""
+"Your Telegram identifier and username are nulled, and your first name, last "
+"name and e-mail address are emptied."
+msgstr ""
+"Ваш идентификатор Telegram и имя пользователя обнуляются, а имя, фамилия и "
+"адрес электронной почты очищаются."
+
+#: src/backend/templates/privacy.html
+msgid ""
+"Your login tokens are invalidated, so a pending login cannot re-link your "
+"account."
+msgstr ""
+"Ваши токены входа аннулируются, поэтому незавершённый вход не сможет заново "
+"привязать вашу учётную запись."
+
+#: src/backend/templates/privacy.html
+msgid ""
+"Your saved searches are deactivated and your search history is deleted."
+msgstr ""
+"Ваши сохранённые поиски деактивируются, а история поиска удаляется."
+
+#: src/backend/templates/privacy.html
+msgid "Your preferred city is cleared."
+msgstr "Ваш предпочитаемый город очищается."
+
+#: src/backend/templates/privacy.html
+msgid "Erased within 30 days"
+msgstr "Удаляется в течение 30 дней"
+
+#: src/backend/templates/privacy.html
+msgid ""
+"The remaining account record and the advertisements and images still linked "
+"to it are permanently removed by the 30-day erasure sweep."
+msgstr ""
+"Оставшаяся запись учётной записи, а также связанные с ней объявления и "
+"изображения безвозвратно удаляются в ходе 30-дневной очистки."
+
+#: src/backend/templates/privacy.html
+msgid "Retained, and why"
+msgstr "Сохраняется и почему"
+
+#: src/backend/templates/privacy.html
+msgid ""
+"Your Telegram chat identifier is retained so the bot can still resolve your "
+"identity after withdrawal. Because it is retained, a withdrawn identity stays "
+"recognisable and therefore stays blocked from acting again; nulling it would "
+"re-open that block."
+msgstr ""
+"Ваш идентификатор чата Telegram сохраняется, чтобы бот по-прежнему мог "
+"определять вашу личность после отзыва. Благодаря этому отозванная личность "
+"остаётся распознаваемой и потому остаётся заблокированной для повторных "
+"действий; его обнуление снова открыло бы этот блок."
+
+#: src/backend/templates/privacy.html
+msgid ""
+"The anonymised consent-action log records that consent was accepted, declined "
+"or withdrawn, and the categories chosen, so we can demonstrate compliance."
+msgstr ""
+"Анонимизированный журнал действий с согласием фиксирует, что согласие было "
+"принято, отклонено или отозвано, и какие категории были выбраны, чтобы мы "
+"могли подтвердить соблюдение требований."
+
+#: src/backend/templates/privacy.html
+msgid ""
+"Moderation records and the text of advertisements already reviewed are "
+"retained for trust and safety and for the resolution of disputes."
+msgstr ""
+"Записи модерации и текст уже проверенных объявлений сохраняются для "
+"обеспечения безопасности и урегулирования споров."

@@ -1441,3 +1441,75 @@ msgid ""
 "One of your photos is no longer available. A fresh draft was prepared — "
 "please upload the missing photo again, then send 'done'."
 msgstr ""
+
+#: src/backend/templates/privacy.html
+msgid ""
+"When you withdraw consent, your account and its advertisements are "
+"soft-deleted immediately. Full erasure of the remaining personal data follows "
+"within 30 days of withdrawal. The sections below explain what is erased and "
+"when, and what is retained and why."
+msgstr ""
+
+#: src/backend/templates/privacy.html
+msgid "Erased immediately on withdrawal"
+msgstr ""
+
+#: src/backend/templates/privacy.html
+msgid ""
+"Your account and its advertisements are soft-deleted and hidden from the site."
+msgstr ""
+
+#: src/backend/templates/privacy.html
+msgid ""
+"Your Telegram identifier and username are nulled, and your first name, last "
+"name and e-mail address are emptied."
+msgstr ""
+
+#: src/backend/templates/privacy.html
+msgid ""
+"Your login tokens are invalidated, so a pending login cannot re-link your "
+"account."
+msgstr ""
+
+#: src/backend/templates/privacy.html
+msgid ""
+"Your saved searches are deactivated and your search history is deleted."
+msgstr ""
+
+#: src/backend/templates/privacy.html
+msgid "Your preferred city is cleared."
+msgstr ""
+
+#: src/backend/templates/privacy.html
+msgid "Erased within 30 days"
+msgstr ""
+
+#: src/backend/templates/privacy.html
+msgid ""
+"The remaining account record and the advertisements and images still linked "
+"to it are permanently removed by the 30-day erasure sweep."
+msgstr ""
+
+#: src/backend/templates/privacy.html
+msgid "Retained, and why"
+msgstr ""
+
+#: src/backend/templates/privacy.html
+msgid ""
+"Your Telegram chat identifier is retained so the bot can still resolve your "
+"identity after withdrawal. Because it is retained, a withdrawn identity stays "
+"recognisable and therefore stays blocked from acting again; nulling it would "
+"re-open that block."
+msgstr ""
+
+#: src/backend/templates/privacy.html
+msgid ""
+"The anonymised consent-action log records that consent was accepted, declined "
+"or withdrawn, and the categories chosen, so we can demonstrate compliance."
+msgstr ""
+
+#: src/backend/templates/privacy.html
+msgid ""
+"Moderation records and the text of advertisements already reviewed are "
+"retained for trust and safety and for the resolution of disputes."
+msgstr ""

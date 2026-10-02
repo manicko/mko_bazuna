@@ -717,6 +717,55 @@ class TestLoginPreferredCitySync:
         user.refresh_from_db()
         assert user.preferred_city_id is None
 
+    def test_reconcile_does_not_backfill_for_declined_user(
+        self, podgorica_city: City
+    ) -> None:
+        """The reconcile returns early for a declined user (06-PII-110).
+
+        A declined user's column was cleared on decline and a surviving cookie
+        must not re-derive it. ``can_login`` refuses a declined user before the
+        reconcile is reached on the HTTP path, so this drives the reconcile
+        helper directly — the unit whose early return is the guard.
+        """
+        from django.test import RequestFactory
+
+        from apps.users.views.consent import _reconcile_preferred_city_on_login
+
+        user = User.objects.create(
+            telegram_id=700000410,
+            chat_id=700000410,
+            username="declined_pref",
+            is_declined=True,
+        )
+        request = RequestFactory().get("/")
+        request.COOKIES["preferred_city"] = "podgorica"
+
+        _reconcile_preferred_city_on_login(request, user)
+
+        user.refresh_from_db()
+        assert user.preferred_city_id is None
+
+    def test_reconcile_backfills_for_non_declined_user(
+        self, podgorica_city: City
+    ) -> None:
+        """Control: a non-declined user's NULL column is still backfilled."""
+        from django.test import RequestFactory
+
+        from apps.users.views.consent import _reconcile_preferred_city_on_login
+
+        user = User.objects.create(
+            telegram_id=700000411,
+            chat_id=700000411,
+            username="active_pref",
+        )
+        request = RequestFactory().get("/")
+        request.COOKIES["preferred_city"] = "podgorica"
+
+        _reconcile_preferred_city_on_login(request, user)
+
+        user.refresh_from_db()
+        assert user.preferred_city_id == podgorica_city.id
+
 
 # ---------------------------------------------------------------------------
 # login_rate_limit_check (04-AUT-003 rate-limit contract)

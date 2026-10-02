@@ -77,6 +77,27 @@ def _set_consent_cookie(
     )
 
 
+def _expire_preferred_city_cookie(response: HttpResponse) -> None:
+    """Delete the ``preferred_city`` cookie by emitting an expired Set-Cookie.
+
+    ``response.delete_cookie()`` cannot clear a ``Secure`` cookie over HTTPS in
+    Django 5.2: it emits ``Secure`` only for ``__Host-``/``__Secure-`` names or
+    ``samesite="none"``, and ``preferred_city`` is neither. Mirror the *write's*
+    attributes (``_set_consent_cookie`` uses ``secure=True`` unconditionally,
+    D-COOKIES) rather than ``request.is_secure()`` — over plain HTTP the cookie
+    was never stored, so there is nothing to delete (06-PII-110).
+    """
+    response.set_cookie(
+        PREFERRED_CITY_COOKIE_NAME,
+        max_age=0,
+        expires="Thu, 01 Jan 1970 00:00:00 GMT",
+        path="/",
+        httponly=True,
+        samesite="Lax",
+        secure=True,
+    )
+
+
 def _set_consent_cookies(
     response: HttpResponse,
     choice: ConsentChoice,
@@ -100,10 +121,13 @@ def _set_consent_cookies(
         CONSENT_TIMESTAMP_COOKIE,
         str(int(timezone.now().timestamp())),
     )
-    # T-06c / ePrivacy: when preferences consent is revoked, clear the
-    # preferred_city cookie so no personalization data outlives consent.
-    if not preferences:
-        response.delete_cookie(PREFERRED_CITY_COOKIE_NAME)
+    # T-06c / ePrivacy: clear the preferred_city cookie whenever preferences
+    # consent is revoked OR the whole consent is declined, so no personalization
+    # data outlives consent. ``consent_preferences`` itself keeps its value — a
+    # decline still records the preferences category as true (PO-02), but the
+    # durable city preference is cleared (06-PII-110).
+    if choice is ConsentChoice.DECLINED or not preferences:
+        _expire_preferred_city_cookie(response)
 
 
 def _parse_submission(request: HttpRequest) -> ConsentSubmission | None:
@@ -383,6 +407,13 @@ def _reconcile_preferred_city_on_login(request: HttpRequest, user: User) -> None
         request: The request carrying the ``preferred_city`` cookie.
         user: The just-authenticated user.
     """
+    if user.is_declined:
+        # A declined user's city preference was cleared on decline and must not
+        # be re-derived from a surviving cookie; re-acceptance is a NEW consent
+        # (give_consent clears is_declined), after which backfill is legitimate
+        # (06-PII-110).
+        return
+
     if user.preferred_city_id is not None:
         # DB preference already set — it wins; do not overwrite from the cookie.
         return

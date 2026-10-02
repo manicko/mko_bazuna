@@ -18,6 +18,7 @@ from pydantic import ValidationError
 
 from apps.categories.models import Category
 from apps.core.enums import AdStatus, ConsentChoice
+from apps.core.middleware.preferred_city import PREFERRED_CITY_COOKIE_NAME
 from apps.locations.models import City
 from apps.users.models import ConsentRecord, LoginToken, User
 from apps.users.schemas import ConsentSubmission
@@ -223,6 +224,43 @@ class TestConsentDeclineView:
         assert response.cookies["consent_analytics"].value == "false"
         # Preferences remain available even on decline (PO-02).
         assert response.cookies["consent_preferences"].value == "true"
+
+    def test_decline_clears_preferred_city_and_expires_cookie_on_https(
+        self, user: User, city: City
+    ) -> None:
+        """A decline clears the column and expires the cookie over HTTPS (06-PII-110).
+
+        The deletion must be a hand-rolled expired Set-Cookie carrying the
+        *write's* attributes (Secure, SameSite=Lax, HttpOnly) — ``delete_cookie``
+        cannot clear a Secure cookie over HTTPS in Django 5.2. ``secure=True`` on
+        the test client makes ``request.is_secure()`` true, mirroring production
+        nginx TLS. Modelled on
+        ``apps/search/tests/test_preferred_city.py::TestReset::
+        test_clear_deletion_cookie_mirrors_attributes_on_https``.
+        """
+        user.preferred_city = city
+        user.save(update_fields=["preferred_city"])
+
+        client = Client()
+        client.force_login(user)
+        response = client.post("/consent/decline/", secure=True)
+
+        assert response.status_code == 302
+        # The DB column is cleared.
+        user.refresh_from_db()
+        assert user.preferred_city_id is None
+        # The cookie is expired with the write's secure attributes.
+        cookie = response.cookies[PREFERRED_CITY_COOKIE_NAME]
+        assert cookie.value == ""
+        assert int(cookie["max-age"]) == 0
+        assert cookie["secure"] is True
+        assert cookie["samesite"] == "Lax"
+        assert cookie["httponly"] is True
+        assert cookie["path"] == "/"
+        # The decline still records preferences as true (PO-02 unchanged).
+        assert response.cookies["consent_preferences"].value == "true"
+        # A hand-rolled expiry, not delete_cookie().
+        assert cookie.key == PREFERRED_CITY_COOKIE_NAME
 
     def test_decline_rejected_on_deleted_user(self, deleted_user: User) -> None:
         """POST /consent/decline/ by a soft-deleted user returns 403."""

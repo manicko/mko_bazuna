@@ -86,6 +86,7 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
 - **Post-withdrawal erasure:** soft-delete immediately (`is_deleted=True`, `deleted_at=now()`) + full PII erasure exactly **30 days** after `consent_revoked_at` (idempotent `consent_hard_delete` sweep, advisory lock 3, hardcoded 30 days; index `IX_users_erasure_sweep`):
   - NULL `telegram_id` + `username`; SET NULL `analytics_events.user_id` and `ModeratorActionLog.user_id`
    - DELETE user's Ad + AdImage rows via ORM `on_delete=CASCADE`; physical media files removed via `delete_photo()` (`apps.media.services.filesystem`) after transaction commits (TX-then-FS pattern), except for a storage key still referenced by another `AdImage` row (`copy_ad` shares keys rather than duplicating files), which the `pre_delete` signal skips
+  - **Immediate withdrawal teardown:** the same transaction that nulls PII also deactivates the user's `SavedSearch` rows (`is_active=False`, one bulk `update()`) and deletes their `SearchHistory` rows; `User.preferred_city` is cleared to `NULL` on withdrawal **and** on DECLINE. `chat_id` is **RETAINED** deliberately — `AccountStateMiddleware._resolve_user` resolves the acting user on `chat_id` precisely because `telegram_id` is nulled, so a withdrawn identity stays resolvable and therefore stays blocked; nulling it is forbidden. `SearchHistory` rows are `CASCADE`-only below this teardown, so this is what bounds them after withdrawal.
   - Anonymized ads (post-withdrawal, pre-hard-delete) persist for 30 days only — NOT the 120-day `purge_deleted_ads` window
   - **PII logging:** All `telegram_id` values in logger calls and `stdout.write` output are masked via `mask_telegram_id()` (SHA-256 hash, non-reversible, `tg_` prefix) from `apps/core/utils/sanitize.py`. Raw telegram_id must never appear in logs.
   - **Withdrawal UI:** Authenticated sellers can withdraw consent via a "Withdraw Data" POST button on the seller dashboard (`/dashboard/`), beside the Logout link. Requires CSRF token + confirmation dialog. Triggers `consent_withdraw` view → `withdraw_consent()`, and flushes the web session via `logout(request)` so a withdrawn (soft-deleted) identity is logged out immediately and can no longer reach seller features (a follow-up `GET /dashboard/` re-redirects to `/login/issue/`).
@@ -129,7 +130,10 @@ Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitor
   (country-wide). Explicit `/city/<slug>/` path or `city` query param always wins.
   On login, a guest's cookie is reconciled into `User.preferred_city` (unless already
   set). The cookie is written only when `consent_preferences` is present. Default
-   display is "Вся страна".
+  display is "Вся страна". A **declined** user is excluded from both restore paths: the
+  login reconcile returns early for `is_declined`, and `set_preferred_city` gates its DB
+  write on `not is_declined`, so the DECLINE-time `NULL` (see §F) is durable until a new
+  consent clears the decline state.
 
 > **Implementation spec:** Runtime language resolution, per-user `telegram_language`,
 > category/city name-localization filters, per-language FTS wiring, localized Telegram alerts,

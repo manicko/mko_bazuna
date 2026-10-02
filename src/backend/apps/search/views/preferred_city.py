@@ -74,8 +74,12 @@ def set_preferred_city(request: HttpRequest) -> JsonResponse:
     if not slug or not City.objects.filter(slug=slug).exists():
         return JsonResponse({"error": "invalid_city"}, status=400)
 
-    # Persist server-side for authenticated buyers (R-11).
-    if request.user.is_authenticated:
+    # Persist server-side for authenticated buyers (R-11), but not for a
+    # declined one: their column was cleared on decline (06-PII-110) and a
+    # header click must not re-set it. The gate is the plain ``is_declined``
+    # attribute — BLOCK 6's account_state_q() would add a cross-app import and
+    # a second spelling of the account-state rule for a single boolean.
+    if request.user.is_authenticated and not request.user.is_declined:
         try:
             city = City.objects.get(slug=slug)
             request.user.preferred_city = city

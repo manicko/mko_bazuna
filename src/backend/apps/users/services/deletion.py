@@ -23,6 +23,7 @@ from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus
+from apps.search.models import SavedSearch, SearchHistory
 from apps.search.services.cache import bump_search_cache_version
 from apps.users.models import LoginToken, User
 
@@ -55,7 +56,20 @@ def decline_consent(user: User) -> None:
 
     user.consent_given_at = None
 
-    user.save(update_fields=["ads_auto_publish", "is_declined", "consent_given_at"])
+    # Clear the persisted behavioural preference. The cookie is expired on the
+    # decline response and the reconcile/header writes are gated on
+    # ``is_declined``, so the NULL is durable until a NEW consent (give_consent)
+    # clears the decline state (06-PII-110).
+    user.preferred_city = None
+
+    user.save(
+        update_fields=[
+            "ads_auto_publish",
+            "is_declined",
+            "consent_given_at",
+            "preferred_city",
+        ]
+    )
 
     # No Ad.save() fires here (ads are not mutated), so the post_save signal
     # would not bump the search cache. Invalidate explicitly, after the decline
@@ -83,6 +97,10 @@ def withdraw_consent(user: User) -> list[str]:
     - Empties first_name, last_name, email (NOT NULL fields — use "" not None)
 
     - Invalidates/deletes all active LoginTokens (prevents re-linking after withdrawal)
+
+    - Deactivates the user's SavedSearch rows and deletes their SearchHistory rows
+
+    - Clears User.preferred_city
 
     - Soft-deletes all user ads (status=DELETED, hidden immediately)
 
@@ -124,6 +142,14 @@ def withdraw_consent(user: User) -> list[str]:
         # This prevents re-linking via a still-valid token after withdrawal
         LoginToken.objects.filter(telegram_id=user_telegram_id).delete()
 
+        # Tear down subscriber state inside the same transaction so revocation
+        # actively terminates alerts/history rather than relying on a future
+        # filter. SavedSearch.updated_at is auto_now, so this bulk .update()
+        # does NOT refresh it — accepted, because the daily alert cap reads
+        # last_notified_at (06-PII-110).
+        SavedSearch.objects.filter(user=user).update(is_active=False)
+        SearchHistory.objects.filter(user=user).delete()
+
         # Set consent revocation timestamp and soft-delete flags
         user.consent_revoked_at = now
         user.is_deleted = True
@@ -136,6 +162,7 @@ def withdraw_consent(user: User) -> list[str]:
         user.last_name = ""
         user.email = ""
         user.consent_given_at = None
+        user.preferred_city = None
 
         user.save(
             update_fields=[
@@ -148,6 +175,7 @@ def withdraw_consent(user: User) -> list[str]:
                 "first_name",
                 "last_name",
                 "email",
+                "preferred_city",
             ]
         )
 

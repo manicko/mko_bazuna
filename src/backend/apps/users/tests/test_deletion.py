@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus
+from apps.search.models import SavedSearch, SearchHistory
 from apps.search.services.cache import get_search_version
 from apps.users.models import LoginToken, User
 from apps.users.services.deletion import (
@@ -280,6 +281,75 @@ class TestWithdrawConsentSoftDeletesAds:
         assert len(deleted_keys) == 4
 
 
+class TestWithdrawConsentTearsDownSubscriberState:
+    """withdraw_consent deactivates saved searches and deletes search history.
+
+    Revocation actively terminates subscriber state inside the existing
+    transaction instead of relying on a future filter (06-PII-110).
+    """
+
+    def test_withdraw_deactivates_saved_searches_and_deletes_history(
+        self, user: User
+    ) -> None:
+        """The withdrawing user's SavedSearch rows go inactive; SearchHistory is deleted."""
+        active = SavedSearch.objects.create(user=user, query="bike", is_active=True)
+        history_a = SearchHistory.objects.create(
+            user=user, query="bike", query_normalized="bike"
+        )
+        history_b = SearchHistory.objects.create(
+            user=user, query="scooter", query_normalized="scooter"
+        )
+
+        withdraw_consent(user)
+
+        active.refresh_from_db()
+        assert active.is_active is False
+        assert not SearchHistory.objects.filter(pk=history_a.pk).exists()
+        assert not SearchHistory.objects.filter(pk=history_b.pk).exists()
+
+    def test_withdraw_leaves_other_users_subscriber_state_untouched(
+        self, user: User
+    ) -> None:
+        """A different user's SavedSearch and SearchHistory rows are untouched."""
+        other = make_user(900000060)
+        other_saved = SavedSearch.objects.create(
+            user=other, query="other-bike", is_active=True
+        )
+        other_history = SearchHistory.objects.create(
+            user=other, query="other-bike", query_normalized="other-bike"
+        )
+
+        withdraw_consent(user)
+
+        other_saved.refresh_from_db()
+        assert other_saved.is_active is True
+        assert SearchHistory.objects.filter(pk=other_history.pk).exists()
+
+
+class TestWithdrawConsentRetainsChatId:
+    """The withdrawn identity stays resolvable by chat_id (06-PII-110).
+
+    ``AccountStateMiddleware._resolve_user`` resolves the acting user on
+    ``chat_id`` precisely because ``telegram_id`` is nulled. Nulling ``chat_id``
+    would silently un-block a withdrawn identity; this test stops a future
+    "cleanup" from doing so.
+    """
+
+    def test_chat_id_survives_and_user_is_resolvable(self, user: User) -> None:
+        """chat_id is unchanged after withdrawal and User.objects.get finds it."""
+        expected_chat_id = user.chat_id
+        assert expected_chat_id is not None
+
+        withdraw_consent(user)
+
+        user.refresh_from_db()
+        assert user.chat_id == expected_chat_id
+        # Exactly what AccountStateMiddleware._resolve_user does.
+        resolved = User.objects.get(chat_id=expected_chat_id)
+        assert resolved.pk == user.pk
+        assert resolved.is_deleted is True
+
+
 class TestGiveConsent:
     """Tests for give_consent service."""
 
@@ -345,14 +415,19 @@ class TestWithdrawConsentAtomicity:
     def test_withdraw_is_atomic_rollback(self, user: User, monkeypatch):
         """If soft_delete_user_ads raises, the entire transaction rolls back.
 
-        LoginTokens and user PII must be fully restored when an error occurs
-        inside the transaction boundary.
+        LoginTokens, the SavedSearch deactivation and the SearchHistory deletion
+        must be fully restored when an error occurs inside the transaction
+        boundary, together with the user PII writes.
         """
         now = timezone.now()
         token = LoginToken.objects.create(
             token_hash="hash_rollback",
             telegram_id=user.telegram_id,
             expires_at=now + timezone.timedelta(hours=1),
+        )
+        saved = SavedSearch.objects.create(user=user, query="rollback", is_active=True)
+        history = SearchHistory.objects.create(
+            user=user, query="rollback", query_normalized="rollback"
         )
 
         def _raise(*args, **kwargs):
@@ -368,6 +443,10 @@ class TestWithdrawConsentAtomicity:
 
         # LoginTokens restored — transaction rolled back
         assert LoginToken.objects.filter(pk=token.pk).exists()
+        # SavedSearch deactivation and SearchHistory deletion rolled back too
+        saved.refresh_from_db()
+        assert saved.is_active is True
+        assert SearchHistory.objects.filter(pk=history.pk).exists()
         # User NOT soft-deleted — PII and flags rolled back
         user.refresh_from_db()
         assert user.is_deleted is False

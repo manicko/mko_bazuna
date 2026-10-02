@@ -127,10 +127,14 @@ PII_ERASURE_ENTRIES: tuple[tuple[str, str, ErasureAction, str], ...] = (
         "users.User",
         "preferred_city",
         ErasureAction.NULL,
-        "NOT implemented today: persisted behavioural preference. Owned by "
-        "BLOCK 9 (06-PII-110), which clears it on DECLINE and on withdrawal "
-        "alongside the cookie deletion; the cookie/column asymmetry is that "
-        "block's defect. Declared here so the column is not forgotten by it.",
+        "Implemented today: cleared to NULL by decline_consent and by "
+        "withdraw_consent inside its existing transaction.atomic(). The clear "
+        "is durable because all four restore paths are closed: the decline "
+        "response expires the preferred_city cookie with a hand-rolled secure "
+        "Set-Cookie (delete_cookie cannot clear a Secure cookie over HTTPS), "
+        "set_preferred_city gates its DB write on not is_declined, and the "
+        "login reconcile returns early for a declined user. Re-acceptance via "
+        "give_consent clears is_declined and is a new consent (06-PII-110).",
     ),
     (
         "users.ConsentRecord",

@@ -96,6 +96,27 @@ class TestPreferredCityView:
         assert response.status_code == 200
         assert response.cookies["preferred_city"].value == "podgorica"
 
+    def test_post_does_not_set_db_for_declined_authenticated_buyer(
+        self, podgorica: City
+    ) -> None:
+        """A declined buyer's header click must not re-set the column (06-PII-110)."""
+        declined_buyer = User.objects.create(
+            telegram_id=900000070,
+            chat_id=900000070,
+            password="y",
+            is_declined=True,
+        )
+        client = Client()
+        client.force_login(declined_buyer)
+        assert declined_buyer.preferred_city_id is None
+
+        response = client.post("/api/preferred-city/", {"slug": "podgorica"})
+        assert response.status_code == 200
+        assert response.json() == {"ok": True}
+
+        declined_buyer.refresh_from_db()
+        assert declined_buyer.preferred_city_id is None
+
     def test_post_with_unknown_slug_returns_400(self) -> None:
         client = Client()
         response = client.post("/api/preferred-city/", {"slug": "nowhere"})
