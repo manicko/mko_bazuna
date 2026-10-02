@@ -242,12 +242,21 @@ disposable database.
 | `moderation`       | 1 | No  |
 | `search`           | 1 | No  |
 | `trust`            | 1 | No  |
-| `users`            | 1 | No  |
+| `users`            | 3 | No  |
 | **Total**          | **10** | — |
 
 The threshold is **8 files per app** (PO decision Q6; variable `CONSOLIDATE_THRESHOLD ?= 8`).
 After the one-time initial reset, every app has returned to **1 `0001_initial.py`** (0 for `core`).
 No app currently exceeds the threshold.
+
+> **This table is a consolidation-era snapshot, not a live count.** It was not re-counted for
+> migrations added after the one-time reset, so rows other than `users` understate the real
+> numbers — re-verify by counting `0*.py` under each `src/backend/apps/*/migrations/` before
+> relying on "no app currently exceeds the threshold". The `users` row is current at **3**:
+> `0001_initial`, `0002_alter_consentrecord_ip_address`, and
+> `0003_logintoken_browser_binding` — the last added by phase 04 for the nullable
+> `login_tokens.browser_binding` column (see [`db-schema.md`](../02-database/db-schema.md)). The
+> total row is stale on the same basis.
 
 ### One-time initial reset
 

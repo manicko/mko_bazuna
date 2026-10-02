@@ -471,6 +471,17 @@ trigger is a **second tab of the same profile**: opening `/login/issue/` there
 silently supersedes the first tab's still-live unclaimed token, so only the
 second tab's deep-link stays redeemable.
 
+**Issuance is GET-renderable — `login_issue` is not `@require_POST`.** It
+carries only `@never_cache`; `@require_POST` guards the *consume* half
+(`login_status`) alone. Any same-origin navigation, prefetch or `<img>` to
+`/login/issue/` therefore mints a token **and** runs the supersession, which is
+precisely why the predicate above is bounded to **unclaimed** rows instead of
+being allowed to burn a claimed one. Cross-site CSRF-forged issuance is
+rate-limited (`login_rate_limit_check`, `check_deep_link_render_rate_limit`, both
+`429`) but not forbidden. Closing it means moving the deep-link page behind a
+POST, which changes the entry point of the whole login funnel. **Recorded here
+as a known gap; this phase did not close it.**
+
 ## Account-State and Session Revocation (04-AUT-002)
 
 **Status: `04-AUT-002` is NOT closed.** The web tier has **zero per-request
@@ -635,6 +646,28 @@ to CI. This is the direct, defensible cost of the phase's "no `.po` modified"
 boundary, which existed because another agent owned the catalogs concurrently.
 The msgid is **queued for the `.po` owner**; translating it is out of scope for
 this pass. The call site carries an inline pointer back to this record.
+
+### Deferred: `login_browser_id` Missing From the Privacy Page (04-AUT-001)
+
+**Recorded deferral, not a fix.** The login-binding cookie is described as
+classified essential in [`db-schema.md`](../02-database/db-schema.md) and
+[`db-enums.md`](../02-database/db-enums.md), but the cookie-inventory table in
+`templates/privacy.html` has **no row for it** — that table still lists only
+`sessionid`, `csrftoken`, `consent_given`, `lang_pref` and `preferred_city`. The
+site therefore issues a first-party cookie that its own privacy page does not
+disclose.
+
+The row cannot land from this pass: it needs a `{% trans %}` description with
+non-empty `ru` and `bs` msgstr, and the `.po` catalogs are owned elsewhere — the
+same boundary as the `04-AUT-005` deferral above. Nothing enforces the table's
+completeness: `apps/core/tests/test_privacy.py::test_privacy_page_lists_cookies`
+asserts that a **fixed list** of five cookies is described, not that every issued
+cookie is named, so the gap is invisible to CI.
+
+**Owed to the i18n owner**: add the row, and add `login_browser_id` to that test
+so the next missing cookie turns a test red. Until then, treat
+[`db-schema.md`](../02-database/db-schema.md) as the accurate disclosure record
+and the privacy page as incomplete.
 
 ## Bot Command Menu
 

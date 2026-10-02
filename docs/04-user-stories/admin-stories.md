@@ -37,13 +37,28 @@ automatically during deployment when `ADMIN_PASSWORD` is set in the environment.
 admin login form displays "Username". Enter the admin username (default: `admin`, or the
 `ADMIN_USERNAME` env var) along with the password from the `ADMIN_PASSWORD` env var.
 
+**Password policy (04-VAL-004):** the bootstrap password is validated against
+`AUTH_PASSWORD_VALIDATORS` — at least 10 characters, not on Django's common-password list, not
+entirely numeric, and not too similar to the username or email. A rejected password aborts
+creation. See [Manual Creation](../ops/docker-deployment.md#manual-creation) for the runbook.
+
 ### Setup Methods
 
 1. **Automatic (recommended):** Set `ADMIN_PASSWORD` in `.env` before running `docker compose up -d`
 2. **Manual:** Run `docker compose run --rm web uv run python src/backend/manage.py create_admin_user`
 
+Both paths create the account **once**. Neither can change the password of an account that
+already exists: `create_admin_user` returns early — before any password write — as soon as the
+username or Telegram ID is taken. Changing an existing password is
+`manage.py changepassword <username>`.
+
+Editing an existing account in the Django admin is a separate and deliberately narrow surface:
+the user change form has exactly **one** writable field (`preferred_city`), so un-ban and
+account-disable have no user-form path. The table of what is still reachable, and how, is in
+[The Admin User Change Form Contract](../ops/docker-deployment.md#the-admin-user-change-form-contract-04-aut-005).
+
 See [docs/ops/docker-deployment.md](../ops/docker-deployment.md#admin-user-setup) for detailed
-instructions on creating, modifying, and managing the admin user.
+instructions on creating and managing the admin user.
 
 ## Stories
 
@@ -61,6 +76,11 @@ Unpublish, delete, change status, or ban all of a user's ads. Actions are instan
 ### US-A4 — Manage users
 Block/unblock/delete users. A blocked user cannot post but may still browse.
 
+*Admin-surface note (04-AUT-005):* **block** remains reachable — the **Ad** changelist action
+*Ban users from selected ads*. **Un-block has no admin path at all** (no unban action, no unban
+service), and the user change form renders `is_banned` read-only, so un-blocking is a
+`manage.py shell` operation. The requirement is unchanged; only the UI moved.
+
 ### US-A5 — Auto-remove stale ads
 Background sweep: archive @2 months, delete @4 months (from `published_at`); logged. See decision J.
 
@@ -73,6 +93,13 @@ Add/edit/deactivate categories and cities. Entities in use are not deletable. Se
 ### US-A8 — Manage consent
 View consent fact and revoke it (triggers the decision F withdrawal flow: `consent_revoked_at` +
 soft-delete + 30-day PII erasure).
+
+*Admin-surface note (04-AUT-005):* the `withdraw_consent_action` method exists on `UserAdmin` but
+is **not listed in `ModelAdmin.actions`**, so the changelist never offers it, and the change form
+renders the consent and erasure flags read-only. The trigger is therefore absent from the admin by
+decision, not by oversight — recorded with its phase-06 owner in
+[architecture.md](../99-agent/architecture.md#account-state-and-session-revocation-04-aut-002).
+Revoking remains available to the user themself via *Withdraw Data* on the seller dashboard.
 
 ### US-A9 — View system logs
 Admin-only view of system logs/events; filter by type/date.

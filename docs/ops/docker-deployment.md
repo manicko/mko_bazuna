@@ -1146,6 +1146,47 @@ credential already stored under the old recipe stays weak until it is changed he
 > command above is the way to change a password. The dead link is a known gap owned by phase 15
 > `15-AUTHZ-003`.
 
+### The Admin User Change Form Contract (04-AUT-005)
+
+`UserAdmin` declares an **explicit** field contract instead of letting Django auto-build a form
+over every editable `User` field. The auto-built form exposed `password` as a writable text input
+whose rendered value was the stored hash, and put `is_superuser` / `is_staff` / `groups` /
+`user_permissions` plus every account-state flag in reach of any staff user — and
+`has_change_permission` ignores `obj`, so a plain moderator could reach **every** row.
+
+**The change form at `/admin/users/user/<id>/change/` has exactly one writable field.**
+
+| Field | State on the change form |
+|-------|--------------------------|
+| `preferred_city` | **writable** — the only operator-editable field |
+| `password` | present but **inert**: rendered as a masked `hasher.safe_summary()`; a POSTed plaintext value is discarded before validation |
+| `is_active`, `is_banned`, `is_deleted`, `is_declined`, `ads_auto_publish`, `telegram_premium`, `telegram_id`, `username`, `first_name`, `last_name`, `email`, `telegram_language`, `source`, `date_joined`, `last_login`, `consent_given_at`, `consent_revoked_at`, `deleted_at` | visible under their fieldset heading but **read-only** |
+| `is_superuser`, `is_staff`, `groups`, `user_permissions`, `chat_id` | **not on the form at all** |
+
+The **add** view (`/admin/users/user/add/`) is the one place identity is writable: it uses
+`UserCreationForm` and exposes `username`, `telegram_id`, `chat_id`, `password1` and `password2`,
+so `AUTH_PASSWORD_VALIDATORS` applies to the new account. It is **superuser-only**
+(`has_add_permission` returns `request.user.is_superuser`).
+
+> **Several day-to-day admin operations no longer have a UI path.** Deliberate and knowingly
+> accepted — read this table before planning an operational runbook that relies on the user form.
+
+| Operator need | Where it is reachable |
+|---|---|
+| Ban a user | **Ad** changelist → select ads → *Ban users from selected ads* (`AdAdmin.action_ban_user`) |
+| **Un-ban** a user | **nowhere in the admin** — there is no unban action and no unban service path. `manage.py shell` (`User.objects.filter(…).update(…)`) |
+| Disable an account (`is_active = False`) | **nowhere in the admin** — `is_active` is read-only on the change form and no other in-repo surface writes it. `manage.py shell` |
+| Grant `is_staff` / `is_superuser` / groups | [`create_admin_user`](#manual-creation); the flag flips themselves are not editable |
+| Change a password | [`changepassword`](#password-change) — the admin's *Reset password* link has no route |
+| Toggle browse-only (`is_declined`) | deliberately unavailable — a form write would skip the `on_commit` search-cache bump, leaving stale listings live |
+| Un-soft-delete / undo an erasure (`is_deleted`) | deliberately unavailable — WITHDRAW is terminal and the PII is already nulled |
+
+Note that disabling an account with `is_active = False` stops **issuance** of a web session
+(`login_status` refuses it) and makes Django's `ModelBackend` reject the identity on every
+subsequent request, but it does **not** invalidate an already-issued session cookie — see
+[`architecture.md` § Account-State and Session Revocation](../99-agent/architecture.md#account-state-and-session-revocation-04-aut-002),
+where `04-AUT-002` is recorded as **NOT closed**.
+
 ### Changing the Telegram ID Placeholder
 
 If you need to use a different telegram_id for admin login:
