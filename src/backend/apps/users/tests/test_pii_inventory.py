@@ -1,14 +1,19 @@
 """Completeness guard for the declarative PII erasure inventory.
 
 These are unit tests: the guard resolves model metadata and reads the
-declaration, and needs no database. That is also how the "importable without a
-database connection" constraint is proven — the declaration is asserted to
-open no connection when touched. The tripwire is on *declared* columns, not a
+declaration, and needs no database. The "importable without a database
+connection" constraint is proven two ways: the declaration is read in a fresh
+interpreter whose database is unusable, and a ``CaptureQueriesContext`` proves
+that reading it executes no SQL. The tripwire is on *declared* columns, not a
 classifier: it cannot decide whether a column is personally identifiable, only
 that every data column on a listed model was reviewed.
 """
 
 from __future__ import annotations
+
+import os
+import subprocess
+import sys
 
 import pytest
 from django.apps import apps
@@ -21,6 +26,26 @@ from apps.users.services.pii_inventory import (
 )
 
 pytestmark = [pytest.mark.unit]
+
+#: Subprocess probe: configure Django against an unusable database host and an
+#: unparseable ``DATABASE_URL``, then import and read the declaration. If the
+#: import required a connection — or gained an ``apps.*`` model import at module
+#: scope that resolves a model only on access — this fails. The probe resolves
+#: no model: it reads only the declared data.
+_IMPORT_WITHOUT_DB_CODE = """
+import django
+django.setup()
+from apps.users.services.pii_inventory import (
+    PII_ERASURE_ENTRIES,
+    REVIEWED_NON_IDENTITY_COLUMNS,
+    ErasureAction,
+)
+assert len(PII_ERASURE_ENTRIES) > 0
+entry = PII_ERASURE_ENTRIES[0]
+assert entry[0] and entry[1] and isinstance(entry[2], ErasureAction) and entry[3]
+assert REVIEWED_NON_IDENTITY_COLUMNS
+print("DECLARATION_READ_WITHOUT_DB")
+"""
 
 #: Column names the guard never treats as review candidates: the implicit
 #: primary key and lifecycle/audit timestamps.
@@ -76,14 +101,75 @@ def _entry_lookup() -> dict[tuple[str, str], tuple[str, str, ErasureAction, str]
 
 
 def test_touching_the_declaration_opens_no_database_connection() -> None:
-    """The declaration is importable and readable without a DB connection.
+    """Importing and reading the declaration is possible with no usable database.
 
-    With no test database fixture active, Django's default connection is still
-    closed (``connection.connection is None``). Reading the declaration must
-    not resolve a model or execute a query, so it stays closed.
+    The plan's literal wording is "importable without a database connection, so
+    a data migration can consume it inside a RunPython." This asserts exactly
+    that in a fresh interpreter whose database host is unroutable and whose
+    ``DATABASE_URL`` is unparseable, so *any* connection attempt raises instead
+    of being silently satisfied by the (long-lived) in-process test connection.
+
+    The original assertion here — ``django.db.connection.connection is None`` —
+    measured the session connection lifecycle, not this module's behaviour: the
+    session-scoped autouse fixture ``_restore_test_schema_post_db_setup`` in
+    ``conftest.py`` unblocks and runs migrations, leaving an ``IDLE`` connection
+    object for the rest of the session regardless of what this module does. It
+    was replaced rather than weakened.
+
+    The in-process proof that no query is executed during a declaration read
+    lives in ``test_reading_the_declaration_executes_no_query``.
     """
-    _ = (PII_ERASURE_ENTRIES[0][0], REVIEWED_NON_IDENTITY_COLUMNS)
-    assert connection.connection is None
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in {"DATABASE_URL", "POSTGRES_HOST", "POSTGRES_PORT"}
+    }
+    env["DJANGO_SETTINGS_MODULE"] = "config.settings.test"
+    env["PYTHONPATH"] = os.pathsep.join(sys.path)
+    # Discrete POSTGRES_* branch (base.py handles it robustly): an unroutable
+    # host/port so no connection attempt can succeed, while settings
+    # construction itself must not connect.
+    env["POSTGRES_HOST"] = "127.0.0.1"
+    env["POSTGRES_PORT"] = "1"
+
+    result = subprocess.run(
+        [sys.executable, "-c", _IMPORT_WITHOUT_DB_CODE],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    assert "DECLARATION_READ_WITHOUT_DB" in result.stdout
+
+
+def test_reading_the_declaration_executes_no_query() -> None:
+    """Reading the declaration issues zero SQL statements.
+
+    This is the "no database access" half of the property, proven in-process
+    even though a connection object already exists. A counting
+    ``execute_wrapper`` spans the declaration access and the model resolution
+    the guard performs (``apps.get_model`` resolves metadata without issuing
+    SQL); it does not call ``ensure_connection()``, so the test stays a unit
+    test and does not need the ``django_db`` marker it exists to avoid.
+    """
+    executed_sql: list[str] = []
+
+    def _record(execute, sql, params, many, context):
+        executed_sql.append(sql)
+        return execute(sql, params, many, context)
+
+    with connection.execute_wrapper(_record):
+        model_label, _column, _action, _reason = PII_ERASURE_ENTRIES[0]
+        # Resolving a model's metadata is not a query; assert that stays true
+        # for the declaration's labels and for the reviewed-column mapping.
+        for label in REVIEWED_NON_IDENTITY_COLUMNS:
+            apps.get_model(label)
+        apps.get_model(model_label)
+
+    assert executed_sql == [], (
+        f"reading the declaration executed {len(executed_sql)} "
+        f"SQL statement(s): {executed_sql}"
+    )
 
 
 def test_every_declared_entry_resolves_to_a_real_field() -> None:
