@@ -162,7 +162,7 @@ created_at / updated_at
                     # heartbeat and the web edit form. Do not revert the predicate.
 published_at (TIMESTAMP, nullable)                 # drives archive_sweep timer (60d); UPDATED on every PUBLISHED transition (timer reset)
 original_published_at (TIMESTAMP, nullable)        # set once on FIRST publish; IMMUTABLE, audit only
-archived_at (TIMESTAMP, nullable)                  # drives delete_sweep timer (60d from archive, AD-005)
+archived_at (TIMESTAMP, nullable)                  # drives delete_sweep timer (60d from archive, AD-005); cleared on every -> PUBLISHED transition
 deleted_at (TIMESTAMP, nullable)
 moderation_failed_at (TIMESTAMP, nullable)         # zone C4/D12: drives IX_ads_purge_failed for 7-day auto-purge
 rejected_at (TIMESTAMP, nullable)                  # zone D4: drives IX_ads_rejected_sweep for 90-day manual-reject cleanup
@@ -192,10 +192,30 @@ locale-specific column > Russian > original column.
 - PUBLISHED → ON_MODERATION (text edits only; immediate hide; mixed edit follows text rule)
 - any → DELETED
 
+The list above is the module-level `ALLOWED_TRANSITIONS` in `apps/ads/models.py`, keyed by all
+**seven** `AdStatus` values: `DRAFT`, `ON_MODERATION`, `PUBLISHED`, `ARCHIVED`, `REJECTED`,
+`ON_MODERATION_FAILED`, `DELETED`. `REJECTED` and `DELETED` are terminal (empty target sets), and
+`any → DELETED` is handled ahead of the matrix lookup, so those are the complete contracts.
+
+**`ON_MODERATION_FAILED → PUBLISHED` is refused by design.** A human approval accepts an
+auto-failed ad as its *input* (the approvable set is `{ON_MODERATION, ON_MODERATION_FAILED}`), but
+the matrix has no such edge, so the approval is reported as a refusal and the ad is not
+published. What a seller may do with an auto-failed ad is an open owner question (gate Q5, BLOCK
+8B) recorded in
+[ad-lifecycle-remediation-record.md](../99-agent/ad-lifecycle-remediation-record.md). No edge has
+been added and no code has shipped for it.
+
 > Zone C4 / D12 (AD-001): Six `CheckConstraint`s enforce timestamp presence at the DB level:
 > `published_at` (PUBLISHED), `archived_at` (ARCHIVED), `rejected_at` (REJECTED),
 > `moderation_failed_at` (ON_MODERATION_FAILED), `deleted_at` (DELETED), and the mutual
 > exclusivity of `moderation_failed_at` and `rejected_at`. See [db-indexes.md > Check Constraints](db-indexes.md#check-constraints--unique-constraints--ads-ad-001).
+
+> `Ad.transition_to` **clears `archived_at`** on every `→ PUBLISHED` transition (and clears the
+> moderation and archive timestamps on `→ ON_MODERATION`), so a reactivated ad carries no stale
+> archive timestamp and its timers restart from the new `published_at`. There is deliberately **no
+> reverse `CheckConstraint`** requiring `archived_at IS NULL` outside `ARCHIVED`: the six presence
+> constraints stay one-way, and the clearing is the transition's job, not the database's. Do not
+> add one.
 
 > Zone D1 (hybrid C, decision O5): `category_name` is denormalized + indexed as described above; see [db-indexes.md](db-indexes.md) for the trigger SQL that syncs it.
 
@@ -338,19 +358,26 @@ image (VARCHAR / storage key)        # served URL/key (our storage). Phase 1: lo
                                      #   Key contains NO user_id/telegram_id/username — only ad_id + UUID v4 (zone R6: URL anonymity)
 telegram_file_id (VARCHAR, nullable) # dedup/re-download metadata; NOT used in <img src>
 sha256 (CHAR(64), db_index=True)     # SHA-256 hex digest for per-user deduplication; auto-computed on save
-position (INT)
+position (INT)                                    # unique per ad (uq_ad_images_ad_position); NOT required to be contiguous
 thumbnail_small (VARCHAR, nullable)    # 240x180 thumbnail storage key
 thumbnail_medium (VARCHAR, nullable) # 640x480 thumbnail storage key
 thumbnail_large (VARCHAR, nullable)  # 1280x960 thumbnail storage key
 ```
 Only compressed Telegram photos (`message.photo`) accepted; `message.document` rejected. Bot downloads bytes and stores in our storage; `image` holds the served URL/key. `file_id` is NOT a URL and not usable in `<img src>` — stored as metadata only.
 
+**`UNIQUE (ad, position)`** — constraint `uq_ad_images_ad_position`, migration
+`src/backend/apps/ads/migrations/0009_adimage_uq_ad_position.py`. A position is unique **within
+one ad** and that is the whole rule: **contiguity is deliberately not enforced, so gaps are
+permitted and preserved** (`copy_ad` carries a source ad's positions such as `[0, 2, 5]` through
+verbatim). Do not add a contiguity check to `AdImage.Meta.constraints`.
+
 A storage key is **not** unique to one row: `copy_ad` points the copy at the source ad's
 keys instead of duplicating files, so one key can be legitimately referenced by several
 `AdImage` rows. Deletion is therefore guarded in the `AdImage` `pre_delete` signal
 (`apps.media.signals`) — `delete_photo()` is skipped while another `AdImage` row still
-references that key. That existence check is the minimal fix; **proper refcounting
-(AD-003) is still open**, and `delete_photo()` itself remains unconditional.
+references that key. That per-key existence check **is** the AD-003 fix (retired as `64a9de6`):
+it is the minimal correct mechanism at the one seam every deletion path shares, not a reference
+count, and `delete_photo()` itself remains unconditional once a key is unreferenced.
 
 > Zone R6 / R8 (storage-boundary validation): `ad_images.image` key is ad-scoped + UUID v4
 > (unguessable, non-sequential). JPEG validated strictly (magic bytes / PIL) on save; non-JPEG

@@ -108,6 +108,43 @@ transitions and `ModeratorActionLog` entries, see [db-schema.md](db-schema.md)).
 The API validates the action up front and returns `400` for any value outside
 this set.
 
+Each ad is processed in its own `transaction.atomic()` under `select_for_update()` on that one
+row, in ascending id order, so a failure on one ad never rolls back or aborts the rest. The
+response shape `{"completed": N, "errors": [{"id": .., "error": ..}]}` and its HTTP `200` are
+unchanged; the per-ad isolation is what that shape already promised.
+
+## BulkModerationError
+Per-id failure strings returned by the moderation JSON API
+(`bulk_moderation_action` view), returned in the `error` field of each entry in `errors`. Like
+[`BulkModerationAction`](#bulkmoderationaction) this is an API-level vocabulary — it is **not**
+stored as a database column. The values carry no driver or exception text.
+
+| Value | Wire string | Meaning |
+|-------|-------------|---------|
+| `CRITERIA_REJECTED` | `Auto-moderation failed` | auto-moderation ran and the ad failed the criteria (the ad is set to `ON_MODERATION_FAILED`) |
+| `TRANSITION_REFUSED` | `Transition refused by ad status` | the ad was not in the approvable set, or the state machine refused the transition; no state change |
+| `AD_NOT_FOUND` | `Ad not found` | the row was absent at lock time or hard-deleted mid-transaction |
+| `MAX_ADS_EXCEEDED` | `User has reached the maximum number of active ads` | the seller's active-ads cap was reached — a business outcome, not a system fault |
+| `INVALID_TRANSITION` | `Ad is not in a modifiable state` | ordinary user input the matrix refuses (e.g. bulk-rejecting an `ARCHIVED` ad) |
+| `PROCESSING_FAILED` | `Processing failed` | an unexpected infrastructure/DB failure; logged loudly so it is never a silent `200` |
+
+## ApproveOutcome
+Result of one ad approval attempt (`approve_ad` in
+`apps/moderation/admin_actions.py`; used by the bulk API and the admin changelist approve
+action). API-level vocabulary — **not** a database column. It exists so a caller can surface the
+real reason instead of a `500`; a refusal writes no audit row.
+
+| Value | Meaning |
+|-------|---------|
+| `PUBLISHED` | auto-moderation passed and the ad was published |
+| `CRITERIA_REJECTED` | auto-moderation ran and the ad failed the criteria (it is set to `ON_MODERATION_FAILED`) |
+| `TRANSITION_REFUSED` | the ad was not in the approvable set, or the state machine refused the transition; no state change |
+
+The approvable set is `{ON_MODERATION, ON_MODERATION_FAILED}` — a failed ad is reachable for
+human review. The state machine still refuses `ON_MODERATION_FAILED → PUBLISHED`, so approving a
+failed ad reports `TRANSITION_REFUSED`; the full matrix is in
+[db-schema.md](db-schema.md).
+
 ## CategoryRejectReason
 UI/admin vocabulary enum for moderator reject dropdown. Used as guidance for
 reason text in `ModeratorActionLog` (never shown to seller, US-A11).

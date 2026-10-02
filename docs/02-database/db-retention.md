@@ -31,6 +31,12 @@ long each ad status is retained before permanent deletion.
 | `PUBLISHED` | 2 months (auto-archive) | `archive_sweep` | `IX_ads_archive_sweep` |
 | `DRAFT` | 30 minutes **of inactivity** | `sweep_drafts` (advisory lock 4) | `IX_ads_draft_sweep` |
 
+The table names the **implemented** anchor of each sweep, which is not the same as a ratified
+decision for every row. `delete_sweep` filters on `archived_at`; whether that is the *correct*
+anchor is an open owner question (`AD-004` / `VAL-005`, gate Q4) and no code has changed. Read
+that row as a description of the command, not as an endorsement of the anchor. The open gates
+are listed in [ad-lifecycle-remediation-record.md](../99-agent/ad-lifecycle-remediation-record.md).
+
 ### Soft-delete model
 
 All ad deletions are **soft deletes**: the `status` is set to `DELETED` and
@@ -152,7 +158,7 @@ When a seller withdraws consent (GDPR Article 21 opt-out), the following lifecyc
    - All `Ad` rows belonging to the user (including `DELETED` status ads)
    - All `AdImage` rows (via `on_delete=CASCADE`)
    - All `SellerVerification` rows (via `on_delete=CASCADE`)
-    - Physical ad-image files (including thumbnail derivatives) deleted via `delete_photo()` loop (`apps.media.services.filesystem`) after transaction commits, using `AdImage.storage_keys()` to collect all key variants (image + `thumbnail_small/medium/large`). A key still referenced by another `AdImage` row is **skipped** by the `pre_delete` signal (`apps.media.signals`) — `copy_ad` shares keys instead of duplicating files, so unconditional deletion would destroy another ad's photo. Proper refcounting (AD-003) is still open.
+    - Physical ad-image files (including thumbnail derivatives) deleted via `delete_photo()` loop (`apps.media.services.filesystem`) after transaction commits, using `AdImage.storage_keys()` to collect all key variants (image + `thumbnail_small/medium/large`). A key still referenced by another `AdImage` row is **skipped** by the `pre_delete` signal (`apps.media.signals`) — `copy_ad` shares keys instead of duplicating files, so unconditional deletion would destroy another ad's photo. That per-key reference check **is** the AD-003 fix; it retired as `64a9de6`. The receiver collects `storage_keys()`, drops the keys still referenced by any **other** `AdImage` row, and defers `delete_photo` for the remainder to `transaction.on_commit`. The exclusion of the row being deleted is load-bearing: `pre_delete` runs before the cascade, so an unexcluded existence check always matches the row itself and would silently stop all file cleanup, leaking every orphaned file.
 
    **Note:** This is a **30-day** hard-delete, distinct from `purge_deleted_ads` which uses a **120-day** retention window for all `DELETED`-status ads regardless of consent withdrawal. Consent-withdrawn users' ads are purged at 30 days; other soft-deleted ads persist until 120 days.
 

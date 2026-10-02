@@ -44,16 +44,19 @@ progress; starting a new ad or copying an existing one replaces it. See decision
 ### US-S5 — Edit ad
 Seller edits description/price/photos. **Text edits** (title/description) →
 `PUBLISHED → ON_MODERATION` and the ad is **hidden immediately** until it passes re-check
-(zone C2). Price/photo edits publish instantly (≤5s). A mixed edit follows the text rule. See
-decision J.
+(zone C2). Price/photo edits publish instantly (≤5s). A mixed edit follows the text rule. An
+unsubmitted `DRAFT` and a pending `ON_MODERATION` ad save directly with the status unchanged; an
+ad in any other status (`ON_MODERATION_FAILED`, `REJECTED`, `DELETED`) is **refused with an
+explicit message** and nothing is written. The dashboard's Edit link is shown only for the
+statuses that can reach a working edit form. See decision J.
 
 ### US-S6 — Delete own ad
 Seller deletes an ad → `DELETED` (soft), hidden from the site.
 
 ### US-S7 — Auto-archive & removal
 2 months after last publish/edit → `ARCHIVED`; 4 months → permanently removed. Timers count from
-`published_at` (reset on every `PUBLISHED` transition). Seller sees archived ads in the dashboard
-and can reactivate them (text re-checked). See decision J.
+`published_at` (reset on every `PUBLISHED` transition and on a price-only edit of a live ad). Seller
+sees archived ads in the dashboard and can reactivate them (text re-checked). See decision J.
 
 ### US-S8 — Delete account
 Seller withdraws consent via a 'Withdraw Data' button on the dashboard (POST, CSRF-protected, confirmation dialog); ads are soft-deleted; `telegram_id`/`username` are nulled exactly **30 days** after `consent_revoked_at` (decision F / zone R1). Independent of the

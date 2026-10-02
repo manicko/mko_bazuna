@@ -80,9 +80,13 @@ Product decisions (A–L) and zone resolutions are the single source of truth in
 `DRAFT → ON_MODERATION → PUBLISHED | REJECTED | ON_MODERATION_FAILED`;
 `PUBLISHED → ARCHIVED → PUBLISHED` (reactivation); `ARCHIVED → ON_MODERATION` (edit-then-re-moderate);
 `PUBLISHED → ON_MODERATION` (text edit);
-any → `DELETED`.
+`ON_MODERATION_FAILED → REJECTED` (human review only);
+any → `DELETED`. `REJECTED` and `DELETED` are terminal.
 
 - `REJECTED` purged @90d; `ON_MODERATION_FAILED` purged @7d (`moderation_failed_at`)
+- `ON_MODERATION_FAILED → PUBLISHED` is **refused by design** — the matrix has no such edge, so an
+  approval of a failed ad reports a refusal. The full matrix (all seven source statuses) is in
+  [db-schema.md](../02-database/db-schema.md).
 
 ## Key tables
 

@@ -73,6 +73,18 @@ status/category/city/date.
 Unpublish, delete, change status, or ban all of a user's ads. Actions are instant and logged to
 `ModeratorActionLog`.
 
+*Admin-surface note (AD-001):* a status change made through the **Ad** change form is routed
+through the lifecycle matrix instead of being written as a raw `UPDATE`, and it writes **exactly
+one** `ModeratorActionLog` row through the existing moderation-log service for the target it routes
+to: today the form can reach `PUBLISHED` and `DELETED` there, because `REJECTED` and
+`ON_MODERATION_FAILED` are refused by the form (their timestamp columns are read-only). A form
+change to `ARCHIVED`, `ON_MODERATION` or `DRAFT` still goes through the matrix guard but writes
+**no** audit row; that is the recorded residual of the deferred admin-status decision. A POST that
+would violate a status timestamp constraint is now a form error instead of an HTTP 500. `status` is
+deliberately still editable, so a moderator may still move it; whether that is the sanctioned seam
+is an open owner question, recorded in
+[ad-lifecycle-remediation-record.md](../99-agent/ad-lifecycle-remediation-record.md).
+
 ### US-A4 — Manage users
 Block/unblock/delete users. A blocked user cannot post but may still browse.
 
