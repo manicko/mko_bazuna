@@ -15,7 +15,7 @@ Max allowed parallel subagents = 2
 Do not launch agents in background.
 If stop or break prefer resume old session not launching new agent.
 
-## 1. Inspect relevant current architecture and implementation 
+## 0. Inspect relevant current architecture and implementation 
 
 Launch an `Auditor` to inspect the current codebase relevant to the plan.
 
@@ -31,8 +31,8 @@ Output as `{code_context}`.
 <original_prompt>
 
 
-## 2. Decompose Plan
-Then launch a `Planner` with the {plan_file} and `{code_context}`.
+## 1. Decompose Plan
+Phase may be skipped if plan is already sufficiently detailed and clear to proceed with implementation if not launch a `Planner` with the {plan_file} and `{code_context}`.
 
 Provide:
 <original_prompt>
@@ -53,6 +53,24 @@ Provide:
 
 Save the result as `Execution plan`: `.ai\plans\{next-number}-{plan-name}.md`.
 ----------------------------------
+
+## 2. Ask user as the Product Owner
+Skip this step unless there are business uncertainty.
+
+Ask user as the Product Owner only the questions required to resolve business uncertainty.
+Provide questions with options to choose basing on the best practices and highlight recommended options. 
+
+Questions should focus on:
+- product behavior
+- business rules
+- priorities
+- user expectations
+- acceptance criteria
+
+Do not ask about technical implementation.
+
+Collect answers for the the specification.
+
 
 ## 3. Execute Blocks
 
