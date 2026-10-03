@@ -1,5 +1,5 @@
 """
-Admin-action tests for the operator ban privilege guard (plan 19, ``B-1``).
+Admin-action tests for the operator ban privilege guard (plan 19, ``B-1``/``B-3``).
 
 Seeds `B-1`'s minimum behavioural proof that the ``is_banned`` lever now has the
 same two-layer protection the ``is_active`` lever has (plan 18). ``B-3`` extends
@@ -8,24 +8,39 @@ and must not rewrite these.
 
 The guard is a **target scope** in the service layer
 (``apps.moderation.admin_actions._resolve_ban_targets``), shared by both ban
-writers, plus a truthful operator toast on the ``AdAdmin`` changelist action.
+writers, plus a truthful operator toast on the ``AdAdmin`` changelist action and
+a refusal notice on the ``moderation:ban`` view.
 
-Literal-guard discipline
-------------------------
+Literal-guard discipline (LOAD-BEARING — do not "de-duplicate")
+--------------------------------------------------------------
 Some tests assert **hard-coded** substrings (``"Banned 1 user(s)"``,
-``"Skipped:"``, ``"1 privileged"``) rather than importing the constants or
-building the expected string from the result object. That duplication is
-deliberate: a test that pins ``SKIPPED_BANNED_ROWS_PREFIX in text`` while
-importing that prefix from the module under test is a tautology which stays green
-after a reword. A future editor must not "fix" the duplication — the guards exist
-so rewording the invariant fails here.
+``"Skipped:"``, ``"1 privileged"``, ``"refuses login and publishing"``,
+``"locked out everywhere"``, ...) rather than importing the constants or building
+the expected string from the result object. That duplication is deliberate: a
+test that pins ``BAN_TIER_ENFORCEMENT in text`` while importing
+``BAN_TIER_ENFORCEMENT`` from the module under test is a tautology which stays
+green after the constant is reworded — even to something the operator should
+never read. This is the hazard
+``test_admin_deactivate_user.py::test_operator_message_names_the_bot_tier_limit``
+documents. A future editor must not "fix" the duplication: the guards exist so
+that rewording an invariant fails here.
+
+The **one** deliberate exception is
+``test_ban_tier_wording_is_identical_on_both_surfaces``: it imports both
+constants on purpose because its assertion is about *equality* between the two
+surfaces (a drift pin), not about the content. See that test's docstring.
+
+The three operator-message tests (the ``AdAdmin`` toast and the ``moderation:ban``
+view notice) are a **security-relevant pin**, not coverage theatre: all of
+``B-2``'s operator copy was unpinned before them (plan §17.3).
 
 ``conftest.py`` is contended territory and supplies no admin/superuser fixture,
 so ``staff_user`` / ``superuser`` and ``_make_user`` are module-local, built with
 ``get_or_create`` on the reserved unclaimed ``9300003xx`` block (``93xxxxxxx`` is
-the users-test block; ``900000xxx`` belongs to the moderation tests) so
-``--reuse-db`` works. Assert observable state and counts, never query shapes; a
-test that re-derived the exclusion in its body would pass vacuously.
+the users-test block; ``900000xxx`` belongs to the moderation tests; ``99xxxxxxx``
+to analytics/search) so ``--reuse-db`` works. Assert observable state and counts,
+never query shapes; a test that re-derived the exclusion in its body would pass
+vacuously.
 """
 
 from __future__ import annotations
@@ -36,6 +51,7 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
+from apps.ads.admin import BAN_TIER_ENFORCEMENT as ADS_BAN_TIER_ENFORCEMENT
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus, ModeratorActionType
 from apps.moderation.admin_actions import (
@@ -44,12 +60,15 @@ from apps.moderation.admin_actions import (
     bulk_ban_users,
 )
 from apps.moderation.models import ModeratorActionLog
+from apps.moderation.views import review
 from apps.users.models import User
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
-# Reserved ``9300003xx`` block (unclaimed at B-1; see module docstring).
+# Reserved ``9300003xx`` block (unclaimed at B-1; B-3 uses ``313``-``330``; see
+# module docstring). Distinct from ``9300001xx`` (users tests) and ``9300002xx``
+# (users password recovery).
 _STAFF_ID = 930000301
 _SUPERUSER_ID = 930000302
 
@@ -186,6 +205,13 @@ def test_moderator_cannot_ban_themselves(
     There is no un-ban path and no per-request web gate for ``is_banned``, so a
     self-ban is an operator lockout the UI cannot repair. The superuser case is
     the branch a naive ``is_superuser`` shortcut drops.
+
+    §15.1 finding 3 (§17.3): ``skipped_privileged == 0`` is asserted for a row
+    that is **both** self **and** privileged. Without it, dropping
+    ``.exclude(pk=moderator_id)`` from the privileged **count** would go
+    undetected, because the two other ``skipped_privileged == 0`` assertions in
+    this module are superuser-actor cases where the privileged count is 0 anyway.
+    This is reporting accuracy; the write scope is unaffected either way.
     """
     create_test_ad(staff_user, category, city, status=AdStatus.ON_MODERATION)
     create_test_ad(superuser, category, city, status=AdStatus.ON_MODERATION)
@@ -203,6 +229,9 @@ def test_moderator_cannot_ban_themselves(
 
     assert moderator_result.changed == 0
     assert moderator_result.skipped_self == 1
+    # The moderator's own row is ``is_staff=True`` and is the actor's row: it is
+    # counted once, as self. The privileged count must stay 0.
+    assert moderator_result.skipped_privileged == 0
     assert superuser_result.changed == 0
     assert superuser_result.skipped_self == 1
     staff_user.refresh_from_db()
@@ -411,3 +440,241 @@ class TestBanScopeStructure:
         """``_resolve_ban_targets`` must not grow a ``select_for_update``."""
         src = inspect.getsource(_resolve_ban_targets)
         assert "select_for_update" not in src
+
+    @staticmethod
+    def test_ban_user_for_ad_keeps_its_lock_inside_atomic() -> None:
+        """Completion of §3's structural inventory for the two ban writers.
+
+        The existing ``TestBulkLockingStructure::test_bulk_ban_users_not_locked``
+        (in ``test_admin_actions.py``) already pins ``bulk_ban_users``' negative
+        lock invariant and is left byte-unchanged. Its positive counterpart
+        ``test_ban_user_for_ad_uses_atomic`` lives there too. This adds the
+        equivalent in-module guard for the single-ad writer's **positive**
+        invariant — the lock is legitimate (a read-then-write on the instance)
+        and must be kept — so the inventory is complete in one place without
+        moving or rewriting the tripwire tests.
+        """
+        src = inspect.getsource(ban_user_for_ad)
+        assert "transaction.atomic" in src
+        assert "select_for_update" in src
+
+    @staticmethod
+    def test_bulk_ban_users_is_atomic_and_not_locked() -> None:
+        """The bulk writer's invariants, restated in-module (see the sibling test).
+
+        ``test_admin_actions.py::TestBulkLockingStructure`` owns the canonical
+        tripwires; this is the in-module copy that completes the inventory the
+        ``B-3`` task requires. It must agree with that file: ``transaction.atomic``
+        present, ``select_for_update`` absent.
+        """
+        src = inspect.getsource(bulk_ban_users)
+        assert "transaction.atomic" in src
+        assert "select_for_update" not in src
+
+
+# ---------------------------------------------------------------------------
+# 10-11. Actor reachability — an anti-vacuity pair.
+# ---------------------------------------------------------------------------
+
+
+def test_non_staff_cannot_reach_the_ban_action(category, city) -> None:
+    """A plain non-staff seller never reaches the action; a POST changes nothing.
+
+    Paired with ``test_moderator_and_superuser_can_reach_the_ban_action`` so the
+    pair cannot pass vacuously: without the positive control this test would stay
+    green even if the action were simply broken for everyone.
+    """
+    actor = _make_user(930000313)
+    target = _make_user(930000314)
+    ad = create_test_ad(target, category, city, status=AdStatus.ON_MODERATION)
+
+    client = Client()
+    client.force_login(actor)
+    response = client.get(reverse("admin:ads_ad_changelist"))
+    # A non-staff user is redirected to the admin login: AdminSite.has_permission
+    # returns False. That 302 is the real actor gate.
+    assert response.status_code == 302
+
+    client.post(
+        reverse("admin:ads_ad_changelist"),
+        data={
+            "action": "action_ban_user",
+            "_selected_action": [str(ad.pk)],
+            "index": "0",
+        },
+    )
+    target.refresh_from_db()
+    assert target.is_banned is False
+
+
+def test_moderator_and_superuser_can_reach_the_ban_action(
+    staff_user: User, superuser: User, category, city
+) -> None:
+    """Positive control: both admin classes reach the action (anti-vacuity).
+
+    Without this, ``test_non_staff_cannot_reach_the_ban_action`` passes if the
+    action is simply absent for everyone. The action is driven over the real ads
+    changelist, whose ``_selected_action`` values are **Ad** pks (the action
+    resolves the users from the selected ads).
+    """
+    moderator_target = _make_user(930000315)
+    superuser_target = _make_user(930000316)
+    moderator_ad = create_test_ad(
+        moderator_target, category, city, status=AdStatus.ON_MODERATION
+    )
+    superuser_ad = create_test_ad(
+        superuser_target, category, city, status=AdStatus.ON_MODERATION
+    )
+
+    for actor, ad, target in (
+        (staff_user, moderator_ad, moderator_target),
+        (superuser, superuser_ad, superuser_target),
+    ):
+        client = Client()
+        client.force_login(actor)
+        response = client.get(reverse("admin:ads_ad_changelist"))
+        assert response.status_code == 200
+        response = client.post(
+            reverse("admin:ads_ad_changelist"),
+            data={
+                "action": "action_ban_user",
+                "_selected_action": [str(ad.pk)],
+                "index": "0",
+            },
+            follow=True,
+        )
+        assert response.status_code == 200
+        target.refresh_from_db()
+        assert target.is_banned is True
+
+
+# ---------------------------------------------------------------------------
+# 12-14. The operator-message contract — the two-sided tier truth.
+#
+# These three drive real endpoints and read the messages off the response, and
+# they assert HARD-CODED substrings (see the module docstring). All of B-2's
+# operator copy was unpinned before them (plan §17.3).
+# ---------------------------------------------------------------------------
+
+
+def test_ban_operator_message_states_the_two_sided_tier_truth(
+    staff_user: User, superuser: User, category, city
+) -> None:
+    """The ``AdAdmin`` toast carries the positive tier truth, exactly once.
+
+    Supersedes §3's ``test_operator_message_does_not_claim_total_lockout``,
+    which asserted **absence only** and therefore passed vacuously even if every
+    tier clause were deleted (§17.3/W2).
+
+    A mixed selection is used so the message is the *partial* branch: the
+    four-clause family is still the whole statement, and the tier sentence is one
+    statement, not boilerplate repeated per clause.
+    """
+    seller = _make_user(930000317)
+    seller_ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+    superuser_ad = create_test_ad(
+        superuser, category, city, status=AdStatus.ON_MODERATION
+    )
+
+    client = Client()
+    client.force_login(staff_user)
+    response = client.post(
+        reverse("admin:ads_ad_changelist"),
+        data={
+            "action": "action_ban_user",
+            "_selected_action": [str(seller_ad.pk), str(superuser_ad.pk)],
+            "index": "0",
+        },
+        follow=True,
+    )
+
+    text = " ".join(str(m) for m in response.context["messages"])
+    # Positive half: the three tier clauses are present as hard-coded literals.
+    assert "refuses login and publishing" in text
+    assert "is enforced in the Telegram bot" in text
+    assert "does not revoke an existing web session" in text
+    # Anti-over-claim half: these must never appear.
+    assert "locked out everywhere" not in text
+    assert "cannot get back in" not in text
+    # One statement, not boilerplate: the tier clause appears exactly once.
+    assert text.count("refuses login and publishing") == 1
+
+
+def test_ban_view_refusal_states_the_two_sided_tier_truth(
+    staff_user: User, category, city
+) -> None:
+    """The ``moderation:ban`` view refusal states the tier truth, exactly once.
+
+    The view surface had **no** test before ``B-3``, and it is the surface
+    ``R1`` was really about (``R1`` was found on the admin toast, but the fix had
+    to land on both). The ad is owned by a peer ``is_staff`` moderator, so the
+    refusal reason is ``PRIVILEGED``.
+    """
+    peer_moderator = _make_user(930000318, is_staff=True)
+    ad = create_test_ad(peer_moderator, category, city, status=AdStatus.ON_MODERATION)
+
+    client = Client()
+    client.force_login(staff_user)
+    response = client.post(
+        reverse("moderation:ban", args=[ad.id]),
+        data={"ban_reason": "policy violation"},
+        follow=True,
+    )
+
+    # A clean non-500 outcome (the redirect followed to the admin changelist).
+    assert response.status_code == 200
+    text = " ".join(str(m) for m in response.context["messages"])
+    # The refusal sentence itself, then the three tier clauses (hard-coded).
+    assert "not applied" in text
+    assert "refuses login and publishing" in text
+    assert "is enforced in the Telegram bot" in text
+    assert "does not revoke an existing web session" in text
+    assert text.count("refuses login and publishing") == 1
+    peer_moderator.refresh_from_db()
+    assert peer_moderator.is_banned is False
+
+
+def test_ban_tier_wording_is_identical_on_both_surfaces() -> None:
+    """Cross-surface drift pin — the **deliberate** exception to literal guards.
+
+    Importing both constants here is CORRECT and required: the assertion is about
+    *equality between the two surfaces* (a drift pin), not about the content. A
+    hard-coded copy of the string would pin the content but not the equality —
+    the two surfaces could drift to different wording and both literals would
+    still match one of the surfaces. So the literal-guard discipline in the
+    module docstring explicitly exempts this test.
+
+    Also pins "not boilerplate" structurally: the tier text is **not** a fifth
+    member of ``_BAN_REFUSAL_MESSAGES`` and is **not** repeated inside any of the
+    four refusal sentences — the tier statement is a single attached clause, not
+    one sentence per refusal.
+    """
+    from apps.ads import admin as ads_admin
+
+    assert ADS_BAN_TIER_ENFORCEMENT == review.BAN_TIER_ENFORCEMENT
+    assert ads_admin.BAN_TIER_ENFORCEMENT == review.BAN_TIER_ENFORCEMENT
+
+    messages = review._BAN_REFUSAL_MESSAGES
+    assert len(messages) == 4
+    # Not a fifth member: the tier text is not one of the four refusal values.
+    assert review.BAN_TIER_ENFORCEMENT not in messages.values()
+    # Not repeated inside the four sentences either.
+    for sentence in messages.values():
+        assert review.BAN_TIER_ENFORCEMENT not in sentence
+
+
+def test_not_in_target_set_refusal_copy_asserts_no_cause() -> None:
+    """Pins ``R2``: the cause-neutral sentence is present; the false cause is gone.
+
+    ``R2`` found that the retired wording asserted a cause
+    (``"outside the set of accounts you may ban"``) that is false for the
+    reachable all-zero producer (a deleted ad owner's account). The current
+    sentence is deliberately cause-neutral. This is asserted against the mapping
+    value directly rather than by contriving an unreachable fixture — the shape
+    the ``B-2`` Validator proposed.
+    """
+    from apps.moderation.admin_actions import BanRefusalReason
+
+    sentence = review._BAN_REFUSAL_MESSAGES[BanRefusalReason.NOT_IN_TARGET_SET]
+    assert "was not among the accounts available to this action" in sentence
+    assert "outside the set of accounts you may ban" not in sentence
