@@ -32,7 +32,15 @@ surfaces (a drift pin), not about the content. See that test's docstring.
 
 The three operator-message tests (the ``AdAdmin`` toast and the ``moderation:ban``
 view notice) are a **security-relevant pin**, not coverage theatre: all of
-``B-2``'s operator copy was unpinned before them (plan §17.3).
+``B-2``'s operator copy was unpinned before them (plan §17.3). The refusal
+*sentences* are pinned the same way: ``test_each_refusal_sentence_names_its_own_cause``
+hard-codes each value's distinguishing clause, and the view test hard-codes the
+``PRIVILEGED`` discriminator, so a swap of two refusal values goes red rather
+than surviving behind their shared ``"not applied"`` prefix. The two message-level
+tests assert ``msg.level`` (``ERROR`` for a fully-refused selection, ``SUCCESS``
+for a partial one) and the two scope tests assert the resolver's returned
+``target_scope`` marker — both hard-coded, neither re-derived from the constant
+under test.
 
 ``conftest.py`` is contended territory and supplies no admin/superuser fixture,
 so ``staff_user`` / ``superuser`` and ``_make_user`` are module-local, built with
@@ -48,6 +56,7 @@ from __future__ import annotations
 import inspect
 
 import pytest
+from django.contrib import messages
 from django.test import Client
 from django.urls import reverse
 
@@ -66,11 +75,27 @@ from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
-# Reserved ``9300003xx`` block (unclaimed at B-1; B-3 uses ``313``-``330``; see
+# Reserved ``9300003xx`` block (unclaimed at B-1; B-3 uses ``313``-``321``; see
 # module docstring). Distinct from ``9300001xx`` (users tests) and ``9300002xx``
 # (users password recovery).
 _STAFF_ID = 930000301
 _SUPERUSER_ID = 930000302
+
+
+def _reset_ban(user: User) -> User:
+    """Clear ``is_banned`` on a reused fixture row (``--reuse-db`` safety).
+
+    The ``staff_user`` / ``superuser`` fixtures are built with ``get_or_create``
+    so ``--reuse-db`` works, but the row then persists across the whole test
+    session. No current test bans either row — both are always refused by the
+    guard — yet a future test that successfully bans one would otherwise poison
+    the fixture for every later test in the session. Resetting the flag on
+    acquire removes that latent ordering hazard.
+    """
+    if user.is_banned:
+        user.is_banned = False
+        user.save(update_fields=["is_banned"])
+    return user
 
 
 @pytest.fixture
@@ -84,7 +109,7 @@ def staff_user() -> User:
             "is_staff": True,
         },
     )
-    return user
+    return _reset_ban(user)
 
 
 @pytest.fixture
@@ -99,7 +124,7 @@ def superuser() -> User:
             "is_superuser": True,
         },
     )
-    return user
+    return _reset_ban(user)
 
 
 def _make_user(telegram_id: int, **overrides: object) -> User:
@@ -190,6 +215,46 @@ def test_superuser_can_ban_a_staff_row(
     assert result.skipped_privileged == 0
     peer_staff.refresh_from_db()
     assert peer_staff.is_banned is True
+
+
+# ---------------------------------------------------------------------------
+# 2b. 19-D7 — the resolver's scope marker names the scope that governed.
+# ---------------------------------------------------------------------------
+
+
+def test_resolve_ban_targets_marker_is_unrestricted_for_a_superuser(
+    superuser: User,
+) -> None:
+    """A superuser actor gets the ``"unrestricted"`` scope marker.
+
+    ``19-D7`` widened the resolver's return to a 3-tuple carrying the scope the
+    write actually ran under, so a caller that logs it cannot name a scope
+    different from the one that governed the write (§15.1 finding 2). This pins
+    the superuser branch by its returned value — a hard-coded literal, not an
+    import that would make the assertion tautological — and swaps the
+    ``"unrestricted"`` / ``"non_privileged_only"`` literals would go red.
+    """
+    target = _make_user(930000320)
+
+    _, _, target_scope = _resolve_ban_targets([target.pk], superuser.id)
+
+    assert target_scope == "unrestricted"
+
+
+def test_resolve_ban_targets_marker_is_restricted_for_a_non_superuser(
+    staff_user: User,
+) -> None:
+    """A non-superuser actor gets the ``"non_privileged_only"`` scope marker.
+
+    The counterpart to the superuser test: the marker is derived from the same
+    ``actor_is_superuser`` lookup that chose the branch, so a non-superuser actor
+    must be labelled with the restricted scope the guard actually applied.
+    """
+    target = _make_user(930000321)
+
+    _, _, target_scope = _resolve_ban_targets([target.pk], staff_user.id)
+
+    assert target_scope == "non_privileged_only"
 
 
 # ---------------------------------------------------------------------------
@@ -600,15 +665,89 @@ def test_ban_operator_message_states_the_two_sided_tier_truth(
     assert text.count("refuses login and publishing") == 1
 
 
+def test_fully_refused_ban_toast_is_reported_at_error_level(
+    staff_user: User, superuser: User, category, city
+) -> None:
+    """A fully-refused ``action_ban_user`` escalates the toast to ``ERROR``.
+
+    ``19-D6`` introduced the escalation: a selection where nothing was banned
+    (``changed == 0`` with a non-zero skip count) is reported at ``error`` so a
+    security-adjacent refusal does not arrive as a false-success toast. Reverting
+    ``action_ban_user`` to a flat ``level="success"`` would otherwise turn nothing
+    red. This is the repo's first assertion on ``msg.level`` — the level is read
+    off the real ``messages`` framework through the admin endpoint, not
+    re-derived from the production constant.
+    """
+    superuser_ad = create_test_ad(
+        superuser, category, city, status=AdStatus.ON_MODERATION
+    )
+
+    client = Client()
+    client.force_login(staff_user)
+    response = client.post(
+        reverse("admin:ads_ad_changelist"),
+        data={
+            "action": "action_ban_user",
+            "_selected_action": [str(superuser_ad.pk)],
+            "index": "0",
+        },
+        follow=True,
+    )
+
+    recorded = list(response.context["messages"])
+    assert len(recorded) == 1
+    assert recorded[0].level == messages.ERROR
+    superuser.refresh_from_db()
+    assert superuser.is_banned is False
+
+
+def test_partially_refused_ban_toast_keeps_success_level(
+    staff_user: User, superuser: User, category, city
+) -> None:
+    """The benign counterpart: a partial success keeps its existing ``SUCCESS``.
+
+    ``19-D6`` escalates **only** the fully-refused case. When at least one ban
+    took effect the action did take effect, so the level must stay ``success`` —
+    this pins that the escalation is not applied indiscriminately.
+    """
+    seller = _make_user(930000319)
+    seller_ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+    superuser_ad = create_test_ad(
+        superuser, category, city, status=AdStatus.ON_MODERATION
+    )
+
+    client = Client()
+    client.force_login(staff_user)
+    response = client.post(
+        reverse("admin:ads_ad_changelist"),
+        data={
+            "action": "action_ban_user",
+            "_selected_action": [str(seller_ad.pk), str(superuser_ad.pk)],
+            "index": "0",
+        },
+        follow=True,
+    )
+
+    recorded = list(response.context["messages"])
+    assert len(recorded) == 1
+    assert recorded[0].level == messages.SUCCESS
+    seller.refresh_from_db()
+    assert seller.is_banned is True
+
+
 def test_ban_view_refusal_states_the_two_sided_tier_truth(
     staff_user: User, category, city
 ) -> None:
     """The ``moderation:ban`` view refusal states the tier truth, exactly once.
 
-    The view surface had **no** test before ``B-3``, and it is the surface
-    ``R1`` was really about (``R1`` was found on the admin toast, but the fix had
-    to land on both). The ad is owned by a peer ``is_staff`` moderator, so the
-    refusal reason is ``PRIVILEGED``.
+    The **refusal path and its copy** had no test before ``B-3`` — that is the
+    gap ``R1`` was really about (``R1`` was found on the admin toast, but the fix
+    had to land on both surfaces). This is NOT the first ban test on this view:
+    ``test_moderation_views.py::TestBanUserView`` already covers the success
+    path (``test_ban_marks_user_as_banned``, ``test_ban_creates_moderation_log``,
+    ``test_ban_requires_post``, ``test_ban_defaults_reason_when_not_provided``),
+    so a future editor must not duplicate that class here. The ad is owned by a
+    peer ``is_staff`` moderator, so the refusal reason is ``PRIVILEGED``.
     """
     peer_moderator = _make_user(930000318, is_staff=True)
     ad = create_test_ad(peer_moderator, category, city, status=AdStatus.ON_MODERATION)
@@ -626,6 +765,13 @@ def test_ban_view_refusal_states_the_two_sided_tier_truth(
     text = " ".join(str(m) for m in response.context["messages"])
     # The refusal sentence itself, then the three tier clauses (hard-coded).
     assert "not applied" in text
+    # Discriminate the refusal reason: only the ``PRIVILEGED`` value contains
+    # these two literals, so a swap with ``SELF`` / ``ALREADY_BANNED`` (or a
+    # ``ban_refusal_reason`` that returns the wrong reason for a privileged
+    # target) goes red. ``"not applied"`` alone matches all four values and
+    # would pin that *a* refusal was reported, not *which* one.
+    assert "the ad's owner is a staff or superuser" in text
+    assert "not permitted to ban" in text
     assert "refuses login and publishing" in text
     assert "is enforced in the Telegram bot" in text
     assert "does not revoke an existing web session" in text
@@ -649,18 +795,50 @@ def test_ban_tier_wording_is_identical_on_both_surfaces() -> None:
     four refusal sentences — the tier statement is a single attached clause, not
     one sentence per refusal.
     """
-    from apps.ads import admin as ads_admin
-
+    # One equality is enough: ``ADS_BAN_TIER_ENFORCEMENT`` is
+    # ``apps.ads.admin.BAN_TIER_ENFORCEMENT`` imported at module top, so asserting
+    # it against ``review.BAN_TIER_ENFORCEMENT`` and re-importing ``ads_admin`` to
+    # assert the same object twice would pin nothing extra.
     assert ADS_BAN_TIER_ENFORCEMENT == review.BAN_TIER_ENFORCEMENT
-    assert ads_admin.BAN_TIER_ENFORCEMENT == review.BAN_TIER_ENFORCEMENT
 
-    messages = review._BAN_REFUSAL_MESSAGES
-    assert len(messages) == 4
+    refusal_messages = review._BAN_REFUSAL_MESSAGES
+    assert len(refusal_messages) == 4
     # Not a fifth member: the tier text is not one of the four refusal values.
-    assert review.BAN_TIER_ENFORCEMENT not in messages.values()
+    assert review.BAN_TIER_ENFORCEMENT not in refusal_messages.values()
     # Not repeated inside the four sentences either.
-    for sentence in messages.values():
+    for sentence in refusal_messages.values():
         assert review.BAN_TIER_ENFORCEMENT not in sentence
+
+
+def test_each_refusal_sentence_names_its_own_cause() -> None:
+    """Every refusal value carries its own discriminating cause, hard-coded.
+
+    The view test exercises only the ``PRIVILEGED`` value, so a swap of the
+    ``SELF`` and ``PRIVILEGED`` sentences (or any reword that erases a sentence's
+    distinguishing clause) would otherwise go undetected — ``"not applied"`` is
+    the shared prefix of all four. This pins each sentence's own cause with
+    hard-coded literals, bringing the refusal-reason assertions to the same
+    standard as ``test_not_in_target_set_refusal_copy_asserts_no_cause`` (which
+    pins the full ``NOT_IN_TARGET_SET`` content directly). The literal is
+    independent of the mapping's value, so this is not a tautology.
+    """
+    from apps.moderation.admin_actions import BanRefusalReason
+
+    refusal_messages = review._BAN_REFUSAL_MESSAGES
+    assert "the ad's owner is your own account" in refusal_messages[BanRefusalReason.SELF]
+    assert (
+        "the ad's owner is a staff or superuser"
+        in refusal_messages[BanRefusalReason.PRIVILEGED]
+    )
+    assert "not permitted to ban" in refusal_messages[BanRefusalReason.PRIVILEGED]
+    assert (
+        "the ad's owner was already banned"
+        in refusal_messages[BanRefusalReason.ALREADY_BANNED]
+    )
+    assert (
+        "was not among the accounts available to this action"
+        in refusal_messages[BanRefusalReason.NOT_IN_TARGET_SET]
+    )
 
 
 def test_not_in_target_set_refusal_copy_asserts_no_cause() -> None:
