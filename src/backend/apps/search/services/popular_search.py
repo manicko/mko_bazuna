@@ -11,7 +11,7 @@ from typing import Final
 from django.db.models import F
 
 from apps.core.enums import SearchSuggestionSource
-from apps.core.utils.sanitize import redact_search_query
+from apps.core.utils.sanitize import redact_search_query, search_query_key
 from apps.search.models import PopularSearch
 from apps.search.schemas import AutocompleteSuggestion
 
@@ -25,24 +25,26 @@ def increment_popular_search(query: str) -> None:
     """
     Atomically increment the hit count for a normalized search query.
 
-    Strips leading/trailing whitespace and lowercases the query for
-    normalization.  Uses ``get_or_create`` for the initial insert and
-    an ``F()`` expression for a race-safe increment on subsequent calls.
+    Derives the key from the REDACTED query (redact first, then strip and
+    lower), so raw PII never survives in the global cross-user
+    ``query_normalized`` column (SRH-004, 06-PII-108).  Uses ``get_or_create``
+    for the initial insert and an ``F()`` expression for a race-safe increment
+    on subsequent calls.
 
     Args:
         query: The raw search query string.
     """
-    normalized = query.strip().lower()
-    if not normalized:
+    key = search_query_key(query)
+    if not key:
         return
 
     # Redact PII (phones, emails, names) before persisting (SRH-004).
-    # ``query_normalized`` remains the lookup/dedup key, so redaction does
-    # not affect matching or autocomplete suggestions.
+    # ``query_normalized`` is the lookup/dedup key derived from the redaction,
+    # so redaction does not affect matching or autocomplete suggestions.
     redacted = redact_search_query(query)
 
     obj, created = PopularSearch.objects.get_or_create(
-        query_normalized=normalized,
+        query_normalized=key,
         defaults={"query": redacted, "hit_count": 1},
     )
     if not created:

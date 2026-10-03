@@ -20,6 +20,7 @@ from apps.categories.models import Category
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
 from apps.core.enums import AdSource, AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
+from apps.core.utils.sanitize import search_query_key
 from apps.locations.models import City
 from apps.media.services.hash_service import FileHashService
 from apps.search.models import PopularSearch
@@ -349,9 +350,8 @@ class SeedService:
         count = 0
         config_searches = self.config.get("popular_searches", [])
         for item in config_searches:
-            normalized = item["query"].strip().lower()
             PopularSearch.objects.update_or_create(
-                query_normalized=normalized,
+                query_normalized=search_query_key(item["query"]),
                 defaults={
                     "query": item["query"],
                     "hit_count": item["hit_count"],
@@ -361,8 +361,11 @@ class SeedService:
             count += 1
 
         rng = random.Random(self.config.get("faker_seed", 42) + 200)
-        # Exclude config queries so they are not upserted twice.
-        existing: set[str] = {item["query"].strip().lower() for item in config_searches}
+        # Exclude config queries so they are not upserted twice. The key must
+        # be derived the same way as the update_or_create above (06-PII-108).
+        existing: set[str] = {
+            search_query_key(item["query"]) for item in config_searches
+        }
 
         title_words: set[str] = set()
         for ad in Ad.objects.filter(source=AdSource.SEED):
@@ -375,7 +378,7 @@ class SeedService:
 
         for word in sorted(title_words)[:limit]:
             PopularSearch.objects.update_or_create(
-                query_normalized=word.lower(),
+                query_normalized=search_query_key(word),
                 defaults={
                     "query": word,
                     "hit_count": max(rng.randint(5, 30), 10),

@@ -1721,3 +1721,32 @@ class TestSeedFilterCoverage:
             .filter(features__slug="used")
             .exists()
         )
+
+
+class TestSeedPopularSearchKeys:
+    """The seeder derives ``query_normalized`` from the redacted query (06-PII-108).
+
+    Writer 4 had no test at all, which is how the raw-PII key survived here.
+    The key is the persisted dedup column this block owns; the ``query`` column
+    is the curated seed text (not user input) and is out of this block's scope.
+    """
+
+    def test_seeded_popular_key_contains_no_pii(self, db: None) -> None:
+        """A curated query with PII is stored under its redacted key."""
+        from apps.core.utils.sanitize import search_query_key
+        from apps.search.models import PopularSearch
+
+        raw = "Иван Петров +79001234567 user@example.com"
+        service = SeedService()
+        service.config = {
+            "popular_searches": [{"query": raw, "hit_count": 50}],
+            "faker_seed": 42,
+        }
+
+        service._seed_popular_searches(limit=0)
+
+        entry = PopularSearch.objects.get(query_normalized=search_query_key(raw))
+        lowered_key = entry.query_normalized.lower()
+        for fragment in ("иван", "петров", "+79001234567", "user@example.com"):
+            assert fragment not in lowered_key
+

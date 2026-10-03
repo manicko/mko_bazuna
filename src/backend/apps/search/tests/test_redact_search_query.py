@@ -11,7 +11,7 @@ Covers:
 
 import pytest
 
-from apps.core.utils.sanitize import redact_search_query
+from apps.core.utils.sanitize import redact_search_query, search_query_key
 from apps.search.models import PopularSearch, SearchHistory
 from apps.search.services.popular_search import (
     get_popular_suggestions,
@@ -96,7 +96,8 @@ class TestIncrementPopularSearchRedaction:
         raw = "куплю велосипед +79001234567 user@example.com"
         increment_popular_search(raw)
 
-        entry = PopularSearch.objects.get(query_normalized=raw.lower())
+        # The key is derived from the redacted query (06-PII-108).
+        entry = PopularSearch.objects.get(query_normalized=search_query_key(raw))
         assert "+79001234567" not in entry.query
         assert "user@example.com" not in entry.query
         assert "+7**********" in entry.query
@@ -108,7 +109,7 @@ class TestIncrementPopularSearchRedaction:
         increment_popular_search(raw)
         increment_popular_search(raw)
 
-        entry = PopularSearch.objects.get(query_normalized=raw.lower())
+        entry = PopularSearch.objects.get(query_normalized=search_query_key(raw))
         assert entry.hit_count == 2
         assert "user@example.com" not in entry.query
 
@@ -140,7 +141,9 @@ class TestRecordSearchHistoryRedaction:
         raw = "Иван Петров +79001234567"
         record_search_history(buyer.id, raw)
 
-        entry = SearchHistory.objects.get(user=buyer, query_normalized=raw.lower())
+        entry = SearchHistory.objects.get(
+            user=buyer, query_normalized=search_query_key(raw)
+        )
         assert "+79001234567" not in entry.query
         assert "Иван" not in entry.query
         assert "Петров" not in entry.query
@@ -150,9 +153,12 @@ class TestRecordSearchHistoryRedaction:
         from django.contrib.sessions.backends.db import SessionStore
 
         session = SessionStore()
-        record_search_history(None, "Иван Петров", session=session)
+        raw = "Иван Петров"
+        record_search_history(None, raw, session=session)
 
-        assert session["search_history"][0]["query_normalized"] == "иван петров"
+        # The session key is derived from the redacted query (06-PII-108): the
+        # un-redacted lower-cased Cyrillic name must not be the key.
+        assert session["search_history"][0]["query_normalized"] == search_query_key(raw)
         assert "Иван" not in session["search_history"][0]["query"]
         assert "Петров" not in session["search_history"][0]["query"]
 

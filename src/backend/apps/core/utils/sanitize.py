@@ -112,6 +112,25 @@ def redact_search_query(query: str) -> str:
     return redacted[:_MAX_QUERY_LENGTH]
 
 
+def search_query_key(query: str) -> str:
+    """Derive the persisted dedup key for a search query.
+
+    Redaction runs FIRST, on the raw query, then strip and lower. The order is
+    load-bearing: ``redact_search_query`` matches personal names on
+    ``\\b[А-ЯЁA-Z]``, which matches nothing in an already-lowercased string, so
+    lower-then-redact would leave every name in the key. The result keeps the
+    prefix structure ``get_popular_suggestions`` reads with
+    ``query_normalized__startswith``, and never lengthens the input.
+
+    Args:
+        query: The raw search query string.
+
+    Returns:
+        The dedup key: the redacted query, stripped and lowercased.
+    """
+    return redact_search_query(query).strip().lower()
+
+
 def sanitize_query_for_log(query: str | None) -> str:
     """
     Sanitize a user-supplied query string for safe logging.

@@ -14,7 +14,7 @@ import logging
 
 from django.contrib.sessions.backends.base import SessionBase
 
-from apps.core.utils.sanitize import redact_search_query
+from apps.core.utils.sanitize import redact_search_query, search_query_key
 from apps.search.models import SearchHistory
 
 logger = logging.getLogger(__name__)
@@ -26,17 +26,18 @@ _MAX_HISTORY: int = 50
 _SESSION_KEY: str = "search_history"
 
 
-def _record_session_history(session: SessionBase | None, normalized: str, query: str) -> None:
+def _record_session_history(session: SessionBase | None, key: str, query: str) -> None:
     """Record a query in the session, deduped and capped at ``_MAX_HISTORY``.
 
     The session stores a list of ``{query, query_normalized}`` dicts ordered
-    most-recent-first. The same normalized query replaces its previous entry
-    (deduplication), and the list is pruned to ``_MAX_HISTORY`` entries.
+    most-recent-first. The same key (the redacted-then-lowercased derivation)
+    replaces its previous entry (deduplication), and the list is pruned to
+    ``_MAX_HISTORY`` entries.
     """
     assert session is not None
     entries = session.get(_SESSION_KEY) or []
-    entries = [e for e in entries if e.get("query_normalized") != normalized]
-    entries.insert(0, {"query": query, "query_normalized": normalized})
+    entries = [e for e in entries if e.get("query_normalized") != key]
+    entries.insert(0, {"query": query, "query_normalized": key})
     session[_SESSION_KEY] = entries[:_MAX_HISTORY]
 
 
@@ -55,31 +56,34 @@ def record_search_history(user_id: int | None, query: str, session: SessionBase 
         query: The raw search query string.
         session: Optional Django session for anonymous session-scoped history.
     """
-    normalized = query.strip().lower()
-    if not normalized:
+    # The dedup key is derived from the REDACTED query, so raw PII never
+    # survives in ``query_normalized`` (SRH-004, 06-PII-108). The empty guard
+    # stays equivalent: the key is empty exactly when the raw strip+lower was.
+    key = search_query_key(query)
+    if not key:
         return
 
     # Redact PII (phones, emails, names) before persisting, both to the
     # database (authenticated users) and to the session (anonymous users).
-    # ``query_normalized`` remains the dedup/lookup key (SRH-004).
+    # ``query_normalized`` is the dedup/lookup key derived from the redaction.
     redacted = redact_search_query(query)
 
     if user_id is None:
         if session is not None:
-            _record_session_history(session, normalized, redacted)
+            _record_session_history(session, key, redacted)
         return
 
     # Deduplicate: delete existing entry with the same normalized query.
     SearchHistory.objects.filter(
         user_id=user_id,
-        query_normalized=normalized,
+        query_normalized=key,
     ).delete()
 
     # Create the new entry.
     SearchHistory.objects.create(
         user_id=user_id,
         query=redacted,
-        query_normalized=normalized,
+        query_normalized=key,
     )
 
     # Prune to _MAX_HISTORY entries per user.
