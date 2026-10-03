@@ -88,6 +88,45 @@ def _proxied_locations(text: str) -> list[str]:
     return [block for block in _iter_location_blocks(text) if "proxy_pass" in block]
 
 
+_LOCATION_RE = re.compile(r"\s*location\s+(?P<modifier>[~*^=]*)?\s*(?P<uri>\S+)")
+
+
+def _deny_block(text: str) -> str:
+    """Return the script-execution deny block, located order-independently.
+
+    ``_location_block`` matches the **first** line containing a string, which is
+    shadowed by the earlier comment, and matches on substring, which the ``~*``
+    header does not contain. Iterating every block and matching on its whole
+    body avoids both hazards.
+    """
+    for block in _iter_location_blocks(text):
+        if "deny all" in block and "return 403" in block and "proxy_pass" not in block:
+            return block
+    return ""
+
+
+def _location_modifier(block: str) -> str:
+    """Return the location header modifier (``~*``, ``=``, ``''`` for prefix)."""
+    match = _LOCATION_RE.match(block.split("\n", 1)[0])
+    return match.group("modifier") or "" if match else ""
+
+
+def _location_uri(block: str) -> str:
+    """Return the location header's URI for the first line of ``block``."""
+    match = _LOCATION_RE.match(block.split("\n", 1)[0])
+    return match.group("uri") if match else ""
+
+
+def _extract_deny_regex(block: str) -> str:
+    """Return the raw PCRE source from the deny ``location`` header."""
+    return _location_uri(block)
+
+
+def _limit_req_zones(text: str) -> list[str]:
+    """Return every ``limit_req_zone`` zone name declared in ``text``."""
+    return re.findall(r"limit_req_zone\s+\S+\s+zone=([A-Za-z0-9_]+):", text)
+
+
 def test_nginx_config_exists() -> None:
     """nginx.conf must exist at docker/nginx/nginx.conf."""
     assert _NGINX_CONF.exists(), (
@@ -217,4 +256,149 @@ def test_real_ip_trust_is_never_wildcard(conf_path: Path) -> None:
     assert not set_from or has_real_ip_header, (
         f"{conf_path.name}: a `set_real_ip_from` directive must be accompanied "
         "by an explicit `real_ip_header`"
+    )
+
+
+@pytest.mark.parametrize("conf_path", _PROXIED_CONFS)
+def test_media_denies_script_execution(conf_path: Path) -> None:
+    """MEDIA_ROOT must refuse requests for executable script extensions.
+
+    The nginx-served media directory must carry exactly one deny block for
+    ``.php``/``.py``/``.cgi``/``.pl``/``.sh``. That block must be a ``~*``
+    regex match — a plain prefix ``location /media/`` would collide with the
+    proxying block (nginx refuses the duplicate, or, if it replaced it, 403s
+    every genuine photo).
+
+    The executable check is the extracted regex itself: it is compiled caseless
+    and exercised against hostile URIs and against real storage-key shapes, with
+    the query string stripped to model nginx. This is the anti-outage control —
+    it fails on the unescaped-dot typo (which inverts the match) and on the
+    ``$``-anchored counterfeit (which lets ``/media/x.php/a.jpg`` through).
+    """
+    text = conf_path.read_text()
+    block = _deny_block(text)
+    assert block, (
+        f"{conf_path.name}: must define a script-execution deny block carrying "
+        "`deny all` and `return 403` with no `proxy_pass`"
+    )
+
+    modifier = _location_modifier(block)
+    assert modifier == "~*", (
+        f"{conf_path.name}: the script-execution deny location must be a ~* "
+        f"regex match, got {modifier!r}"
+    )
+
+    pattern = _extract_deny_regex(block)
+    compiled = re.compile(pattern, re.IGNORECASE)
+
+    # 10 hostile URIs: extension at the tail, with a trailing slash, in path
+    # segments, uppercased, and double-extension shapes.
+    hostile = [
+        "/media/x.php",
+        "/media/x.PHP",
+        "/media/x.php/a.jpg",
+        "/media/x.jpg.php",
+        "/media/nested/dir/shell.sh",
+        "/media/x.py?download=1",
+        "/media/x.cgi/anything.png",
+        "/media/x.pl",
+        "/media/a.b.php/a.jpg",
+        "/media/seed/x.php",
+    ]
+    # nginx strips the query string before matching a location, so strip it here
+    # too (``?download=1`` must not smuggle an executable past the deny).
+    missed = [uri for uri in hostile if not compiled.search(uri.split("?", 1)[0])]
+    assert not missed, f"{conf_path.name}: deny regex does not deny: {missed}"
+
+    # Real key shapes that must NEVER be denied: any false positive here is a
+    # silent outage of the photo surface.
+    genuine = [
+        "/media/7f3c1a9e-8b2d-4c6f-9a01-2b3c4d5e6f70.jpg",
+        "/media/7f3c1a9e-8b2d-4c6f-9a01-2b3c4d5e6f70-small.jpg",
+        "/media/7f3c1a9e-8b2d-4c6f-9a01-2b3c4d5e6f70-medium.jpg",
+        "/media/7f3c1a9e-8b2d-4c6f-9a01-2b3c4d5e6f70-large.jpg",
+        "/media/seed/kvartiry_01.jpg",
+        "/media/seed/kvartiry_01-small.jpg",
+        "/media/staging/7f3c1a9e-8b2d-4c6f-9a01-2b3c4d5e6f70.jpg",
+        "/media/seed/kvartiry_01-large.jpg",
+        "/media/a.b.c.jpg",
+        # Extension-less look-alikes that a wildcard dot would over-block: the
+        # regex must key on a literal ``.`` before the extension, never on the
+        # extension letters inside an arbitrary word. These are the shapes that
+        # expose the unescaped-dot typo (``\.`` -> ``.``).
+        "/media/spy",
+        "/media/happy",
+        "/media/seed/plash",
+    ]
+    broken = [uri for uri in genuine if compiled.search(uri.split("?", 1)[0])]
+    assert not broken, (
+        f"{conf_path.name}: OUTAGE: deny regex would 403 genuine photos: {broken}"
+    )
+
+
+@pytest.mark.parametrize("conf_path", _PROXIED_CONFS)
+def test_media_location_is_rate_limited(conf_path: Path) -> None:
+    """The proxying ``/media/`` location must use ``browse_limit`` with nodelay.
+
+    ``browse_limit`` is already declared; ``/media/`` must reference it. The
+    zone census is a positive equality so it fails if a zone is deleted, if a
+    fourth is added, or if ``browse_limit`` is renamed.
+    """
+    text = conf_path.read_text()
+
+    zones = _limit_req_zones(text)
+    assert len(zones) == 3, (
+        f"{conf_path.name}: expected exactly 3 limit_req zones, found {zones}"
+    )
+    assert zones.count("browse_limit") == 1, (
+        f"{conf_path.name}: `browse_limit` must be defined exactly once; found "
+        f"{zones.count('browse_limit')}"
+    )
+
+    media_blocks = [
+        block
+        for block in _iter_location_blocks(text)
+        if _location_uri(block).startswith("/media/")
+    ]
+    assert len(media_blocks) == 1, (
+        f"{conf_path.name}: expected exactly one `/media/` prefix location, "
+        f"found {len(media_blocks)}"
+    )
+    block = media_blocks[0]
+    assert "limit_req zone=browse_limit" in block, (
+        f"{conf_path.name}: `location /media/` must carry "
+        "`limit_req zone=browse_limit`"
+    )
+    assert "nodelay" in block, (
+        f"{conf_path.name}: `location /media/` limit_req must use `nodelay`, "
+        "otherwise accepted thumbnails are delayed"
+    )
+    assert "proxy_pass" in block, (
+        f"{conf_path.name}: `location /media/` must still proxy to Django"
+    )
+
+
+def test_media_deny_adds_no_collateral_change() -> None:
+    """The media hardening must leave the pre-existing controls untouched.
+
+    Re-asserts the three ``/metrics`` facts and ``/protected-media/`` on
+    nginx.conf, and confirms neither new comment mentions ``= /metrics`` (which
+    would shadow ``_location_block(_NGINX_CONF, "= /metrics")``).
+    """
+    text = _NGINX_CONF.read_text()
+    metrics = _location_block(text, "= /metrics")
+    assert metrics, "nginx.conf must define a `location = /metrics` block"
+    assert "proxy_pass" in metrics
+    assert "allow 127.0.0.1" in metrics
+    assert "deny all" in metrics
+
+    protected = _location_block(text, "/protected-media/")
+    assert protected, "nginx.conf must define a `location /protected-media/` block"
+    assert "internal;" in protected
+    assert "alias /media_volume/;" in protected
+
+    deny = _deny_block(text)
+    deny_comment = deny.split("location", 1)[0]
+    assert "= /metrics" not in deny_comment, (
+        "the new media comment must not contain `= /metrics`"
     )
