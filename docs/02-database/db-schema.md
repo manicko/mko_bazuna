@@ -14,6 +14,7 @@ related:
   - packages-list
   - spec-index
   - i18n-spec
+  - pii-consent-remediation-record
 ---
 
 ## Purpose
@@ -107,14 +108,19 @@ JSONB carries granular flags (`{"analytics": bool, "preferences": bool}`).
 ```
 id (PK)
 user_id (FK → users.id, nullable, SET_NULL)   # NULL for anonymous/guest consent (cookie-only sessions)
+session_key (VARCHAR(40), nullable)            # sole identifier of an ANONYMOUS record; also the admin search_fields key
 choice (StrEnum — ConsentChoice)              # see db-enums.md
 categories (JSONB)                            # {"analytics": bool, "preferences": bool}
+consent_version (VARCHAR(20), default "1.0")       # ConsentVersion StrEnum; banner text version shown at the time of the action
+consent_given_at (TIMESTAMP, auto_now_add)     # sweep anchor for purge_consent_records; Meta.ordering = ["-consent_given_at"]
 ip_address (INET, nullable)                   # anonymised CLIENT address, masked /24 (IPv4) or /64 (IPv6) — see the note below
-user_agent (TEXT, nullable)                   # anonymous records only
-consented_at (TIMESTAMP, default now)
-revoked_at (TIMESTAMP, nullable)             # set when choice = WITHDRAWN → triggers consent_hard_delete sweep + 30-day PII erasure
+user_agent (TEXT, blank=True, NOT nullable)   # cleared to "" (not NULLed) by the retention sweep
 db_table: consent_records
 ```
+There is **no `consented_at` and no `revoked_at` column**: the action timestamp is
+`consent_given_at` for all three choices, and a WITHDRAW is distinguished by `choice`, not by
+a separate revocation column. The 30-day erasure trigger is `users.consent_revoked_at`, a column
+on `users` — not on this table.
 `ip_address` stores the **anonymised client** address, not the direct socket peer. It is
 resolved by `apps/core/utils/client_ip.py::get_client_ip` (peer gate + `X-Real-IP` /
 right-to-left `X-Forwarded-For`) and then masked by
@@ -136,18 +142,37 @@ retention sweep, which **anonymises** (never deletes) rows older than the ratifi
 fingerprint window. `Meta.ordering = ["-consent_given_at"]` does not create an index, so the
 sweep column leads this real index.
 
+**Known limitation — no actor column (`06-NEW-02`, open and unowned).** `consent_records` records
+**what** was decided, never **who decided it**. There is no `actor` / `performed_by` column and
+no `via` discriminator:
+
+- A **staff-initiated** revocation (the admin's *Withdraw consent* action,
+  `UserAdmin.withdraw_consent_action`) is evidenced identically to a self-service withdrawal —
+  the row reads *"the subject withdrew"*, and nothing in the ledger records that a staff member
+  did it. The staff identity survives only in the Django admin's own log of who submitted the
+  changelist action, not in the consent evidence itself.
+- The admin-initiated row carries **no `ip_address` and no `user_agent`**: those are written from
+  the *request* on the `consent_accept` / `consent_decline` / `consent_withdraw` web views, and
+  the admin action has no consent request behind it.
+- Consequently, `session_key` is not merely "the anonymous identifier" — for **every** row it is
+  the only field that ties a decision to the client that made it, and
+  `purge_consent_records` clears it at 90 days along with the rest of the fingerprint set.
+
+The retention sweep that shipped for `06-PII-116` bounds and anonymises the ledger; it does
+**not** add provenance. **This is not assigned to any block, and no block in the phase that
+raised it is still to come** — it needs an owner. See
+[`pii-consent-remediation-record.md`](../99-agent/pii-consent-remediation-record.md#open-work).
+
 ---
 
 ### ads (single table)
 ```
 id (PK)
 user_id (FK → users.id)
-title (VARCHAR)                                    # Russian title (base storage; renamed from original in MVP)
-title_ru (VARCHAR, nullable)                      # Explicit Russian title for multi-language support
+title (VARCHAR)                                    # RUSSIAN title — the base storage column (there is no title_ru)
 title_en (VARCHAR, nullable)                      # English translation for UI display
 title_bs (VARCHAR, nullable)                      # Bosnian translation for UI display
-description (TEXT)                                # Russian description (base storage)
-description_ru (TEXT, nullable)                   # Explicit Russian description for multi-language support
+description (TEXT)                                # RUSSIAN description — the base storage column (there is no description_ru)
 description_en (TEXT, nullable)                   # English translation for UI display
 description_bs (TEXT, nullable)                   # Bosnian translation for UI display
 original_language (VARCHAR(5), nullable)            # Source language code (e.g. 'ru', 'bs', 'en')
@@ -171,7 +196,7 @@ archived_at (TIMESTAMP, nullable)                  # drives delete_sweep timer (
 deleted_at (TIMESTAMP, nullable)
 moderation_failed_at (TIMESTAMP, nullable)         # zone C4/D12: drives IX_ads_purge_failed for 7-day auto-purge
 rejected_at (TIMESTAMP, nullable)                  # zone D4: drives IX_ads_rejected_sweep for 90-day manual-reject cleanup
-search_vector (TSVECTOR)                            # NOT GENERATED ALWAYS — legacy concatenated vector (maintained by trigger)
+search_vector (TSVECTOR)                            # NOT GENERATED ALWAYS — legacy concatenated vector (maintained by the same trigger, on every write)
 search_vector_ru (TSVECTOR, nullable)              # NOT GENERATED ALWAYS — per-language vector (russian config), trigger-maintained
 search_vector_bs (TSVECTOR, nullable)              # NOT GENERATED ALWAYS — per-language vector (simple config), trigger-maintained
 search_vector_en (TSVECTOR, nullable)              # NOT GENERATED ALWAYS — per-language vector (english config), trigger-maintained
@@ -181,11 +206,15 @@ moderated_by (FK → users.id, nullable, SET_NULL)    # moderator who manually r
 
 **AdStatus** (StrEnum) — see [db-enums.md](db-enums.md) for the authoritative list and values.
 
-**Transitional note:** For backward compatibility, the original `title` and `description` columns
-are repurposed as `title_ru` and `description_ru`. New ads receive `title_ru`/`description_ru`
-populated with translated content; legacy ads fall back to `title`/`description`. The
-`get_title(locale)` and `get_description(locale)` methods implement the fallback chain:
-locale-specific column > Russian > original column.
+**Storage layout, not a transitional repurpose.** The Russian base lives in **`title`** and
+**`description`**; there are **no `title_ru` / `description_ru` columns**. So `ads` has exactly
+**six** text columns — `title`, `title_en`, `title_bs`, `description`, `description_en`,
+`description_bs` — and `ads_search_vector_fn` folds all six into **all four** vectors on every
+`INSERT`/`UPDATE`. `get_title(locale)` / `get_description(locale)` implement the fallback chain
+locale-specific column → the Russian base column, i.e. `title_<locale>` → `title`. An earlier
+revision of this document described the base columns as having been "repurposed as" `title_ru`
+and `description_ru`; that rename never reached the schema, and any text or tooling written
+against `title_ru` is looking at a column that does not exist.
 
 **`ad_features`** (through table for `Ad.features` M2M) — see below.
 
@@ -417,9 +446,17 @@ Aggregated via ORM; admin/CLI `show_metrics` access.
 ---
 
 ### Search (logic, not a table)
-- Per-language `search_vector_ru/bs/en` on `ads` (trigger-maintained: title + description + localized category_name; see [db-indexes.md](db-indexes.md) for the dual-write trigger SQL).
+- Per-language `search_vector_ru/bs/en` on `ads` (trigger-maintained: title + description + localized category_name; see [db-indexes.md](db-indexes.md) for the trigger SQL).
 - `GIN index` on each vector (`IX_ads_search_gin_ru/_bs/_en`) — see [db-indexes.md](db-indexes.md).
-- Legacy `search_vector` retained during dual-write transition (to be dropped in Phase 3).
+- Legacy `search_vector` is **maintained, not retired.** `ads_search_vector_fn` is a single
+  `BEFORE INSERT OR UPDATE` trigger function that rewrites **all four** vector columns on every
+  write — `search_vector` plus `search_vector_ru` / `_bs` / `_en` — so there is no dual-write
+  *transition* left to finish and the "dropped in Phase 3" note this line used to carry is stale.
+  The column is read by **no** search path: every search selects one per-language vector via
+  `LanguageLocale.fts_vector_field`, and `search_vector` is excluded from the admin form (rendering
+  it read-only would advertise editable data the trigger then discards). It is kept only for
+  backward compatibility, and dropping it is a **separate, unowned** piece of work — see
+  [ad-lifecycle-remediation-record.md](../99-agent/ad-lifecycle-remediation-record.md).
 - **PG18 upgrade note:** On PostgreSQL 18, FTS/collation-dependent processing uses the cluster's default collation provider; reindex `ads` GIN indexes after any major PostgreSQL collation-provider upgrade (per PG18 release notes). Fresh MVP cluster initialized on PG18 with ICU needs no reindex.
 - App-level category fuzzy detect (`difflib`) → `category_id` filter (zone D1).
 - Search fill per language: **title (weight A) + description (weight B) + category_name (weight C)**, using the locale-appropriate `to_tsvector` config (`russian`/`simple`/`english`). Queries are searched **in the buyer's own language** against the matching per-language vector — no query-time translation (decision G). Single-word queries matching category names also apply an explicit `category_id` filter (locale-aware via `Category.get_name(locale)`).
@@ -494,7 +531,7 @@ the context-processor inventory.
 Durable marker for the scheduler's daily command set (`apps/core/models.py`,
 `SchedulerDailyState`; migration `0005_scheduler_daily_state`; service
 `apps/core/services/scheduler_daily_state.py`). Records the calendar date the daily set
-(`send_alerts`, `rollup_daily_metrics`) last completed cleanly. `run_scheduler` reads it
+(`send_alerts`, `rollup_daily_metrics`, `purge_consent_records`) last completed cleanly. `run_scheduler` reads it
 once on start-up, and `run_one_cycle` writes it only when every daily command exited `0`
 with no stop request; a failed day is retried on the next hourly tick. The implicit `pk=1`
 is the singleton invariant (no `UniqueConstraint` needed). Two overlapping schedulers during
@@ -720,8 +757,8 @@ Tracks popular search queries for autocomplete suggestions.
 
 ```
 id (PK)
-query (VARCHAR(200), db_index=True)                              # PII-redacted at write time (SRH-004); phones, emails, multi-word names masked via redact_search_query() — query_normalized remains the raw lookup/dedup key
-query_normalized (VARCHAR(200), db_index=True)
+query (VARCHAR(200), db_index=True)                              # PII-redacted at write time (SRH-004); phones, emails, multi-word names masked via redact_search_query()
+query_normalized (VARCHAR(200), db_index=True)                   # lookup/dedup key = search_query_key(query): redact-then-lower on the RAW query, so it carries no more PII than `query` (06-PII-108). NOT a digest — get_popular_suggestions reads query_normalized__startswith, which a keyed digest has no structure for
 hit_count (POSITIVE INT, default 1)
 last_seen (TIMESTAMP, auto_now=True)
 source (StrEnum: TELEGRAM | SEED, nullable, default NULL)  # 'SEED' marks seed-generated rows for cleanup
@@ -737,7 +774,7 @@ Per-user search query tracking for personalized autocomplete.
 id (PK)
 user_id (FK → users.id, CASCADE, nullable)
 query (VARCHAR(200))                                            # PII-redacted at write time (SRH-004); phones, emails, multi-word names masked via redact_search_query()
-query_normalized (VARCHAR(200), db_index=True)
+query_normalized (VARCHAR(200), db_index=True)                 # search_query_key(query) — redact-then-lower, same derivation as popular_searches (06-PII-108)
 created_at (TIMESTAMP, auto_now_add=True)
 
 db_table: search_history

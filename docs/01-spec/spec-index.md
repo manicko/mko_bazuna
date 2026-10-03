@@ -18,6 +18,7 @@ related:
   - user-stories-index
   - design-system
   - owner-decisions-index
+  - pii-consent-remediation-record
   - migration-workflow
 ---
 
@@ -69,9 +70,9 @@ Product decisions (A–L) and zone resolutions are the single source of truth in
 - **Contact (C):** no seller identity on site; "Contact" deep-link `t.me/<bot>?start=contact_<ad_id>`; rendered only if `PUBLISHED` + seller valid + consent not revoked.
 - **Categories (D):** closed admin mptt tree; category-name search REQUIRED (denormalized `category_name` + per-language `search_vector_*` weight 'C' + `difflib` fuzzy → `category_id`). Search runs per-language FTS; no query-time translation.
 - **Photos (E):** 1–5 Telegram-compressed JPEG only; local `MEDIA_ROOT` via `FileSystemStorage`.
-- **Consent (F):** DECLINE (browse-only) ≠ WITHDRAW (`consent_revoked_at` → soft-delete + PII erasure after 30 days).
+- **Consent (F):** DECLINE ≠ WITHDRAW. A DECLINE is **reversible** and erases nothing, but while it stands it blocks publishing (`ads_auto_publish=False`) and hides the seller's PUBLISHED ads from listings, search, direct URL and the media gate; it does **not** block login. WITHDRAW (`consent_revoked_at` → soft-delete + PII erasure after 30 days) is terminal.
 - **Language/search (G):** content translated to Russian at ad publication (egress); buyers search per-language FTS vectors with no query-time translation; exact city match + did-you-mean.
-- **Consent banner (K):** buyers browse `PUBLISHED` ads before accepting; DECLINE blocks seller login only (no erasure, contact still works) ≠ WITHDRAW (`consent_revoked_at` + erasure). Banner covers bot too — no separate bot confirmation.
+- **Consent banner (K):** buyers browse `PUBLISHED` ads before accepting; **a DECLINE is reversible** — it blocks seller publishing and hides the seller's PUBLISHED ads from public search/listings, direct URL access and the media gate, but **not** login, so re-consenting restores both; the recovery route is the existing `LoginToken` handshake (`/login/issue/` → bot `/start login_<token>` → `/login/status/`), with no new token, model or migration. No erasure; contact still works. Decision record: [`pii-consent-remediation-record.md`](../99-agent/pii-consent-remediation-record.md#decline-1-q-d1--a-decline-is-reversible). Banner covers bot too — no separate bot confirmation.
 - **Login (H):** QR deep-link `login_<token>` (32-char URL-safe token (~192-bit CSPRNG, rate-limited 5-min TTL — exceeds NIST SP 800-63B's 128-bit minimum)), `LoginToken` two-phase atomic claim via `UPDATE ... RETURNING` with `WHERE consumed_at IS NULL`; raw token SHA-256 hashed, 192-bit entropy; consumption via POST body + CSRF (not URL query).
 - **Lifecycle (J):** timers from `published_at` (reset on every PUBLISHED transition); text edits → `PUBLISHED→ON_MODERATION` + hide; archive@2mo, delete@4mo.
 

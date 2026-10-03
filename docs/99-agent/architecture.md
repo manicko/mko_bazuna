@@ -8,6 +8,7 @@ related:
   - references
   - migration-workflow
   - db-enums
+  - pii-consent-remediation-record
 ---
 
 ## Purpose
@@ -39,8 +40,9 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
    wait is interruptible (backed by the stop event), a stop during a cycle short-circuits the
    commands not yet started, and the in-flight command is never interrupted. The loop then
    breaks at its next top-of-loop check and closes Django DB connections in
-   a `finally` teardown (ENT-002). The daily set (`send_alerts`, `rollup_daily_metrics`) is
-   gated on a **durable** marker in the `scheduler_daily_state` singleton ([`db-schema`](../02-database/db-schema.md#scheduler_daily_state)),
+   a `finally` teardown (ENT-002). The daily set (`send_alerts`, `rollup_daily_metrics`,
+   `purge_consent_records`) is
+   gated on a **durable** marker in the `scheduler_daily_state` singleton ([`db-schema`](../02-database/db-schema.md#scheduler_daily_state-singleton)),
    read at start-up and written only on a clean daily cycle; a failed daily cycle is retried
    on the next hourly tick.
 - **Search:** Native PostgreSQL full-text search.
@@ -541,6 +543,86 @@ an owed action"*). The two `B-04` commits have empty bodies and history is not
 rewritten, so this tracked block is where the obligation is discharged. **The
 Planner does not set the finding's status; this record does.**
 
+## Account-State Predicate Seam (06-PII-104, 06-PII-109)
+
+Four declarations in `src/backend/apps/users/services/account_state.py` answer four different
+questions about an account. They are **composed, not merged**: each answers exactly one question,
+and no predicate mutates another. Confusing them is what produced the pre-phase-06 defects, so the
+split is recorded here rather than left to the docstrings.
+
+| Predicate | Shape | Question it answers | Deliberate omission |
+|---|---|---|---|
+| `account_state_q(prefix="") -> Q` | queryset-level, returns a **new `Q`** on every call | *"Which rows' owners may receive messages?"* — the filterable form of the access-control flags | omits `ads_auto_publish`: a publishing restriction is orthogonal to whether an account may be contacted |
+| `get_account_state(user) -> AccountState` | instance-level `NamedTuple` of the **six** flags | *"What is this account's state?"* | — |
+| `can_login(user)` | instance-level | *"May this identity obtain and hold a web session?"* | does not read `is_declined` (Q-D1, below) and not `is_deleted` (a deleted user has `telegram_id` nulled and cannot be looked up at all) |
+| `can_publish_ad(user)` | instance-level | *"Is this account allowed to publish at all?"* | does not read `consent_given_at`; does not read `is_declined` (the decline travels on `ads_auto_publish=False`) |
+| `can_store_personal_data(user)` | instance-level | *"May this account have personal data stored for it?"* — the storage-consent gate support intake needs | omits `is_active` (that is the operator access switch, and plan 19's support carve-out depends on it staying omitted) |
+| `can_create_ad(user)` | instance-level, a **conjunction** | *"May this account create or edit an ad?"* | does not add `is_active` (already covered by `ModelBackend` and by the bot's `_evaluate_user_state`) |
+
+**`account_state_q` is a pure function, never a manager.** It is not installed on a manager and
+no `get_queryset()` overrides it. That is load-bearing: `AccountStateMiddleware._resolve_user`
+does `User.objects.get(chat_id=...)` and treats a miss as an unregistered, **fail-open** identity,
+so a default-manager filter would invert the deny gates the predicate exists to enforce. Its five
+conjuncts are `is_deleted`, `consent_revoked_at IS NULL`, `is_declined=False`, `is_banned=False`,
+`is_active=True`; `prefix` is the ORM lookup prefix to `User` (`""` on a `User` queryset,
+`"user__"` on a model that reaches the owner through its FK). `Q` is immutable and `__and__`
+returns a new object, so callers may narrow it without mutating the declaration or a sibling
+result. A never-consented but otherwise unblocked registered user passes all five conjuncts —
+which is exactly why `can_store_personal_data` exists as a separate predicate.
+
+**The alert fan-out is gated by the same declaration, on both sides (06-PII-104).** An ad whose
+owner is withdrawn, declined, banned or deactivated is hidden from public search, listings, direct
+URL and the media gate, so it must not fan its title and price out to subscribers either:
+
+- `apps/search/services/alert_query.py::find_matching_ads` applies `account_state_q("user__")` to
+  the **ad** queryset — this is the ad-side audience filter.
+- `find_matching_saved_searches` applies `account_state_q("user__")` to the **`SavedSearch`**
+  queryset — a withdrawn, declined, banned or deactivated **subscriber** receives no alerts. Its
+  docstring is explicit that the ad's *owner* is deliberately not filtered there (an `Ad` filter
+  cannot constrain a `SavedSearch` queryset) and that its one production caller,
+  `immediate_alerts.deliver_immediate_alerts`, applies the same predicate to its own ad fetch.
+- The **daily** path (`send_alerts`) and the **immediate** path both go through these two
+  functions, so gating the audience in the two matchers is what gates all three delivery paths;
+  there is no separate per-path audience filter to forget. The `chat_id` check remains a
+  **delivery precondition** applied at the record/payload stage, not an audience filter.
+
+**Import-cycle hazard (frozen).** `account_state.py`'s transitive import closure already reaches
+`apps.search.services.cache` through `apps/users/services/__init__.py` → `deletion` →
+`bump_search_cache_version`. The alert path consuming `account_state_q` therefore depends on
+`apps/search/services/__init__.py` staying **import-free**; a submodule import added there closes
+the loop and breaks the whole alert path. A fresh-interpreter probe in
+`apps/users/tests/test_account_state.py` is the tripwire. Do not "tidy" that `__init__.py`.
+
+**A DECLINE no longer blocks login (Q-D1, ratified 2026-10-03).** `is_declined` was dropped from
+`can_login()`; publishing stays restricted via `ads_auto_publish=False` and listing/search
+visibility via `account_state_q`. The bot tier is deliberately **stricter than `can_login`**: a
+declined user may hold a web session but is **browse-only** in the bot, with exactly two
+carve-outs — the contact deep-link (contact still works while publishing does not) and the
+`login_<token>` deep-link, which is the **route back**. The login carve-out is pattern-based
+(`_is_login_deep_link`, matching the same `LOGIN_PATTERN` the handler matches, imported lazily to
+avoid a middleware/handler cycle) precisely so a bare `startswith("login_")` cannot also swallow
+`login_start`, `login_email` and `login_help`. It is scoped to `is_declined` alone: a deactivated,
+banned, deleted or withdrawn account is refused even a well-formed login deep-link. Full decision
+record:
+[pii-consent-remediation-record.md](pii-consent-remediation-record.md#decline-1-q-d1--a-decline-is-reversible).
+
+**The ad-creation gate (06-PII-109).** `can_create_ad` is `can_publish_ad AND
+can_store_personal_data`, and the composition is the rule — neither predicate alone is. Creating
+an ad stores the seller's user-authored text and photos, so it is also a personal-data-storage
+act. It is enforced at the **writers**, not only at the entry point:
+
+- Bot — two refusals, the shape `support.py` uses. `AccountStateMiddleware._evaluate_publish_permission`
+  returns `AD_CONSENT_REQUIRED_MESSAGE` (the `ads_auto_publish` branch is kept first), and
+  `submit_ad` returns `SubmitAdOutcome.CONSENT_REQUIRED` as its **first statement**, before any
+  filesystem work, staged-media plan, thumbnail generation or `transaction.atomic()`. `process_preview`
+  answers the outcome's message and clears the FSM.
+- Web — four seller surfaces through one shared pair of helpers in `apps/ads/views/edit.py`
+  (`_seller_may_create_ad`, the thin seam over `can_create_ad`, and
+  `_consent_required_forbidden`, the distinct `HttpResponseForbidden`) used by `ad_edit`,
+  `ad_archive` and `ad_reactivate`; `dashboard` lives in its own module but imports the same
+  helpers. Existing ownership-`403` wording and lock-timeout re-render paths are preserved.
+  `ad_delete` (`apps/ads/views/delete.py`) is deliberately **not** gated.
+
 ## Account-State and Session Revocation (04-AUT-002)
 
 **Status: `04-AUT-002` is NOT closed.** The web tier has **no per-request gate
@@ -552,25 +634,37 @@ Django's own `ModelBackend`, see
 [Operator-Facing Account Kill-Switch](#operator-facing-account-kill-switch-emergent-from-b-01-b-05)
 below.)
 
-Of the five **logout-flushable** account-state transitions, only one is
-reachable and it is unreachable **for its subject**:
+Of the five **logout-flushable** account-state transitions, the only one a **subject** can
+trigger on themselves is `consent_withdraw`, and it is closed. The rest are correct-by-design
+no-logout transitions or operator-driven surfaces where a `logout()` would target the wrong
+identity:
 
 - `users/views/consent.py::consent_withdraw` is **CLOSED** — it calls
   `logout(request)`, which flushes the withdrawing browser's session.
 - `users/views/consent.py::consent_accept` is **correct** — it restores
   capability; no logout belongs on it.
 - `users/views/consent.py::consent_decline` is deliberately left untouched
-  (`B-07` gate `G-7b`): `can_login(is_declined=True) is False`, and
-  `give_consent` is the only clearer of `is_declined` and is reachable only from
-  an **authenticated** `consent_accept`, so a decline logout would be a
-  permanent one-way door. Acceptance retention (`G-E`) is the missing
-  double-fencing.
-- `users/admin.py::UserAdmin.withdraw_consent_action` is **unreachable and was
-  never registered** in `ModelAdmin.actions`, so the form's `is_deleted` /
-  `is_declined` writes were retired by `B-01` with no compensating operator
-  trigger. **There is no operator-reachable erasure trigger — absent by
-  decision, not by oversight** (`B-07` gate `G-B`). Phase 06's `PII-107` must
-  cite that decision, not the absence.
+  (`B-07` gate `G-7b`) — and after phase 06 that reasoning rests on a
+  **different** predicate. A decline does not flush the session, and it must not:
+  the only clearer of `is_declined` is the **authenticated** `consent_accept`, so a
+  decline logout would strand the subject. Under the pre-phase-06 design the strand
+  was unavoidable (`can_login(is_declined=True) is False`); **owner decision Q-D1
+  (ratified 2026-10-03) removed that**: `is_declined` is no longer a login blocker,
+  and `AccountStateMiddleware` lets a declined user through the `login_<token>`
+  deep-link specifically, so recovery does not depend on the session that recorded the
+  decline. See
+  [pii-consent-remediation-record.md](pii-consent-remediation-record.md#decline-1-q-d1--a-decline-is-reversible).
+  Acceptance retention (`G-E`) is the missing double-fencing.
+- `users/admin.py::UserAdmin.withdraw_consent_action` is now **wired and reachable**
+  (phase 06, `06-PII-107`, Q-D7 = WIRE): registered in `UserAdmin.actions` and gated
+  superuser-only through `permissions=["delete"]` → `has_delete_permission`, which
+  delegates to the superuser-only predicate. The `B-01` retirement of the form's
+  `is_deleted` / `is_declined` writes therefore *does* have a compensating operator
+  trigger. It is still **logout-less** — the subject is never the caller, so a
+  `logout()` would be the same wrong-target trap as `ban_user` — and it writes the
+  `WITHDRAWN` `ConsentRecord` inside the withdrawal transaction with **no actor
+  column and no IP/user-agent**, which is the open `06-NEW-02` limitation recorded in
+  [`db-schema.md`](../02-database/db-schema.md#consent_records-zone-f--plan-21).
 - `moderation/views/review.py::ban_user` is **reachable but unfixable with a
   `logout()`**: it is `@staff_required`, so `request.user` is the **moderator**
   while the changed identity is `ad.user`. `django.contrib.auth.logout(request)`
@@ -583,9 +677,11 @@ logout-less**: `users/admin.py::UserAdmin.deactivate_user` /
 `reactivate_user` (delegating to `apps.users.services.deactivation`). They are
 operator-driven, so the subject is never the caller and a `logout()` would be
 the same wrong-target trap as `ban_user`. They are **not** in the list above
-because that list is scoped to transitions a subject can trigger on themselves;
+because that list is scoped to the consent transitions;
 `deactivate_user` is the one operator transition that **does** revoke the
 subject's live session, and it does so through `ModelBackend`, not a logout.
+(`withdraw_consent_action` **is** in the list above and is operator-driven for the
+same wrong-target reason; it gained no logout when phase 06 wired it.)
 
 `django_session` cannot be enumerated cheaply: it has no user column, and
 `session_data` is `signing.dumps(..., compress=True)` — zlib-compressed, base64,
@@ -632,8 +728,9 @@ as `60 * 60 * 24 * 14` (`SESSION_SAVE_EVERY_REQUEST` stays `False`). This is a
 retention/row-count control, **not** a session-revocation control
 (`clear_expired()` deletes only rows past `expire_date`); it is re-filed against
 [`db-retention.md`](../02-database/db-retention.md) / phase 12 (`B-07` gate
-`G-E`), because adding it to `HOURLY_COMMANDS` (9→10) or `DAILY_COMMANDS` (2→3)
-would break two exact-`==` pinned tests in `apps/core/tests/test_scheduler.py`.
+`G-E`), because adding it to `HOURLY_COMMANDS` (9→10) or `DAILY_COMMANDS` (3→4
+after phase 06 added `purge_consent_records`) would break the exact-`==` pinned
+lists in `apps/core/tests/test_scheduler.py`.
 
 ## Operator-Facing Account Kill-Switch (Emergent from B-01 + B-05)
 
@@ -689,9 +786,14 @@ same clause as staff and superusers.
 both surfaces rather than claiming a total lockout: a ban refuses **login and
 publishing** and is enforced in the **Telegram bot**, but it does **not** revoke
 an existing web session, which keeps working until it expires. Publishing is
-refused because `AccountStateMiddleware` denies *every* bot interaction and ad
-creation is bot-only — **not** because of `can_publish_ad()`, which has no
-production call site. `is_active` is no longer the mirror image: since plan 19
+refused at two independent seams: `AccountStateMiddleware` denies *every* bot
+interaction, and the **create-time gate** `can_create_ad` refuses the writers
+themselves — `submit_ad` returns `SubmitAdOutcome.CONSENT_REQUIRED` as its first
+statement and the four web seller surfaces return `403` (see
+[Account-State Predicate Seam](#account-state-predicate-seam-06-pii-104-06-pii-109)).
+`can_publish_ad()` is half of that composition, so it is **no longer a dead
+predicate** (it had no production call site until phase 06). `is_active` is no
+longer the mirror image: since plan 19
 (2026-10-03) it is enforced on **both** tiers — the web's `ModelBackend` **and**
 the bot's `AccountStateMiddleware` (with the support carve-out).
 
@@ -706,9 +808,11 @@ contract — `UserRole.MODERATOR`, `media_gate`, `AdminSite.has_permission`, the
 15-of-17 `ModelAdmin` permission overrides — is `15-AUTHZ-003`'s and is
 **untouched**; this landing must **not** be read as phase 15 closing. The
 remaining items (asymmetric `ModeratorActionLog` coverage, the un-locked read of
-the actor's privilege, the dead `can_publish_ad()` predicate, the deliberately
-undecided flag taxonomy) are enumerated with owners in **plan 19 §7** and are
-deliberately not absorbed here. Separately, approve / reject / soft-delete are
+the actor's privilege, the deliberately undecided flag taxonomy) are enumerated
+with owners in **plan 19 §7** and are deliberately not absorbed here. (The fourth
+item plan 19 listed, "the dead `can_publish_ad()` predicate", is **retired** by
+phase 06: `can_create_ad` composes it and is wired into both tiers.) Separately,
+approve / reject / soft-delete are
 **ad-level** actions with no target guard: a moderator may still act on a
 privileged account's ads.
 
@@ -980,7 +1084,11 @@ Delivery targets admin-configured channels via two fail-open seams:
 Access control is enforced upstream by `AccountStateMiddleware` (`telegram_bot/middlewares/permissions.py`):
 banned/deleted/consent-revoked users are blocked before the handler runs, and DECLINE users cannot
 reach support because `SUPPORT_START` is not a contact deep-link (pre-existing). A deactivated user
-reaches the intake only through the plan-19 support carve-out.
+reaches the intake only through the plan-19 support carve-out. A declined user has **two** bot-tier
+carve-outs, both peers: the contact deep-link and the `login_<token>` deep-link (the recovery route
+back to the authenticated consent form, since a decline is reversible); neither is granted to a
+banned/deleted/withdrawn account — see
+[Account-State Predicate Seam](#account-state-predicate-seam-06-pii-104-06-pii-109).
 **Storage-consent gate (06-PII-101).** Support intake additionally requires consent to personal-data
 storage: the handler resolves the actor server-side from the Telegram-signed `chat_id` and enforces
 `apps.users.services.account_state.can_store_personal_data` (the six account flags plus a granted

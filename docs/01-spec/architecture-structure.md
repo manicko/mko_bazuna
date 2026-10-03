@@ -233,19 +233,23 @@ docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile schedu
 
 The scheduler runs 9 hourly sweep commands (`archive_sweep`, `delete_sweep`,
 `consent_hard_delete`, `sweep_drafts`, `sweep_orphaned_media`, `cleanup_login_tokens`,
-`purge_failed_ads`, `purge_rejected_ads`, `purge_deleted_ads`) plus 2 daily commands
-(`send_alerts`, `rollup_daily_metrics` — both fire at 08:00 UTC on the first hourly tick
-at or after that hour) via the extracted module `apps.core.utils.scheduler`
+`purge_failed_ads`, `purge_rejected_ads`, `purge_deleted_ads`) plus 3 daily commands
+(`send_alerts`, `rollup_daily_metrics`, `purge_consent_records` — all fire at 08:00 UTC on the
+first hourly tick at or after that hour) via the extracted module `apps.core.utils.scheduler`
 (`python -m apps.core.utils.scheduler`), invoked by `entrypoint-scheduler.sh`.
 The scheduler depends on `load_catalog` completing successfully (via `depends_on: condition: service_completed_successfully` in `docker-compose.yml`/`docker-compose.prod.yml`). Each dispatched command is bounded by `SCHEDULER_COMMAND_TIMEOUT` (default `1800s`); a command that times out is logged and skipped so the cycle continues (ENT-001).
 
-The two daily commands are gated on a **durable** marker, not process memory. The date lives
+The three daily commands are gated on a **durable** marker, not process memory. The date lives
 in the `scheduler_daily_state` singleton (see `apps/core/services/scheduler_daily_state.py`
-and [`db-schema`](../02-database/db-schema.md#scheduler_daily_state)); `run_scheduler` reads
+and [`db-schema`](../02-database/db-schema.md#scheduler_daily_state-singleton)); `run_scheduler` reads
 it before the loop, and `run_one_cycle` writes it only when every daily command exits `0`
 with no stop request. A restart does not re-fire the set, a failed set is retried on the
 next tick, and the marker is **fail-open** (a marker problem causes a re-run, never a
-silent skip).
+silent skip). Because the marker is written **only when all three exit `0`**, each daily command's
+exit code is load-bearing for the other two: `send_alerts` is not idempotent, so a daily command
+that fails for a routine reason would re-run the alert delivery hourly. Every daily command
+therefore returns `0` on all non-exceptional outcomes (`purge_consent_records` returns `0` for an
+empty eligible set and for `--dry-run`).
 
 **Systemd alternative (bare metal):**
 
@@ -290,9 +294,11 @@ WantedBy=multi-user.target
 # Daily commands at 08:00 UTC
 0 8  * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py send_alerts
 5 8  * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py rollup_daily_metrics
+10 8 * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py purge_consent_records
 ```
 
-**Note (cron alternative):** the bare-metal `cron` block above fires both commands directly.
+**Note (cron alternative):** the bare-metal `cron` block above fires all three daily commands
+directly.
 Under cron there is no scheduler marker in the loop, so a retried or manually re-invoked
 `send_alerts` is protected only by `uq_saved_search_ad` plus `find_matching_ads`' `NOT EXISTS`
 (it re-collects only pairs whose delivery receipt is still absent) but **not** by a run-level
@@ -354,6 +360,7 @@ Lock IDs are fixed and allocated centrally in the `AdvisoryLockId` IntEnum
 | 11 | `purge_deleted_ads` |
 | 12 | `recompute_normalized_prices` (session-scoped, per-batch commits) |
 | 13 | `repair_bot_username` (one-shot repair of `SiteConfig.bot_username`; see [`contact-us.md`](contact-us.md)) |
+| 14 | `purge_consent_records` (daily `ConsentRecord` retention sweep — **anonymises, never deletes**; see [`db-retention.md`](../02-database/db-retention.md#purge_consent_records-06-pii-116)) |
 | 100 | `migrate_locked.main` (session-scoped, runs migrate + setup_search_triggers + load_exchange_rates; optional `backfill_translations` when `RUN_TRANSLATION_BACKFILL=true`) |
 | 101 | `create_admin_user` (session-scoped, for idempotent admin creation) |
 | 102 | `backfill_thumbnails` |
@@ -362,7 +369,7 @@ Lock IDs are fixed and allocated centrally in the `AdvisoryLockId` IntEnum
 | 110 | `seed` (session-scoped, prevents concurrent seed operations) |
 | 111 | `test_schema_setup` (xdist fixture, resets test DB) |
 
-> **Note:** Lock ID 10 is intentionally unused/reserved; it was formerly `QUEUE_PROCESSING` and was removed in DB-007. IDs 14–99 are reserved for future scheduled jobs.
+> **Note:** Lock ID 10 is intentionally unused/reserved; it was formerly `QUEUE_PROCESSING` and was removed in DB-007. **IDs below 100 are reserved for scheduled jobs** and IDs 15–99 remain free for future ones; take the next free id and re-read `src/backend/apps/core/enums.py` immediately before editing, because nothing in the suite catches an id collision across two phases.
 
 Every command is idempotent, supports `--dry-run`, and logs via `logger` (no
 `print`). The scheduler service is gated by `profiles: ["scheduler"]` so it does not

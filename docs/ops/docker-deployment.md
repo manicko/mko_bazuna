@@ -353,6 +353,7 @@ The production override file (`docker-compose.prod.yml`) includes:
 | Variable | Required | Description |
 |----------|----------|-------------|
 | `DJANGO_SECRET_KEY` | Yes | Django secret key for signing sessions and CSRF tokens. Generate with: `python -c "from django.core.management.utils import get_random_secret_key; print(get_random_secret_key())"`. Rotate this key if it may have been committed to VCS or exposed. After rotation, restart the `web` and `bot` containers together — all signed tokens (sessions and CSRF tokens) are invalidated. |
+| `LOG_MASK_KEY` | Yes (prod) | HMAC key for the Telegram-ID log mask (`mask_telegram_id`, `apps/core/utils/sanitize.py`). Generate with: `python -c "import secrets; print(secrets.token_hex(32))"` — minimum **32 bytes** (RFC 2104 §3). **Required in production**: `prod.py` fail-fast rejects an empty, placeholder (`<…>`) or too-short value at boot, so `web` and `bot` will not start until it is real. It is an **independent** secret, deliberately **not** derived from `DJANGO_SECRET_KEY` — a shared key would give one leak two blast radii and leave no scoped revocation. Empty outside production is accepted: the mask then falls back to a **per-process random** key (stable within the process, changed on every restart) and logs one warning, so masked values are **not** correlatable across processes. Rotate **only on suspected compromise, never on a schedule** — see [Rotating Secrets](#rotating-secrets). |
 | `DEBUG` | No (default: `False`) | Django debug mode. Must be `True` only in dev (`docker-compose.dev.override.yml` sets this inline). Production must keep `False` |
 | `BOT_TOKEN` | Yes | Telegram bot token from @BotFather (placeholder `<...>` values are rejected at boot). An **empty** value is legal in development: the bot logs `BOT_TOKEN not set - skipping bot startup (development mode)` and the rest of the stack runs normally. A *placeholder* value is rejected by the bot entrypoint (`telegram_bot/main.py`) and fails the bot process only — it no longer aborts the whole dev stack at Django settings import. Rotate if compromised: get a new token from @BotFather, update `BOT_TOKEN` in `.env.prod`, then run `docker compose ... up -d bot`. This project uses long-polling (not webhooks), so no Telegram-side URL reconfiguration is needed. After rotation, the old token is immediately invalidated. |
 | `BOT_USERNAME` | Yes (prod) | Telegram handle without `@`; 3-32 chars, `[A-Za-z0-9_]` only. **Required in production**: `prod.py` rejects an empty, placeholder (`<your-bot-username>`) or malformed value at boot, so `web` and `bot` will not start until it is real. It is also a seed value only — migration `0003` copies it into the `SiteConfig` singleton once and no render path reads the env var afterwards, so a value that was wrong at migration time leaves a dead `t.me/` row behind. Correct an already-seeded row with `manage.py repair_bot_username` (or the Django admin) — see [`contact-us.md`](../01-spec/contact-us.md). |
@@ -421,6 +422,46 @@ restart the affected container(s), and account for the consequences.
    docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d bot
    ```
 4. The translation service reads the key at call time via `settings.GOOGLE_TRANSLATE_API_KEY`, so no other containers need restarting and no user-facing state is invalidated.
+
+**`LOG_MASK_KEY`** — rotate **only if the key may have been committed to VCS or exposed**. There
+is deliberately **no rotation schedule**: this key's only job is to make the Telegram-ID log mask
+unverifiable without it, and a scheduled rotation would cost permanent loss of correlation across
+the log history while shortening no exposure window.
+
+1. Generate a new key:
+   ```bash
+   python -c "import secrets; print(secrets.token_hex(32))"
+   ```
+2. Update `LOG_MASK_KEY` in `.env.prod`.
+3. Restart `web` and `bot` together. Both processes mask IDs (`bot` on every masked log call, `web`
+   on the login/consent paths), so a partial restart leaves two mask families in the same log.
+   ```bash
+   docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml up -d web bot
+   ```
+
+**The rotation trade-off.** Rotating changes **every** masked value in the log history: old and new
+lines stop being correlatable, and a `tg_…` value from before the rotation cannot be joined to one
+from after it. That is the entire cost. What it is **not** is a data migration — **nothing persists
+a masked value** (no model field, no session, no cache key, no Redis key), so there is no stored
+data to rewrite and no rollback beyond restoring the old key. A retained key also means the value is
+**pseudonymised, not anonymised**: the operator who still holds the key can re-derive a candidate
+Telegram ID from a mask, which is precisely why the key's own compromise is the thing to rotate
+on.
+
+**Where the key is wired, and why a new one is a four-file change.** `LOG_MASK_KEY` is enforced at
+four points, and they move together — this is what makes a typo in a template fail loudly instead of
+silently degrading the mask to an enumerable digest:
+
+| Point | File | What it enforces |
+|---|---|---|
+| Allowlist | `config/settings/base.py` (`ALLOWED_ENV_VARS`) | the variable is readable at all; a name absent here logs an unknown-env-var warning |
+| Templates | `.env.example`, `.env.dev.example`, `.env.prod.example`, `.env.test.example` | the operator-facing contract. `.env.example` / `.env.prod.example` carry the placeholder `prod.py` rejects; `.env.dev.example` is empty by design (per-process random fallback); `.env.test.example` carries a non-placeholder ≥32-byte value because every settings test importing the production module reads it |
+| CI | `.github/workflows/ci.yml`, `deploy-check.env` | the blocking `manage.py check --deploy` job runs against `config.settings.prod`, so the fail-fast guard must pass in CI too. Never set `DJANGO_BUILD` / `DJANGO_ONESHOT` there: either one suppresses the guard and the gate passes without checking anything |
+| Boot guard | `config/settings/prod.py` → `validate_log_mask_key()` in `config/settings/secret_validation.py` | rejects **empty**, then **placeholder**, then **< 32 bytes**, each with a value-free message. Skipped under `DJANGO_BUILD=1` (image build) and for dev bootstrap one-shots (`config.settings.oneshot` + `DJANGO_ONESHOT=1`) |
+
+On rollback, revert the settings entry **and** its `ALLOWED_ENV_VARS` entry **together**; the two
+allowlist tests (`test_env_allowlist.py`, `test_env_allowlist_reverse.py`) gate in both directions
+and will fail on a one-sided revert.
 
 ### Lock timeouts (`canceling statement due to lock timeout`)
 
@@ -499,16 +540,17 @@ env shape is also wrong for this image).
 ### Deployment Checks
 
 Deployment configuration is validated via Django's `manage.py check --deploy`:
-- **CI:** A dedicated `deploy-check` job in `.github/workflows/ci.yml` runs `check --deploy --fail-level WARNING` against `config.settings.prod` (not the test settings). It sets all required production env vars to valid non-secret placeholders — `DJANGO_SECRET_KEY` (a 50+ character literal), `BOT_TOKEN`, `BOT_USERNAME` (a handle matching `^[A-Za-z0-9_]{3,32}$`), `GOOGLE_TRANSLATE_API_KEY`, `SITE_URL=https://example.com`, `ALLOWED_HOSTS=example.com`, `CSRF_TRUSTED_ORIGINS=https://example.com`, `EMAIL_HOST=smtp.example.com`, `REDIS_URL=redis://localhost:6379/0`, and `DATABASE_URL` for `env.db()` parsing — so the full production settings import path is exercised. No PostgreSQL service container is required (`check --deploy` is static). Because `--fail-level WARNING` is used and the step has no `continue-on-error`, any W-series finding fails the build. This replaces the previous `test`-job step that ran against `config.settings.test` and produced 6 false-positive warnings (W008, W009, W012, W016, W018, W021) which masked real deployment gaps.
+- **CI:** A dedicated `deploy-check` job in `.github/workflows/ci.yml` runs `check --deploy --fail-level WARNING` against `config.settings.prod` (not the test settings). It sets all required production env vars to valid non-secret placeholders — `DJANGO_SECRET_KEY` (a 50+ character literal), `BOT_TOKEN`, `BOT_USERNAME` (a handle matching `^[A-Za-z0-9_]{3,32}$`), `LOG_MASK_KEY` (a non-placeholder ≥32-byte literal), `GOOGLE_TRANSLATE_API_KEY`, `SITE_URL=https://example.com`, `ALLOWED_HOSTS=example.com`, `CSRF_TRUSTED_ORIGINS=https://example.com`, `EMAIL_HOST=smtp.example.com`, `REDIS_URL=redis://localhost:6379/0`, and `DATABASE_URL` for `env.db()` parsing — so the full production settings import path is exercised. No PostgreSQL service container is required (`check --deploy` is static). Because `--fail-level WARNING` is used and the step has no `continue-on-error`, any W-series finding fails the build. This replaces the previous `test`-job step that ran against `config.settings.test` and produced 6 false-positive warnings (W008, W009, W012, W016, W018, W021) which masked real deployment gaps.
 - **Drift gate:** that `env:` block is a contract, not just fixtures. `config/settings/tests/test_deploy_check_env_parity.py` parses it out of `ci.yml` and imports `config.settings.prod` with exactly that set, so a new production guard fails the test suite until its key is added to the block in the same change. Never add `DJANGO_BUILD` or `DJANGO_ONESHOT` there: either one suppresses the guards and makes the gate pass while checking nothing.
 - **Boot:** Both `web` and `bot` entrypoints call `check --deploy` after the database is reachable and before starting the application server. The call is non-fatal — it logs a `WARNING` and continues if any checks fail, so boot is never blocked by a deploy warning.
-- This complements the `${VAR:?}` presence guards in `docker-compose.yml`. Additionally, `prod.py` enforces import-time validation on nine variables; **eight** of them are gated on the `_SKIP_SECRET_VALIDATION` block, while `ALLOWED_HOSTS` is checked unconditionally (`if not ALLOWED_HOSTS: raise ValueError(...)` below the gate). `DJANGO_BUILD=1` therefore bypasses the eight secret guards but **not** the `ALLOWED_HOSTS` check — a load-bearing fact for the Docker builder stage, whose `collectstatic` environment must still supply a non-empty `ALLOWED_HOSTS`:
+- This complements the `${VAR:?}` presence guards in `docker-compose.yml`. Additionally, `prod.py` enforces import-time validation on ten variables; **nine** of them are gated on the `_SKIP_SECRET_VALIDATION` block, while `ALLOWED_HOSTS` is checked unconditionally (`if not ALLOWED_HOSTS: raise ValueError(...)` below the gate). `DJANGO_BUILD=1` therefore bypasses the nine secret guards but **not** the `ALLOWED_HOSTS` check — a load-bearing fact for the Docker builder stage, whose `collectstatic` environment must still supply a non-empty `ALLOWED_HOSTS`:
 
   | Variable | Rule | Failure |
   |---|---|---|
   | `DJANGO_SECRET_KEY` | non-empty; not a `<...>` placeholder or the `dev-only-dummy` sentinel; ≥ 50 characters | `ImproperlyConfigured` |
   | `BOT_TOKEN` | non-empty; not a `<...>` placeholder | `ImproperlyConfigured` |
   | `BOT_USERNAME` | non-empty; not a `<...>` placeholder; `^[A-Za-z0-9_]{3,32}$` (it is persisted into `SiteConfig.bot_username`, and a bad value makes every `t.me/` deep link dead) | `ImproperlyConfigured` |
+  | `LOG_MASK_KEY` | non-empty; not a `<...>` placeholder; ≥ 32 bytes. An empty or weak value would silently reduce the Telegram-ID log mask to an enumerable digest, so the fix must not ship as a false security property | `ImproperlyConfigured` |
   | `GOOGLE_TRANSLATE_API_KEY` | non-empty; not a `<...>` placeholder | `ImproperlyConfigured` |
   | `SITE_URL` | non-empty | `ImproperlyConfigured` |
   | `EMAIL_HOST` | non-empty | `ImproperlyConfigured` |
@@ -746,16 +788,19 @@ and is skipped so the hourly/daily cycle continues without stalling (ENT-001). C
 the bound via the `SCHEDULER_COMMAND_TIMEOUT` environment variable (see
 [Environment Variables](#environment-variables)).
 
-**Daily dispatch marker.** The two daily commands (`send_alerts`, `rollup_daily_metrics`)
-fire once per calendar day per successful dispatch, not once per process.
+**Daily dispatch marker.** The three daily commands (`send_alerts`, `rollup_daily_metrics`,
+`purge_consent_records`) fire once per calendar day per successful dispatch, not once per process.
 `run_scheduler` reads the last successful date from the `scheduler_daily_state` singleton
 (`pk=1`) on start-up, and `run_one_cycle` records it only after every daily command
 exited `0` with no stop request. A restart mid-day therefore does **not** re-fire the set;
 a day whose set failed is retried on the next hourly tick (bounded ~16 attempts). If the
 marker cannot be read or written the scheduler **re-runs** the set and never skips it
 silently. `send_alerts` additionally exits non-zero if every attempted user failed, which
-keeps an all-failed day from being recorded as a success. Inspect with
-`SELECT last_daily, last_daily_completed_at FROM scheduler_daily_state;`.
+keeps an all-failed day from being recorded as a success. Every daily command therefore
+treats its own exit code as load-bearing and returns `0` on all non-exceptional outcomes —
+`purge_consent_records` returns `0` even for an empty eligible set and for `--dry-run` —
+because a non-zero exit clears `hourly_marker` and re-runs the whole daily set hourly.
+Inspect with `SELECT last_daily, last_daily_completed_at FROM scheduler_daily_state;`.
 
 On `SIGTERM` / `SIGINT` (e.g. `docker stop`), the scheduler installs handlers
 (`_handle_shutdown_signal`) that set a module-level stop flag (`_stop_event`). The
@@ -782,6 +827,7 @@ service is restarted immediately after a graceful stop (ENT-002).
 | `purge_deleted_ads` | Purge soft-deleted ads (120 days) | Hourly |
 | `send_alerts` | Deliver pending search alerts | Daily at 08:00 UTC (first hourly tick ≥ 08:00 UTC; only if not already completed today) — one digest per user per day, max 10 ads |
 | `rollup_daily_metrics` | Roll up daily analytics metrics | Daily at 08:00 UTC |
+| `purge_consent_records` | Anonymise aged `ConsentRecord` fingerprint fields (90 d); retain the decision record (5 y). **Never deletes rows** — advisory lock 14. See [`db-retention.md`](../02-database/db-retention.md#purge_consent_records-06-pii-116) | Daily at 08:00 UTC |
 
 Per-user digest fairness note: the 10-ad per-user cap is applied at **collection** time
 (in `_collect_alerts`, so the notification rows and the rendered digest are the same set),

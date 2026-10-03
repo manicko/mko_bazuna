@@ -11,6 +11,7 @@ related:
   - architecture
   - technical-specification
   - spec-index
+  - pii-consent-remediation-record
 ---
 
 ## Purpose
@@ -238,8 +239,8 @@ Backs the GDPR/ePrivacy accept/decline/withdraw flow (decision F, zone R3).
 | Value | Meaning |
 |-------|---------|
 | `ACCEPTED` | user accepted all processing (cookie `consent_given=accepted`) |
-| `DECLINED` | user declined non-essential cookies (browse-only; no erasure) |
-| `WITHDRAWN` | user withdrew consent (sets `consent_revoked_at`; triggers soft-delete + 30-day PII erasure) |
+| `DECLINED` | user declined non-essential cookies (browse-only; no erasure). **Reversible** — re-consenting clears it and restores publishing and listing visibility; it does **not** block login (decision Q-D1, see [`pii-consent-remediation-record.md`](../99-agent/pii-consent-remediation-record.md#decline-1-q-d1--a-decline-is-reversible)) |
+| `WITHDRAWN` | user withdrew consent (sets `consent_revoked_at`; triggers soft-delete + 30-day PII erasure). **Terminal** — `consent_accept` / `consent_decline` return `403` for a soft-deleted user |
 
 ## CookieCategory
 Non-essential cookie categories offered by the consent banner (Plan 21 D-9). Used as the
