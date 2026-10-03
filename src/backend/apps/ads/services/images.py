@@ -19,10 +19,17 @@ logger = logging.getLogger(__name__)
 class AdImageService:
     """Create ``AdImage`` rows with content-aware deduplication.
 
-    When a seller uploads a photo that is byte-identical to one they have
-    already attached to another ad, the existing row is returned instead of
-    creating a duplicate.  This keeps storage and the ``sha256`` index lean
-    without silently swallowing writes in the model layer.
+    Deduplication is scoped **per ad**: if the same ad already has an
+    ``AdImage`` whose ``sha256`` matches the newly uploaded file, that
+    existing row is returned instead of creating a duplicate, and the skip is
+    logged.  The same photo attached to a *different* ad — including a
+    different ad of the *same* seller — is a distinct upload and creates its
+    own row with its own storage key; seller-global upload dedup is
+    deliberately not a goal here.
+
+    A skip is observable as ``returned.image != offered_key``: the offered key
+    is minted fresh by ``generate_storage_key()`` (``uuid.uuid4()``) and
+    retried on ``FileExistsError``, so no existing row can carry it.
     """
 
     @staticmethod
@@ -46,14 +53,24 @@ class AdImageService:
     ) -> AdImage:
         """Create an ``AdImage``, returning an existing duplicate if one is found.
 
-        Deduplication is scoped per seller: if the ad's owner already has an
+        Deduplication is scoped **per ad**: if the target ad already has an
         ``AdImage`` whose ``sha256`` matches the newly uploaded file, that
         existing row is returned (no new row is created) and the skip is
-        logged.
+        logged.  The same photo on a *different* ad — even one owned by the
+        same seller — is a distinct upload and creates its own row with its
+        own key.
+
+        A skip is signalled to the caller by
+        ``returned.image != <offered key>``, not by a truthiness test.  The
+        proof: ``generate_storage_key()`` mints a fresh ``uuid.uuid4()`` key
+        and ``save_photo`` retries on ``FileExistsError``, so no existing row
+        can already carry the offered key — a differing ``.image`` is therefore
+        exactly "not created".  The asymmetry is deliberate: mis-reading a
+        *created* row as a skip would let a reclaim delete bytes that a live
+        row references.
 
         Args:
-            ad: Parent ad.  Must already be persisted so that ``user_id``
-                is available for the dedup query.
+            ad: Parent ad.  The dedup predicate is scoped to this ad itself.
             image: Storage key of the image file.  Under the deferred-promotion
                 design (03-DB-005) this is the **permanent** key while the
                 bytes are still in ``staging/``, so ``_compute_sha256(image)``
@@ -72,10 +89,11 @@ class AdImageService:
         digest = sha256 if sha256 is not None else cls._compute_sha256(image)
 
         if digest:
-            duplicate = AdImage.objects.filter(
-                sha256=digest,
-                ad__user_id=ad.user_id,
-            ).first()
+            duplicate = (
+                AdImage.objects.filter(ad=ad, sha256=digest)
+                .order_by("pk")
+                .first()
+            )
             if duplicate is not None:
                 logger.info(
                     "AdImage dedup: sha256=%s ad_id=%s user_id=%s "

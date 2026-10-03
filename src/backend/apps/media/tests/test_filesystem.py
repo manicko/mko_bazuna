@@ -31,6 +31,7 @@ from apps.media.services.filesystem import (
     generate_storage_key,
     plan_staging_promotion,
     promote_media_files,
+    reclaim_staged_keys,
     strip_photo_exif,
     validate_jpeg_bytes,
     validate_photo,
@@ -732,3 +733,80 @@ class TestPromoteMediaFiles:
         # The later key still moved despite the earlier failure.
         assert (tmp_path / "b.jpg").is_file()
         assert not (tmp_path / "staging" / "b.jpg").exists()
+
+
+# ---------------------------------------------------------------------------
+# Test — reclaim_staged_keys
+# ---------------------------------------------------------------------------
+
+
+class TestReclaimStagedKeys:
+    """``reclaim_staged_keys`` — post-commit deletion of skipped staged uploads."""
+
+    @pytest.fixture(autouse=True)
+    def _isolate_media_root(
+        self,
+        tmp_path: Path,
+    ) -> Iterator[None]:
+        """Redirect MEDIA_ROOT to a temp dir and create the staging subdir."""
+        with override_settings(MEDIA_ROOT=str(tmp_path)):
+            (tmp_path / "staging").mkdir()
+            yield
+
+    def test_deletes_all_staged_files_and_promotes_nothing(
+        self, tmp_path: Path
+    ) -> None:
+        """Each key's staged file is removed; no permanent file is created.
+
+        The permanent-form key names the eventual destination, but the bytes are
+        still at ``staging/<key>`` at reclaim time — so ``reclaim_staged_keys``
+        composes ``STAGING_PREFIX + key`` and must not touch the permanent path.
+        """
+        keys = ["uuid.jpg", "uuid-small.jpg", "uuid-medium.jpg", "uuid-large.jpg"]
+        for key in keys:
+            (tmp_path / "staging" / key).write_bytes(b"staged")
+
+        reclaim_staged_keys(keys)
+
+        for key in keys:
+            assert not (tmp_path / "staging" / key).exists(), (
+                f"staged file {key} was not reclaimed"
+            )
+            assert not (tmp_path / key).exists(), (
+                f"reclaim must not create permanent {key}"
+            )
+
+    def test_missing_staged_file_is_silent(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A staged file already gone is a silent no-op, never an exception."""
+        with caplog.at_level(logging.WARNING):
+            reclaim_staged_keys(["already-gone.jpg"])  # must not raise
+
+        assert not (tmp_path / "staging" / "already-gone.jpg").exists()
+
+    def test_one_bad_key_does_not_abort_the_remaining_reclaims(
+        self, tmp_path: Path, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A traversal key is swallowed and logged; the rest are still deleted.
+
+        This is the per-key-isolation tripwire.  ``delete_photo`` calls
+        ``assert_storage_key_contained`` outside its retry loop and that raises
+        ``ValueError``; because Django invokes ``on_commit`` callbacks unguarded,
+        an unguarded raise would abort every later callback.  The composed
+        argument here is ``"staging/../x.jpg"``, whose parts contain ``..``, so
+        the containment check rejects it.  Without the per-key ``try/except``
+        this test fails with an escaped ``ValueError`` and the good key survives.
+        """
+        (tmp_path / "staging" / "good.jpg").write_bytes(b"staged")
+
+        with caplog.at_level(
+            logging.ERROR, logger="apps.media.services.filesystem"
+        ):
+            reclaim_staged_keys(["../x.jpg", "good.jpg"])  # must not raise
+
+        assert any(record.levelno >= logging.ERROR for record in caplog.records), (
+            "the rejected key should have been logged"
+        )
+        # The good key was still reclaimed despite the earlier bad key.
+        assert not (tmp_path / "staging" / "good.jpg").exists()

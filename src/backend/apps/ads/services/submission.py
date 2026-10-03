@@ -40,6 +40,7 @@ from apps.media.services.filesystem import (
     STAGING_PREFIX,
     plan_staging_promotion,
     promote_media_files,
+    reclaim_staged_keys,
 )
 from apps.media.services.hash_service import FileHashService
 from apps.media.services.thumbnails import ThumbnailService
@@ -355,8 +356,9 @@ def submit_ad(input: SubmitAdInput) -> SubmitAdResult:
         # the staged bytes was captured above (they are not at the row's
         # permanent key), so content dedup keeps working under deferred
         # promotion.
+        reclaimed_keys: list[str] = []
         for index, photo in enumerate(input.photos):
-            AdImageService.create_or_skip(
+            created = AdImageService.create_or_skip(
                 ad=ad,
                 image=photo.storage_key,
                 telegram_file_id=photo.telegram_file_id,
@@ -366,6 +368,16 @@ def submit_ad(input: SubmitAdInput) -> SubmitAdResult:
                 thumbnail_large=photo.thumbnail_large,
                 sha256=staged_digests[index],
             )
+            # A differing ``.image`` is exactly "not created": the offered key
+            # was minted fresh by ``generate_storage_key()`` (uuid4, retried on
+            # ``FileExistsError``), so no row can already carry it.  This is the
+            # same proof that makes a defensive ``unreferenced_keys`` query here
+            # pointless — the row was never created, so nothing can reference
+            # the bytes.  Reading a *created* row as a skip would delete bytes a
+            # live row references, which is why this compares keys rather than
+            # testing truthiness.
+            if created.image != photo.storage_key:
+                reclaimed_keys.extend(photo.storage_keys())
 
         # Transition DRAFT -> ON_MODERATION (state machine requires this step).
         # A refusal (e.g. the row left DRAFT concurrently) is a business
@@ -391,6 +403,26 @@ def submit_ad(input: SubmitAdInput) -> SubmitAdResult:
         from apps.moderation.services.auto_moderation import auto_moderate
 
         passed = auto_moderate(ad)
+
+        if reclaimed_keys:
+            # In-place slice: the promotion closure holds THIS list object via
+            # ``lambda keys=permanent_keys``, so rebinding would leave it holding
+            # the unpruned list and promote the orphans.  Pruning also keeps the
+            # contract truthful when a reclaim FAILS — the bytes then stay in
+            # ``staging/`` for TTL reclamation instead of becoming permanent
+            # orphans.
+            reclaimed = set(reclaimed_keys)
+            permanent_keys[:] = [key for key in permanent_keys if key not in reclaimed]
+
+            # Registered AFTER auto_moderate, immediately BEFORE promotion: the
+            # DRAFT_GONE / INVALID_TRANSITION paths are early *returns*, so the
+            # atomic block still commits and any hook registered above would fire
+            # — deleting the skipped file out from under the seller's re-confirm.
+            # One registration per submission, so every reclaim precedes every
+            # promotion and a single failing key cannot abort the rest.
+            transaction.on_commit(
+                lambda keys=list(reclaimed_keys): reclaim_staged_keys(keys)
+            )
 
         # Schedule the filesystem move only after the owning rows commit.
         # Registered INSIDE the atomic block and AFTER the Ad.DoesNotExist

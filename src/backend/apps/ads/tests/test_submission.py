@@ -464,3 +464,262 @@ def test_submit_ad_invalid_transition_returns_outcome_not_raises(
     # The row was untouched: REJECTED is terminal, so no transition happened.
     ad.refresh_from_db()
     assert ad.status == AdStatus.REJECTED
+
+
+# ---------------------------------------------------------------------------
+# 07-MEDIA-002: reclaim the staged bytes of a skipped duplicate upload
+# ---------------------------------------------------------------------------
+
+
+def _make_jpeg_bytes() -> bytes:
+    """Return minimal decodable JPEG bytes for the real thumbnail pipeline."""
+    import io
+
+    from PIL import Image
+
+    image = Image.new("RGB", (800, 600), color=(64, 128, 192))
+    buffer = io.BytesIO()
+    image.save(buffer, format="JPEG", quality=95)
+    return buffer.getvalue()
+
+
+def _stage_photos(media_root, photos: list[tuple[str, int]]):
+    """Write staged bytes for each ``(key, position)`` and build photo dicts.
+
+    All photos share byte-identical content so the second is a content
+    duplicate of the first under per-ad dedup.
+    """
+    from apps.media.services.filesystem import STAGING_PREFIX
+
+    photo_bytes = _make_jpeg_bytes()
+    staging_dir = media_root / STAGING_PREFIX
+    staging_dir.mkdir(parents=True, exist_ok=True)
+
+    dicts = []
+    for key, position in photos:
+        (staging_dir / key).write_bytes(photo_bytes)
+        dicts.append(
+            {
+                "storage_key": f"{STAGING_PREFIX}{key}",
+                "telegram_file_id": "AgADBQ",
+                "position": position,
+            }
+        )
+    return dicts
+
+
+def _submit_input(ad: Ad, photos: list[dict]) -> SubmitAdInput:
+    """Build a ``SubmitAdInput`` carrying *photos* for *ad*."""
+    return SubmitAdInput(
+        ad_id=ad.id,
+        title_ru="Title",
+        desc_ru="Description",
+        category_id=ad.category_id,
+        city_id=ad.city_id,
+        price_amount=Decimal("100"),
+        price_currency=CurrencyCode.EUR,
+        photos=photos,
+        user_id=ad.user_id,
+    )
+
+
+def test_intra_submission_duplicate_reclaims_all_four_staged_files(
+    seller, category, city, tmp_path
+) -> None:
+    """A duplicate *within one submission* reclaims all four of its staged files.
+
+    Two byte-identical photos at positions 0 and 1 in one ``submit_ad``: photo 0
+    creates the row, photo 1 is skipped as a content duplicate, leaving a legal
+    gap at ``position=1`` (``AdImage.Meta`` does not enforce contiguity).  The
+    reclaim must remove photo 1's original **and** all three thumbnails from
+    ``staging/`` — reclaiming only the original would let ``promote_media_files``
+    promote the three orphans to permanent storage.  Photo 0's four files must
+    still be promoted.
+    """
+    from django.test import override_settings
+
+    from apps.ads.models import AdImage
+    from apps.media.services.filesystem import STAGING_PREFIX
+
+    ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+    media_root = tmp_path
+
+    with override_settings(MEDIA_ROOT=str(media_root)):
+        photos = _stage_photos(media_root, [("first.jpg", 0), ("second.jpg", 1)])
+
+        with patch(
+            "apps.moderation.services.auto_moderation.auto_moderate",
+            return_value=True,
+        ):
+            result = submit_ad(_submit_input(ad, photos))
+
+        assert result.outcome is SubmitAdOutcome.PUBLISHED, result.errors
+
+        # Exactly one row: the second photo was skipped.
+        assert AdImage.objects.filter(ad=ad).count() == 1
+
+        # Photo 0's original and thumbnails are promoted to permanent storage.
+        assert (media_root / "first.jpg").is_file()
+        for suffix in ("small", "medium", "large"):
+            assert (media_root / f"first-{suffix}.jpg").is_file()
+
+        # Photo 1's original AND thumbnails are absent from staging/ ...
+        assert not (media_root / STAGING_PREFIX / "second.jpg").exists()
+        for suffix in ("small", "medium", "large"):
+            assert not (
+                media_root / STAGING_PREFIX / f"second-{suffix}.jpg"
+            ).exists()
+        # ... and were never promoted to permanent storage.
+        assert not (media_root / "second.jpg").exists()
+        for suffix in ("small", "medium", "large"):
+            assert not (media_root / f"second-{suffix}.jpg").exists()
+
+
+def test_rollback_leaves_skipped_photo_staged_and_promotes_nothing(
+    seller, category, city, tmp_path
+) -> None:
+    """Placement B: on rollback neither hook runs, so nothing is reclaimed.
+
+    The reclaim is registered on ``transaction.on_commit``, so when the atomic
+    block rolls back (``auto_moderate`` raises) **both** photos' staged files
+    survive in ``staging/``, no ``AdImage`` row exists, and no file was
+    promoted — the bytes await TTL reclamation.  Placement B **rejects
+    placement A** (deleting inside the atomic block), which would irreversibly
+    destroy the staged bytes of an upload the seller can retry.  ``RuntimeError``
+    is used, never sleeps, so the interleaving is deterministic.
+    """
+    from django.test import override_settings
+
+    from apps.ads.models import AdImage
+    from apps.media.services.filesystem import STAGING_PREFIX
+
+    ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+    media_root = tmp_path
+
+    with override_settings(MEDIA_ROOT=str(media_root)):
+        photos = _stage_photos(media_root, [("first.jpg", 0), ("second.jpg", 1)])
+
+        with patch(
+            "apps.moderation.services.auto_moderation.auto_moderate",
+            side_effect=RuntimeError("simulated moderation failure"),
+        ):
+            with pytest.raises(RuntimeError, match="simulated moderation failure"):
+                submit_ad(_submit_input(ad, photos))
+
+        # Both photos' staged files survive — nothing was reclaimed.
+        assert (media_root / STAGING_PREFIX / "first.jpg").is_file()
+        assert (media_root / STAGING_PREFIX / "second.jpg").is_file()
+
+        # Nothing promoted to permanent storage.
+        assert not (media_root / "first.jpg").exists()
+        assert not (media_root / "second.jpg").exists()
+
+        # No row committed.
+        assert AdImage.objects.filter(ad=ad).count() == 0
+
+
+def test_invalid_transition_does_not_reclaim_skipped_files(
+    seller, category, city, tmp_path
+) -> None:
+    """The reclaim hook must not fire on a refused transition.
+
+    ``INVALID_TRANSITION`` is an early **return**, not an exception, so the
+    atomic block still commits and every hook registered before the refusal
+    would fire.  Registering the reclaim above ``auto_moderate`` would therefore
+    delete the skipped photo's staged file, and the seller's re-confirm would
+    hit ``plan_staging_promotion``'s ``FileNotFoundError`` → ``PHOTO_UNAVAILABLE``
+    → a forced full re-upload.  This test pins the hook placement: after a
+    refused transition the skipped photo's staged files **still exist**.  It
+    fails if the reclaim is moved above ``auto_moderate`` (or above the
+    transition).
+
+    The ad is ``REJECTED`` so the ``DRAFT -> ON_MODERATION`` transition is
+    refused.  It already holds a row whose digest matches the staged bytes, so
+    the ``create_or_skip`` loop — which runs *before* the transition — records a
+    reclaim.  The hook must therefore NOT be registered, because control leaves
+    via the early return before reaching it.
+    """
+    from django.test import override_settings
+
+    from apps.ads.models import AdImage
+    from apps.media.services.filesystem import STAGING_PREFIX
+
+    ad = create_test_ad(seller, category, city, status=AdStatus.REJECTED)
+    media_root = tmp_path
+
+    with override_settings(MEDIA_ROOT=str(media_root)):
+        photo_bytes = _make_jpeg_bytes()
+        # An existing row on this ad with the same digest as the staged bytes,
+        # so the new submission is a content duplicate and would be reclaimed.
+        from apps.media.services.hash_service import FileHashService
+
+        staging_dir = media_root / STAGING_PREFIX
+        staging_dir.mkdir(parents=True, exist_ok=True)
+        (staging_dir / "dup.jpg").write_bytes(photo_bytes)
+        digest = FileHashService.calculate_sha256(
+            str(staging_dir / "dup.jpg")
+        )
+        AdImage.objects.create(ad=ad, image="existing.jpg", position=0, sha256=digest)
+
+        photos = [
+            {
+                "storage_key": f"{STAGING_PREFIX}dup.jpg",
+                "telegram_file_id": "AgADBQ",
+                "position": 1,
+            }
+        ]
+
+        with patch(
+            "apps.moderation.services.auto_moderation.auto_moderate",
+            return_value=True,
+        ):
+            result = submit_ad(_submit_input(ad, photos))
+
+        assert result.outcome is SubmitAdOutcome.INVALID_TRANSITION
+
+        # The staged duplicate is untouched — no reclaim fired on the committed
+        # refusal, which is only true while the hook sits after the transition.
+        assert (media_root / STAGING_PREFIX / "dup.jpg").is_file()
+        assert not (media_root / "dup.jpg").exists()
+        # The pre-existing row is the only row; the duplicate was skipped.
+        assert AdImage.objects.filter(ad=ad).count() == 1
+
+
+def test_moderation_failure_still_reclaims_skipped_files(
+    seller, category, city, tmp_path
+) -> None:
+    """``auto_moderate`` returning ``False`` still commits, so the hooks fire.
+
+    A moderation failure is not an exception: the transaction commits, the
+    reclaim hook runs, and the skipped duplicate's staged files are removed —
+    while the outcome is ``MODERATION_FAILED``.
+    """
+    from django.test import override_settings
+
+    from apps.ads.models import AdImage
+    from apps.media.services.filesystem import STAGING_PREFIX
+
+    ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+    media_root = tmp_path
+
+    with override_settings(MEDIA_ROOT=str(media_root)):
+        photos = _stage_photos(media_root, [("first.jpg", 0), ("second.jpg", 1)])
+
+        with patch(
+            "apps.moderation.services.auto_moderation.auto_moderate",
+            return_value=False,
+        ):
+            result = submit_ad(_submit_input(ad, photos))
+
+        assert result.outcome is SubmitAdOutcome.MODERATION_FAILED
+
+        # The committed hooks fired: the skipped photo's staged files are gone.
+        assert not (media_root / STAGING_PREFIX / "second.jpg").exists()
+        for suffix in ("small", "medium", "large"):
+            assert not (
+                media_root / STAGING_PREFIX / f"second-{suffix}.jpg"
+            ).exists()
+        assert not (media_root / "second.jpg").exists()
+
+        # The first photo's row committed and its files were promoted.
+        assert AdImage.objects.filter(ad=ad).count() == 1

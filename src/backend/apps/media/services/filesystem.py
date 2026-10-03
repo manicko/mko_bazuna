@@ -134,6 +134,41 @@ def promote_media_files(keys: Iterable[str]) -> None:
                 logger.exception("Failed to promote staged file %s", key)
 
 
+def reclaim_staged_keys(keys: Iterable[str]) -> None:
+    """Delete the staged bytes of an upload that was never referenced.
+
+    For each *key* (permanent form), removes ``staging/<key>`` through
+    :func:`delete_photo` — the same receiver ``apps.media.signals._cleanup``
+    calls, so ``delete_photo`` remains the sole byte-freeing entry point.
+
+    Used when ``AdImageService.create_or_skip`` **skipped** an upload as a
+    content duplicate: no row references the files the submission pipeline
+    already wrote, so they must not be promoted.  The caller has pruned those
+    keys out of the list it hands to :func:`promote_media_files`.
+
+    This runs **post-commit**, from a ``transaction.on_commit`` callback, and
+    **never propagates**.  Each key is wrapped individually: Django pops
+    ``on_commit`` callbacks before invoking them and calls unguarded callbacks
+    without a ``try``, so a single unhandled failure would abort every later
+    callback — including :func:`promote_media_files` — and strand the ad's
+    surviving photos in ``staging/`` until TTL reclamation.  One bad key must
+    never cost the others.
+
+    Args:
+        keys: Permanent storage keys whose staged bytes are unreferenced (as
+            returned by ``SubmittedPhoto.storage_keys()``).
+
+    Note:
+        A missing staged file is silent: :func:`delete_photo` treats
+        ``FileNotFoundError`` as terminal and returns.
+    """
+    for key in keys:
+        try:
+            delete_photo(f"{STAGING_PREFIX}{key}")
+        except Exception:  # noqa: BLE001 - never let a reclaim abort promotion
+            logger.exception("Failed to reclaim staged file %s", key)
+
+
 def assert_storage_key_contained(storage_key: str) -> None:
     """Validate that *storage_key* is a safe relative path within MEDIA_ROOT.
 

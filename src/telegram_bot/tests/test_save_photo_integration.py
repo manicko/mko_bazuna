@@ -376,13 +376,26 @@ class TestSubmitAdStagingMove:
         FAILS if that override is removed from the ``submit_ad`` call site: the
         stored digest would be empty and the second submission would create a
         second row.
+
+        Deduplication is scoped **per ad** (07-MEDIA-002): the two submissions
+        therefore target the **same** ad, not two different ads of one seller.
+        The second submission re-arms the ad to ``DRAFT`` first — ``submit_ad``
+        requires ``DRAFT -> ON_MODERATION``, and ``auto_moderate`` is patched so
+        the ad is left in ``ON_MODERATION``, which is not a legal source state
+        for a second transition (it would return ``INVALID_TRANSITION`` and the
+        second photo would never reach ``create_or_skip`` at all, so the test
+        would silently stop exercising dedup).  The two photos are placed at
+        distinct ``position`` values (0, then 1) so a broken tripwire fails with
+        the clean count assertion rather than ``IntegrityError`` from
+        ``uq_ad_images_ad_position``.
         """
-        from apps.ads.models import AdImage
+        from apps.ads.models import Ad, AdImage
         from apps.ads.services.submission import (
             SubmitAdInput,
             SubmitAdOutcome,
             submit_ad,
         )
+        from apps.core.enums import AdStatus
         from apps.currencies.enums import CurrencyCode
         from apps.media.services.filesystem import STAGING_PREFIX
         from apps.media.services.hash_service import FileHashService
@@ -396,7 +409,7 @@ class TestSubmitAdStagingMove:
         expected_digest = FileHashService.calculate_sha256(str(digest_probe))
 
         with override_settings(MEDIA_ROOT=str(media_root)):
-            first_ad = await create_draft_ad(user_id=user.id)
+            ad = await create_draft_ad(user_id=user.id)
 
             def stage(key: str) -> str:
                 storage_key = f"{STAGING_PREFIX}{key}"
@@ -405,7 +418,7 @@ class TestSubmitAdStagingMove:
                 (staging_dir / key).write_bytes(photo_bytes)
                 return storage_key
 
-            def build_input(ad, storage_key: str) -> SubmitAdInput:
+            def build_input(storage_key: str, position: int) -> SubmitAdInput:
                 return SubmitAdInput(
                     ad_id=ad.id,
                     title_ru="Title",
@@ -418,7 +431,7 @@ class TestSubmitAdStagingMove:
                         {
                             "storage_key": storage_key,
                             "telegram_file_id": "AgADBQ",
-                            "position": 0,
+                            "position": position,
                         }
                     ],
                     user_id=user.id,
@@ -428,40 +441,44 @@ class TestSubmitAdStagingMove:
                 "apps.moderation.services.auto_moderation.auto_moderate",
                 return_value=True,
             ):
-                first_key = stage("first.jpg")
                 first_result = await sync_to_async(submit_ad)(
-                    build_input(first_ad, first_key)
+                    build_input(stage("first.jpg"), 0)
                 )
                 assert first_result.outcome is SubmitAdOutcome.PUBLISHED, (
                     first_result.errors
                 )
 
-                first_image = await sync_to_async(AdImage.objects.get)(ad=first_ad)
+                first_image = await sync_to_async(AdImage.objects.get)(ad=ad)
 
                 # The digest is non-empty and equals the digest of the STAGED bytes.
                 assert first_image.sha256 != "", "deferred promotion emptied the digest"
                 assert first_image.sha256 == expected_digest
 
-                # ``create_draft_ad`` deletes any pre-existing DRAFT for the
-                # user, so the second draft is created only after the first ad
-                # has left DRAFT (submit_ad → ON_MODERATION).
-                second_ad = await create_draft_ad(user_id=user.id)
-                second_key = stage("second.jpg")
+                # Re-arm the ad to DRAFT: submit_ad left it in ON_MODERATION and
+                # a second DRAFT -> ON_MODERATION transition requires DRAFT as
+                # the source state (see the docstring).
+                await sync_to_async(
+                    lambda: Ad.objects.filter(pk=ad.pk).update(status=AdStatus.DRAFT)
+                )()
+
                 second_result = await sync_to_async(submit_ad)(
-                    build_input(second_ad, second_key)
+                    build_input(stage("second.jpg"), 1)
                 )
                 assert second_result.outcome is SubmitAdOutcome.PUBLISHED, (
                     second_result.errors
                 )
 
-            # Identical bytes → same user → same row, not a second row.
-            count = await sync_to_async(
-                lambda: AdImage.objects.filter(ad__user_id=user.id).count()
+            # Identical bytes + same ad → same row, not a second row.
+            rows = await sync_to_async(
+                lambda: list(AdImage.objects.filter(ad=ad))
             )()
-            assert count == 1, (
-                "identical bytes created a duplicate row — the sha256 override "
-                "is missing or ineffective"
+            assert len(rows) == 1, (
+                "identical bytes to the same ad created a duplicate row — the "
+                "sha256 override is missing or ineffective"
             )
+            # The surviving row is the first one: the second submission was a
+            # skip, not a silently-not-created row.
+            assert rows[0].pk == first_image.pk
 
     @pytest.mark.asyncio
     async def test_submit_ad_rollback_leaves_files_in_staging(

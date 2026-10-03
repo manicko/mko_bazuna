@@ -140,3 +140,32 @@ class TestAdImageServiceCreateOrSkip:
         assert result.pk is not None
         assert result.image == key
         assert result.sha256 == ""
+
+    def test_same_seller_two_ads_creates_two_rows(
+        self, seller, category, city, isolated_media_root
+    ):
+        """Identical bytes on two ads of the *same* seller create two rows.
+
+        Over-scoping guard for 07-MEDIA-002: dedup is scoped **per ad**, so a
+        seller reposting the same photo to a second ad gets its own row with
+        its own storage key — the two rows must not collapse to one.
+        """
+        from apps.ads.models import AdImage
+        from apps.ads.services.images import AdImageService
+
+        ad_a = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        ad_b = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        key_a = "seller-photo-a.jpg"
+        key_b = "seller-photo-b.jpg"
+        (isolated_media_root / key_a).write_bytes(b"identical-byte-content")
+        (isolated_media_root / key_b).write_bytes(b"identical-byte-content")
+
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            first = AdImageService.create_or_skip(ad_a, key_a, position=0)
+            second = AdImageService.create_or_skip(ad_b, key_b, position=0)
+
+        assert first.pk != second.pk
+        assert first.image == key_a
+        assert second.image == key_b
+        assert AdImage.objects.filter(ad=ad_a).count() == 1
+        assert AdImage.objects.filter(ad=ad_b).count() == 1

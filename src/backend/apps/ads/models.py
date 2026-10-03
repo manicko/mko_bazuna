@@ -702,7 +702,7 @@ class AdImage(models.Model):
 
         Deduplication is intentionally **not** performed here — use
         ``AdImageService.create_or_skip()`` for bot-uploaded photos so that
-        duplicate uploads by the same seller are detected and logged.
+        duplicate uploads to the same ad are detected and logged.
         """
         from apps.media.services.filesystem import assert_storage_key_contained
         from apps.media.services.hash_service import FileHashService
