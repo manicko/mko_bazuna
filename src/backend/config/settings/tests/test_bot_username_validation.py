@@ -60,6 +60,7 @@ _PROD_ENV_ALLOWLIST = frozenset(
         "ALLOWED_HOSTS",
         "CSRF_TRUSTED_ORIGINS",
         "REDIS_URL",
+        "LOG_MASK_KEY",
         "EMAIL_HOST",
         "EMAIL_PORT",
         "EMAIL_HOST_USER",

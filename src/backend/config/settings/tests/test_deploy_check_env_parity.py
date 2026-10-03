@@ -48,7 +48,7 @@ is no ``src/.env``, so emptying it takes ``base.py``'s missing-file branch and
 exercising ``prod.py``.
 
 The two rows also assert different exception types on purpose: the prod import
-has no single failure surface. Six guards raise ``ImproperlyConfigured``, two
+has no single failure surface. Seven guards raise ``ImproperlyConfigured``, two
 (``ALLOWED_HOSTS``, ``CSRF_TRUSTED_ORIGINS``) raise a bare ``ValueError``, and an
 unset ``DJANGO_SECRET_KEY`` fails from ``base.py`` with a different message
 again.

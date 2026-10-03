@@ -27,6 +27,7 @@ ALLOWED_ENV_VARS = frozenset({
     # --- Python-consumed (env()/env.*()/os.getenv in base.py, prod.py,
     #     apps/core/utils/migrate_locked.py) ---
     "DJANGO_SECRET_KEY", "DJANGO_SETTINGS_MODULE",
+    "LOG_MASK_KEY",
     "DEBUG", "BOT_TOKEN", "GOOGLE_TRANSLATE_API_KEY",
     "ALLOWED_HOSTS", "CSRF_TRUSTED_ORIGINS",
     "DATABASE_URL",
@@ -128,6 +129,12 @@ else:
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env("DJANGO_SECRET_KEY")
+
+# HMAC key for the Telegram-ID log mask (apps/core/utils/sanitize.py). Required
+# in production - guard-enforced in prod.py. Independent of SECRET_KEY on
+# purpose: reusing SECRET_KEY would give one leak two blast radii and no scoped
+# revocation. Empty in non-production is deliberate; see _resolve_log_mask_key.
+LOG_MASK_KEY = env("LOG_MASK_KEY", default="")
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = env("DEBUG")

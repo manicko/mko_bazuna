@@ -528,6 +528,7 @@ jobs:
       DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
       EMAIL_HOST: smtp.example.com
       REDIS_URL: redis://localhost:6379/0
+      LOG_MASK_KEY: ci-deploy-check-log-mask-key-not-for-production-use
     steps:
       - uses: actions/checkout@v4
 

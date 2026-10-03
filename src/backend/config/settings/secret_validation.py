@@ -13,7 +13,9 @@ secret. The defect is correctness, not disclosure. Settings modules validate it
 inside their existing secret-validation block because that block is the
 project's single "this variable must be real when we serve traffic" mechanism —
 not because the value is confidential. Widening the block is therefore a
-deliberate decision, not a convenience.
+deliberate decision, not a convenience. ``LOG_MASK_KEY`` is the opposite case:
+it **is** a secret, and it lives in the same block because the block is also
+where a required production value is refused when it is missing.
 
 ``BOT_USERNAME_PATTERN`` duplicates ``SiteConfig.bot_username``'s
 ``RegexValidator`` on purpose: settings cannot import the model. The two are
@@ -29,6 +31,11 @@ from django.core.exceptions import ImproperlyConfigured
 
 # Byte-identical to SiteConfig.bot_username's RegexValidator (see module docstring).
 BOT_USERNAME_PATTERN: Final[str] = r"^[A-Za-z0-9_]{3,32}$"
+
+# RFC 2104 section 3's minimum recommended key length for HMAC-SHA-256. A key
+# shorter than the hash block size weakens the construction; 32 bytes (256 bits)
+# is the standard floor and matches a `secrets.token_hex(32)` value.
+_MIN_LOG_MASK_KEY_BYTES: Final[int] = 32
 
 # Matches values shipped as templates in .env.*.example files, e.g.
 # <generate-with-django-secret-key-generator>, <your-bot-token-from-botfather>
@@ -85,4 +92,31 @@ def validate_bot_username(var_name: str, value: str) -> None:
             f"{var_name} must be 3-32 characters, alphanumeric and underscore "
             "only, because it is persisted into SiteConfig.bot_username. Provide "
             "the real Telegram bot handle (without the @ prefix) in .env.prod."
+        )
+
+
+def validate_log_mask_key(var_name: str, value: str) -> None:
+    """Fail fast when the log-mask key is missing, a template, or too short.
+
+    Checks in the order that produces the most actionable message first: the
+    empty case before the placeholder case, and the placeholder case before the
+    length case. Raises ``ImproperlyConfigured`` with a value-free message naming
+    the variable and the remediation; never logs or echoes the value.
+    """
+    if not value:
+        raise ImproperlyConfigured(
+            f"{var_name} must be set and non-empty in production. Generate one with "
+            '`python -c "import secrets; print(secrets.token_hex(32))"` and put the '
+            "real value in the .env.prod runtime file."
+        )
+    if is_placeholder(value):
+        raise ImproperlyConfigured(
+            f"{var_name} appears to be a placeholder value from a .env template. "
+            "Replace it with the real value in .env.prod."
+        )
+    if len(value.encode()) < _MIN_LOG_MASK_KEY_BYTES:
+        raise ImproperlyConfigured(
+            f"{var_name} must be at least {_MIN_LOG_MASK_KEY_BYTES} bytes (RFC 2104 "
+            "section 3). Generate one with "
+            '`python -c "import secrets; print(secrets.token_hex(32))"`.'
         )

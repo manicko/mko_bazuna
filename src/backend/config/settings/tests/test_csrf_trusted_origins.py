@@ -56,6 +56,11 @@ def _prod_env(**overrides: str) -> dict[str, str]:
     # ambient environment differs between the Docker test container (.env.test)
     # and the CI test job (no .env). See BLOCK 5 decision D1.
     env["BOT_USERNAME"] = overrides.pop("BOT_USERNAME", "test_bot_for_testing_only")
+    # LOG_MASK_KEY is required by the prod.py fail-fast guard (06-PII-112). Must
+    # be non-empty, non-placeholder and >= 32 bytes.
+    env["LOG_MASK_KEY"] = overrides.pop(
+        "LOG_MASK_KEY", "test-log-mask-key-for-testing-only-not-a-secret"
+    )
     env["GOOGLE_TRANSLATE_API_KEY"] = overrides.pop(
         "GOOGLE_TRANSLATE_API_KEY", "test-translate-key-for-testing-only"
     )

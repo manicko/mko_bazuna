@@ -9,7 +9,11 @@ import os
 from django.core.exceptions import ImproperlyConfigured
 
 from .base import *  # noqa: F403, F401
-from .secret_validation import is_placeholder, validate_bot_username
+from .secret_validation import (
+    is_placeholder,
+    validate_bot_username,
+    validate_log_mask_key,
+)
 
 DEBUG = False
 
@@ -83,7 +87,7 @@ if SENTRY_DSN and not DEBUG:  # noqa: F405 (SENTRY_DSN from base via *)
 # ---------------------------------------------------------------------------
 # Secret-validation bypass
 # ---------------------------------------------------------------------------
-# The eight secret guards below must run for every production settings module.
+# The nine secret guards below must run for every production settings module.
 # Two control flags can suppress them, each with a different scope:
 #
 #   DJANGO_BUILD=1   — set ONLY in the Docker image builder stage
@@ -318,3 +322,16 @@ if not _SKIP_SECRET_VALIDATION:
 # `manage.py repair_bot_username`, or edit SiteConfig in the Django admin.
 if not _SKIP_SECRET_VALIDATION:
     validate_bot_username("BOT_USERNAME", BOT_USERNAME)  # noqa: F405
+
+# Fail fast: LOG_MASK_KEY is required in production. It is the HMAC key that
+# makes the Telegram-ID log mask unverifiable without it (apps/core/utils/
+# sanitize.py). An empty, placeholder or too-short value would silently reduce
+# the mask to an enumerable digest, so the fix would ship a false security
+# property. It is an INDEPENDENT secret, never derived from SECRET_KEY: reusing
+# SECRET_KEY would give one leak two blast radii and no scoped revocation.
+# Skipped during the Docker image build (DJANGO_BUILD=1), which runs
+# collectstatic under this module with no .env at all; dev bootstrap one-shots
+# run config.settings.oneshot, not this module. The real key is provided at
+# runtime via .env.prod.
+if not _SKIP_SECRET_VALIDATION:
+    validate_log_mask_key("LOG_MASK_KEY", LOG_MASK_KEY)  # noqa: F405

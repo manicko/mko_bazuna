@@ -6,12 +6,19 @@ they reach log output, preventing log injection and PII leaks.
 """
 
 import hashlib
+import hmac
 import json
+import logging
 import re
+import secrets
 from typing import TYPE_CHECKING, Final
+
+from django.conf import settings
 
 if TYPE_CHECKING:
     from pydantic import ValidationError
+
+logger = logging.getLogger(__name__)
 
 
 # Max characters retained for a logged query string.
@@ -131,12 +138,66 @@ def sanitize_autocomplete_query(query: str) -> str:
     return re.sub(r"[;'\"\\]", "", query.strip())
 
 
+# Whether the empty-key warning has already been emitted for this process, so a
+# developer is told once rather than once per masked value.
+_log_mask_key_warning_emitted: bool = False
+
+# The per-process random fallback key, materialised at most once. It must be
+# stable across calls within a process or same-input-same-output correlation
+# within that process would break; it is deliberately NOT configurable.
+_log_mask_key_fallback: bytes | None = None
+
+
+def _resolve_log_mask_key() -> bytes:
+    """Return the HMAC key used to pseudonymise Telegram IDs.
+
+    Production is guarded in ``config/settings/prod.py``, so
+    ``settings.LOG_MASK_KEY`` is always a real, non-placeholder key there.
+
+    Outside production the setting defaults to the empty string. Falling back
+    to the old unkeyed digest would reintroduce exactly the enumeration defect
+    this module exists to remove, so an empty key is instead replaced by a
+    per-process random value. Correlation across processes is deliberately
+    unavailable in that case — the mask is still unverifiable and never leaks
+    the raw ID — and a single warning is emitted so a developer is not misled
+    into believing non-production logs are correlatable.
+    """
+    global _log_mask_key_fallback, _log_mask_key_warning_emitted
+
+    key = settings.LOG_MASK_KEY
+    if key:
+        return key.encode()
+    if _log_mask_key_fallback is None:
+        _log_mask_key_fallback = secrets.token_bytes(32)
+    if not _log_mask_key_warning_emitted:
+        _log_mask_key_warning_emitted = True
+        logger.warning(
+            "LOG_MASK_KEY is unset: mask_telegram_id is using a per-process random "
+            "key. Masked values are not correlatable across processes and change on "
+            "every restart. Set LOG_MASK_KEY to a shared value for correlatable logs."
+        )
+    return _log_mask_key_fallback
+
+
 def mask_telegram_id(telegram_id: int | None) -> str:
     """Mask a Telegram user ID for safe logging.
 
-    Non-reversible SHA-256 hash (first 8 hex chars) with 'tg_' prefix.
-    Same input always produces the same output, enabling log correlation
-    without exposing the raw PII.
+    Keyed HMAC-SHA-256 over ``str(telegram_id)``, truncated to the first 12 hex
+    characters, with a ``tg_`` prefix. The KEY is what makes the value unusable
+    to anyone who does not hold it: without ``LOG_MASK_KEY`` an attacker may
+    enumerate candidate Telegram IDs but cannot confirm any of them. A retained
+    key means the value is pseudonymised, never anonymised.
+
+    CORRELATION IDENTIFIER, NEVER AN AUTHENTICATOR. 12 hex is 48 bits,
+    deliberately below RFC 2104 section 5's 80-bit floor for a truncated HMAC,
+    because this mask is never accepted as proof of anything: it is written
+    into logs and never checked against anything. If a future change needs it to
+    authenticate, 48 bits is insufficient and the width must be raised then.
+
+    Rotating ``LOG_MASK_KEY`` changes every value: old and new log lines stop
+    being correlatable. Rotation is on suspected compromise, never on a
+    schedule; a scheduled rotation would cost permanent loss of correlation
+    across the log history while shortening no exposure window.
 
     Args:
         telegram_id: The Telegram user ID to mask, or None.
@@ -147,7 +208,9 @@ def mask_telegram_id(telegram_id: int | None) -> str:
     if telegram_id is None:
         return "None"
     tid = str(telegram_id)
-    return f"tg_{hashlib.sha256(tid.encode()).hexdigest()[:8]}"
+    key = _resolve_log_mask_key()
+    digest = hmac.new(key, tid.encode(), hashlib.sha256).hexdigest()
+    return f"tg_{digest[:12]}"
 
 
 def pydantic_errors_json(exc: ValidationError) -> list[dict[str, object]]:
