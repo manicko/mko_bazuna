@@ -106,10 +106,15 @@ HOURLY_COMMANDS: list[str] = [
 
 # Daily at 08:00 UTC — first hourly tick >= 08:00 UTC each calendar day.
 # ``send_alerts`` is the search-alert delivery task; ``rollup_daily_metrics``
-# is the daily analytics rollup (AdvisoryLockId.ROLLUP_DAILY_METRICS).
+# is the daily analytics rollup (AdvisoryLockId.ROLLUP_DAILY_METRICS);
+# ``purge_consent_records`` anonymises aged consent-ledger rows against a
+# multi-month boundary, so daily is the right cadence (AdvisoryLockId.
+# CONSENT_RECORD_SWEEP). Its exit code is load-bearing for the durable daily
+# marker, so it returns 0 on every non-exceptional outcome.
 DAILY_COMMANDS: list[str] = [
     "send_alerts",
     "rollup_daily_metrics",
+    "purge_consent_records",
 ]
 
 # Daily threshold hour (UTC). Daily commands fire on the first hourly tick

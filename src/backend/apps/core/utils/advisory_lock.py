@@ -49,6 +49,7 @@ def advisory_lock(lock_id: int, *, session: bool = False):
           11  PURGE_DELETED_ADS            deleted-ad purge
           12  RECOMPUTE_NORMALIZED_PRICES  price normalization
           13  REPAIR_BOT_USERNAME          BOT_USERNAME repair
+          14  CONSENT_RECORD_SWEEP         consent-record retention sweep
           102  BACKFILL_THUMBNAILS          thumbnail backfill
           103  SWEEP_ORPHANED_MEDIA         orphaned media sweep
 

@@ -1711,12 +1711,17 @@ msgstr ""
 
 #: src/backend/templates/privacy.html
 msgid ""
-"The anonymised consent-action log records that consent was accepted, declined "
-"or withdrawn, and the categories chosen, so we can demonstrate compliance."
+"The anonymised consent-action log records that consent was accepted, "
+"declined or withdrawn, and the categories chosen, so we can demonstrate "
+"compliance. The identifying details of the action (session identifier, IP "
+"address and browser string) are removed after 90 days, and the anonymised "
+"decision record is kept for 5 years."
 msgstr ""
 "Анонимизированный журнал действий с согласием фиксирует, что согласие было "
 "принято, отклонено или отозвано, и какие категории были выбраны, чтобы мы "
-"могли подтвердить соблюдение требований."
+"могли подтвердить соблюдение требований. Идентифицирующие детали действия "
+"(идентификатор сессии, IP-адрес и строка браузера) удаляются через 90 дней, "
+"а анонимизированная запись о решении хранится 5 лет."
 
 #: src/backend/templates/privacy.html
 msgid ""

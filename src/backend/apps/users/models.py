@@ -282,6 +282,11 @@ class ConsentRecord(models.Model):
     class Meta:
         db_table = "consent_records"
         ordering = ["-consent_given_at"]
+        indexes = [
+            models.Index(
+                fields=["consent_given_at"], name="IX_consent_records_sweep"
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"ConsentRecord {self.id} ({self.choice})"

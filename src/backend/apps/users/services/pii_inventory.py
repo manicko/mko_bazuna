@@ -139,29 +139,30 @@ PII_ERASURE_ENTRIES: tuple[tuple[str, str, ErasureAction, str], ...] = (
     (
         "users.ConsentRecord",
         "session_key",
-        ErasureAction.RETAIN,
-        "NOT implemented today: a live Django session identifier with no "
-        "retention boundary. The ConsentRecord half of 06-PII-110 was absorbed "
-        "into 06-PII-116; BLOCK 15 owns the TTL decision (Q-D4) and the sweep. "
-        "Declared so the deferral is visible.",
+        ErasureAction.NULL,
+        "Implemented by BLOCK 15's purge_consent_records (lock 14) at R2, the "
+        "ratified 90-day fingerprint window (06-PII-116). Nulled in the SAME "
+        "UPDATE as user_id, because an anonymous consent record is identified "
+        "by session_key; clearing one without the other would leave a live "
+        "re-identification path through django_session that this inventory "
+        "does not declare.",
     ),
     (
         "users.ConsentRecord",
         "user_agent",
-        ErasureAction.RETAIN,
-        "NOT implemented today: browser-fingerprint-grade text, same table and "
-        "retention class as session_key. BLOCK 15's sweep (06-PII-116) owns its "
-        "boundary (Q-D4).",
+        ErasureAction.CLEAR,
+        "Implemented by BLOCK 15's purge_consent_records (lock 14) at R2, the "
+        "ratified 90-day fingerprint window (06-PII-116). CLEAR, not NULL: the "
+        "column is blank=True and NOT nullable. Not required for any Art. 7(1) "
+        "proof — EDPB 05/2020 §106.",
     ),
     (
         "users.ConsentRecord",
         "ip_address",
-        ErasureAction.RETAIN,
-        "NOT implemented today: declared by BLOCK 3, not by any finding — same "
-        "table and retention class as session_key/user_agent, and an undeclared "
-        "sibling in a table BLOCK 15 will sweep is exactly the omission this "
-        "block exists to prevent. BLOCK 15 (06-PII-116) owns its boundary "
-        "(Q-D4).",
+        ErasureAction.NULL,
+        "Implemented by BLOCK 15's purge_consent_records (lock 14) at R2, the "
+        "ratified 90-day fingerprint window (06-PII-116). Nullable, already "
+        "masked at write by _client_ip_mask, and not required for the proof.",
     ),
     (
         "users.LoginToken",

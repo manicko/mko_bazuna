@@ -101,8 +101,13 @@ class TestSchedulerConstants:
         ]
 
     def test_daily_commands_include_send_alerts(self) -> None:
-        """DAILY_COMMANDS must include send_alerts and rollup_daily_metrics."""
-        assert DAILY_COMMANDS == ["send_alerts", "rollup_daily_metrics"]
+        """DAILY_COMMANDS must include send_alerts, rollup_daily_metrics and
+        purge_consent_records."""
+        assert DAILY_COMMANDS == [
+            "send_alerts",
+            "rollup_daily_metrics",
+            "purge_consent_records",
+        ]
 
     def test_daily_hour_utc_is_8(self) -> None:
         """DAILY_HOUR_UTC must be 08:00 UTC per phase-02 spec."""

@@ -131,6 +131,11 @@ Index on `user_id` supports the `consent_hard_delete` sweep. `consent_hard_delet
 `users.consent_revoked_at` (zone F) — the 30-day PII null + hard-delete of the row runs only
 after the full grace window.
 
+`IX_consent_records_sweep` on `consent_given_at` supports the `purge_consent_records`
+retention sweep, which **anonymises** (never deletes) rows older than the ratified
+fingerprint window. `Meta.ordering = ["-consent_given_at"]` does not create an index, so the
+sweep column leads this real index.
+
 ---
 
 ### ads (single table)

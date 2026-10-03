@@ -338,7 +338,6 @@ class ConsentRecordAdmin(admin.ModelAdmin):
         "id",
         "consent_given_at",
         "user",
-        "session_key",
         "choice",
         "consent_version",
     ]

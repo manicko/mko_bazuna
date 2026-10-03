@@ -95,6 +95,7 @@ docker compose --env-file .env.dev \
 | `purge_rejected_ads` | 90 days | Delete REJECTED ads older than 90 days |
 | `sweep_drafts` | 30 minutes | Delete DRAFT ads with no seller activity for 30 minutes (`Ad.updated_at`) |
 | `consent_hard_delete` | 30 days | Hard-delete user PII after 30-day consent withdrawal |
+| `purge_consent_records` | 90 days / 5 years | Anonymise `ConsentRecord` identity fields after 90 days; retain the decision record for 5 years (**never deletes rows**) |
 
 **`DRAFT` retention measures inactivity, not age.** The predicate is
 `status = DRAFT AND updated_at < now() - interval '30 minutes'`. `updated_at` is
@@ -168,7 +169,7 @@ See also: [technical-specification.md Decision F](../01-spec/technical-specifica
 
 ## Configuration
 
-All retention values are hardcoded in the respective management command source files. No environment variables or CLI arguments (beyond `--dry-run`) are read for retention durations. The values are: `archive_sweep` (60 days), `delete_sweep` (60 days), `purge_deleted_ads` (120 days), `purge_failed_ads` (7 days), `purge_rejected_ads` (90 days), `sweep_drafts` (30 minutes), `consent_hard_delete` (30 days).
+All retention values are hardcoded in the respective management command source files. No environment variables or CLI arguments (beyond `--dry-run`) are read for retention durations. The values are: `archive_sweep` (60 days), `delete_sweep` (60 days), `purge_deleted_ads` (120 days), `purge_failed_ads` (7 days), `purge_rejected_ads` (90 days), `sweep_drafts` (30 minutes), `consent_hard_delete` (30 days), `purge_consent_records` (90-day fingerprint window / 5-year decision window).
 
 Separately, `LOCK_TIMEOUT_SECONDS` (default 10) bounds every lock wait; it is a
 connection setting, not a retention value.

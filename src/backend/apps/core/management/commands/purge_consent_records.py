@@ -1,0 +1,168 @@
+"""
+Management command to anonymise aged ``ConsentRecord`` rows on a ratified schedule.
+
+The consent ledger is Art. 7(1) accountability evidence, so this sweep
+**anonymises, never deletes**. Two windows apply, both owner-ratified and both
+hardcoded (``_FINGERPRINT_RETENTION_DAYS`` / ``_DECISION_RETENTION_DAYS``):
+
+* At the **fingerprint** window the HTTP-layer identity is removed: ``user`` and
+  ``session_key`` are cleared in the **same** ``UPDATE`` (an anonymous record is
+  identified by ``session_key``, so clearing one without the other would leave a
+  live re-identification path through ``django_session``), ``ip_address`` is set
+  ``NULL`` and ``user_agent`` is cleared to ``""`` (the column is ``blank=True``
+  and **not** nullable, so the action is ``CLEAR``, not ``NULL``).
+* The **decision** fields (``choice``, ``categories``, ``consent_version``,
+  ``consent_given_at``) are retained at every age; the row itself is never
+  deleted, which is what lets the controller demonstrate that consent was given
+  and survives the re-prompt boundary.
+
+The command asserts ``0 < _FINGERPRINT_RETENTION_DAYS <= _DECISION_RETENTION_DAYS``
+itself so a mis-ordering fails loudly instead of making the fingerprint stage a
+silent no-op; the fingerprint window is additionally floored at the declared
+Django session lifetime (``SESSION_COOKIE_AGE``) so a still-live session's
+support evidence is not destroyed.
+
+Uses advisory lock 14 for idempotent, safe concurrent execution. Batching is
+deliberately off: ``ConsentRecord`` grows by consent *actions*, not by requests,
+and the workload is far below the ``~10**5`` eligible rows that would justify
+``archive_sweep``'s keyset-batched shape.
+
+Changelist residual (06-PII-116, recorded not closed): the admin changelist no
+longer lists ``session_key``, but ``ConsentRecordAdmin.search_fields`` still
+contains it, so a staff user with changelist permission can probe a session key
+they already hold and learn whether a row exists. Closing that needs a decision
+about whether any staff probe is acceptable at all, which is outside this
+block's surface.
+"""
+
+import logging
+from datetime import timedelta
+
+from django.conf import settings
+from django.core.management.base import BaseCommand
+from django.db import transaction
+from django.utils import timezone
+
+from apps.core.enums import AdvisoryLockId
+from apps.core.utils.advisory_lock import advisory_lock
+from apps.users.models import ConsentRecord
+
+logger = logging.getLogger(__name__)
+
+#: Ratified R2: how long the fingerprint fields (session_key, user_agent,
+#: ip_address, plus the user link) are retained after the consent action.
+_FINGERPRINT_RETENTION_DAYS = 90
+
+#: Ratified R1: how long the decision fields are retained. The rows themselves
+#: are anonymised, never deleted, so this is not a deletion boundary.
+_DECISION_RETENTION_DAYS = 365 * 5
+
+
+class Command(BaseCommand):
+    """Anonymise aged ConsentRecord rows without ever deleting them."""
+
+    help = (
+        "Anonymise ConsentRecord fingerprint fields older than 90 days and "
+        "retain the decision fields for 5 years (never deletes rows)"
+    )
+
+    def add_arguments(self, parser) -> None:
+        """Add dry-run argument to the command."""
+        parser.add_argument(
+            "--dry-run",
+            action="store_true",
+            dest="dry_run",
+            default=False,
+            help="Report the counts that would be anonymised without mutating",
+        )
+
+    def handle(self, *args, **options) -> None:
+        """Execute the consent-record retention sweep with advisory lock."""
+        dry_run: bool = options["dry_run"]
+
+        self._assert_retention_ordering()
+
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+            with advisory_lock(AdvisoryLockId.CONSENT_RECORD_SWEEP):
+                now = timezone.now()
+                fingerprint_cutoff = now - timedelta(
+                    days=_FINGERPRINT_RETENTION_DAYS
+                )
+                decision_cutoff = now - timedelta(days=_DECISION_RETENTION_DAYS)
+
+                # A row is fingerprint-eligible when it is older than the
+                # fingerprint window and still carries identity material.
+                # `consent_given_at` is the leading column of the
+                # IX_consent_records_sweep index, so this is an Index Cond.
+                fingerprint_qs = ConsentRecord.objects.filter(
+                    consent_given_at__lt=fingerprint_cutoff,
+                ).exclude(
+                    user__isnull=True,
+                    session_key__isnull=True,
+                    ip_address__isnull=True,
+                    user_agent="",
+                )
+
+                # A row is decision-eligible when it is older than the decision
+                # window; the row is retained, only its fingerprint fields are
+                # (already) cleared. Counted separately so the log distinguishes
+                # "fingerprint cleared now" from "old decision rows retained".
+                decision_eligible = ConsentRecord.objects.filter(
+                    consent_given_at__lt=decision_cutoff,
+                ).count()
+
+                if dry_run:
+                    logger.info(
+                        "DRY RUN: Would anonymise %d consent records older than "
+                        "%d days (%d rows past the %d-day decision window are "
+                        "retained, never deleted)",
+                        fingerprint_qs.count(),
+                        _FINGERPRINT_RETENTION_DAYS,
+                        decision_eligible,
+                        _DECISION_RETENTION_DAYS,
+                    )
+                    return
+
+                # One statement: user and session_key must never be half-cleared.
+                # Nulling user while keeping session_key would leave the
+                # anonymous record re-identifiable through django_session.
+                anonymised_count = fingerprint_qs.update(
+                    user=None,
+                    session_key=None,
+                    ip_address=None,
+                    user_agent="",
+                )
+
+        logger.info(
+            "Anonymised %d consent records older than %d days; %d records past "
+            "the %d-day decision window retained (never deleted).",
+            anonymised_count,
+            _FINGERPRINT_RETENTION_DAYS,
+            decision_eligible,
+            _DECISION_RETENTION_DAYS,
+        )
+
+    @staticmethod
+    def _assert_retention_ordering() -> None:
+        """Fail loudly if the two windows are mis-ordered.
+
+        ``0 < fingerprint TTL <= decision TTL`` makes the fingerprint stage a
+        silent no-op otherwise. The fingerprint TTL is additionally floored at
+        the declared Django session lifetime so a still-live session's evidence
+        is not destroyed on a run that lands between the two.
+        """
+        session_cookie_age_days = settings.SESSION_COOKIE_AGE / 86400
+        if not 0 < _FINGERPRINT_RETENTION_DAYS <= _DECISION_RETENTION_DAYS:
+            raise ValueError(
+                "Retention mis-ordering: expected "
+                "0 < _FINGERPRINT_RETENTION_DAYS <= _DECISION_RETENTION_DAYS, "
+                f"got {_FINGERPRINT_RETENTION_DAYS} / "
+                f"{_DECISION_RETENTION_DAYS}"
+            )
+        if _FINGERPRINT_RETENTION_DAYS < session_cookie_age_days:
+            raise ValueError(
+                "Fingerprint TTL is below the declared Django session lifetime "
+                f"({_FINGERPRINT_RETENTION_DAYS} days < "
+                f"{session_cookie_age_days} days); this would destroy evidence "
+                "for a session that is still live."
+            )
