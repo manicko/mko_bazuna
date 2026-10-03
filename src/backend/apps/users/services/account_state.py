@@ -117,6 +117,15 @@ def can_publish_ad(user: User) -> bool:
     - NOT deleted (GDPR withdrawal)
     - ads_auto_publish is True (publishing restriction)
 
+    This predicate does **not** read ``is_declined`` (06-PII-105). A declined
+    seller's publishing block travels on ``ads_auto_publish=False``, which
+    ``decline_consent`` sets and ``give_consent`` restores — so a decline is
+    enforced here through the publishing-restriction term, not through a
+    decline conjunct. Reading ``is_declined`` directly would keep a
+    re-consented seller blocked while a cached queryset still held the stale
+    decline flag. The decline's other remaining effect, listing/search
+    visibility, is carried by ``account_state_q`` (a separate predicate).
+
     Args:
         user: User instance to check.
 
@@ -144,9 +153,18 @@ def can_login(user: User) -> bool:
     """
     Check if user can login.
 
-    A user can login only if NOT deactivated, NOT banned and NOT declined
-    consent. Note: Deleted users have telegram_id nulled, so they cannot login
-    anyway.
+    A user can login only if NOT deactivated and NOT banned. A DECLINE is
+    **not** a login blocker (06-PII-105): declining consent is reversible, so
+    a declined seller must be able to reach the authenticated consent form
+    that clears the decline. The only clearer of ``is_declined`` is that
+    authenticated consent form (``give_consent``), which is unreachable
+    without a session — refusing login would make the decline a permanent
+    one-way door and the recovery route dead. The decline's remaining effects
+    are therefore carried elsewhere: publishing is blocked by
+    ``ads_auto_publish=False`` (see :func:`can_publish_ad`) and listing/search
+    visibility by :func:`account_state_q`, both independent of login.
+
+    Note: Deleted users have telegram_id nulled, so they cannot login anyway.
 
     ``is_active`` was added in plan 19 (``B-1``) so the shared predicate agrees
     with Django's own ``ModelBackend.user_can_authenticate``. ``consent.py``'s
@@ -168,10 +186,6 @@ def can_login(user: User) -> bool:
 
     if state.is_banned:
         logger.info("User %s cannot login: banned", user.id)
-        return False
-
-    if state.is_declined:
-        logger.info("User %s cannot login: declined consent", user.id)
         return False
 
     return True

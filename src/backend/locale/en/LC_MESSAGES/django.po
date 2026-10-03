@@ -378,6 +378,11 @@ msgstr ""
 msgid "Consent declined: you can browse but cannot post. Contact still works."
 msgstr ""
 
+msgid ""
+"Consent declined: you can browse but cannot post. You can change this from "
+"the site or by logging in here. Contact still works."
+msgstr ""
+
 msgid "Consent withdrawn: your data is being erased."
 msgstr ""
 
@@ -1051,6 +1056,9 @@ msgid ""
 "allow."
 msgstr ""
 
+msgid "You can change a decline later — choosing to accept again restores posting."
+msgstr ""
+
 msgid "Essential"
 msgstr ""
 
@@ -1321,6 +1329,15 @@ msgid "You can revisit and change your consent choices at any time. Use the"
 msgstr ""
 
 msgid "link to open the consent banner, or contact us on Telegram at"
+msgstr ""
+
+msgid "You can revisit and change your consent choices at any time. A decline is reversible: choose to accept again and posting is restored."
+msgstr ""
+
+msgid "Use the"
+msgstr ""
+
+msgid "link to reopen the consent banner on this page, or log in and change your consent from the Telegram bot."
 msgstr ""
 
 msgid "Save search alert"

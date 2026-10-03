@@ -289,16 +289,18 @@ class TestConsentDeclineSessionKnownGap:
 
     Known gap: ``consent_decline`` performs no ``logout()``. The session survives,
     but the decline path is a deliberately retained one-way door — this block
-    (``B-07``, gate ``G-7b``) decided NOT to ship a decline logout, because
-    ``can_login(is_declined=True) is False`` makes the session harmless for
-    login, and ``give_consent`` (reachable only from an AUTHENTICATED
-    ``consent_accept``) is the only clearer of ``is_declined``. Adding a logout
-    would remove the only working session the user has while the decline remains
-    unclearable on the web.
+    (``B-07``, gate ``G-7b``) decided NOT to ship a decline logout. The original
+    rationale cited ``can_login(is_declined=True) is False`` to call the session
+    "harmless"; that premise is now **void**: since 06-PII-105 a decline is
+    reversible, ``can_login`` allows a declined user, and the session a decline
+    left behind is the **route back**, not harmless — it is what makes the
+    authenticated ``consent_accept`` (the only clearer of ``is_declined``)
+    reachable. Adding a logout would remove the only working session the user
+    has while the decline remains unclearable on the web.
 
     This is a red-to-green specification for phase 15's ``15-AUTHZ-001``: it
     turns red if a decline logout is ever shipped. Owner of the eventual fix:
-    phase 15, ``15-AUTHZ-001`` (with phase 06's ``PII-105`` owning decline
+    phase 15, ``15-AUTHZ-001`` (phase 06's ``PII-105`` owns decline
     reversibility). Produced by B-07 gate ``G-7b``.
     """
 
@@ -332,6 +334,51 @@ class TestConsentDeclineSessionKnownGap:
         user.refresh_from_db()
         assert user.is_declined is False
         assert user.ads_auto_publish is True
+
+
+# ---------------------------------------------------------------------------
+# Decline reversibility end to end (06-PII-105)
+# ---------------------------------------------------------------------------
+
+
+class TestDeclineThenAcceptEndToEnd:
+    """Decline then accept through the real views restores the seller fully."""
+
+    def test_decline_then_accept_restores_the_seller(self, user: User) -> None:
+        """Decline → accept restores state, login eligibility, record and publish.
+
+        Drives the real HTTP flow (``/consent/decline/`` then
+        ``/consent/accept/``) rather than hand-constructing a row, so the
+        assertion covers the actual ``decline_consent`` / ``give_consent``
+        transitions.
+        """
+        from apps.users.services.account_state import can_login, can_publish_ad
+
+        client = Client()
+        client.force_login(user)
+
+        decline_response = client.post("/consent/decline/")
+        assert decline_response.status_code == 302
+
+        user.refresh_from_db()
+        assert user.is_declined is True
+        assert user.ads_auto_publish is False
+        assert can_publish_ad(user) is False
+
+        accept_response = client.post("/consent/accept/")
+        assert accept_response.status_code == 302
+
+        user.refresh_from_db()
+        assert user.is_declined is False
+        assert user.ads_auto_publish is True
+        assert can_login(user) is True
+        assert can_publish_ad(user) is True
+        assert user.consent_given_at is not None
+
+        # The accept is recorded as an ACCEPTED ConsentRecord for the user.
+        assert ConsentRecord.objects.filter(
+            user=user, choice=ConsentChoice.ACCEPTED
+        ).exists()
 
 
 # ---------------------------------------------------------------------------

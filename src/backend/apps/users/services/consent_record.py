@@ -45,7 +45,10 @@ def record_consent_action(
     """Create a ``ConsentRecord`` for a consent action.
 
     ``user`` may be ``None`` for anonymous cookie-based consent; an anonymous
-    record is identified by the request's ``session_key`` instead.
+    record is identified by the request's ``session_key`` instead. When the
+    caller is anonymous and the request has no session yet, the session is
+    created (the stored key is what makes the row attributable) — see the
+    comment in the body.
 
     When ``request`` is ``None`` the action is recorded without HTTP-layer
     context (e.g. from the Telegram bot /start entry point). ``session_key``,
@@ -63,6 +66,20 @@ def record_consent_action(
         The newly created ``ConsentRecord``.
     """
     if request is not None:
+        # An anonymous consent must be attributable. A ``session_key`` is the
+        # sole identifier of an anonymous record (the ``search_fields`` entry on
+        # ``ConsentRecordAdmin``), so a row written with a NULL key is not
+        # evidence. Nothing on the anonymous consent path otherwise creates a
+        # session — ``SESSION_ENGINE`` is the DB-backed default,
+        # ``CSRF_USE_SESSIONS`` is unset (CSRF lives in a cookie), and the only
+        # ``request.session`` write in ``src/backend`` is the authenticated
+        # ``?lang=`` branch — so force the session into existence before the
+        # read. ``request.session.create()`` mints and saves the key here;
+        # setting ``session.modified`` instead would defer key creation to
+        # ``SessionMiddleware.process_response``, which has already run by the
+        # time the caller assigns ``response`` (06-PII-105).
+        if user is None and request.session.session_key is None:
+            request.session.create()
         session_key = request.session.session_key
         # `get_client_ip` returns the literal "unknown" when no usable peer
         # exists; `_anonymize_ip` cannot parse that and would raise. Map the

@@ -168,7 +168,7 @@ class TestCanPublishAd:
 
 
 class TestCanLogin:
-    """Flag matrix for can_login: is_active, banned, declined."""
+    """Flag matrix for can_login: is_active, banned. A decline is NOT a blocker."""
 
     def test_normal_user_can_login(self, user: User) -> None:
         """Default user can login."""
@@ -189,10 +189,18 @@ class TestCanLogin:
         u = make_user(900001020, is_banned=True)
         assert can_login(u) is False
 
-    def test_declined_user_cannot_login(self) -> None:
-        """User who declined consent cannot login."""
+    def test_declined_user_can_login(self) -> None:
+        """A declined user CAN login — a decline is reversible (06-PII-105).
+
+        The pre-decision behaviour (``is_declined`` blocked login) made the
+        decline a permanent one-way door: the only clearer of ``is_declined``
+        is the authenticated consent form, which is unreachable without a
+        session. The decline's remaining effects travel elsewhere — publishing
+        on ``ads_auto_publish=False`` and listing/search visibility on
+        ``account_state_q`` — so login is not a decline blocker (Q-D1).
+        """
         u = make_user(900001021, is_declined=True)
-        assert can_login(u) is False
+        assert can_login(u) is True
 
     def test_banned_and_declined_cannot_login(self) -> None:
         """Banned + declined cannot login."""

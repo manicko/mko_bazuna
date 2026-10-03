@@ -23,6 +23,33 @@ from telegram_bot.states import ContactUsState
 logger = logging.getLogger(__name__)
 
 
+def _is_login_deep_link(text: str) -> bool:
+    """Whether ``text`` is a ``/start login_<token>`` deep-link.
+
+    This is the narrowest correct recognition of the existing token-handshake
+    shape: it reuses ``LOGIN_PATTERN`` (the very pattern ``handle_login_deep_link``
+    matches), so the carve-out and the handler can never disagree about what a
+    login deep-link is. A bare ``text.startswith("login_")`` would also swallow
+    ``login_start``, ``login_email`` and ``login_help`` — widening the carve-out
+    well beyond the token handshake and letting a declined user reach arguments
+    the handler then refuses anyway.
+
+    The pattern is imported lazily, mirroring the contact-classifier import in
+    ``__call__``: importing ``telegram_bot.handlers`` at module import time would
+    run the handlers package ``__init__`` and risk a middleware/handler cycle.
+
+    The pattern is anchored to the ``login_<32-char-token>`` payload, so only a
+    real deep-link argument matches. ``/start`` itself is not a login deep-link
+    — it is handled by the handler's no-argument greeting branch.
+    """
+    args = text.split(maxsplit=1)
+    if len(args) < 2:
+        return False
+    from telegram_bot.handlers.login import LOGIN_PATTERN
+
+    return LOGIN_PATTERN.match(args[1]) is not None
+
+
 class AccountStateMiddleware(BaseMiddleware):
     """
     Middleware that checks account state on every Telegram message.
@@ -38,7 +65,10 @@ class AccountStateMiddleware(BaseMiddleware):
       EXCEPT the support carve-out below
     - is_banned: Admin action, blocks all bot interactions
     - is_deleted: GDPR withdrawal, blocks all bot interactions (telegram_id nulled)
-    - is_declined: User declined consent, blocks posting but allows contact deep-links (browse-only)
+    - is_declined: User declined consent, blocks posting but allows contact and
+      login deep-links (browse-only). A decline is reversible (06-PII-105), so the
+      ``login_<token>`` handshake is the route back to the authenticated consent
+      form that clears it.
     - consent_revoked: Consent withdrawn, blocks all bot interactions (data erasing)
     - ads_auto_publish=False: Restricts /post command only
 
@@ -137,6 +167,13 @@ class AccountStateMiddleware(BaseMiddleware):
         callback_data = event.callback_query.data if event.callback_query else None
         is_contact_link = classify_contact_deep_link(text, callback_data) is not None
 
+        # A login deep-link is the route BACK from a decline (06-PII-105): it is
+        # the existing LoginToken handshake, reachable at /login/issue/ ->
+        # bot /start login_<token> -> /login/status/. Like the contact carve-out,
+        # it applies to a declined user only; every other blocking flag still
+        # refuses even a login deep-link.
+        is_login_link = _is_login_deep_link(text)
+
         # Resolve the acting user ONCE per update; every consumer below
         # shares this instance.  Keyed on the stable chat_id, never
         # telegram_id: see the class docstring for the column rationale.
@@ -160,6 +197,7 @@ class AccountStateMiddleware(BaseMiddleware):
         can_interact, state_reason = self._evaluate_user_state(
             user,
             is_contact_link=is_contact_link,
+            is_login_link=is_login_link,
             deactivation_carve_out=deactivation_carve_out,
         )
         if not can_interact:
@@ -196,6 +234,7 @@ class AccountStateMiddleware(BaseMiddleware):
         chat_id: int,
         is_contact_link: bool = False,
         deactivation_carve_out: bool = False,
+        is_login_link: bool = False,
     ) -> tuple[bool, str]:
         """
         Resolve a chat_id and evaluate the interaction gate in one step.
@@ -208,8 +247,9 @@ class AccountStateMiddleware(BaseMiddleware):
         The signature's first parameter is load-bearing:
         ``TestCheckUserStateMessages`` and ``TestCrossPredicateAgreement`` call
         ``_check_user_state(chat_id)`` with a single positional argument.  Do
-        not change it.  ``deactivation_carve_out`` defaults to False, so those
-        existing calls are unaffected and a deactivated user is blocked.
+        not change it.  ``deactivation_carve_out`` and ``is_login_link``
+        default to False, so those existing calls are unaffected and a
+        deactivated user is blocked.
 
         Args:
             chat_id: Stable Telegram chat ID.
@@ -220,6 +260,10 @@ class AccountStateMiddleware(BaseMiddleware):
             deactivation_carve_out: True if a deactivated user's update falls
                 inside the support carve-out (no-arg ``/start``,
                 ``SUPPORT_START`` callback, or support-intake free text).
+            is_login_link: True if the current event is a ``/start
+                login_<token>`` deep-link. DECLINE users are allowed through it
+                (06-PII-105): it is the route back to the authenticated consent
+                form that clears the decline.
 
         Returns:
             Tuple of (can_interact, rejection_message).
@@ -228,6 +272,7 @@ class AccountStateMiddleware(BaseMiddleware):
         return self._evaluate_user_state(
             user,
             is_contact_link=is_contact_link,
+            is_login_link=is_login_link,
             deactivation_carve_out=deactivation_carve_out,
         )
 
@@ -305,6 +350,7 @@ class AccountStateMiddleware(BaseMiddleware):
         user: User | None,
         *,
         is_contact_link: bool,
+        is_login_link: bool = False,
         deactivation_carve_out: bool = False,
     ) -> tuple[bool, str]:
         """
@@ -324,6 +370,9 @@ class AccountStateMiddleware(BaseMiddleware):
                 (``/start contact_<ad_id>``, ``/start contact_us``, or the
                 inline ``contact_us`` callback).  DECLINE users are allowed
                 through contact deep-links only (browse-only consent).
+            is_login_link: True if the current event is a ``/start
+                login_<token>`` deep-link. DECLINE users are allowed through it
+                (06-PII-105); every other blocking flag still refuses.
             deactivation_carve_out: True if a deactivated user's update is the
                 no-arg ``/start`` / ``SUPPORT_START`` / support-intake free
                 text. Ignored for a non-deactivated account.
@@ -368,12 +417,20 @@ class AccountStateMiddleware(BaseMiddleware):
             return (False, _("Your account has been deleted."))
 
         if state.is_declined:
-            if is_contact_link:
-                return (True, "")  # DECLINE = browse-only; contact deep-link is allowed
+            # DECLINE = browse-only. Two carve-outs are peers and both apply to
+            # a declined user only: the contact deep-link (contact still works
+            # while publishing does not) and the login deep-link, which is the
+            # route BACK — the existing LoginToken handshake is how the
+            # authenticated consent form that clears the decline is reached
+            # (06-PII-105). Order is deliberate: neither is granted to a
+            # banned/deleted/withdrawn account (this branch is after those).
+            if is_contact_link or is_login_link:
+                return (True, "")
             return (
                 False,
                 _(
                     "Consent declined: you can browse but cannot post. "
+                    "You can change this from the site or by logging in here. "
                     "Contact still works."
                 ),
             )

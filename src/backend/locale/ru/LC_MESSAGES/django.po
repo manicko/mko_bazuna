@@ -459,6 +459,13 @@ msgstr "Ваш аккаунт удалён."
 msgid "Consent declined: you can browse but cannot post. Contact still works."
 msgstr "Согласие отклонено: просмотр только, связь по-прежнему работает."
 
+msgid ""
+"Consent declined: you can browse but cannot post. You can change this from "
+"the site or by logging in here. Contact still works."
+msgstr ""
+"Согласие отклонено: просмотр доступен, но публикация — нет. Вы можете "
+"изменить это на сайте или войдя здесь. Связь по-прежнему работает."
+
 msgid "Consent withdrawn: your data is being erased."
 msgstr "Согласие отозвано: ваши данные удаляются."
 
@@ -1163,6 +1170,11 @@ msgstr ""
 "и запоминания ваших предпочтений. Выберите, какие необязательные файлы "
 "cookie разрешить."
 
+msgid "You can change a decline later — choosing to accept again restores posting."
+msgstr ""
+"Отказ можно изменить позже — выбрав согласие снова, вы восстановите "
+"возможность публикации."
+
 msgid "Essential"
 msgstr "Необходимые"
 
@@ -1461,6 +1473,19 @@ msgstr ""
 msgid "link to open the consent banner, or contact us on Telegram at"
 msgstr ""
 "ссылку, чтобы открыть баннер согласия, или свяжитесь с нами через Telegram:"
+
+msgid "You can revisit and change your consent choices at any time. A decline is reversible: choose to accept again and posting is restored."
+msgstr ""
+"Вы можете в любой момент пересмотреть и изменить свои предпочтения согласия. "
+"Отказ обратим: выберите согласие снова, и возможность публикации восстановится."
+
+msgid "Use the"
+msgstr "Используйте"
+
+msgid "link to reopen the consent banner on this page, or log in and change your consent from the Telegram bot."
+msgstr ""
+"ссылку, чтобы снова открыть баннер согласия на этой странице, либо войдите и "
+"измените согласие через Telegram-бота."
 
 msgid "Save search alert"
 msgstr "Сохранить оповещение по поиску"

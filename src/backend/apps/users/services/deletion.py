@@ -284,7 +284,13 @@ def give_consent(user: User) -> None:
 
     restores full publishing ability (is_declined=False, ads_auto_publish=True)
 
-    and clears a prior revocation timestamp.
+    and clears a prior revocation timestamp. Because the seller was hidden from
+
+    listings/search while declined, the search cache version is bumped (via
+
+    ``transaction.on_commit``) once this transaction commits, so the ads
+
+    reappear without waiting for the cache TTL (06-PII-105).
 
     Does NOT reverse WITHDRAW: if the user is soft-deleted (is_deleted=True),
 
@@ -323,5 +329,15 @@ def give_consent(user: User) -> None:
             "consent_revoked_at",
         ]
     )
+
+    # Make the reversal EFFECTIVE, not merely reachable (06-PII-105). Clearing
+    # ``is_declined`` restores eligibility under ``account_state_q`` and under
+    # the ``user__is_declined=False`` filter in ``ads/views/listings.py`` — but
+    # cached search result sets were computed while the user was excluded, and
+    # ``build_search_cache_key`` embeds ``get_search_version()``. Without a bump
+    # the re-consented seller's ads stay invisible for up to ``SEARCH_CACHE_TTL``
+    # plus the stale window. Mirrors ``decline_consent`` exactly: no Ad.save()
+    # fires here, so invalidate explicitly, after the change is committed.
+    transaction.on_commit(bump_search_cache_version)
 
     logger.info("User %s gave consent - consent_given_at set", user.id)

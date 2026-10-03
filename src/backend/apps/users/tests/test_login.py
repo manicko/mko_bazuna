@@ -493,6 +493,93 @@ class TestLoginStatus:
 
 
 # ---------------------------------------------------------------------------
+# Decline reversibility: the login handshake is the route back (06-PII-105)
+# ---------------------------------------------------------------------------
+
+
+class TestDeclinedUserRecovery:
+    """A declined user reaches the web session that clears the decline.
+
+    Headline case: ``can_login`` no longer refuses a declined user, so the
+    existing ``LoginToken`` two-phase handshake (``/login/issue/`` → bot claim →
+    ``/login/status/``) completes and the declined seller can reach the
+    authenticated consent form. The decline is otherwise still in force until
+    they re-consent.
+    """
+
+    @staticmethod
+    def _establish_session(client: Client, telegram_id: int) -> str:
+        """Run issue → bot claim → redeem; return the /login/status/ response body."""
+        issued = client.get("/login/issue/")
+        raw_token = issued.context["raw_token"]
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        from apps.users.services.login_token import claim_token
+
+        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
+        response = client.post("/login/status/", {"token": raw_token})
+        assert response.status_code == 200
+        return raw_token
+
+    def test_declined_user_obtains_a_web_session(self) -> None:
+        """A declined user completes the handshake and holds a session (was 410)."""
+        telegram_id = 700000600
+        user = make_user(
+            telegram_id, username="declined_login", is_declined=True,
+        )
+        user.ads_auto_publish = False
+        user.save(update_fields=["ads_auto_publish"])
+
+        client = Client()
+        self._establish_session(client, telegram_id)
+
+        assert client.session.session_key is not None
+        assert "_auth_user_id" in client.session
+
+    def test_ban_still_refuses_the_same_handshake(self) -> None:
+        """Control: a banned account is still refused (decline is the only change)."""
+        telegram_id = 700000601
+        make_user(telegram_id, username="banned_login", is_banned=True)
+
+        client = Client()
+        issued = client.get("/login/issue/")
+        raw_token = issued.context["raw_token"]
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+        from apps.users.services.login_token import claim_token
+
+        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
+
+        response = client.post("/login/status/", {"token": raw_token})
+        assert response.status_code == 410
+        assert "_auth_user_id" not in client.session
+
+    def test_session_is_gone_then_deep_link_handshake_yields_a_new_session(
+        self,
+    ) -> None:
+        """After the session is gone, the deep-link handshake mints a new one.
+
+        The bot login handshake is session-independent: a fresh client (no
+        session at all) completes issue → claim → redeem and ends holding a
+        new session. No new token type, route or field is involved.
+        """
+        telegram_id = 700000602
+        make_user(telegram_id, username="session_gone", is_declined=True)
+
+        first_client = Client()
+        self._establish_session(first_client, telegram_id)
+        assert "_auth_user_id" in first_client.session
+
+        # A different browser (session gone from its perspective) redoes the
+        # handshake from scratch. It carries no session cookie before the
+        # handshake — nothing on a fresh client has created one.
+        fresh_client = Client()
+        assert "sessionid" not in fresh_client.cookies
+        self._establish_session(fresh_client, telegram_id)
+        assert "_auth_user_id" in fresh_client.session
+
+
+# ---------------------------------------------------------------------------
 # LoginToken security edge cases (G-06)
 # ---------------------------------------------------------------------------
 
@@ -723,9 +810,12 @@ class TestLoginPreferredCitySync:
         """The reconcile returns early for a declined user (06-PII-110).
 
         A declined user's column was cleared on decline and a surviving cookie
-        must not re-derive it. ``can_login`` refuses a declined user before the
-        reconcile is reached on the HTTP path, so this drives the reconcile
-        helper directly — the unit whose early return is the guard.
+        must not re-derive it. The guard under test is the ``if user.is_declined:
+        return`` early return in ``_reconcile_preferred_city_on_login`` itself.
+        It is no longer true that ``can_login`` refuses a declined user before
+        the reconcile is reached on the HTTP path — since 06-PII-105 a declined
+        user may hold a session, and their having been refused here was the bug.
+        The early return is therefore the load-bearing guard, driven directly.
         """
         from django.test import RequestFactory
 

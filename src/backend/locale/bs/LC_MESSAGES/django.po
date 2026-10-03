@@ -449,6 +449,13 @@ msgstr "Vaš nalog je izbrisan."
 msgid "Consent declined: you can browse but cannot post. Contact still works."
 msgstr "Suglasnost odbijena: pregled samo, kontakt i dalje radi."
 
+msgid ""
+"Consent declined: you can browse but cannot post. You can change this from "
+"the site or by logging in here. Contact still works."
+msgstr ""
+"Suglasnost odbijena: pregled je dostupan, ali objavljivanje nije. To možete "
+"promijeniti na sajtu ili prijavom ovdje. Kontakt i dalje radi."
+
 msgid "Consent withdrawn: your data is being erased."
 msgstr "Suglasnost povučena: vaši podaci se brišu."
 
@@ -1149,6 +1156,11 @@ msgstr ""
 "Koristimo kolačiće da bismo održali servis u funkciji, mjerili prometa i "
 "pamtili vaše postavke. Odaberite koje neobavezne kolačiće dozvoljavate."
 
+msgid "You can change a decline later — choosing to accept again restores posting."
+msgstr ""
+"Odbijanje možete promijeniti kasnije — ponovnim prihvatanjem vraćate "
+"mogućnost objavljivanja."
+
 msgid "Essential"
 msgstr "Neophodni"
 
@@ -1443,6 +1455,20 @@ msgstr ""
 msgid "link to open the consent banner, or contact us on Telegram at"
 msgstr ""
 "link da otvorite banner pristanka, ili kontaktirajte nas putem Telegrama na"
+
+msgid "You can revisit and change your consent choices at any time. A decline is reversible: choose to accept again and posting is restored."
+msgstr ""
+"Možete ponovo posetiti i promeniti svoje izbore pristanka u bilo koje vreme. "
+"Odbijanje je reverzibilno: ponovnim prihvatanjem vraća se mogućnost "
+"objavljivanja."
+
+msgid "Use the"
+msgstr "Koristite"
+
+msgid "link to reopen the consent banner on this page, or log in and change your consent from the Telegram bot."
+msgstr ""
+"link da ponovo otvorite banner pristanka na ovoj stranici, ili se prijavite i "
+"promenite pristanak putem Telegram bota."
 
 msgid "Save search alert"
 msgstr "Sačuvaj obaveštenje o pretrazi"

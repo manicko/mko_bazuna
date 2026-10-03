@@ -40,6 +40,23 @@ _BASE_CHAT_ID = 900000200
 _next_update_id = itertools.count(42)
 
 
+def _blocked_state_kwargs(blocked_state: str) -> dict[str, object]:
+    """Map a named blocking state to ``make_user`` overrides for a declined row.
+
+    ``withdrawn`` mirrors the real ``withdraw_consent`` shape: ``is_deleted``
+    and ``consent_revoked_at`` are set together.
+    """
+    if blocked_state == "deactivated":
+        return {"is_active": False}
+    if blocked_state == "banned":
+        return {"is_banned": True}
+    if blocked_state == "deleted":
+        return {"is_deleted": True}
+    if blocked_state == "withdrawn":
+        return {"is_deleted": True, "consent_revoked": True}
+    raise ValueError(f"unknown blocked_state: {blocked_state}")
+
+
 def _make_message_update(chat_id: int, text: str = "") -> Update:
     """Construct a real aiogram Update wrapping a Message from a test user."""
     from aiogram.types import Chat, Message, Update, User as TelegramUser
@@ -257,34 +274,60 @@ class TestCrossPredicateAgreement:
 
     @pytest.mark.asyncio
     @pytest.mark.parametrize(
-        "row, is_banned, is_declined",
+        "row, is_banned, is_active",
         [
-            (1, True, False),
-            (2, False, True),
-            (3, True, True),
+            (1, True, True),
+            (2, False, False),
         ],
     )
     async def test_blocks_when_can_login_blocks(
         self,
         row: int,
         is_banned: bool,
-        is_declined: bool,
+        is_active: bool,
     ) -> None:
         """When can_login(user) is False, _check_user_state also blocks.
 
-        ``can_login`` gates on is_banned and is_declined only.  The middleware
-        extends that gate with is_deleted and consent_revoked, so whenever
-        ``can_login`` denies access the middleware must deny too (the middleware
-        blocks a superset of the login predicate).
+        ``can_login`` gates on ``is_active`` and ``is_banned`` (a decline is no
+        longer a login blocker — 06-PII-105). The middleware is deliberately
+        **stricter** than ``can_login``: it also blocks a deleted or
+        consent-withdrawn user, so whenever ``can_login`` denies access the
+        middleware must deny too (it blocks a superset of the login predicate).
+        A declined user is the case that now disagrees: they may hold a web
+        session yet are browse-only in the bot — asserted separately in
+        :meth:`test_declined_user_is_browse_only_in_the_bot`.
         """
         chat_id = _BASE_CHAT_ID + 200 + row
         user = await sync_to_async(make_user)(
             chat_id,
             is_banned=is_banned,
-            is_declined=is_declined,
+            is_active=is_active,
         )
 
         assert can_login(user) is False
+
+        middleware = AccountStateMiddleware()
+        can_interact, message = await middleware._check_user_state(chat_id)
+
+        assert can_interact is False
+        assert message != ""
+
+    @pytest.mark.asyncio
+    async def test_middleware_is_stricter_than_can_login_for_deleted_user(
+        self,
+    ) -> None:
+        """A deleted user is blocked by the middleware though can_login allows.
+
+        ``can_login`` does not read ``is_deleted`` (a deleted user's
+        ``telegram_id`` is nulled, so they cannot authenticate anyway). The
+        middleware blocks them outright, which is the stricter-than-login
+        behaviour this class documents. A declined user is the analogous
+        browse-only case (:meth:`test_declined_user_is_browse_only_in_the_bot`).
+        """
+        chat_id = _BASE_CHAT_ID + 260
+        user = await sync_to_async(make_user)(chat_id, is_deleted=True)
+
+        assert can_login(user) is True
 
         middleware = AccountStateMiddleware()
         can_interact, message = await middleware._check_user_state(chat_id)
@@ -449,6 +492,120 @@ class TestCallPipeline:
         assert result == "proceed"
         handler.assert_awaited_once_with(update, {})
         mock_answer.assert_not_awaited()
+
+    # --- 06-PII-105: DECLINE users may reach the login deep-link (route back) ---
+
+    @pytest.mark.asyncio
+    async def test_call_declined_user_allowed_for_login_deep_link(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A declined user sending /start login_<token> reaches the handler.
+
+        The login deep-link is the route back to the authenticated consent form
+        that clears the decline, so the middleware must not block it. Uses a
+        well-formed 32-char token so the carve-out (pattern-based) recognises it.
+        """
+        chat_id = _BASE_CHAT_ID + 710
+        await sync_to_async(make_user)(chat_id, is_declined=True)
+
+        token = "A" * 32
+        update = _make_message_update(chat_id, f"/start login_{token}")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result == "proceed"
+        handler.assert_awaited_once_with(update, {})
+        mock_answer.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("arg", ["login_help", "login_start", "login_email"])
+    async def test_call_declined_user_blocked_for_prefix_sharing_arguments(
+        self, monkeypatch: pytest.MonkeyPatch, arg: str
+    ) -> None:
+        """A declined user sending /start login_help (etc.) is still blocked.
+
+        Proves the carve-out is pattern-based (``LOGIN_PATTERN``), not a bare
+        ``startswith("login_")`` — an over-broad prefix check would let these
+        through and widen the carve-out beyond the token handshake.
+        """
+        chat_id = _BASE_CHAT_ID + 711
+        await sync_to_async(make_user)(chat_id, is_declined=True)
+
+        update = _make_message_update(chat_id, f"/start {arg}")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result is None
+        handler.assert_not_awaited()
+        mock_answer.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "blocked_state",
+        ["deactivated", "banned", "deleted", "withdrawn"],
+    )
+    async def test_call_login_carve_out_refused_when_additionally_blocked(
+        self, monkeypatch: pytest.MonkeyPatch, blocked_state: str
+    ) -> None:
+        """A login deep-link is refused when the account is otherwise blocked.
+
+        The login carve-out applies to ``is_declined`` alone (19-D6 holds): a
+        deactivated, banned, deleted or withdrawn account gets no route back
+        even with a well-formed ``login_<token>`` deep-link. A real withdrawal
+        sets ``is_deleted`` and ``consent_revoked_at`` together (that is what
+        ``withdraw_consent`` does).
+        """
+        chat_id = _BASE_CHAT_ID + 720
+        await sync_to_async(make_user)(
+            chat_id, is_declined=True, **_blocked_state_kwargs(blocked_state)
+        )
+
+        token = "B" * 32
+        update = _make_message_update(chat_id, f"/start login_{token}")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result is None
+        handler.assert_not_awaited()
+        mock_answer.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "blocked_state",
+        ["deactivated", "banned", "deleted", "withdrawn"],
+    )
+    async def test_call_contact_carve_out_refused_when_additionally_blocked(
+        self, monkeypatch: pytest.MonkeyPatch, blocked_state: str
+    ) -> None:
+        """A contact deep-link is refused when the account is otherwise blocked.
+
+        Peer of the login carve-out: both apply to ``is_declined`` alone. A
+        banned/deleted/withdrawn/deactivated user gets no contact channel.
+        """
+        chat_id = _BASE_CHAT_ID + 730
+        await sync_to_async(make_user)(
+            chat_id, is_declined=True, **_blocked_state_kwargs(blocked_state)
+        )
+
+        update = _make_message_update(chat_id, "/start contact_42")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result is None
+        handler.assert_not_awaited()
+        mock_answer.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_call_declined_user_blocked_for_post(

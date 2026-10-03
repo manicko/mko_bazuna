@@ -156,11 +156,11 @@
             <section class="bg-white rounded-lg shadow p-6 mb-6">
                 <h2 class="text-xl font-bold text-gray-800 mb-3">{% trans "7. Manage Your Consent" %}</h2>
                 <p class="text-sm text-gray-700">
-                    {% trans "You can revisit and change your consent choices at any time. Use the" %}
-                    <a href="/?ref=preferences"
+                    {% trans "You can revisit and change your consent choices at any time. A decline is reversible: choose to accept again and posting is restored." %}
+                    {% trans "Use the" %}
+                    <a href="?ref=preferences"
                        class="text-blue-600 underline hover:text-blue-800">{% trans "Cookie settings" %}</a>
-                    {% trans "link to open the consent banner, or contact us on Telegram at" %}
-                    {% telegram_deep_link "contact_us" classes="text-blue-600 underline hover:text-blue-800" target="_blank" %}.
+                    {% trans "link to reopen the consent banner on this page, or log in and change your consent from the Telegram bot." %}
                 </p>
             </section>
         </main>

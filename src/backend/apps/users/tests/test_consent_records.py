@@ -70,16 +70,61 @@ class TestConsentRecords:
         assert record.choice == ConsentChoice.WITHDRAWN.value
         assert record.categories == {"analytics": False, "preferences": False}
 
-    def test_anonymous_accept_record_has_null_user(self) -> None:
-        """Anonymous consent stores a null user and a session_key."""
+    def test_anonymous_accept_record_has_session_key(self) -> None:
+        """An anonymous consent is attributable: null user AND a session_key.
+
+        The ``session_key`` is the sole identifier of an anonymous record (the
+        field ``ConsentRecordAdmin.search_fields`` searches), so a row written
+        with a NULL key is not evidence. The anonymous consent path creates no
+        session otherwise, so this asserts the record is identifiable, not just
+        that ``user_id`` is null (06-PII-105).
+        """
         client = Client()
         response = client.post("/consent/accept/")
 
-        # The client holds a session when cookies are enabled.
         record = ConsentRecord.objects.get()
         assert record.user_id is None
+        assert record.session_key
         assert record.consent_version == ConsentVersion.V1_0.value
         assert response.cookies.get("consent_given") is not None
+
+    def test_two_anonymous_consents_in_different_sessions_are_distinguishable(
+        self,
+    ) -> None:
+        """Two anonymous accepts from different clients yield distinct records.
+
+        Each client has its own session, so the two rows carry different,
+        non-null ``session_key`` values — the property that makes the log an
+        audit trail rather than an undifferentiated set.
+        """
+        first = Client()
+        first.post("/consent/accept/")
+        second = Client()
+        second.post("/consent/decline/")
+
+        records = list(ConsentRecord.objects.order_by("id"))
+        assert len(records) == 2
+        keys = {record.session_key for record in records}
+        assert all(key for key in keys)
+        assert len(keys) == 2
+
+    def test_session_key_record_is_findable_by_search(self) -> None:
+        """An anonymous accept's record is findable by searching on session_key.
+
+        This is the RED-first case for the session guard: before it, the row
+        landed with ``user_id=NULL, session_key=NULL`` and no search could
+        retrieve it. After it, the key is populated and searchable.
+        """
+        client = Client()
+        client.post("/consent/accept/")
+
+        record = ConsentRecord.objects.get()
+        assert record.session_key
+        found = ConsentRecord.objects.filter(
+            session_key=record.session_key
+        ).first()
+        assert found is not None
+        assert found.pk == record.pk
 
     def test_ip_is_anonymized_and_ua_truncated(self, user) -> None:
         """IP last octet zeroed; user agent truncated to 500 chars."""

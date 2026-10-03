@@ -161,6 +161,62 @@ class TestDeclineConsentBumpsSearchCache:
         assert version_after > version_before
 
 
+class TestReConsentRestoresVisibilityWithoutCacheExpiry:
+    """Re-consent makes the seller's ads visible again immediately (06-PII-105).
+
+    A declined seller's ads are hidden by ``account_state_q`` and by the
+    ``user__is_declined=False`` filter; cached search result sets were computed
+    while the user was excluded. Clearing ``is_declined`` restores eligibility,
+    but ``build_search_cache_key`` embeds ``get_search_version()`` — so without
+    ``give_consent`` bumping the version, the cached (excluded) result stays
+    reachable for up to ``SEARCH_CACHE_TTL`` plus the stale window. This test
+    fails if the ``transaction.on_commit(bump_search_cache_version)`` call is
+    missed.
+    """
+
+    @pytest.mark.django_db(transaction=True)
+    def test_give_consent_bumps_search_cache_version(self, user: User) -> None:
+        """give_consent increments the search cache version (mirrors decline)."""
+        decline_consent(user)
+        version_after_decline = get_search_version()
+
+        give_consent(user)
+
+        assert get_search_version() > version_after_decline
+
+    @pytest.mark.django_db(transaction=True)
+    def test_declined_ads_absent_then_present_after_re_consent(
+        self, user: User, category, city
+    ) -> None:
+        """A declined seller's ad is hidden, and visible again after re-consent."""
+        from apps.users.services.account_state import account_state_q
+
+        ad = create_test_ad(
+            user,
+            category,
+            city,
+            title="Reversibility Ad",
+            status=AdStatus.PUBLISHED,
+        )
+
+        # While declined the ad is excluded by the owner-state predicate.
+        decline_consent(user)
+        assert not Ad.objects.filter(
+            status=AdStatus.PUBLISHED, pk=ad.pk
+        ).filter(account_state_q("user__")).exists()
+
+        # The cached result set is now stale; record the version it embeds.
+        stale_version = get_search_version()
+
+        # Re-consent restores eligibility AND bumps the version, so the stale
+        # cache entry is unreachable without waiting for the TTL.
+        give_consent(user)
+        assert get_search_version() > stale_version
+        assert Ad.objects.filter(
+            status=AdStatus.PUBLISHED, pk=ad.pk
+        ).filter(account_state_q("user__")).exists()
+
+
 class TestWithdrawConsentSoftDeletesAds:
     """Tests for ad soft-deletion on consent withdrawal (P11.3)."""
 
