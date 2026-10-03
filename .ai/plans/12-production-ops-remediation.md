@@ -221,13 +221,13 @@ consequences, or a named routing. **Silence is not an acceptable outcome for any
 | **Q2** | What happens to `Makefile`'s dev-stack `restore` target, which `restore.md` points at for a **production** restore? (a) split into `restore` (dev) and `restore-prod`; (b) make it refuse without an explicit `--env-file .env.prod`; (c) document it as dev-only and give the runbook a separate procedure | **9** | Planner | **GATED.** This is the **irreversible-data surface**. An engineer at 3 a.m. following `restore.md` runs `pg_restore --clean --if-exists` against the **dev** database. No option is silent |
 | **Q3** | Is `scripts/ops/*.sh` the right instrument for making runbooks executable, or is a markdown-parity test the better guard? (a) extract shell into linted scripts; (b) a parity test asserting every production `docker compose` block in `docs/ops/*.md` carries `--env-file` and both `-f` files; (c) both | **9** | Planner + Researcher | **GATED.** `scripts/ops/` has **no precedent and no lint harness** in the tree (C-8). Option (a) is a new capability; option (b) is string-level and therefore inherits `VAL-003`'s weakness; option (c) costs both |
 | **Q4** | Is `user: postgres` on the `backup` service actually writable against the `./backups` host bind mount, and does the fix need a pre-created directory with matching ownership? | **2** | Researcher (runtime probe) + Planner (compose shape) | **GATED.** `postgres` in `postgres:18-alpine` is uid 70; a host bind mount is owned by the invoking uid. The answer may be "yes, plus a directory-provisioning step", which is an ops change, not a compose change |
-| **Q5** | Does phase 12 deploy a monitoring stack, or retire the SLO artefacts? (a) deploy `prometheus` with `rule_files`; (b) retire the SLO artefacts and correct the docs; (c) minimum viable — correct the selectors, add a `promtool`-style lint, add the scrape-contract test, and defer the stack | **11** | **Owner** (product/infrastructure decision), escalated by the Planner | **GATED.** The report states plainly: *"this is a decision, not a task."* It changes the block's size by an order of magnitude and adds a secret surface if (a) is chosen |
-| **Q6** | For `OPS-010`: enable `BOT_HEALTH_CHECK_ENABLED=true` for `web` in production, or remove the shipped-but-disabled staleness window and the doc claims? | **13** | Owner (operational) + Planner | **GATED.** Enabling makes a wedged bot return 503 from `/health/ready/`, which is the **deploy gate** and the rollback validation target. That is a deploy-pipeline behaviour change |
+| **Q5** | Does phase 12 deploy a monitoring stack, or retire the SLO artefacts? (a) deploy `prometheus` with `rule_files`; (b) retire the SLO artefacts and correct the docs; (c) minimum viable — correct the selectors, add a `promtool`-style lint, add the scrape-contract test, and defer the stack | **11** | **Product Owner** — answered 2026-10-03 | **RESOLVED 2026-10-03 (Product Owner) — option (c): MINIMUM VIABLE ONLY.** Correct the alert selectors, add the **`promtool`-style lint** and the **scrape-contract test**, and **defer the monitoring stack**. The full-stack option (a) is **DECLINED** and (b) is **not chosen**. BLOCK 11 **shrinks to the reduced deliverable**; **no new secret surface** is created |
+| **Q6** | For `OPS-010`: enable `BOT_HEALTH_CHECK_ENABLED=true` for `web` in production, or remove the shipped-but-disabled staleness window and the doc claims? | **13** | **Product Owner** (operational) — answered 2026-10-03 | **RESOLVED 2026-10-03 (Product Owner) — the flag STAYS DISABLED in production.** The shipped documentation implying the staleness window works is **removed**; **bot health does not gate deploys**. Revisit only when D18's deferred alerting is delivered. BLOCK 13 ships the doc removal + honest labelling; the availability risk row is **restated as knowingly accepted** |
 | **Q7** | For `VAL-001`: add every `*_MEM_LIMIT` / `*_CPUS` key to all four `.env.*.example` files and to `ALLOWED_ENV_VARS`, or ship only the guard that prevents **silent** regression? | **7** | Planner + phase 02 (which owns the allowlist) | **GATED.** `config/settings/base.py`'s allowlist is phase-02-owned and `test_env_allowlist.py` reads it in **both** directions. Adding ~20 keys × 4 files is a large diff against another phase's file |
-| **Q8** | For `OPS-004`: is off-host artifact replication in scope? Without it, the real-artifact restore drill cannot pass at all | **16** | **Owner** (infrastructure) | **GATED, may be declined.** BLOCK 16's *unconditional* half still ships either way; only the real-artifact consumption is conditional |
-| **Q9** | **Does anything external consume `/health/`?** | **18** | **Coordinator / owner** — not the Implementor | **GATED, blocking.** This is the only backward-incompatible change in the phase. ✔ Nothing in the repository records an uptime monitor, a status-page integration or a `UptimeRobot`/`healthchecks.io` reference — **but absence of a record is not proof**, and an external monitor reading `/health/ready/` would begin receiving `403` |
-| **Q10** | For `OPS-011`, what is the operator-notification floor? (a) a `manage.py notify_operator` command delivered over the existing Telegram transport; (b) a dump-age + container-health **metric** only, consumed by whatever Q5 decides; (c) neither — formally declare detection out of scope for a single-host deployment and document the gap | **12** | **Owner**, with Planner on (a)'s shape | **GATED.** Option (a) needs a recipient configuration key that does not exist: adding one means `ALLOWED_ENV_VARS` **and** all four `.env.*.example` files, or `test_env_allowlist.py` fails. And it must run inside the `backup` service, which is `read_only: true`, `cap_drop: ["ALL"]` and — until BLOCK 2 — root |
-| **Q11** | For `OPS-002`, what is the deploy-gate mechanism? (a) assert in-workflow that the dispatched SHA is on `main` with a green `CI` run; (b) a `workflow_run` trigger chained to `CI`; (c) repository branch protection as the enforcement point plus a constrained input | **10** | **Owner**, with Planner on (a)'s implementation | **GATED.** (b) removes the human approval that currently exists; (c) moves the control outside the repository, where this plan cannot verify it. All four agents are required for this block |
+| **Q8** | For `OPS-004`: is off-host artifact replication in scope? Without it, the real-artifact restore drill cannot pass at all | **16** | **Product Owner** (infrastructure) — answered 2026-10-03 | **RESOLVED 2026-10-03 (Product Owner) — YES: off-host artifact replication IS IN SCOPE.** BLOCK 16's real-artifact restore drill becomes **UNCONDITIONAL**; the *"may be declined"* conditionality is **REMOVED**, the block's class changes from `conditional` to `behavioural`, and `OPS-004` is **closable**. Options (b) and (c) are **closed** |
+| **Q9** | **Does anything external consume `/health/`?** | **18** | **Product Owner** — asserted, not the Implementor | **RESOLVED 2026-10-03 (Product Owner) — NO external consumer.** **This is an owner-asserted fact, NOT an inference from the absence of a record**, and it is recorded **with its date** so the backward-incompatible change stays traceable to a decision. The block is **no longer blocked**; it may lock the endpoint down |
+| **Q10** | For `OPS-011`, what is the operator-notification floor? (a) a `manage.py notify_operator` command delivered over the existing Telegram transport; (b) a dump-age + container-health **metric** only, consumed by whatever Q5 decides; (c) neither — formally declare detection out of scope for a single-host deployment and document the gap | **12** | **Product Owner** — answered 2026-10-03 | **RESOLVED 2026-10-03 (Product Owner) — option (b).** The operator-notification floor is a **machine-readable metric** (dump age + container health), consumed by whatever D18/Q5 delivers. The Telegram **`notify_operator` command is DECLINED** — so **no recipient configuration key is added**, and **`ALLOWED_ENV_VARS` and the four `.env.*.example` files are untouched**. BLOCK 12's scope is **reduced accordingly** and its **residual gap is named** rather than closed |
+| **Q11** | For `OPS-002`, what is the deploy-gate mechanism? (a) assert in-workflow that the dispatched SHA is on `main` with a green `CI` run; (b) a `workflow_run` trigger chained to `CI`; (c) repository branch protection as the enforcement point plus a constrained input | **10** | **Product Owner**, with Planner on (a)'s implementation — answered 2026-10-03 | **RESOLVED 2026-10-03 (Product Owner) — option (a).** The deploy gate is the **in-workflow assertion that the dispatched SHA is on `main` with a green `CI` run**. **The existing human approval is RETAINED.** Options **(b)** (the `workflow_run` chain, which removes the human approval) and **(c)** (branch protection as the enforcement point) are **DECLINED**. **The assertion's token scope must be stated in the commit body** |
 | **Q12** | For `OPS-008`, what replaces the tag-based capture — digest capture, a required-SHA template, or both? | **10** | Planner | **GATED.** `docker inspect --format='{{index .Image}}' "$(docker compose ps -q web)"` appears nowhere in the repository and is untested here; `restore-test.yml` also pulls by tag, so a digest-only scheme needs a second change |
 | **Q13** | *New.* Does any phase-12 block need an `AdvisoryLockId`? | — | Planner | **ROUTED, default is no.** Phase 12 allocates **none** (C-6). Next free integer is `14`. If a block appears to need one — the plausible case is a `notify_operator` invoked concurrently — that is a decision gate, it requires re-reading `apps/core/enums.py` immediately before editing, and it must be reported to the coordinator because phases 03/05/06/07/10 all hold that file |
 | **Q14** | *New.* Does the `docs/ops` parity test resolve markdown cross-references? | **15** | Planner | **GATED, and it must be answered as (b) unless argued.** `docs/ops/docker-deployment.md` contains a link to the **deleted** `.ai/audit/12-production-ops/findings.md`. Option (a) resolve links → the test is red on arrival for a defect BLOCK 14 must also fix; option (b) do not resolve links → the dead link stays. **The default answer is (b)** with the dead link re-pointed at the validated report, and BLOCK 14 must say so in its commit body |
@@ -254,6 +254,41 @@ them — these are *not* open questions):
   hard sequential edge instead, which delivers the same single review window.
 - **`VAL-003` is a convention, not a code change.** It is enforced by §1.5 and by every block's
   `acceptance_criteria`; it ships no file.
+
+---
+
+### 0.7 Product Owner gate rulings — 2026-10-03
+
+**Authority.** Product Owner decisions, dated `2026-10-03`, recorded here so that no Implementor
+can re-derive a settled question. **This phase had six owner gates; all six are now answered.**
+Three of them **reduce** a block's scope, one **removes a conditionality**, one **unblocks** a
+backward-incompatible change, and one **adds a permanent obligation**.
+
+| Gate | Ruling (2026-10-03, Product Owner) | Chosen option | Block-level consequence |
+|---|---|---|---|
+| **Q5** | **MINIMUM VIABLE ONLY.** Correct the alert selectors, add a **`promtool`-style lint** and the **scrape-contract test**, and **defer the monitoring stack** | **(c)** | **BLOCK 11 SHRINKS to the reduced deliverable, unconditionally.** The full-stack option is **DECLINED**, so there is **no new compose service, no new configuration file and no new secret surface**, and **BLOCK 8's service-set coupling becomes inapplicable** (recorded, not silently dropped). `PROMETHEUS_LATENCY_BUCKETS` is **not** introduced. Binding constraint 7 is restated as inapplicable, and a new binding constraint requires the lint to be **demonstrated red**. `redis_db_keyspace_hits_total` is **retired**. **The commit body must state that `OPS-003` is closed and `OPS-011`'s detection half is still open** |
+| **Q6** | **`BOT_HEALTH_CHECK_ENABLED` STAYS DISABLED in production**, and the shipped documentation implying the staleness window works is **removed**. **Bot health does not gate deploys** | **(b), strengthened** | **BLOCK 13's scope is reduced to documentation.** No compose edit, **no `.env.prod.example` entry** (option (c) not chosen), no settings edit. Option (a) is **DECLINED**, so the "deploy gate fails on a bot fault" consequence was refused outright. The required removal of `BOT_HEALTH_STALE_SECONDS` from **`docker-compose.yml` is BLOCK 1's file** and is **reported, not made**. `test_health_contract.py` stays **green unchanged** — both branches remain reachable. **The residual exposure is restated as knowingly accepted**: a wedged bot is invisible to `/health/ready/` and to the deploy gate |
+| **Q8** | **Off-host artifact replication IS IN SCOPE** | effectively **(a)** | **BLOCK 16's real-artifact restore drill becomes UNCONDITIONAL.** The *"may be declined"* conditionality is **REMOVED**; the block's class changes from `conditional` to `behavioural`; options (b) and (c) are **closed**; and **`OPS-004` is now closable** — the commit body must say it is **closed**, not "not closed". New obligations, with acceptance criteria: configure the off-host push with credentials, a **retention policy** and a **stated restore path**, and demonstrate that a truncated or wrong-version artifact **fails** the drill |
+| **Q9** | **Nothing external consumes `/health/`** | owner assertion | **BLOCK 18 is UNBLOCKED** and may lock the endpoint down. **This is an owner-asserted fact, NOT an inference from the absence of a repository record**, and **its date must appear in the commit body** so the only backward-incompatible change in the phase is traceable to a decision. The *location* choice (nginx vs a Django change) remains open with **(a) still preferred**, and the two real outage risks — `/health/live/` reachability and the deploy gate — are **untouched by the ruling** and must still be **verified, not assumed** |
+| **Q10** | The operator-notification floor is a **machine-readable metric** (dump age + container health), consumed by whatever D18/Q5 delivers. The Telegram **`notify_operator` command is DECLINED** | **(b)** | **BLOCK 12's scope is reduced** to the machine-readable signals plus the labelling half. **No recipient configuration key is added**, so **`ALLOWED_ENV_VARS` and the four `.env.*.example` files are untouched** — a guarantee now, not a coincidence. No second sender; the `backup` loop is not modified. **The residual gap is named, not closed**: because Q5 deferred the stack, nothing consumes the signals in this programme, so the commit body must state that detection is unchanged and **`OPS-011` is not closed** |
+| **Q11** | The deploy gate is the **in-workflow assertion that the dispatched SHA is on `main` with a green `CI` run**. **The existing human approval is RETAINED** | **(a)** | **BLOCK 10 is no longer gated.** The `workflow_run` chain (b) and branch protection (c) are **DECLINED**. Binding constraint 4 becomes an **unconditional prohibition** on removing the manual approval, and a new constraint forbids adding a `workflow_run` trigger. **The token scope must be stated in the commit body.** **Fail-closed is the accepted failure mode** — an under-scoped token halts deploys rather than admitting an ungated SHA |
+
+**Rulings that change the phase's shape, stated once.**
+
+- **`conditional` is now an empty class.** Q8 and Q9 were the phase's only two `conditional`
+  blocks; both are answered, so **no block in this phase ships a reduced deliverable "unless a
+  gate is declined"**. BLOCKS 11, 12 and 13 are `behavioural` with **reduced** scopes — and
+  **reduced is not conditional**: those reductions are decided and permanent for this programme.
+- **Cross-phase staleness the owner should know about.** The Product Owner's `AD-008` ruling
+  (recorded in plan 11, 2026-10-03) makes `ON_MODERATION` a **durable** status, so this plan's
+  `AD-008` carry-forward — *"a `pending_moderation` alert is dead on arrival"* — is **stale as
+  to its reason**, though binding constraint 3 still forbids adding such an alert here. Phase 05
+  owns the correction (plan 11 §5.4).
+
+**Technical gates that are NOT Product Owner decisions and remain exactly as they are.**
+**Q1** (contract-file placement), **Q2**, **Q3**, **Q4**, **Q7**, **Q12** (Planner decisions) and
+**Q14** are untouched. **No migration numbering, module placement, commit sequencing or
+cache-TTL arithmetic was changed by any 2026-10-03 ruling.**
 
 ---
 
@@ -495,16 +530,16 @@ breaks a shipped test, or is gated. `structural` = introduces a contract or a so
 | ID | Class | Disposition | Block | Severity | One-line reason |
 |---|---|---|---|---|---|
 | `OPS-001` | **behavioural** | **implement — gated on nothing, but the triage is the work.** Fix both scan roots and the config path, repair `exclude_dirs` to the real test trees, triage the residual **by class, never by baseline**, and replace `test_ci_yml_has_sast_job` with a scanned-file-count assertion | **4** | HIGH (↓CRITICAL) | Two independent path-relativity errors make the step exit 2; **no Python file in the repository has ever been statically analysed**. The report's baseline recommendation is **rejected** (it would institutionalise 64 test-fixture `B106` and permanently permit new hardcoded credentials in production code). The `security` job runs no pytest, so no test there can fail for a second reason |
-| `OPS-002` | **behavioural** | **implement — gated on Q11.** Add `on: pull_request` to `ci.yml`; constrain the deploy input per the chosen mechanism. **The `CFG-002` precondition is already satisfied** | **10** | HIGH | Two independent ungated paths to a production image: any PR is ungated, and any SHA can be typed into a free-text input. The manual environment approval is a human checkbox, not a verification. The report's sequencing constraint ("land `CFG-002` before `OPS-002`") is **discharged** |
-| `OPS-003` | **behavioural** | **implement the selector correction and the scrape-contract test unconditionally; the monitoring stack is gated on Q5 and may be declined.** Correct the stale multiprocess caveat in the same pass | **11** | HIGH | Three alert rules select series that do not exist (`django_http_response_duration_seconds` + a `handler` label + a `le="2.000"` edge), one of them from a `redis_exporter` that is not deployed, and **no Prometheus exists in any compose file**. The durable fix is a scrape-contract test, which is verifiable **today** through `test_observability.py` |
-| `OPS-004` | **conditional** | **implement the unconditional half; gate the real-artifact half on Q8.** Assert non-empty restores and `django_migrations` presence; pin the app image to a recorded known-good tag instead of `${{ github.sha }}`; keep the self-generated dump as a labelled **additional** smoke test | **16** | HIGH | The monthly control restores a dump it generated three steps earlier from a healthy in-memory database, so it proves nothing about the artifacts it exists to prove. ✔ **Without an off-host artifact path the real-artifact half is impossible** — that is a platform investment, not an edit. On a `schedule` trigger `github.sha` is the default-branch tip and may have no pushed image |
+| `OPS-002` | **behavioural** | **implement — Q11 RESOLVED 2026-10-03: option (a).** Add `on: pull_request` to `ci.yml`; assert in-workflow that the dispatched SHA is on `main` with a green `CI` run. **The existing human approval is RETAINED**; the `workflow_run` chain (b) and branch protection (c) are **DECLINED**. **The assertion's token scope must be stated in the commit body.** **The `CFG-002` precondition is already satisfied** | **10** | HIGH | Two independent ungated paths to a production image: any PR is ungated, and any SHA can be typed into a free-text input. The manual environment approval is a human checkbox, not a verification — **and it now stays, by decision, with an assertion in front of it**. The report's sequencing constraint ("land `CFG-002` before `OPS-002`") is **discharged** |
+| `OPS-003` | **behavioural** | **implement the REDUCED deliverable, UNCONDITIONALLY — Q5 RESOLVED 2026-10-03 as option (c), minimum viable only.** Correct the selectors, add the **`promtool`-style lint** and the **scrape-contract test**, correct the stale multiprocess caveat. **The monitoring stack is DEFERRED**; the full-stack option is **DECLINED**. **No new secret surface.** BLOCK 11 shrinks | **11** | HIGH | Three alert rules select series that do not exist (`django_http_response_duration_seconds` + a `handler` label + a `le="2.000"` edge), one of them from a `redis_exporter` that is not deployed, and **no Prometheus exists in any compose file**. The durable fix is a scrape-contract test, which is verifiable **today** through `test_observability.py`. **Changed premise:** the option-(a) coupling to BLOCK 8's service-set guard **disappears**, because no new service ships |
+| `OPS-004` | **behavioural** (was `conditional`) | **implement in full, UNCONDITIONALLY — Q8 RESOLVED 2026-10-03: off-host artifact replication IS IN SCOPE.** Assert non-empty restores and `django_migrations` presence; pin the app image to a recorded known-good tag instead of `${{ github.sha }}`; keep the self-generated dump as a labelled **additional** smoke test **and consume a real artifact**. **The "may be declined" conditionality is REMOVED and `OPS-004` is closable** | **16** | HIGH | The monthly control restores a dump it generated three steps earlier from a healthy in-memory database, so it proves nothing about the artifacts it exists to prove. On a `schedule` trigger `github.sha` is the default-branch tip and may have no pushed image. ✔ **Without an off-host artifact path the real-artifact half is impossible — that obstacle was the reason Q8 was gated, and the owner has ruled it in scope** |
 | `OPS-005` | — | **merged → `OPS-007`; not a separate work item** | **8** | MEDIUM | Same root cause and same fix as `OPS-007`. The off-host-replication limb was demoted by the validator to advisory (§6.1) |
 | `OPS-006` | **behavioural** | **implement — gated on Q2 (irreversible-data surface) and Q3 (instrument).** `--env-file .env.prod` on every production invocation in `restore.md`; `.env.prod` as the credential source, never `.env.dev`; sweep `postgres-18-docker-volume-migration.md` and `migration-workflow.md` | **9** | HIGH | The document an engineer opens when the database is already lost cannot be followed: **every** invocation aborts at config rendering. The `.env.dev` credential read is a dev/prod confusion, not a missing flag — it points the operator at the wrong database. **Do not touch `rollback.md`'s production invocations — they are already correct** (C-10) |
 | `OPS-007` | **structural** | **implement — gated on Q1.** Name every long-lived prod service in every deploy compose invocation, in both recreate commands, and in the runbooks; add the regression guard keyed on `restart:` | **8** | HIGH | Three services are profile-gated and none is named by the deploy path, so after a deploy the scheduler runs an arbitrarily stale image and the daily backup job **is never started**. Rollback is not atomic. **The report's `ENT-003` sequencing constraint is discharged** by phase 01 |
 | `OPS-008` | **behavioural** | **implement — gated on Q12, with BLOCK 10.** Capture the digest, roll back by digest, forbid `IMAGE_TAG=latest` in the prod template, and cover the no-previous-digest and digest-absent branches | **10** | MEDIUM (↓HIGH) | Tags are mutable labels, not identity, and no digest is captured anywhere. The report's "silent no-op in exactly the default configuration" is **refuted** — `deploy.yml` deliberately re-exports the CI tag after sourcing `.env.prod` — so the exposure is conditional on a manual deploy |
 | `OPS-009` | **mechanical** | **implement.** Define the image coordinate once as a `build` job output; align `cache-from` with `cache-to`; guard the literals across the four files | **3** | MEDIUM | Three namespaces, and `cache-from`/`cache-to` **also disagree with each other** (`mko_bazuna` vs `mko-bazuna`) — which silently degrades every CI build to a cold cache. The `build` job already declares `outputs.image_tag`, the natural single source |
-| `OPS-010` | **behavioural** | **implement — gated on Q6.** Either enable the coupling in prod and document it, or remove the shipped-but-disabled window and the doc claims | **13** | MEDIUM | A configured-but-disabled control: `BOT_HEALTH_STALE_SECONDS=120` ships for `web` and `bot`, the enable flag defaults `False`, appears in no compose file and no `.env.*.example`. The impact is narrower than reported — new submissions are not *started*, already-persisted `DRAFT` rows are unaffected |
-| `OPS-011` | **behavioural** | **implement the labelling half unconditionally; gate the notification floor on Q10.** Whatever is chosen, the SLO artefacts must stop reading as active controls | **12** | MEDIUM | Nothing anywhere inspects container health, dump freshness, deploy outcome or the SLO rules. A stuck `unhealthy` container and a backup job that died a week ago are discovered by users. **`EMAIL_HOST` is phase 09's `API-009` and is not re-filed** |
+| `OPS-010` | **behavioural** | **implement the REDUCED deliverable — Q6 RESOLVED 2026-10-03: the flag STAYS DISABLED in production, and the shipped documentation implying the staleness window works is REMOVED.** **Bot health does not gate deploys.** Revisit only when the deferred alerting lands | **13** | MEDIUM | A configured-but-disabled control: `BOT_HEALTH_STALE_SECONDS=120` ships for `web` and `bot`, the enable flag defaults `False`, appears in no compose file and no `.env.*.example`. The impact is narrower than reported — new submissions are not *started*, already-persisted `DRAFT` rows are unaffected. **Changed premise:** the "deploy gate fails on a bot fault" consequence is **not accepted** — it is declined outright, and the resulting availability exposure is **knowingly accepted** |
+| `OPS-011` | **behavioural** | **implement the REDUCED scope — Q10 RESOLVED 2026-10-03 as option (b).** The floor is a **machine-readable metric**: dump age + container health, **consumed by whatever the deferred alerting delivers**. **The Telegram `notify_operator` command is DECLINED**, so **no recipient configuration key is added** and **`ALLOWED_ENV_VARS` plus the four `.env.*.example` files are untouched**. The labelling half ships and the **residual gap is named, not closed** | **12** | MEDIUM | Nothing anywhere inspects container health, dump freshness, deploy outcome or the SLO rules. A stuck `unhealthy` container and a backup job that died a week ago are discovered by users. **`EMAIL_HOST` is phase 09's `API-009` and is not re-filed.** Under the reduced scope the detection gap **remains open by decision** and must be reported as such, not closed |
 | `OPS-012` | **behavioural** | **implement.** `logconfig_dict` routing `gunicorn.access`/`gunicorn.error` at the existing `RedactingJsonFormatter`, plus a structured `access_log_format`. **Preserve phase 01's `child_exit` hook.** Keep `accesslog`/`errorlog` set until proven | **17** | LOW (↓MEDIUM) | The production log stream mixes JSONL and plaintext with the highest-volume record unstructured. **No demonstrated security exposure exists** — the gap is a property of the format, not of any parameter the application emits. `logconfig_dict` changes gunicorn startup; a malformed config crashes the arbiter **before** the bind, turning a logging change into an outage |
 | `OPS-013` | **mechanical** | **implement.** Validate the DSN before use (shape check, or a guarded `except` around `sentry_sdk.init`), log **value-free**, add the malformed-DSN row to the existing subprocess harness | **6** | MEDIUM | A purely optional, non-security setting, shipped empty, can take the **entire** production stack offline at settings import — every process plus the CI `deploy-check` job. The report's trigger examples (leading space, trailing newline) are **handled** by `sentry-sdk 2.69.2`; the live trigger is an unrecognised scheme |
 | `OPS-014` | **behavioural** | **implement — gated on Q4.** `user:` + a dump-age healthcheck on `backup`; align the dump filename with the prune glob at all three sites; add the hardening guard **as an exception list**, not by extending `_HARDENING_KEYS` | **2** | MEDIUM | A root container holding `POSTGRES_PASSWORD` and writing to a host bind mount, with no healthcheck and no dump-age signal, and `backup-*.dump` files the prune globs never match accumulating until the disk fills. ✔ The **running uid was not observed** (C-3) — the assertion is the **absence**, not the inferred uid |
@@ -513,13 +548,14 @@ breaks a shipped test, or is gated. `structural` = introduces a contract or a so
 | `OPS-017` | **mechanical** | **implement.** Pin every third-party action to a full commit SHA with the version in a trailing comment; verify the gitleaks download against a committed checksum; **pin and verify the `syft` install in `docker/Dockerfile` and the Tailwind `latest/download` fetch** | **5** | MEDIUM | The trust boundary is the least-pinned part of the system. `appleboy/ssh-action` receives the **production SSH private key**. The unverified gitleaks tarball is the step that decides whether a secret enters the repository; the unverified `syft` install means the shipped image's toolchain provenance is unverified at every build. Dependabot keeps the pins updated |
 | `OPS-018` | **behavioural** | **implement — after BLOCKS 4 and 9.** Correct **twelve** instances (the report's six live ones plus the six drift instances phases 01/02 created). Do **not** reintroduce the refuted `bazuna_db` sub-claim | **14** | MEDIUM | The ops documentation is the only description of the production system and a reader cannot tell which parts are live: a false claim about a security control, a false recovery procedure, and a false rollback procedure on a gitignored file. The report's warning holds — **the parity test comes later, never in the same commit** |
 | `OPS-019` | **mechanical** | **implement — first block in the plan.** `start_period` on all four missing healthchecks, **including `docker-compose.test.yml` and `docker-compose.prod.yml`'s `pgbouncer`**, which the report did not name; per-file guard | **1** | LOW | A failing probe counts toward `retries` immediately, so PostgreSQL 18 can be marked `unhealthy` during crash recovery and the `depends_on` chain fails to start — surfacing as a cascade of one-shot services exiting non-zero rather than "database still starting". **Wider than the report** (C-1), and one of the four files is the one every phase's test command reads |
-| `OPS-020` | **conditional** | **implement — blocked on Q9.** Restrict `/health/` the same way `/metrics` is restricted, or return a reduced public body behind an internal-only path | **18** | LOW | An anonymous caller can poll readiness and read both service availability and the identity of the failing dependency. **The only backward-incompatible change in the phase.** ✔ Nothing in the repository records an external consumer — **but that is not proof** |
+| `OPS-020` | **behavioural** (was `conditional`) | **implement — Q9 RESOLVED 2026-10-03: the owner ASSERTS that nothing external consumes `/health/`.** The block is **no longer blocked** and may lock the endpoint down. **This is an owner-asserted fact, not an inference from the absence of a record, and it must be recorded WITH ITS DATE** so the backward-incompatible change is traceable to a decision | **18** | LOW | An anonymous caller can poll readiness and read both service availability and the identity of the failing dependency. **The only backward-incompatible change in the phase.** ✔ The absence of a repository record is **no longer the argument** — the owner's assertion is, and its date belongs in the commit body |
 | `OPS-021` | **mechanical** | **implement the comment limb in BLOCK 3; the backup-loop limb in BLOCK 2.** Fix the stale `OPS-001` citation in the `deploy-check` rationale header; drift-compensate the sleep and assert dump freshness | **2**, **3** | LOW | The rationale comment now sits in the right place (phase 02 moved it) — **only the wrong ID reference remains**, and it points at the bandit finding. The loop's true interval is 24 h plus dump duration plus retry delay, and nothing anywhere asserts the newest dump is recent |
 | `VAL-001` | **behavioural** | **implement — gated on Q7.** `mem_limit` / `cpus` resolution contract plus a guard that the defaults cannot ship silently; cross-reference `SRCH-001` rather than merging with it | **7** | MEDIUM | The ops layer declares **no** capacity limits and enforces no `mem_limit` contract; every environment falls back to the compose default. `SRCH-001` owns the OOM consequence — **fixing one does not close the other**, and a reader must not conclude otherwise |
 | `VAL-002` | — | **not a code change here** — the ops-surface timeout-budget item requires a decision that interacts with phase 03 `DB-004` | §6.1 | LOW | 0 matches for `lock_timeout` / `statement_timeout` in the one-shot containers or the scheduler's child dispatch. A stuck `pg_dump` is indistinguishable from a slow one, is not covered by any healthcheck, and is never pruned. Routed to phase 03 with the intersection recorded |
 | `VAL-003` | **mechanical** | **implement as a convention**, enforced by §1.5 and by every block's `acceptance_criteria`. Ships no file | all | MEDIUM | Every existing ops guard is string-level, and that is the shared root cause of `OPS-001`, `OPS-003` and `OPS-004`. **A guard that asserts a token is present cannot assert that a control is effective.** Highest leverage per byte in the phase |
-| `Q1` / `Q11` | — | **GATED** — Planner + Researcher (Q1); Owner + Planner (Q11) | **8**, **10** | — | The two structural gates. Q1 creates the contract file; Q11 chooses the deploy-gate mechanism and therefore the block's shape |
-| `Q2` / `Q3` / `Q4` / `Q5` / `Q6` / `Q7` / `Q8` / `Q9` / `Q10` / `Q12` | — | **GATED** — each inside its block, with the options and consequences written down | **2**, **9**, **11**, **13**, **16**, **18**, **12**, **10** | — | Ten further gates. Q9 is **blocking** on BLOCK 18. Q5, Q8, Q10 and Q11 are **owner** decisions, not Planner decisions — the report itself says "this is a decision, not a task" |
+| `Q1` / `Q11` | — | **Q1 GATED** — Planner + Researcher. **Q11 RESOLVED 2026-10-03 (Product Owner) — option (a): the in-workflow SHA-on-`main`-with-green-`CI` assertion; the human approval is RETAINED; `workflow_run` and branch protection are DECLINED** | **8**, **10** | — | The two structural gates. Q1 creates the contract file. **Q11 chose the deploy-gate mechanism, and the block's shape follows from it — including the constraint that the manual environment approval must survive, which binding constraint 4 already forbids removing unless (b) is selected** |
+| **`Q5` / `Q6` / `Q8` / `Q9` / `Q10` / `Q11`** | — | **ALL RESOLVED 2026-10-03 (Product Owner)** — options (c), stay-disabled, (a), owner-assertion, (b), (a) respectively | **11**, **13**, **16**, **18**, **12**, **10** | — | The six owner gates are closed. **Q5 → (c) minimum viable, stack deferred, no new secret surface. Q6 → `BOT_HEALTH_CHECK_ENABLED` stays disabled, docs removed, bot health does not gate deploys. Q8 → off-host replication IS in scope; BLOCK 16 unconditional and `OPS-004` closable. Q9 → nothing external consumes `/health/`, asserted and dated. Q10 → a machine-readable dump-age + container-health metric; `notify_operator` declined, so no recipient key and `ALLOWED_ENV_VARS`/the four `.env.*.example` files are untouched. Q11 → the in-workflow SHA-on-`main`-with-green-`CI` assertion, human approval RETAINED, `workflow_run` and branch protection declined** |
+| **`Q2` / `Q3` / `Q4` / `Q7` / `Q12`** | — | **GATED** — each inside its block, with the options and consequences written down | **2**, **9**, **7**, **10** | — | Five further gates. **Q2, Q3, Q4 and Q7 remain owner/coordinator/Planner decisions that no 2026-10-03 ruling touched.** Q12 is a Planner decision |
 | `Q13` / `Q14` | — | **ROUTED** / **GATED, default answer stated** | — | **Q14** BLOCK 15 | `Q13`: phase 12 allocates no lock id; next free is `14`; the file is held by five phases. `Q14`: the parity test does **not** resolve markdown links by default, and BLOCK 14 re-points the dead one |
 
 **Note on `OPS-012`.** Its subject (`gunicorn.conf.py` at the repository root) is owned by
@@ -531,8 +567,17 @@ instruction ("do not let it compete with `OPS-007` for the same deploy window") 
 placing it near the end of the order.
 
 **Block classification summary:** `mechanical` = **1, 3, 5, 6, 7** ·
-`behavioural` = **2, 4, 9, 10, 11, 12, 13, 14, 15, 17** · `structural` = **8** ·
-`conditional` = **16, 18**.
+`behavioural` = **2, 4, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18** · `structural` = **8** ·
+`conditional` = **none**.
+
+**Changed 2026-10-03.** **BLOCKS 16 and 18 were the phase's only `conditional` blocks, and both
+are now `behavioural`.** Q8 made BLOCK 16's real-artifact half unconditional, and Q9 unblocked
+BLOCK 18 on an owner-asserted answer. **No block in this phase ships a reduced deliverable
+"unless a gate is declined" any more** — the two conditional shapes were Q8 and Q9, and both are
+answered. BLOCK 11 is `behavioural` with a **reduced** (not conditional) scope under Q5; BLOCK
+12 is `behavioural` with a **reduced** scope under Q10; BLOCK 13 is `behavioural` with a
+**reduced** scope under Q6. **Reduced is not conditional** — those three reductions are decided
+and permanent for this programme.
 
 ---
 
@@ -1951,9 +1996,8 @@ tests_to_run:
 | **Depends on** | BLOCK 8 (the same deploy file and the same service set), BLOCK 9 |
 | **Blocks** | BLOCK 16 (the restore drill pins a recorded image tag; the recording mechanism is this block's) |
 | **Priority** | **P0** — the report calls fixing `OPS-002` with `CFG-002` "the highest-leverage pair in this phase", and `CFG-002` is **already shipped** |
-| **Risk level** | **HIGH** — this block changes how production is deployed. A mistake stops deploys; it does not corrupt data |
-| **Blast radius** | `ci.yml`, `deploy.yml`, `.env.prod.example`, three test modules. **No compose file edit** |
-| **Required agents** | **Auditor · Researcher · Planner · Validator** — all four |
+| **Risk level** | **HIGH** — this block changes how production is deployed. A mistake stops deploys; it does not corrupt data. **⚠ Fail-closed is the accepted failure mode**: an under-scoped token halts deploys rather than letting an ungated SHA through |
+| **Required agents** | **Auditor · Researcher · Planner · Validator** — all four. **Q11 is answered (2026-10-03)**, so the Researcher is now needed for the *token-scope and fail-closed behaviour reproduction*, not for the gate choice |
 
 **The precondition is discharged.** ✔ Phase 02 shipped `ci.yml`'s `deploy-check` env block and
 `test_deploy_check_env_parity.py`, so the automated prod-config gate **actually executes**
@@ -1965,13 +2009,30 @@ is the residual gap this block states honestly: `deploy-check` runs on `push`, s
 CI run for a specific immutable artefact, not from a free-text input plus a human checkbox"*.
 `registry/repository@sha256` is the deploy unit; the tag is a label on it.
 
-**Decision required before implementation — Q11: what is the deploy gate mechanism?**
+**Q11 RESOLVED 2026-10-03 (Product Owner) — option (a), and the human approval STAYS**
 
-| Option | What it is | Consequences |
+**The ruling: option (a).** The deploy gate is the **in-workflow assertion that the dispatched
+SHA is on `main` with a green `CI` run**, executed before the SSH step. **The existing manual
+environment approval is RETAINED.** Options **(b)** and **(c)** are **DECLINED** — recorded here
+so neither is re-proposed.
+
+| Option | What it is | Status |
 |---|---|---|
-| **(a)** | Assert in-workflow that the dispatched SHA is on `main` and has a successful `CI` run for that SHA, before the SSH step | **Gains:** the control lives in the repository and is reviewable; the human approval stays. **Costs:** the assertion needs a token with enough scope to read workflow runs and check statuses; if the scope is wrong the gate fails closed and deploys stop. Also adds a `pull_request` trigger whose **pre-existing** failures surface immediately |
-| **(b)** | A `workflow_run` trigger chained to `CI`, removing the manual dispatch entirely | **Gains:** a deploy cannot happen without a CI run, structurally. **Costs:** removes the human approval that currently exists, auto-deploys on every green `main` push, and turns any `pull_request`-triggered breakage into a deploy blocker. A significant change to how the team ships |
-| **(c)** | Repository branch protection as the enforcement point plus a constrained input | **Gains:** the smallest workflow diff. **Costs:** moves the control **outside the repository**, where this plan cannot verify it and no test can guard it. `branch protection` is also not expressible in a compose or YAML contract this plan owns |
+| **(a) — CHOSEN 2026-10-03** | Assert in-workflow that the dispatched SHA is on `main` and has a successful `CI` run for that SHA, before the SSH step | **Adopted.** The control lives in the repository and is reviewable, and **the human approval survives in front of it**. **Costs:** the assertion needs a token with enough scope to read workflow runs and check statuses; **if the scope is wrong the gate fails CLOSED and deploys stop.** It also adds a `pull_request` trigger whose **pre-existing** failures surface immediately |
+| ~~**(b)**~~ | A `workflow_run` trigger chained to `CI`, removing the manual dispatch | **DECLINED 2026-10-03.** It would remove the human approval that currently exists, auto-deploy on every green `main` push, and turn any `pull_request`-triggered breakage into a deploy blocker |
+| ~~**(c)**~~ | Repository branch protection as the enforcement point plus a constrained input | **DECLINED 2026-10-03.** It moves the control **outside the repository**, where this plan cannot verify it and no test can guard it — and `branch protection` is not expressible in a compose or YAML contract this plan owns |
+
+**Two consequences that are now binding rather than advisory.**
+
+1. **The manual environment approval must survive.** Binding constraint 4 previously said *"do
+   not remove the manual environment approval unless Q11 option (b) is selected."* **Option (b)
+   was declined**, so that clause resolves to an **unconditional prohibition**: the approval is
+   retained, full stop. An Implementor who removes it is re-introducing a declined option.
+2. **The token scope must be stated in the commit body.** The assertion reads workflow runs and
+   status checks. The commit body names the `GITHUB_TOKEN` permissions the assertion requires, and
+   what happens if they are insufficient — fail closed, with the failure message naming the cause.
+   A gate whose scope requirement lives only in the workflow file is a gate the next maintainer
+   silently weakens.
 
 **Decision required before implementation — Q12: what replaces the tag-based capture?**
 
@@ -2003,9 +2064,9 @@ CI run for a specific immutable artefact, not from a free-text input plus a huma
 3. **The `PREVIOUS_IMAGE_TAG` capture is timing-sensitive.** ✔ It must be captured while the
    old containers still run — before `pull` and before `up`. Moving it after `up` captures
    the image being deployed, which makes the rollback reproduce the failing image.
-4. **Do not remove the manual environment approval** unless Q11 option (b) is selected, and
-   say so explicitly in the commit body. Removing a human gate without recording it is the
-   most dangerous outcome this block can produce.
+4. **Do not remove the manual environment approval.** Option (b) was **DECLINED on 2026-10-03**,
+   so this is an **unconditional prohibition**, not a conditional one. Say explicitly in the
+   commit body that the approval was retained and that the declined option was not taken.
 5. **`.env.prod.example` must not ship `IMAGE_TAG=latest`** under Q12 option (b) or (c), and
    the guard must be **shown to fail** when the default is `latest`.
 6. **`deploy.yml`'s compose invocations must keep BLOCK 8's profiles and service set.**
@@ -2040,9 +2101,16 @@ goals:
   - "forbid IMAGE_TAG=latest in the production template"
   - "cover the no-digest and digest-absent-from-registry branches"
 extra_context: |
-  DECISION GATES - Q11 AND Q12 MUST BOTH BE ANSWERED FIRST. The Implementor may not choose either.
-  Q11 is an owner decision about how the team ships. Q12 is a Planner decision about what
-  replaces tag identity; option (c) is the recommendation.
+  Q11 IS RESOLVED - 2026-10-03, Product Owner: option (a). The deploy gate is the in-workflow
+  assertion that the dispatched SHA is on main with a green CI run, before the SSH step. The
+  EXISTING HUMAN APPROVAL IS RETAINED. The workflow_run chain (b) and branch protection as the
+  enforcement point (c) are both DECLINED. Q12 remains a separate Planner decision, resolved
+  2026-10-01.
+
+  THE TOKEN SCOPE MUST BE STATED IN THE COMMIT BODY. Name the GITHUB_TOKEN permissions the
+  assertion requires and what happens if they are insufficient: it fails CLOSED, with a message
+  naming the cause. A gate whose scope requirement lives only in the workflow file is a gate the
+  next maintainer silently weakens.
 
   BINDING CONSTRAINTS
   1. pull_request will surface pre-existing failures. That is the point. If the workflow turns
@@ -2053,13 +2121,15 @@ extra_context: |
      no-digest and digest-absent branches their own messages rather than a generic failure.
   3. The previous-image capture must happen while the old containers still run - before pull and
      before up. Capturing after up captures the image being deployed.
-  4. Do NOT remove the manual environment approval unless Q11 option (b) is selected, and say so
-     explicitly in the commit body.
+  4. Do NOT remove the manual environment approval. Option (b) was DECLINED, so this is an
+     unconditional prohibition. State in the commit body that the approval was retained.
   5. The guard forbidding IMAGE_TAG=latest must be shown to fail.
   6. Preserve BLOCK 8's profiles and service set in every deploy compose invocation.
   7. Never read or print a value from .env.prod.
   8. BOTH test_deploy_workflow.py modules - src/backend/tests/ and src/backend/apps/core/tests/ -
      are updated in the same commit. They are duplicates for the same file.
+  9. Do NOT add a workflow_run trigger and do NOT rely on branch protection. Both were declined;
+  adding either re-introduces a declined option and removes the human gate.
   FORBIDDEN: appending a job to ci.yml after deploy-check: (test_ci_security.py slices from that
   marker to EOF); removing the deploy-check env: block (phase 02 owns it); editing the compose
   files; editing docker-compose.prod.yml.
@@ -2102,7 +2172,9 @@ changes:
       Add tests for the two untested rollback branches.
 acceptance_criteria:
   - "ci.yml declares a pull_request trigger"
-  - "the dispatched SHA is constrained per the recorded Q11 option and the option is named in the commit body"
+  - "the dispatched SHA is constrained by the in-workflow assertion that it is on main with a green CI run; the Q11 option (a) and its date (2026-10-03) are named in the commit body"
+  - "the manual environment approval is RETAINED - the workflow_run chain (b) and branch protection (c) were declined and neither is present"
+  - "the commit body states the GITHUB_TOKEN permissions the assertion requires and that it fails closed if they are insufficient"
   - "the previous image is captured before pull and before up, and the capture is digest-based per the recorded Q12 option"
   - "the /health/ready/ deploy gate step is byte-identical; OPS-020's exposure is BLOCK 18's and is not touched here"
   - "the no-digest and digest-absent branches each have a distinct message and a test"
@@ -2126,10 +2198,10 @@ tests_to_run:
 | **Findings owned** | `OPS-003` (HIGH) |
 | **Class** | **behavioural** — the rules file and the doc sweep both change |
 | **Depends on** | BLOCK 10 (nothing functional; it runs after so the phase's highest-coordination block is not waiting) |
-| **Blocks** | BLOCK 12 (the operator-notification floor is the detection path for whatever Q5 decides); BLOCK 14 |
+| **Blocks** | BLOCK 12 (the operator-notification floor is a **machine-readable metric**, per the Q10 ruling; this block determines whether anything evaluates the SLO rules) · BLOCK 14 |
 | **Priority** | **P0** |
-| **Risk level** | **MEDIUM for the unconditional half, HIGH under Q5 option (a)** — a new compose service, a new configuration file and a new secret surface |
-| **Blast radius** | `docs/ops/prometheus-slo-alerts.yaml`, `apps/core/tests/test_observability.py`, `config/settings/base.py` (only under Q5 option (a)), and `docker-compose.prod.yml` (only under (a)). **Base compose is never edited.** Under Q5 option (a) a **new prod service** is introduced, which is the largest structural change in the phase |
+| **Risk level** | **MEDIUM** — **the option-(a) "HIGH under (a)" risk is GONE (2026-10-03).** No compose service, no configuration file, no secret surface, no BLOCK 8 coupling. What remains is a rules-file correction plus two guards |
+| **Blast radius** | `docs/ops/prometheus-slo-alerts.yaml`, `apps/core/tests/test_observability.py`, `src/backend/tests/` (the new lint's home). **Base compose and `docker-compose.prod.yml` are NOT edited** — under the resolved option (c) no service is added, so the earlier "largest structural change in the phase" no longer applies |
 | **Required agents** | **Auditor · Researcher · Planner · Validator** — all four |
 
 **Two limbs, only one of which is unconditional.**
@@ -2144,22 +2216,63 @@ the tree. The claim that `django-prometheus 2.5.0` emits no
 scrape**. The scrape-contract test reads a rendered `/metrics` — which is both the test and
 the verification.
 
-**Decision required before implementation — Q5: deploy a monitoring stack, or retire the SLO
-artefacts?** The report states plainly: *"this is a decision, not a task."*
+**Q5 RESOLVED 2026-10-03 (Product Owner) — MINIMUM VIABLE ONLY**
 
-| Option | What it is | Consequences |
+**The ruling is option (c), in full.** Correct the alert selectors, add a **`promtool`-style
+lint**, add the **scrape-contract test**, correct the stale multiprocess caveat, and **defer the
+monitoring stack**. The full-stack option (a) is **DECLINED**. **No new secret surface is
+created.** The block is **unconditional** in the sense that nothing here waits on a decision —
+but its **deliverable is reduced**, and that reduction is permanent for this programme.
+
+**What the ruling removed.** Under option (a) this block would have introduced a **new
+long-lived service** in `docker-compose.prod.yml`, a `prometheus.yml`, a volume-or-tmpfs
+decision, and a secret surface if remote-write were added — and **BLOCK 8's service-set guard
+would then have failed until the new service was named in the deploy path**. **None of that
+happens.** `docker-compose.prod.yml` is **not edited by this block**, no configuration file is
+added, and binding constraint 7 (the BLOCK 8 coupling) is **withdrawn as inapplicable** —
+recorded, not silently dropped.
+
+**What the ruling did NOT remove.** The **unconditional half is unchanged and still ships**:
+
+- the three selectors are corrected against a **rendered** `/metrics`;
+- the **stale multiprocess caveat** is corrected (phase 01 shipped `PROMETHEUS_MULTIPROC_DIR`
+  plus the tmpfs plus the `child_exit` hook, so the caveat is now wrong);
+- the **scrape-contract test** exists, is behavioural, and has been **demonstrated red**;
+- the `PrometheusRule` CRD form — a Kubernetes artefact in a Compose-only project — is either
+  changed to something a Compose project can consume or **explicitly labelled as planned, not
+  deployed**. It must not stay a CRD that nothing consumes;
+- **no moderation-queue-depth alert is added** (`AD-008` makes it dead on arrival — see the
+  carry-forward below, which is now stale in one respect, see §0.7);
+- `redis_db_keyspace_hits_total` is **retired**, because no `redis_exporter` is deployed and the
+  new guard would reject it.
+
+**The honest consequence the block must state.** Option (c) itself says it: *"no alert fires
+until someone deploys a stack, so the detection half of `OPS-011` is still unmet."* That
+sentence is now the block's **binding output** — the commit body must say that `OPS-003` is
+**closed** and `OPS-011`'s **detection** half is **still open**. `OPS-011` is now governed by the
+Q10 ruling (option (b), a machine-readable metric), which consumes BLOCK 2's signals but does not
+alert on them. **Neither block closes detection, and the phase must not imply that it does.**
+
+| Option | What it is | Status |
 |---|---|---|
-| **(a)** | Deploy `prometheus` with a `prometheus.yml` whose `rule_files` include this file, and move the rules out of the Kubernetes-only `PrometheusRule` CRD form or document the prerequisite | **Gains:** the alerts become real and the SLOs become measurable. **Costs:** a **new long-lived service** in `docker-compose.prod.yml` — which BLOCK 8's service-set guard will then require to be named in the deploy path, a direct coupling between two gates. A new configuration file, a new persistent-volume or tmpfs decision, and a secret surface if remote-write is added. **An order of magnitude larger than the finding's "minimum viable path"** |
-| **(b)** | **Retire** `docs/ops/prometheus-slo-alerts.yaml` and `docs/ops/grafana-slo-dashboard.json`, or move them under a clearly-labelled "planned — not deployed" heading | **Gains:** the docs stop reading as active controls, which is exactly `OPS-011`'s second half and `OPS-018`'s Prometheus instance. **Costs:** the SLO thresholds in `src/benchmark/constants.py::PerformanceSLO` lose their operational expression, and the alert **definitions** are lost — they were written deliberately, if against the wrong API surface |
-| **(c)** | **Minimum viable:** correct the selectors against the real series (or set `PROMETHEUS_LATENCY_BUCKETS` to include a `2.0` edge so the existing `le="2.000"` resolves), add the scrape-contract test, correct the stale caveat, and **defer the stack** | **Gains:** the durable half ships either way — a hand-maintained PromQL file becomes a **verified contract** that cannot drift into a dead selector again — and the file remains ready to deploy. **Costs:** no alert fires until someone deploys a stack, so the *detection* half of `OPS-011` is still unmet and BLOCK 12 must say so |
+| ~~**(a)**~~ | Deploy `prometheus` with a `prometheus.yml` whose `rule_files` include this file | **DECLINED 2026-10-03.** No new service, no new configuration file, no new secret surface, no BLOCK 8 coupling |
+| ~~**(b)**~~ | **Retire** `docs/ops/prometheus-slo-alerts.yaml` and the Grafana dashboard, or label them "planned — not deployed" | **NOT CHOSEN.** The file survives as a **verified contract**; only its *deployment status* is labelled |
+| **(c) — CHOSEN 2026-10-03** | **Minimum viable:** correct the selectors, add a `promtool`-style lint and the scrape-contract test, correct the stale caveat, **defer the stack** | **Adopted**, and it is this Planner's own recommendation — (c) ships the guard that would make a later (a) safe, at no cost if (a) never happens |
 
-**The Implementor may not choose.** Q5 is an infrastructure decision the owner makes. The
-Planner's recommendation is **(c) then (a) later**, because (c) ships the guard that makes (a)
-safe and costs nothing if (a) never happens.
+**The `promtool`-style lint is a new required deliverable.** It is the cheap half of "the file
+must be syntactically and semantically loadable", and it is verifiable **today** without a
+running Prometheus: it parses the YAML, loads the rules, and checks them against the rule schema
+the way `promtool check rules` does. **If `promtool` is not installed in the test image, the lint
+must be a pure-Python equivalent** — and whichever it is, it must be **shown to fail** on a
+malformed rule. A lint that has never been seen red is not a lint.
 
-**Carry forward (`AD-008`, phase 05).** `get_pending_queue_size()` is structurally 0 because
-`ON_MODERATION` is never committed. **A naive `pending_moderation` alert is dead on arrival.**
-If Q5 option (a) is taken, that warning must travel with it into the rules file.
+**Carry forward (`AD-008`, phase 05) — and note the amendment.** `get_pending_queue_size()` is
+structurally 0 today because `ON_MODERATION` is never committed. **The Product Owner's
+2026-10-03 ruling on `AD-008` (recorded in plan 11) makes `ON_MODERATION` a DURABLE status**, so
+this warning is **stale**: the queue is no longer structurally empty. **Binding constraint 3
+still stands for this block — do not add a `pending_moderation` alert in this commit** — but it
+stands for a different reason than the one this block originally gave. Phase 05 owns the
+correction of the underlying claim (plan 11 §5.4).
 
 **File surface (semantic units)**
 
@@ -2167,9 +2280,9 @@ If Q5 option (a) is taken, that warning must travel with it into the rules file.
 |---|---|---|
 | `docs/ops/prometheus-slo-alerts.yaml` | the three rules' `expr` selectors; the header comment's stale multiprocess caveat; the `le=` bucket edge | ✔ Confirmed at the current content |
 | `src/backend/apps/core/tests/test_observability.py` | beside `test_metrics_endpoint` | **The one behavioural precedent in the repository** — render `/metrics` through the Django test client and assert the exposition. **Model this guard on it** |
-| `config/settings/base.py` | `PROMETHEUS_LATENCY_BUCKETS` | **Only** if Q5 chooses the bucket-edge remedy. It does not exist today; adding it is a new `ALLOWED_ENV_VARS` entry plus example-file entries in the same commit |
-| `docker-compose.prod.yml` | a new `prometheus` service | **Only under Q5 option (a)** |
-| `docs/ops/grafana-slo-dashboard.json` | — | Only under Q5 option (b) (retire) |
+| `config/settings/base.py` | `PROMETHEUS_LATENCY_BUCKETS` | **NOT INTRODUCED.** Under the resolved option (c) the `le="2.000"` edge is fixed in the **rules file** instead of by adding an env-overridable setting. This removes a potential new `ALLOWED_ENV_VARS` entry and four `.env.*.example` lines — consistent with D20's ruling that this phase adds **no new secret surface** |
+| `docker-compose.prod.yml` | — | **NOT EDITED.** No `prometheus` service is added. BLOCK 8's service-set guard therefore cannot fail from this block; binding constraint 7 is **inapplicable**, not satisfied |
+| `docs/ops/grafana-slo-dashboard.json` | — | **Not retired** (option (b) was not chosen) — but its "not deployed" status is stated, so it stops reading as an active control |
 | `src/backend/apps/core/tests/test_slo_constants.py` | — | ✔ Read-only. It pins `PerformanceSLO` **values only** and never touches PromQL — which is precisely the gap |
 
 **Binding constraints**
@@ -2181,19 +2294,33 @@ If Q5 option (a) is taken, that warning must travel with it into the rules file.
 2. **The test must fail when a selector is added that names a series the exposition does not
    contain**, and that failure must be demonstrated. A guard that only checks today's three
    rules is not a contract.
-3. **Never add a moderation-queue-depth alert.** `AD-008` makes it structurally dead.
-4. **The `redis_db_keyspace_hits_total` rule has no exporter.** ✔ No `redis_exporter` exists
-   and none is deployed. Either the rule is retired, or it names a series the scrape will
-   never produce — **which the new guard will reject**. Decide per Q5 and say which.
-5. **A `PrometheusRule` CRD presupposes Kubernetes.** This project runs Compose. Under Q5
-   option (a) the file must change form, and under (b) it must be labelled. It must not stay
-   a CRD that nothing consumes.
+**Never add a moderation-queue-depth alert.** `AD-008` originally made it dead on arrival,
+since `ON_MODERATION` was never committed. **⚠ That reason is STALE as of 2026-10-03:** the
+Product Owner ruled `ON_MODERATION` a **durable** status (auto-moderation defers the ad to a
+human queue), so the queue is no longer structurally empty — **phase 05 owns that correction**
+(plan 11 §5.4). The prohibition stands for this block as a **scope** boundary, not as a claim
+about a zero metric.
+4. **The `redis_db_keyspace_hits_total` rule is RETIRED.** ✔ No `redis_exporter` exists and
+   none is deployed, and the new scrape-contract guard would reject it. This is now a
+   **decision, not a per-option choice**: under the resolved Q5 option (c) the rule goes, and
+   the commit body says why. (Q5 option (b) is not chosen, so the file itself survives — only
+   this rule does not.)
+5. **A `PrometheusRule` CRD presupposes Kubernetes.** This project runs Compose. Under the
+   resolved option (c) the file is **changed form or labelled "planned — not deployed"**, and
+   it must not stay a CRD that nothing consumes.
 6. **The stale multiprocess caveat is corrected in this block, not deferred.** ✔ Phase 01
    shipped `PROMETHEUS_MULTIPROC_DIR` plus the paired tmpfs plus the `child_exit` hook; the
    caveat that the default registry is in-process is now wrong.
-7. **If Q5 option (a) is taken, BLOCK 8's service-set guard will fail** until the new
-   `prometheus` service is named in the deploy path. That coupling is real and must be
-   reported, not worked around.
+7. **⚠ The BLOCK 8 service-set coupling is INAPPLICABLE under the resolved option.** ✔ Recorded,
+   not silently dropped: option (a) is **DECLINED**, so no service is added and there is nothing
+   for BLOCK 8's guard to reject. **An Implementor who nevertheless adds a `prometheus` service is
+   re-introducing the declined option and must stop.**
+8. **A `promtool`-style lint must exist and must be shown to fail.** Either `promtool check
+   rules` is available in the test image, or a pure-Python equivalent parses the YAML, loads the
+   rules and checks them against the rule schema. **A malformed rule must turn it red, and that
+   failure must be demonstrated.**
+9. **No new secret surface and no new `ALLOWED_ENV_VARS` entry.** `PROMETHEUS_LATENCY_BUCKETS`
+   is **not** introduced; fix the bucket edge in the rules file instead.
 
 **Implementor task**
 
@@ -2219,31 +2346,38 @@ goals:
   - "correct the stale multiprocess caveat"
   - "per the recorded Q5 option, either deploy a monitoring stack or stop the artefacts reading as active controls"
 extra_context: |
-  DECISION GATE - Q5 MUST BE ANSWERED FIRST. The Implementor may not choose. Q5 is an
-  infrastructure decision the owner makes. Option (c) - minimum viable - is the Planner's
-  recommendation: it ships the guard that makes a later deploy safe and costs nothing if it
-  never happens.
+  Q5 IS RESOLVED - 2026-10-03, Product Owner, option (c): MINIMUM VIABLE ONLY. The Implementor
+  may not choose. Deploying a monitoring stack is DECLINED. There is therefore no new compose
+  service, no new configuration file, no new secret surface, and NO coupling to BLOCK 8's
+  service-set guard. The deliverable is REDUCED but unconditional: correct the selectors, add a
+  promtool-style lint, add the scrape-contract test, correct the stale caveat, and state that
+  detection is NOT delivered.
 
-  CARRY FORWARD: phase 05's AD-008 establishes that get_pending_queue_size() is structurally
-  zero because ON_MODERATION is never committed. A moderation-queue-depth alert is dead on
-  arrival. Never add one.
+  CARRY FORWARD - and note the amendment: phase 05's AD-008 established that
+  get_pending_queue_size() is structurally zero because ON_MODERATION is never committed. The
+  Product Owner's 2026-10-03 ruling makes ON_MODERATION a DURABLE status, so that claim is now
+  STALE and phase 05 owns the correction. Do NOT add a moderation-queue alert in this commit
+  regardless - it is out of scope, not out of date.
 
   BINDING CONSTRAINTS
   1. The scrape-contract test asserts against a RENDERED /metrics, never against the library
      source. Model it on apps/core/tests/test_observability.py::test_metrics_endpoint.
   2. The test must fail when a selector naming an absent series is added, and that failure must
      be demonstrated. Checking only today's three rules is not a contract.
-  3. redis_db_keyspace_hits_total has no deployed exporter. Decide per Q5 which way it resolves
-     and say which - the new guard will reject a selector the exposition cannot produce.
+  3. redis_db_keyspace_hits_total has no deployed exporter. It is RETIRED. Say so in the commit
+     body - the new guard would reject it anyway.
   4. The file must not remain a Kubernetes PrometheusRule CRD that nothing consumes.
   5. Correct the stale multiprocess caveat in this block.
-  6. If Q5 option (a) is taken, BLOCK 8's service-set guard will fail until the new prometheus
-     service is named in the deploy path. Report that coupling; do not work around it.
-  7. If PROMETHEUS_LATENCY_BUCKETS is introduced, it is a new ALLOWED_ENV_VARS entry plus
-     example-file entries in the SAME commit.
-  FORBIDDEN: adding a moderation-queue alert; editing docker-compose.yml or
-  docker-compose.test.yml; deploying Grafana or Alertmanager without the Q5 answer; editing
-  the backup, scheduler or pgbouncer service blocks.
+  6. INAPPLICABLE, recorded not dropped: BLOCK 8's service-set guard cannot fail from this block
+     because no service is added. Adding a prometheus service re-introduces the DECLINED
+     option - stop and report instead.
+  7. Add a promtool-style lint (or a pure-Python equivalent if promtool is not in the test
+     image) and SHOW IT FAILING on a malformed rule.
+  8. Do NOT introduce PROMETHEUS_LATENCY_BUCKETS. Fix the le="2.000" edge in the rules file.
+     No new ALLOWED_ENV_VARS entry and no .env.*.example lines in this phase.
+  FORBIDDEN: adding a moderation-queue alert; editing docker-compose.yml,
+  docker-compose.test.yml or docker-compose.prod.yml; deploying Grafana, Alertmanager or
+  Prometheus; editing the backup, scheduler or pgbouncer service blocks.
 files:
   - path: docs/ops/prometheus-slo-alerts.yaml
     targets:
@@ -2279,15 +2413,21 @@ changes:
       against the rendered exposition.
   - action: update_code
     description: >
-      Per Q5, deploy the stack or label the artefacts as not deployed.
+      Per the RESOLVED Q5 option (c), do NOT deploy the stack and do NOT label the artefacts as
+      retired. Correct the selectors and state the not-deployed status.
 acceptance_criteria:
   - "every selector in the file resolves against a rendered /metrics, or the rule is retired"
   - "adding a selector naming an absent series turns the new test red, and that failure is demonstrated"
+  - "a promtool-style lint exists and has been demonstrated red on a malformed rule"
   - "the file is no longer a Kubernetes CRD that nothing consumes"
   - "the stale multiprocess caveat is corrected"
+  - "redis_db_keyspace_hits_total is retired, and the commit body says why"
   - "no moderation-queue-depth alert exists"
+  - "docker-compose.prod.yml, docker-compose.yml and docker-compose.test.yml are UNCHANGED - no service is added"
+  - "no new ALLOWED_ENV_VARS entry and no .env.*.example line was added"
   - "test_observability.py's existing assertions are green unchanged"
-  - "the Q5 option and its consequences are recorded in the commit body"
+  - "the Q5 option (c), its date (2026-10-03) and its consequences are recorded in the commit body"
+  - "the commit body states that the detection half of 12-OPS-011 is STILL OPEN and that no alert fires until a stack is deployed"
   - "the fast Docker gate is green"
 tests_to_run:
   - src/backend/apps/core/tests/test_observability.py
@@ -2303,12 +2443,12 @@ tests_to_run:
 |---|---|
 | **Findings owned** | `OPS-011` (MEDIUM). **The `EMAIL_HOST` limb is phase 09's `API-009` and is not re-filed** |
 | **Class** | **behavioural** — a new operator-visible surface, or an explicit declaration that there is none |
-| **Depends on** | BLOCK 11 (Q5's answer determines what the floor *is* consumed by) |
+| **Depends on** | BLOCK 11 (Q5's answer determines what the floor *is* consumed by — **now resolved: the stack is DEFERRED, so the consumer does not exist yet**) |
 | **Blocks** | BLOCK 14 (the doc sweep must describe whatever this block lands) |
 | **Priority** | **P1** — the report calls this the detection floor that `OPS-007`, `OPS-014` and `OPS-021` all depend on |
-| **Risk level** | **MEDIUM** under option (a) (a new env key, a new management command, a new transport path); **LOW** under (b) and (c) |
-| **Blast radius** | `ALLOWED_ENV_VARS` + four example files (option (a) only), one management command, the `backup` service, `docs/ops/`. **The finding's value is that BLOCKS 2, 8 and 16 cannot be *noticed* without it** |
-| **Required agents** | **Auditor · Planner · Validator.** Under option (a), **Researcher** as well (the transport and the recipient key) |
+| **Risk level** | **LOW** under the resolved option (b). **The option-(a) "MEDIUM" risk — a new env key, a new management command, a new transport path — is GONE (2026-10-03)** |
+| **Blast radius** | `docs/ops/` labelling only, plus a confirmation that BLOCK 2's signals are machine-readable. **`ALLOWED_ENV_VARS`, the four `.env.*.example` files, `docker-compose.prod.yml` and the `backup` loop are all OUT of the blast radius now.** The finding's value is that BLOCKS 2, 8 and 16 cannot be *noticed* without it |
+| **Required agents** | **Auditor · Planner · Validator.** ~~Under option (a), **Researcher** as well~~ — **not required under the resolved option (b)**: there is no transport and no recipient key to research |
 
 **What the finding actually is, after correction.** ✔ The report's stated evidence — that a
 repository-wide `send_mail` search returns zero production hits — is **false**.
@@ -2319,52 +2459,76 @@ removed. What survives is narrower and true: **there is no *operator-alerting* p
 — no management command, service, signal or host-side job inspects container health, dump
 freshness, deploy outcome or the SLO rules.
 
-**Decision required before implementation — Q10: what is the operator-notification floor?**
+**Q10 RESOLVED 2026-10-03 (Product Owner) — a machine-readable metric, and the command is DECLINED**
 
-| Option | What it is | Consequences |
+**The ruling is option (b).** The operator-notification floor is a **machine-readable metric**
+(**dump age + container health**), consumed by whatever the resolved Q5 option (c) eventually
+delivers. The Telegram **`manage.py notify_operator` command is DECLINED**. Consequences, stated
+flatly because they are the whole point of the ruling:
+
+- **No recipient configuration key is added.** So **`ALLOWED_ENV_VARS` is untouched** and **none
+  of the four `.env.*.example` files is edited**. `test_env_allowlist.py` is unaffected in either
+  direction, and that is now a *guarantee*, not a coincidence.
+- **No second sender** exists alongside the support-desk mail. The adjacency `API-009` is
+  examining is **not created**.
+- The `backup` service's loop is **not modified**. Binding constraints 2, 3, 5 and 6 — which
+  exist to keep option (a) from leaking into this block — are **inapplicable**; recorded, not
+  silently dropped.
+
+**The residual gap is NAMED, not closed.** Under option (b) the signals go nowhere until a
+monitoring stack exists, and Q5 (option (c)) **defers that stack**. So the honest position, which
+this block's commit body must state in those words, is: **`OPS-011` is not closed. The signals
+are produced and machine-readable; nothing alerts on them; detection remains as wide as it was.**
+Reporting `OPS-011` closed would be a false completion, and the finding's whole content is the
+absence.
+
+| Option | What it is | Status |
 |---|---|---|
-| **(a)** | A `manage.py notify_operator` command delivered over the **Telegram transport the bot already has**, invoked by the `backup` service after each dump and by a host-side job reading `docker compose ps --format json` | **Gains:** the only option that reaches a human today. **Costs:** a recipient configuration key that does not exist — adding one means `ALLOWED_ENV_VARS` **and** all four `.env.*.example` files, or `test_env_allowlist.py` fails. It runs inside the `backup` service, which is `read_only: true` and `cap_drop: ["ALL"]`, and — until BLOCK 2 — root. And it introduces a **second sender** alongside the support-desk mail, which is exactly the adjacency `API-009` is examining |
-| **(b)** | No command; ship the **dump-age and container-health signals** that BLOCK 2 already produces, for whatever Q5 decided to consume | **Gains:** no new command, no new env key, no second sender; it makes BLOCK 2's healthcheck actually *reachable*. **Costs:** if Q5 declined to deploy a stack, the signals go nowhere — **the detection gap remains exactly as wide** and this block becomes a documentation exercise |
-| **(c)** | Neither; **formally declare detection out of scope** for a single-host deployment and document the gap as a known, accepted risk | **Gains:** honest, zero new surface, and it stops pretending. **Costs:** `OPS-011` is not closed; the finding's whole content is the absence, and declaring the absence accepted is a business decision, not a fix |
+| ~~**(a)**~~ | A `manage.py notify_operator` command over the **existing Telegram transport**, invoked by the `backup` service and a host-side job | **DECLINED 2026-10-03.** It needed a recipient key across `ALLOWED_ENV_VARS` **and** four example files; it ran inside a `read_only: true`, `cap_drop: ["ALL"]` container; and it created a **second sender** next to the support-desk mail |
+| **(b) — CHOSEN 2026-10-03** | No command; ship the **dump-age and container-health signals** that BLOCK 2 already produces, as a **machine-readable metric**, for whatever Q5 decided to consume | **Adopted.** No new command, **no new env key**, no second sender. **It makes BLOCK 2's healthcheck actually reachable.** **Costs, accepted:** if the deferred stack never arrives, the signals go nowhere — **the detection gap is unchanged**, and the block must say so |
+| ~~**(c)**~~ | Neither; formally declare detection out of scope | **NOT CHOSEN.** Option (b) was preferred over declaring the absence accepted, so the signals ship |
 
-**The Implementor may not choose.** Q10 is an owner decision about who is on call.
+**The unconditional half is unchanged.** `docs/ops/prometheus-slo-alerts.yaml` and
+`docs/ops/grafana-slo-dashboard.json` must **stop reading as active controls** — either
+corrected and labelled, or explicitly marked *"planned — not deployed"*. BLOCK 11 already did the
+labelling under the resolved Q5 option (c); **this block confirms the outcome rather than
+repeating it.**
 
-**The unconditional half.** Whichever option is taken, `docs/ops/prometheus-slo-alerts.yaml`
-and `docs/ops/grafana-slo-dashboard.json` must **stop reading as active controls** — either
-corrected and labelled, or explicitly marked "planned — not deployed". BLOCK 11 may already
-have done this under Q5 option (b); this block confirms the outcome rather than repeating it.
+**The unconditional half.** `docs/ops/prometheus-slo-alerts.yaml` and
+`docs/ops/grafana-slo-dashboard.json` must **stop reading as active controls** — either
+corrected and labelled, or explicitly marked "planned — not deployed". BLOCK 11 already did this
+under the resolved Q5 option (c); this block confirms the outcome rather than repeating it.
 
-**File surface (semantic units)**
+**File surface (semantic units)** — *post-ruling: no new command, no new env key*
 
 | File | Target | Notes |
 |---|---|---|
-| a new management command | `manage.py notify_operator` | **Only under Q10 option (a).** Its home is a decision, not an assumption |
-| `config/settings/base.py` | `ALLOWED_ENV_VARS` | **Only under (a)** — the recipient key |
-| `.env.prod.example`, `.env.dev.example`, `.env.test.example`, `.env.example` | the recipient key | **Only under (a).** All four, in the same commit |
-| `docker-compose.prod.yml` | the `backup` service's `command:` loop | ✔ **BLOCK 2 owns this block.** This block may add an invocation; it may not re-edit the loop |
-| `src/telegram_bot/services/` | the existing transport | Read-only unless (a) selects it; reuse the existing helper rather than opening an aiogram session |
-| `docs/ops/` | the SLO artefacts' labelling | Confirm BLOCK 11's outcome |
+| **a new management command** | `manage.py notify_operator` | **NOT CREATED — the command is DECLINED (2026-10-03).** Listed only so the de-scoping is on the record and a later Implementor does not "helpfully" build it |
+| `config/settings/base.py` | `ALLOWED_ENV_VARS` | **NOT EDITED.** No recipient key is added, so the allowlist is untouched and `test_env_allowlist.py` needs no change |
+| `.env.prod.example`, `.env.dev.example`, `.env.test.example`, `.env.example` | — | **NOT EDITED — all four.** This is now a *guarantee* of the ruling, not an accident of option selection |
+| `docker-compose.prod.yml` | the `backup` service's `command:` loop | ✔ **BLOCK 2 owns this block. NOT EDITED** — option (a) was the only thing that would have added an invocation here, and it was declined |
+| BLOCK 2's dump-age healthcheck and container-health probes | the signals this block makes machine-readable | **Read-only.** This block *consumes* BLOCK 2's signals; it does not add or change them |
+| `docs/ops/prometheus-slo-alerts.yaml`, `docs/ops/grafana-slo-dashboard.json` | the "planned — not deployed" labelling | Confirm BLOCK 11's outcome |
 
 **Binding constraints**
 
 1. **`EMAIL_HOST`, `EMAIL_BACKEND`, `DEFAULT_FROM_EMAIL` and the support-desk sender are out of
-   scope.** They are phase 09's `API-009` and phase 02's settings surface. This block adds a
-   **Telegram** notification path or none.
-2. **The new recipient key is added to `ALLOWED_ENV_VARS` and all four example files in the
-   same commit**, or `test_env_allowlist.py` fails in both directions.
-3. **No `print()`.** A notification path is a `logging` caller first and a sender second.
-   Exceptions must be **fail-open** — a failed alert must never take down the process that
-   raised it, and it must say so in a comment. ✔ That is the existing convention the
-   support-desk sender follows and the reason the report's evidence check found it at all.
-4. **Reuse the existing Telegram transport**, not a new aiogram session, not a raw HTTP call
-   with a hand-rolled bot token read. `SITE_URL` is already enforced in production for deep
-   links; follow that precedent.
-5. **Do not modify `backup`'s loop.** ✔ BLOCK 2 owns it, including the drift compensation and
-   the prune convention. Adding an invocation is the maximum change here.
-6. **The `backup` service runs `read_only: true` with `cap_drop: ["ALL"]`.** Anything the
-   command writes to disk needs a `tmpfs` or it does not happen. Say which in the commit body.
-7. **Under option (b), say plainly that the detection gap is unchanged.** A commit that ships
-   a signal nobody consumes and calls `OPS-011` closed is a false completion.
+   scope.** They are phase 09's `API-009` and phase 02's settings surface. This block adds **no
+   Telegram notification path at all** under the resolved ruling.
+2. **⚠ No new recipient key.** Under option (b) none is added, so `ALLOWED_ENV_VARS` and all
+   four example files stay untouched. **Recorded, not dropped:** binding constraint 2 as
+   originally written ("the key goes into both in the same commit") is **inapplicable**; the
+   guarantee that replaces it is that **neither place changes**.
+3. **No `print()`.** Applies to any future consumer of these metrics and to the documentation.
+4. **⚠ The existing Telegram transport is not reused, because there is no command.** Binding
+   constraints 4 and 6 (transport reuse; the `read_only`/`cap_drop` tmpfs question) are
+   **inapplicable** under option (b).
+5. **Do not modify `backup`'s loop.** ✔ BLOCK 2 owns it, including the drift compensation and the
+   prune convention. **Under the resolved ruling this block adds no invocation either.**
+6. **The residual gap must be named.** A commit that ships signals nothing consumes and calls
+   `OPS-011` closed is a **false completion**. The commit body must say, in substance: *"the
+   signals are machine-readable; nothing alerts on them; detection is unchanged and `OPS-011`
+   is not closed."*
 
 **Implementor task**
 
@@ -2386,60 +2550,55 @@ goals:
   - "per the recorded Q10 option, establish one concrete operator-notification floor or formally record that there is none"
   - "make the SLO artefacts stop reading as active controls"
 extra_context: |
-  DECISION GATE - Q10 MUST BE ANSWERED FIRST. The Implementor may not choose. Q10 is an owner
-  decision about who is on call. Under option (a), Researcher is also required.
+  Q10 IS RESOLVED - 2026-10-03, Product Owner, option (b). The Implementor may not choose. The
+  manage.py notify_operator command is DECLINED. Therefore: NO recipient configuration key, NO
+  change to ALLOWED_ENV_VARS, and NO edit to any of the four .env.*.example files. The deliverable
+  is the machine-readable dump-age and container-health signals BLOCK 2 already produces, plus
+  the labelling of the SLO artefacts.
+
+  THE RESIDUAL GAP MUST BE NAMED. Option (c) of Q5 defers the monitoring stack, so nothing
+  consumes these signals during this programme. The commit body must state that the signals are
+  machine-readable, that nothing alerts on them, that the detection gap is UNCHANGED, and that
+  12-OPS-011 IS NOT CLOSED.
 
   BINDING CONSTRAINTS
   1. EMAIL_HOST, EMAIL_BACKEND, DEFAULT_FROM_EMAIL and the support-desk sender are OUT OF SCOPE
-     - phase 09's API-009 and phase 02's settings surface. This block adds a Telegram path or none.
-  2. Any new recipient key goes into ALLOWED_ENV_VARS and all four .env.*.example files in the
-     SAME commit.
-  3. No print(). The notification path is a logging caller first and a sender second. Exceptions
-     are fail-open, and the comment must say why: a failed alert must never take down the process
-     that raised it.
-  4. Reuse the existing Telegram transport. Do not open a new aiogram session and do not read a
-     bot token by hand.
-  5. Do NOT modify the backup service's loop - BLOCK 2 owns it. Adding an invocation is the
-     maximum change.
-  6. The backup service is read_only: true with cap_drop ALL. Anything written to disk needs a
-     tmpfs; say which in the commit body.
-  7. Under option (b), say plainly that the detection gap is UNCHANGED.
-  FORBIDDEN: re-filing the EMAIL_HOST limb; adding a second send_mail call site; editing
-  docker-compose.yml or docker-compose.test.yml; touching the backup loop's sleep, prune or
-  filename convention.
+     - phase 09's API-009 and phase 02's settings surface. This block adds no Telegram path at
+     all.
+  2. NO new recipient key. ALLOWED_ENV_VARS and all four .env.*.example files are untouched.
+  3. No print(). Any documentation or metric emission is a logging concern first.
+  4. Do NOT modify the backup service's loop - BLOCK 2 owns it, and under option (b) this block
+     adds no invocation either.
+  5. Confirm BLOCK 11's not-deployed labelling rather than repeating the work.
+  FORBIDDEN: re-filing the EMAIL_HOST limb; adding a send_mail call site; creating
+  manage.py notify_operator; editing ALLOWED_ENV_VARS or any .env.*.example file; editing
+  docker-compose.yml, docker-compose.test.yml or docker-compose.prod.yml; touching the backup
+  loop's sleep, prune or filename convention.
 files:
   - path: docs/ops/prometheus-slo-alerts.yaml
     targets: []
   - path: docs/ops/grafana-slo-dashboard.json
     targets: []
-  - path: config/settings/base.py
-    targets:
-      - type: module_constant
-        name: ALLOWED_ENV_VARS
-  - path: .env.prod.example
-    targets: []
-  - path: .env.dev.example
-    targets: []
-  - path: .env.test.example
-    targets: []
-  - path: .env.example
-    targets: []
 changes:
   - action: update_code
     description: >
-      Per Q10, add the notification floor or record the accepted gap.
+      Per the RESOLVED Q10 option (b), make BLOCK 2's dump-age and container-health signals
+      machine-readable. Do NOT add a management command, a recipient key, or an ALLOWED_ENV_VARS
+      entry.
   - action: update_code
     description: >
-      Confirm the SLO artefacts are labelled as deployed or not deployed.
+      Confirm the SLO artefacts are labelled as planned - not deployed.
 acceptance_criteria:
-  - "the Q10 option and its consequences are recorded in the commit body"
-  - "under option (b), the commit body states that the detection gap is unchanged and does not claim 12-OPS-011 is closed"
-  - "under option (a), the recipient key is in ALLOWED_ENV_VARS and all four example files in the same commit"
-  - "under option (a), a failed notification cannot take down the calling process, and that is demonstrated"
-  - "the backup service loop is byte-identical to the end of BLOCK 2"
-  - "no send_mail call site was added"
+  - "the Q10 option (b), its date (2026-10-03) and its consequences are recorded in the commit body"
+  - "the commit body states that the detection gap is UNCHANGED and does not claim 12-OPS-011 is closed"
+  - "manage.py notify_operator was NOT created - the command is declined"
+  - "ALLOWED_ENV_VARS is unchanged and NO env key was added"
+  - "all four .env.*.example files are unchanged"
+  - "no compose file was edited, and the backup service loop is byte-identical to the end of BLOCK 2"
+  - "no send_mail call site was added and no Telegram transport was opened"
+  - "the dump-age and container-health signals are reachable as machine-readable metrics"
   - "the SLO artefacts do not read as active controls"
-  - "test_env_allowlist.py is green"
+  - "test_env_allowlist.py is green and required no change"
   - "the fast Docker gate is green"
 tests_to_run:
   - src/backend/config/settings/tests/test_env_allowlist.py
@@ -2476,46 +2635,75 @@ rollback validation target** in `rollback.md`. Turning the bot check on means **
 fails the deploy**, not merely reports degraded readiness. That is a change to the deploy
 pipeline's failure model.
 
-**Decision required before implementation — Q6: enable the coupling, or remove the claim?**
+**Q6 RESOLVED 2026-10-03 (Product Owner) — the flag STAYS DISABLED, and the claims are removed**
 
-| Option | What it is | Consequences |
+**The ruling is neither option (a) nor option (b) as written; it is a stricter form of (b).**
+`BOT_HEALTH_CHECK_ENABLED` **stays disabled in production**, and **the shipped documentation
+implying the staleness window works is removed**. **Bot health does not gate deploys.** Revisit
+this decision only when the deferred alerting lands (Q5 option (c) does not deliver it in this
+programme), and record it as a new decision rather than a silent re-enable.
+
+| Option | What it is | Status |
 |---|---|---|
-| **(a)** | Set `BOT_HEALTH_CHECK_ENABLED=true` for `web` in `docker-compose.prod.yml`, ship the key in `.env.prod.example`, and document the widened readiness contract | **Gains:** the readiness probe observes a bot that is alive but no longer polling — a retry loop, a stuck long-poll, a wedged dispatcher — which today it cannot. **Costs:** the deploy gate now fails on a bot fault. A bot outage blocks deploys and a deploy can roll back for a bot reason. The 120 s window is also shorter than a gunicorn restart cycle in some configurations — that must be measured, not assumed |
-| **(b)** | Keep the decoupling (the setting comment documents the reasoning) and **remove** `BOT_HEALTH_STALE_SECONDS` from `web` and `bot`, drop the bot claim from the runbooks, and say readiness probes DB + cache only | **Gains:** no configured-but-disabled control; the documentation matches the intent. **Costs:** the readiness probe cannot observe a wedged bot at all, and the deploy gate cannot either |
-| **(c)** | Keep the flag off in production but ship it in `.env.prod.example` as an operator opt-in, documented | **Gains:** the capability exists without changing the deploy failure model. **Costs:** a default-off control with documentation is the shape `OPS-018` complains about, one level up. Only defensible if the documentation is unambiguous about it being off by default |
+| ~~**(a)**~~ | Set `BOT_HEALTH_CHECK_ENABLED=true` for `web` in production and document the widened readiness contract | **DECLINED 2026-10-03.** The owner declined the consequence outright: a wedged bot would return 503 from `/health/ready/`, which **is** the deploy gate and the rollback validation target. A bot outage would block deploys, and a deploy could roll back for a bot reason |
+| **(b), strengthened — CHOSEN 2026-10-03** | Keep the decoupling, and **remove** `BOT_HEALTH_STALE_SECONDS` from `web` and `bot`, drop the bot claim from the runbooks, and say readiness probes **DB + cache only** | **Adopted.** No configured-but-disabled control remains described as active, and the documentation matches the intent. **Costs, accepted by the owner:** the readiness probe cannot observe a wedged bot at all — and neither can the deploy gate |
+| ~~**(c)**~~ | Keep the flag off but ship the key in `.env.prod.example` as an operator opt-in | **NOT CHOSEN.** The owner removed the documentation claim rather than documenting an off-by-default control. So **`.env.prod.example` gains nothing**, and the accept criteria must assert that |
 
-**The Implementor may not choose.** Q6 changes what "the deploy succeeded" means.
+**What "stays disabled" means operationally, and the one edit BLOCK 1 still owns.** The flag
+defaults `False` in `base.py` and appears in no compose file and no `.env.*.example` — that
+stays exactly as it is. `BOT_HEALTH_STALE_SECONDS=120` currently ships for `web` and `bot` in
+**`docker-compose.yml`**, and under this ruling it is **removed**. **`docker-compose.yml` is
+BLOCK 1's file**: BLOCK 13 must **report** that edit and **must not make it silently**. It is
+executed by whoever runs BLOCK 1 or in a follow-up commit (§5.3). **Recorded, not dropped.**
+
+**What BLOCK 13 DOES deliver here** (a smaller file surface than the option table suggests):
+1. The **runbook and doc corrections** — every sentence claiming the staleness window works is
+   removed, and readiness is described as **database + cache only**.
+2. The **outcome recorded for BLOCK 14**, whose sweep corrects the readiness criterion in
+   `rollback.md` and `docker-deployment.md`.
+3. **No compose edit, no `.env.prod.example` edit, no settings edit.** The flag is not set
+   anywhere, and the option-(a) "widened readiness contract" work does not happen.
+
+**Why `/health/live/` is untouched.** It is the container `HEALTHCHECK` target in both
+`docker/Dockerfile` and `docker-compose.yml`. Liveness stays dependency-free; this block changes
+readiness's *claims*, never the probe contract.
 
 **File surface (semantic units)**
 
 | File | Target | Notes |
 |---|---|---|
-| `docker-compose.prod.yml` | `web` — `environment:` (or the base's `web` `environment:` if the prod override must inherit it) | Per Q6. ✔ The prod `web` override sets only `image`, `env_file`, `volumes` and `stop_grace_period`, so it inherits the base `environment:` verbatim |
-| `docker-compose.yml` | `web`, `bot` — `BOT_HEALTH_STALE_SECONDS` | **Only under Q6 option (b).** ✔ **BLOCK 1 owns this file** — BLOCK 13 may not edit it. If option (b) is selected, this is a **reported** cross-block edit, executed by whoever runs BLOCK 1 or in a follow-up commit, never silently by BLOCK 13 |
-| `.env.prod.example` | `BOT_HEALTH_CHECK_ENABLED` | ✔ The key is **already in `ALLOWED_ENV_VARS`**, so shipping it in the example file is allowlist-clean |
-| `apps/core/tests/test_health_contract.py` | the `BOT_HEALTH_CHECK_ENABLED` branches | ✔ Already covers **both** branches via `override_settings` |
-| `docs/ops/rollback.md`, `docs/ops/docker-deployment.md` | the readiness criterion | BLOCK 14's sweep, informed by this block |
+| `docs/ops/rollback.md`, `docs/ops/docker-deployment.md` | **the readiness criterion and every staleness-window claim** | **This is BLOCK 13's primary file surface under the resolved ruling.** The claims are removed here; BLOCK 14's sweep confirms the corrected text across `docs/ops/` |
+| `docker-compose.yml` | `web`, `bot` — `BOT_HEALTH_STALE_SECONDS` | ✔ **BLOCK 1 owns this file — BLOCK 13 may NOT edit it.** The resolved ruling requires the key removed; that is a **reported** cross-block edit, executed by whoever runs BLOCK 1 or in a follow-up commit (§5.3). **Recorded, not dropped** |
+| `docker-compose.prod.yml` | — | **NOT EDITED.** Option (a) is declined, so the `web` service's `environment:` gains nothing |
+| `.env.prod.example` | `BOT_HEALTH_CHECK_ENABLED` | **NOT ADDED.** Option (c) is not chosen: the owner removed the documentation claim rather than documenting an off-by-default control. **This is a change of premise from the option table**, which had listed this file under option (a)/(c) |
+| `apps/core/tests/test_health_contract.py` | the `BOT_HEALTH_CHECK_ENABLED` branches | ✔ Already covers **both** branches via `override_settings`, and both remain reachable — the flag is a shipped setting, it is just off in production. **Do not rewrite it**; it should stay green unchanged |
+| `config/settings/base.py` | — | **NOT EDITED.** The flag is already in `ALLOWED_ENV_VARS` and stays there; nothing is added or removed |
 
 **Binding constraints**
 
-1. **`BOT_HEALTH_CHECK_ENABLED` is already in `ALLOWED_ENV_VARS`** ✔ — unlike BLOCK 7's and
-   BLOCK 12's new keys, this one needs no allowlist edit. **Verify that before editing**; if
-   another phase has removed it, this block must re-add it and run `test_env_allowlist.py`.
-2. **`docker-compose.yml` is BLOCK 1's file.** Q6 option (b) requires removing
-   `BOT_HEALTH_STALE_SECONDS` from it. That edit is **reported, not silently made** — see the
-   file-surface table.
-3. **The `120 s` staleness window must be measured, not assumed**, under option (a). ✔ It
-   ships for both `web` and `bot`; a window shorter than a legitimate pause produces a false
-   deploy rollback.
-4. **`test_health_contract.py` already covers both branches.** Do not rewrite it. Extend it
-   only if the option adds a case it does not have.
+1. **`BOT_HEALTH_CHECK_ENABLED` stays DISABLED in production.** ✔ Under the resolved ruling it
+   is **not set** in any compose file and **not added** to `.env.prod.example`. The key is
+   **already in `ALLOWED_ENV_VARS`** and stays there — nothing is added or removed, so
+   `test_env_allowlist.py` needs no change. Verify that before editing anything.
+2. **`docker-compose.yml` is BLOCK 1's file.** The resolved ruling requires
+   `BOT_HEALTH_STALE_SECONDS` removed from it. That edit is **reported, not silently made** —
+   see the file-surface table and §5.3.
+3. **The 120 s window is not measured, because the control is not enabled.** ✔ This constraint
+   exists for option (a) and is **inapplicable** here; recorded, not silently dropped. The
+   window is removed instead.
+4. **`test_health_contract.py` already covers both branches. Do not rewrite it.** ✔ Both remain
+   reachable — the flag is a shipped setting that is simply off in production. It should be green
+   **unchanged**, and if the ruling appears to require changing it, that is a signal the ruling
+   has been misread.
 5. **Do not conflate this with `AD-008`** (phase 05). That is a different signal — a
    moderation-queue metric — and the two must not appear in the same remediation narrative.
-6. **`/health/live/` must remain dependency-free.** ✔ It is the container `HEALTHCHECK` target
-   in both `docker/Dockerfile` and `docker-compose.yml`. A liveness probe that depends on
-   anything restarts the container; this block changes readiness only.
-7. **If the option changes the readiness contract, `rollback.md`'s validation criterion is
-   BLOCK 14's to correct** — this block records the outcome and BLOCK 14 writes it down.
+6. **`/health/live/` must remain dependency-free.** ✔ It is the container `HEALTHCHECK` target in
+   both `docker/Dockerfile` and `docker-compose.yml`. A liveness probe that depends on anything
+   restarts the container; this block changes readiness's *claims* only.
+7. **The availability exposure is knowingly accepted and must be written down.** Under the
+   resolved ruling **bot health does not gate deploys**, so a wedged bot is invisible to
+   `/health/ready/` and to the deploy gate. The commit body must state that as an **accepted**
+   risk, not a mitigated one. Revisit only when alerting is delivered.
 
 **Implementor task**
 
@@ -2538,45 +2726,55 @@ goals:
   - "per the recorded Q6 option, either enable the coupling in production and document the widened readiness contract, or remove the shipped-but-disabled window and the claims that depend on it"
   - "leave no configured-but-disabled control described as active"
 extra_context: |
-  DECISION GATE - Q6 MUST BE ANSWERED FIRST. The Implementor may not choose. Q6 changes what
-  "the deploy succeeded" means. Under option (a), Researcher is required to measure the staleness
-  window against a real pause in the bot's liveness refresh.
+  Q6 IS RESOLVED - 2026-10-03, Product Owner. The flag STAYS DISABLED in production and the
+  shipped documentation implying the staleness window works is REMOVED. Bot health does NOT gate
+  deploys. Option (a) is DECLINED and option (c) is NOT CHOSEN, so .env.prod.example gains
+  nothing. This block delivers the doc corrections and records the outcome for BLOCK 14. No
+  Researcher is required - there is no consequence to reproduce because the control is not
+  enabled.
 
   BINDING CONSTRAINTS
-  1. BOT_HEALTH_CHECK_ENABLED is ALREADY in ALLOWED_ENV_VARS - verify before editing. If another
-     phase removed it, re-add it and run test_env_allowlist.py.
-  2. docker-compose.yml is BLOCK 1's file. Q6 option (b) needs BOT_HEALTH_STALE_SECONDS removed
-     from it. REPORT that cross-block edit; do not make it silently in this block.
-  3. Under option (a), the 120 s window must be MEASURED against a real pause, not assumed.
-  4. Do NOT rewrite test_health_contract.py - it already covers both branches. Extend only if the
-     option adds an uncovered case.
+  1. BOT_HEALTH_CHECK_ENABLED is ALREADY in ALLOWED_ENV_VARS and stays there. It is not set in
+     any compose file and NOT added to .env.prod.example. Nothing is added or removed, so
+     test_env_allowlist.py needs no change.
+  2. docker-compose.yml is BLOCK 1's file. The resolved ruling requires BOT_HEALTH_STALE_SECONDS
+     removed from it. REPORT that cross-block edit; do not make it silently in this block.
+  3. The 120 s window is NOT measured - the control is not enabled. That constraint applied to
+     option (a) and is inapplicable here.
+  4. Do NOT rewrite test_health_contract.py - both branches remain reachable and it should stay
+     green unchanged.
   5. Do NOT conflate this with phase 05's AD-008, which is a different signal.
   6. /health/live/ stays dependency-free. It is the container HEALTHCHECK target.
+  7. The commit body must state that a wedged bot is invisible to /health/ready/ and to the
+     deploy gate, and that this is a KNOWINGLY ACCEPTED risk under the 2026-10-03 decision - not
+     a mitigated one.
   FORBIDDEN: editing docker-compose.yml without reporting it (BLOCK 1 owns it); editing
-  docker-compose.test.yml; changing liveness_check; removing the /health/ready/ deploy gate.
+  docker-compose.test.yml or docker-compose.prod.yml; adding BOT_HEALTH_CHECK_ENABLED to
+  .env.prod.example; changing liveness_check; removing the /health/ready/ deploy gate.
 files:
-  - path: docker-compose.prod.yml
-    targets:
-      - type: service
-        name: web
-  - path: .env.prod.example
-    targets:
-      - type: env_key
-        name: BOT_HEALTH_CHECK_ENABLED
+  - path: docs/ops/rollback.md
+    targets: []
+  - path: docs/ops/docker-deployment.md
+    targets: []
   - path: src/backend/apps/core/tests/test_health_contract.py
     targets: []
 changes:
   - action: update_code
     description: >
-      Per Q6, set the coupling in production or remove the shipped-but-disabled window, and record
-      the outcome for BLOCK 14.
+      Per the RESOLVED Q6 ruling, remove every shipped documentation claim that the bot staleness
+      window works, and describe /health/ready/ as probing database and cache only. Do NOT enable
+      BOT_HEALTH_CHECK_ENABLED anywhere and do NOT add it to .env.prod.example. Record the
+      accepted availability exposure for BLOCK 14.
 acceptance_criteria:
-  - "the Q6 option and its consequences are recorded in the commit body"
+  - "BOT_HEALTH_CHECK_ENABLED is not set in any compose file and was not added to .env.prod.example"
+  - "no shipped doc claims the bot staleness window works; readiness is described as database and cache only"
+  - "the commit body names the Q6 option, its date (2026-10-03) and who decided it"
+  - "the commit body states that a wedged bot is invisible to /health/ready/ and to the deploy gate, and that this is a KNOWINGLY ACCEPTED risk"
+  - "the required docker-compose.yml edit (removing BOT_HEALTH_STALE_SECONDS) is REPORTED rather than made silently"
   - "no configured-but-disabled control is left described as active"
   - "liveness_check is byte-identical and /health/live/ remains dependency-free"
-  - "test_health_contract.py is green unchanged unless a genuinely new case was added"
-  - "test_env_allowlist.py is green"
-  - "any required docker-compose.yml edit is reported rather than made silently"
+  - "test_health_contract.py is green UNCHANGED - both branches remain reachable"
+  - "test_env_allowlist.py is green and required no change"
   - "the fast Docker gate is green"
 tests_to_run:
   - src/backend/apps/core/tests/test_health_contract.py
@@ -2860,33 +3058,39 @@ tests_to_run:
 | | |
 |---|---|
 | **Findings owned** | `OPS-004` (HIGH) |
-| **Class** | **conditional** — the unconditional half always ships; the real-artifact half may be declined |
+| **Class** | **behavioural** (was `conditional`) — **every half now ships; nothing is conditional** |
 | **Depends on** | BLOCK 2 (`Makefile`), BLOCK 9 (the runbook), BLOCK 10 (the recorded image tag) |
 | **Blocks** | nothing in-plan; BLOCK 14's RPO/RTO correction cites this block's outcome |
 | **Priority** | P1 |
-| **Risk level** | **MEDIUM** — `pg_restore` into an isolated instance is destructive by nature, and the target it changes is the one an operator reaches for |
-| **Blast radius** | `Makefile`'s `restore-test` target, `.github/workflows/restore-test.yml`, `src/backend/tests/test_restore_test_workflow.py`, `docs/ops/restore.md`. **No compose file edit.** The blast radius is **the recovery path** |
+| **Risk level** | **MEDIUM** (↓HIGH-adjacent) — `pg_restore` into an isolated instance is destructive by nature, and the target it changes is the one an operator reaches for. **The ruling raises the operational surface** (an off-host artifact path now exists and is consumed) but removes the *honesty* risk: the drill no longer has to admit it proves nothing |
+| **Blast radius** | `Makefile`'s `restore-test` target, `.github/workflows/restore-test.yml`, `src/backend/tests/test_restore_test_workflow.py`, `docs/ops/restore.md`, **plus the `backup` service's off-host push and the object-storage credentials it needs**. **No compose file edit beyond `docker-compose.prod.yml`'s `backup` block if the push is configured there** |
 | **Required agents** | **Auditor · Researcher · Planner · Validator** |
 
-**What is unconditional and what is gated.**
+**EVERY half now ships. Nothing here is conditional.**
+
+**Q8 RESOLVED 2026-10-03 (Product Owner) — off-host artifact replication IS IN SCOPE.** The
+*"may be declined"* conditionality is **REMOVED**. `OPS-004` is **closable** by this block, and
+the commit body must say it is closed rather than "not closed". The options are retained for
+traceability; **(a) is effectively chosen and (b)/(c) are closed.**
 
 | Half | Ships? | Content |
 |---|---|---|
 | **Preconditions** | **always** | ✔ The drill's smoke tests currently `echo` a table count and an `ads_ad` row count and assert **nothing**. Make an empty or partial restore **fail**: `django_migrations` must exist, `ads_ad` rows must be plausible |
 | **Image pin** | **always** | ✔ `restore-test.yml` pulls `ghcr.io/mko-bazuna/mko_bazuna:${{ github.sha }}`. On a `schedule` trigger `github.sha` is the default-branch tip at fire time, which may have **no pushed image**, so the monthly drill can fail at `docker pull` for a reason unrelated to backup integrity |
 | **Honest labelling** | **always** | The self-generated dump is kept, but as an **additional** smoke test, labelled as what it is |
-| **Real artifact** | **gated on Q8** | Downloading the newest production dump requires an off-host artifact path that **does not exist** |
+| **Real artifact** | **UNCONDITIONALLY — was "gated on Q8"** | ✔ Downloading and restoring the newest **production** dump is now **required**. A truncated, silently corrupted, wrong-version or row-missing backup **must fail the drill** |
 
-**Decision required before implementation — Q8: is off-host artifact replication in scope?**
-
-| Option | What it is | Consequences |
+| Option | What it is | Status |
 |---|---|---|
-| **(a)** | Have the `backup` service push the newest dump to object storage (a signed push is the practical route); `restore-test.yml` downloads the most recent artifact | **Gains:** the control proves what it exists to prove — that real artifacts are restorable. A truncated, silently corrupted, wrong-version or row-missing backup fails. **Costs:** new credentials, a new external dependency, retention policy, and a restore path that reads from it. **This is a platform investment, not an edit** |
-| **(b)** | Decline; ship the unconditional half and **document precisely what the drill does and does not prove** | **Gains:** the control becomes honest about its scope at near-zero cost. **Costs:** ✔ **the finding is not closed** — `OPS-004`'s content is precisely that the drill proves nothing about real backups. This must be recorded as an accepted, documented risk, not as a fix |
-| **(c)** | Ship the unconditional half **and** raise the off-host replication as a separate infrastructure work item with a named owner | **Gains:** nothing is dropped and the decision is on record. **Costs:** the same as (b) plus a commitment |
+| **(a) — IN FORCE 2026-10-03** | The `backup` service pushes the newest dump to object storage; `restore-test.yml` downloads the most recent artifact and restores it | **Adopted.** The control now proves what it exists to prove. **Costs, accepted by the owner:** new credentials, a new external dependency, a retention policy, and a restore path that reads from it. **This is a platform investment, and the owner has funded it** |
+| ~~**(b)**~~ | Decline; ship the unconditional half and document what the drill does not prove | **CLOSED 2026-10-03.** Would have left `OPS-004` open, which the owner declined |
+| ~~**(c)**~~ | Ship the unconditional half and raise off-host replication as a separate work item with a named owner | **CLOSED 2026-10-03.** Superseded — the owner put it **in scope** rather than parking it |
 
-**The Implementor may not choose.** Q8 is an infrastructure decision. **Under any option, the
-unconditional half ships** — that is the point of splitting it.
+**The gate is gone; two obligations replace it.** Because the real-artifact half is now
+unconditional, this block **must** (i) configure the off-host push on the `backup` service with
+its credentials, retention policy and a stated restore path, and (ii) state in the commit body
+that `OPS-004` **is closed**. The drill may no longer describe itself as not proving real
+artifacts.
 
 **File surface (semantic units)**
 
@@ -2938,11 +3142,17 @@ goals:
   - "make an empty or partial restore fail the drill"
   - "pin the drill's application image to a recorded known-good tag"
   - "keep the self-generated dump as a labelled additional smoke test"
-  - "per the recorded Q8 option, either consume a real artifact or document precisely what the drill does not prove"
+  - "restore a REAL off-host production artifact - unconditional under the resolved Q8 ruling - so the drill proves what it exists to prove"
 extra_context: |
-  DECISION GATE - Q8. The UNCONDITIONAL HALF SHIPS UNDER EVERY OPTION. Q8 decides only whether
-  the real-artifact half ships. Under option (b) or (c), 12-OPS-004 IS NOT CLOSED and the
-  commit body must say so.
+  Q8 IS RESOLVED - 2026-10-03, Product Owner: off-host artifact replication IS IN SCOPE. The
+  Implementor may not choose. EVERY half ships - the real-artifact half is no longer conditional,
+  and options (b) and (c) are closed. 12-OPS-004 IS CLOSED by this block; the commit body must
+  say so. A drill that still describes itself as not proving real artifacts has failed the
+  ruling.
+
+  This raises the operational surface: the backup service needs an off-host push with its
+  credentials, a retention policy, and a stated restore path. Say which provider, which
+  retention, and which restore path in the commit body.
 
   BINDING CONSTRAINTS
   1. make restore-test must still restore into a fully isolated instance - separate volume,
@@ -2956,8 +3166,10 @@ extra_context: |
   6. The new guard is behavioural. The existing string guards in
      test_restore_test_workflow.py may stay, but they are not the guard for this finding.
   7. Do NOT add a restore-test target to Makefile.ps1 - it has none and none is required.
-  FORBIDDEN: editing compose files; weakening the isolation property; deleting the self-generated
-  dump path; editing docs/ops/restore.md beyond the drill's scope statement.
+  FORBIDDEN: editing compose files beyond the backup service's off-host push configuration;
+  weakening the isolation property; deleting the self-generated dump path; editing
+  docs/ops/restore.md beyond the drill's scope statement; treating the real-artifact half as
+  optional.
 files:
   - path: Makefile
     targets:
@@ -2978,18 +3190,19 @@ changes:
       Pin the migrate --plan --check image to a recorded known-good tag.
   - action: update_code
     description: >
-      Per Q8, either download the newest real artifact or label the self-generated dump honestly
-      and record what the drill does not prove.
-  - action: add_code
-    description: >
-      Add a behavioural guard demonstrating that an empty restore fails.
+      Per the RESOLVED Q8 ruling, consume the newest REAL production artifact from the off-host
+      path and restore it - unconditionally. Keep the self-generated dump as a labelled
+      additional smoke test. A truncated or wrong-version artifact must fail the drill.
 acceptance_criteria:
   - "an empty or partial restore fails the drill target, and that failure is demonstrated"
   - "django_migrations presence is asserted, not merely counted"
   - "the drill no longer pulls an image tagged with github.sha on a schedule trigger"
+  - "the drill restores a REAL off-host production artifact, and this is not optional - the real-artifact half is unconditional under the 2026-10-03 ruling"
+  - "the commit body names the object-storage provider, the retention policy and the restore path"
+  - "a truncated or wrong-version artifact fails the drill, and that failure is demonstrated"
+  - "12-OPS-004 is recorded as CLOSED, and the commit body does not claim the drill is partial"
   - "the self-generated dump path still exists and is labelled as an additional smoke test"
   - "the isolation property - separate volume, network and database via docker run - is unchanged"
-  - "the Q8 option is recorded in the commit body, and under (b) or (c) the body states that 12-OPS-004 is not closed"
   - "the fast Docker gate is green"
 tests_to_run:
   - src/backend/tests/test_restore_test_workflow.py
@@ -3130,22 +3343,35 @@ tests_to_run:
 | | |
 |---|---|
 | **Findings owned** | `OPS-020` (LOW) |
-| **Class** | **conditional** — **the only backward-incompatible change in the phase**, and it is blocked until Q9 is answered |
+| **Class** | **behavioural** (was `conditional`) — **the only backward-incompatible change in the phase, and it is no longer blocked** |
 | **Depends on** | BLOCK 13 (both change what the health surface says), BLOCK 15 |
 | **Blocks** | nothing in-plan |
-| **Priority** | **P3, and gated.** It is free to close and the last thing that should be done |
-| **Risk level** | **HIGH for a LOW finding** — a wrong assumption takes an external uptime monitor dark |
+| **Priority** | **P3** — free to close and the last thing that should be done. **It is no longer *gated*, only late** |
+| **Risk level** | **HIGH for a LOW finding** — a wrong assumption takes an external uptime monitor dark. **The ruling reduces that probability: the assumption is now an owner assertion, not an inference** |
 | **Blast radius** | `docker/nginx/nginx.conf`, possibly `apps/core/views.py` and `apps/core/urls.py`, three test modules. **No compose file edit** |
 | **Required agents** | **Auditor · Researcher · Planner · Validator** — all four |
 
-**Blocking gate — Q9: does anything external consume `/health/`?** (the coordinator / owner, not
-the Implementor)
+**Q9 RESOLVED 2026-10-03 (Product Owner) — nothing external consumes `/health/`**
 
-✔ Nothing in the repository records an uptime monitor, a status-page integration, or a
-`UptimeRobot` / `healthchecks.io` reference — **but absence of a record is not proof**, and the
-report itself flags this as the one non-backward-compatible item in the phase. **Until the
-answer is written down, this block does not start.** The in-repo half is answered; the external
-half is a question to whoever operates the site.
+**The ruling: no external consumer exists.** **This is an OWNER-ASSERTED FACT, not an inference
+from the absence of a record** — a distinction the block's original gate cared about, and the
+reason the answer is now stronger than the evidence the Auditor had. ✔ Nothing in the repository
+records an uptime monitor, a status-page integration, or a `UptimeRobot` / `healthchecks.io`
+reference; **that observation is no longer the argument.** The **owner's assertion** is, and
+**its date, 2026-10-03, is part of the record** so this backward-incompatible change stays
+traceable to a decision rather than to an omission.
+
+**The block is no longer blocked.** It may restrict the endpoint. What it must now do instead of
+waiting:
+
+1. **Record the assertion and its date in the commit body**, verbatim in substance: *"no external
+   consumer of `/health/` — owner assertion, 2026-10-03."* Without that sentence the change is an
+   untraceable guess.
+2. **Choose where the restriction is expressed** — this is still an Implementor decision with
+   three argued options below, and **option (a) remains the preference**.
+3. **Verify, do not assume**, that `/health/live/` stays reachable by the container healthcheck
+   and that the deploy gate still passes. Those were the two real outage risks, and the ruling
+   did not touch either.
 
 **What is exposed.** ✔ nginx proxies `location /health/` with no `allow`/`deny` and no
 `limit_req` — the block's own comment reads *"Health check endpoint (no rate limiting, no
@@ -3163,9 +3389,9 @@ the identity of the failing dependency.
 | **(b)** | Keep `/health/` reachable but return a **reduced public body** (`{"status": "alive"}`) and move the per-dependency breakdown to an internal-only path | **Gains:** a status probe keeps working; the dependency graph stops leaking. **Costs:** a Django change — new view, new route, `apps/core/urls.py` edits — and it makes the `/health/` alias no longer a backward-compatible alias of `/health/ready/`. **More surface for a LOW finding** |
 | **(c)** | Restrict `/health/` like `/metrics` **and** expose a deliberately minimal public liveness alias | **Gains:** both properties — availability signal stays public, dependency detail does not. **Costs:** both costs above |
 
-**The Implementor may not choose**, and **Q9 must be answered first regardless of which option
-is selected.** Option (b) still changes an existing public response body, which is the same
-compatibility question wearing a different hat.
+**The Implementor may not choose *where* the restriction lives**, and the location choice remains
+open among (a)/(b)/(c) below. **Q9 no longer gates the block** — it answered the compatibility
+question and dated the answer.
 
 **File surface (semantic units)**
 
@@ -3179,7 +3405,12 @@ compatibility question wearing a different hat.
 
 **Binding constraints**
 
-1. **Q9 is answered in writing before this block starts.** A non-answer is not an answer.
+1. **⚠ Q9 is ANSWERED — 2026-10-03, Product Owner: nothing external consumes `/health/`.**
+   This is an **owner assertion, not an inference from the absence of a record**, and the
+   **commit body must state the assertion and its date** so the backward-incompatible change is
+   traceable to a decision. The block is **no longer blocked**. *(This constraint was written when
+   the answer did not exist; it is retained in this form so the answer's provenance is recorded
+   rather than merely assumed.)*
 2. **`/health/live/` must remain reachable by the container healthcheck.** ✔ It is the target in
    both `docker/Dockerfile` and `docker-compose.yml` for three services. If it is restricted,
    the container is marked `unhealthy` and `restart: unless-stopped` begins a restart loop —
@@ -3213,16 +3444,20 @@ description: >
   service availability and the identity of the failing dependency. This is the only
   backward-incompatible change in the phase.
 goals:
-  - "per the recorded option, restrict /health/ the way /metrics is restricted, or return a reduced public body with the breakdown on an internal-only path"
-  - "confirm no external consumer depends on the current response before changing it"
+  - "per the recorded location option, restrict /health/ the way /metrics is restricted, or return a reduced public body with the breakdown on an internal-only path"
+  - "record the Q9 owner assertion and its date so the backward-incompatible change is traceable to a decision"
 extra_context: |
-  BLOCKING GATE - Q9 MUST BE ANSWERED IN WRITING FIRST. "Does anything external consume
-  /health/?" The repository records no uptime monitor, no status-page integration and no
-  healthchecks.io reference, but absence of a record is not proof. A non-answer is not an answer.
-  This is the only backward-incompatible change in the phase.
+  Q9 IS RESOLVED - 2026-10-03, Product Owner: nothing external consumes /health/. This is an
+  OWNER-ASSERTED FACT, not an inference from the absence of a repository record. The block is NO
+  LONGER BLOCKED. Record the assertion and its date in the commit body so this backward-incompatible
+  change is traceable to a decision rather than to an omission. This is still the only
+  backward-incompatible change in the phase.
+
+  The remaining Implementor decision is WHERE the restriction lives; option (a), nginx, is the
+  preference because it is the mechanism the file already uses one block below.
 
   BINDING CONSTRAINTS
-  1. Q9 is answered before the block starts.
+  1. The commit body states the Q9 owner assertion and its date (2026-10-03).
   2. /health/live/ must remain reachable by the container healthcheck - it is the target in
      docker/Dockerfile and docker-compose.yml for three services. Restricting it creates a
      restart loop, i.e. an availability outage created by a security fix.
@@ -3261,7 +3496,7 @@ changes:
       Add a guard that fails when /health/ is reachable without a restriction, modelled on the
       existing /metrics assertion.
 acceptance_criteria:
-  - "the Q9 answer is recorded in the commit body"
+  - "the commit body states the Q9 answer as an OWNER ASSERTION dated 2026-10-03, and does not present it as an inference from the absence of a record"
   - "the container healthcheck target remains reachable, and that is verified rather than assumed"
   - "the deploy health gate still passes, and that is verified rather than assumed"
   - "/metrics's existing restriction is unchanged"
@@ -3294,15 +3529,15 @@ with the programme's highest blast-radius file written exactly once, first.
 | 7 | PgBouncer + capacity limits | `OPS-015`, `VAL-001` | B | 2 | **Q7** | MED |
 | 8 | Prod service-set contract | `OPS-007` (+`OPS-005`) | **S** | 3, 7 | **Q1** | **HIGH** |
 | 9 | Runbook executability | `OPS-006` | B | 8 | **Q2**, **Q3** | **HIGH** (irreversible data) |
-| 10 | Deploy provenance | `OPS-002`, `OPS-008` | B | 8, 9 | **Q11**, **Q12** | **HIGH** |
-| 11 | SLO alert contract | `OPS-003` | B | 10 | **Q5** | MED / **HIGH** under (a) |
-| 12 | Operator-notification floor | `OPS-011` | B | 11 | **Q10** | MED |
-| 13 | Bot readiness contract | `OPS-010` | B | 7 | **Q6** | MED |
+| 10 | Deploy provenance | `OPS-002`, `OPS-008` | B | 8, 9 | **Q11 RESOLVED 2026-10-03 (a); human approval RETAINED** · Q12 | **HIGH** |
+| 11 | SLO alert contract | `OPS-003` | B | 10 | **Q5 RESOLVED 2026-10-03 (c) — reduced, unconditional** | MED (↓HIGH — the option-(a) risk is gone) |
+| 12 | Operator-notification floor | `OPS-011` | B | 11 | **Q10 RESOLVED 2026-10-03 (b) — reduced; `notify_operator` declined** | **LOW** (↓MED) |
+| 13 | Bot readiness contract | `OPS-010` | B | 7 | **Q6 RESOLVED 2026-10-03 — stays disabled, docs removed** | MED (availability knowingly accepted) |
 | 14 | `docs/ops` truth sweep | `OPS-018` | B | 4, 9, 13 | — | LOW / HIGH consequence |
 | 15 | `docs/ops` parity guard | `VAL-003` | M | **14**, strictly | **Q14** | MED |
-| 16 | Restore drill | `OPS-004` | **C** | 2, 9, 10 | **Q8** | MED |
+| 16 | Restore drill | `OPS-004` | **B** (was C) | 2, 9, 10 | **Q8 RESOLVED 2026-10-03 — in scope; real-artifact half UNCONDITIONAL** | MED |
 | 17 | Gunicorn log format | `OPS-012` | B | 12 | — | **HIGH** for a LOW finding |
-| 18 | `/health/` exposure | `OPS-020` | **C** | 13, 15 | **Q9 (blocking)** | **HIGH** |
+| 18 | `/health/` exposure | `OPS-020` | **B** (was C) | 13, 15 | **Q9 RESOLVED 2026-10-03 — owner assertion, dated** | **HIGH** |
 
 `M` = mechanical · `B` = behavioural · `S` = structural · `C` = conditional.
 
@@ -3692,19 +3927,22 @@ finding's severity. "Blast" covers what else feels the change. "Contention" cove
 | **9** | An engineer at 3 a.m. runs `pg_restore --clean --if-exists` against the **dev** database | **Irreversible data** | Med | **High** | ✔ Q2 is a gate with three options and their consequences; constraint 2 removes `.env.dev` from the procedure; the drift-compensation and prune changes are BLOCK 2's and already committed | Med — accepted, by decision |
 | **9** | `docs/ops/rollback.md`'s correct invocations are "fixed" | Process | Med | Med | ✔ Constraint 1; the acceptance criteria require byte-identity | Very low |
 | **9** | Q3 option (a) lands `scripts/ops/` with no lint harness, so the "structural fix" is not one | Quality | Med | Med | ✔ Constraint 8 requires `sh -n` and an executable assertion; the gate's consequences say a new CI job is part of the option's cost | Low |
-| **10** | The deploy gate fails closed and **production deploys stop** | **Availability** | Med | **High** | Q11 is an owner decision; the assertion's token scope must be stated in the commit body; the rollback path is unchanged and manual | Med — accepted, by decision |
+| **10** | The deploy gate fails closed and **production deploys stop** | **Availability** | Med | **High** | **Q11 is RESOLVED 2026-10-03 as option (a)** — fail-closed is the **accepted** failure mode of the chosen mechanism; the assertion's **token scope must be stated in the commit body**; the rollback path is unchanged and manual; and **the human approval is retained**, so a failed assertion can be overridden deliberately | Med — accepted, by decision |
+| **10** | The manual environment approval is removed "because the gate now proves it" | Process | Low | **High** | **Option (b) was DECLINED.** Binding constraint 4 is now an unconditional prohibition and binding constraint 9 forbids adding a `workflow_run` trigger. The commit body must state that the approval was retained | Very low |
 | **10** | `pull_request` surfaces pre-existing failures and someone removes the trigger | Process | Med | Med | ✔ Constraint 1: *"the fix is the failing check, not the removal of the trigger"* | Low |
 | **10** | The digest capture runs after `up` and captures the image being deployed | **Correctness** | Low | **High** | ✔ Constraint 3 names the ordering; the capture position is in the acceptance criteria | Very low |
 | **10** | One of the two `test_deploy_workflow.py` modules is forgotten | Correctness | Med | Med | ✔ Constraint 8: both in the same commit; both named in the file surface | Very low |
-| **11** | Q5 option (a) adds a service BLOCK 8's guard then rejects | Contention | **High** (under (a)) | Med | ✔ Constraint 7: report the coupling, do not work around it | Med — accepted under (a) |
+| **11** | ~~Q5 option (a) adds a service BLOCK 8's guard then rejects~~ | — | — | — | **CLOSED 2026-10-03.** Option (a) is **DECLINED**; no service is added and the coupling cannot arise. Recorded, not dropped | Closed |
+| **11** | An Implementor adds the `prometheus` service "to make the alerts real" | Scope | **Med** | Med | The full-stack option is **DECLINED** and binding constraint 7 names the coupling **inapplicable**. Adding the service re-introduces a declined option and re-couples the block to BLOCK 8 — stop and report | Low |
 | **11** | The scrape-contract test is written against the library source and reproduces the defect | Correctness | Med | **High** | ✔ Constraint 1; model on `test_metrics_endpoint`, which renders a live response | Low |
 | **11** | A `pending_moderation` alert is added and is dead on arrival | **Correctness** | Low | Med | ✔ `AD-008` is carried into the block and constraint 3 forbids it | Very low |
 | **11** | The rules are corrected but nothing evaluates them, and the block claims closure | Review | Med | Med | ✔ Constraint 4 and the Q5 option consequences: option (c) explicitly says the *detection* half of `OPS-011` is still unmet | Low |
-| **12** | Q10 option (a) adds a second sender beside the support-desk mail | **Architecture** | Med | Med | ✔ Constraint 1: `EMAIL_HOST` and the existing sender are phase 09's; the commit must reuse the transport, not open a session | Med — accepted, by decision |
-| **12** | Q10 option (b) ships a signal nobody consumes and calls `OPS-011` closed | Review | **High** | Med | ✔ Constraint 7: *"under option (b), say plainly that the detection gap is unchanged"* | Low |
+| **12** | ~~Q10 option (a) adds a second sender beside the support-desk mail~~ | — | — | — | **CLOSED 2026-10-03.** Option (a) is **DECLINED**; no command, no recipient key, no second sender. Recorded, not dropped | Closed |
+| **12** | Q10 option (b) ships a signal nobody consumes and calls `OPS-011` closed | Review | **High** | Med | **Now higher, because option (c) of Q5 defers the stack — nothing consumes these signals in this programme.** Binding constraint 6 and an explicit acceptance criterion: the commit body states the detection gap is unchanged and does **not** claim `OPS-011` is closed | Med — accepted, by decision |
+| **12** | An Implementor adds the recipient key "while adding the metric" | Scope | Med | Med | Q10 option (b) guarantees **no** key, so `ALLOWED_ENV_VARS` and all four `.env.*.example` files are untouched. Acceptance criteria assert their absence, not just green tests | Very low |
 | **12** | A failed alert takes down the process that raised it | **Correctness** | Low | **High** | ✔ Constraint 3: fail-open, with the reason in a comment | Very low |
-| **13** | Enabling the bot check makes a bot outage block deploys and roll back healthy code | **Availability** | Med | **High** | Q6 is an owner decision with that consequence written into option (a); constraint 3 requires the 120 s window to be measured | Med — accepted, by decision |
-| **13** | BLOCK 13 silently edits `docker-compose.yml` to remove `BOT_HEALTH_STALE_SECONDS` | Contention | Med | **High** | ✔ Constraint 2 and the acceptance criteria: report it, do not make it | Very low |
+| **13** | Enabling the bot check makes a bot outage block deploys and roll back healthy code | **Availability** | Med | **High** | **DECLINED 2026-10-03 — the consequence was not accepted.** The flag stays disabled, so the deploy gate never fails for a bot reason. **The residual exposure is the mirror image and is KNOWINGLY ACCEPTED: a wedged bot is invisible to `/health/ready/` and to the deploy gate.** Binding constraint 7 requires the commit body to say so as an accepted risk, not a mitigated one | Med — accepted, by decision |
+| **13** | BLOCK 13 silently edits `docker-compose.yml` to remove `BOT_HEALTH_STALE_SECONDS` | Contention | Med | **High** | ✔ Binding constraint 2 and the acceptance criteria: report it, do not make it | Very low |
 | **13** | `liveness_check` is touched and the container healthcheck starts restarting | **Availability** | Low | **High** | ✔ Constraint 6: liveness stays dependency-free | Very low |
 | **14** | A correction states what was false rather than what is true | Review | Med | Med | ✔ Constraint 4 | Low |
 | **14** | A **true** statement is "corrected" back (the already-fixed `deploy-check` env claim) | Process | Med | Med | ✔ Constraint 3; named explicitly in the instance table and the acceptance criteria | Very low |
@@ -3715,11 +3953,13 @@ finding's severity. "Blast" covers what else feels the change. "Contention" cove
 | **16** | The preconditions cannot fail and the drill stays decorative | **Correctness** | Med | **High** | ✔ Constraint 2; an empty restore is demonstrated to fail | Low |
 | **16** | The isolation property is weakened and a `pg_restore` reaches a live database | **Irreversible data** | Low | **High** | ✔ Constraint 1 (hard) and 5 (never); separate volume, network and database via `docker run` | Very low |
 | **16** | The drill pins an image that has been garbage-collected | Behaviour | Low | Med | Constraint 3; "a recorded known-good tag", and BLOCK 10's digest mechanism where available | Low |
-| **16** | Q8 is declined and `OPS-004` is reported closed | Review | Med | Med | ✔ The block's `extra_context` requires the commit body to state the finding is **not closed** under (b) or (c) | Low |
+| **16** | ~~Q8 is declined and `OPS-004` is reported closed~~ | — | — | — | **CLOSED 2026-10-03.** The opposite now holds: `OPS-004` **is** closable and the commit body must say it is closed. Replaced by the row below | Closed |
+| **16** | The off-host push lands without a retention policy or a documented restore path, and the artifact store fills or is unreachable when needed | Correctness | **Med** | **High** | **New risk created by the 2026-10-03 ruling.** The ruling funds the dependency, so the block must state the provider, the retention and the restore path in the commit body — an acceptance criterion, not a courtesy | Med — accepted, by decision |
+| **16** | The drill "proves itself" against the self-generated dump again, because the real artifact is unavailable | Review | **High** | Med | The real-artifact half is **unconditional**. The self-generated dump is an **additional** smoke test and is labelled as such; a commit that leaves it as the primary path has failed the ruling | Low |
 | **17** | A malformed `logconfig_dict` crashes the arbiter **before** the bind | **Availability** | Med | **High** | ✔ Constraint 3: verify in a throwaway container first; `preload_app` makes this the arbiter's config, not a worker's | Low |
 | **17** | `accesslog` is set to `None` "because the formatter is better", and a broken config produces silence | Correctness | Low | **High** | ✔ Constraint 2: keep both set; silence is a failure mode, plaintext is a diagnostic | Very low |
 | **17** | Phase 01's `child_exit` hook is removed "while reorganising the config" | **Correctness** | Low | **High** | ✔ Constraint 1 and the acceptance criteria | Very low |
-| **18** | No external uptime monitor exists — but one does, and it goes dark | **Compatibility** | Low | **High** | ✔ Q9 is a **blocking** gate; the block does not start until the answer is written down. This is the only backward-incompatible change in the phase | Low |
+| **18** | No external uptime monitor exists — but one does, and it goes dark | **Compatibility** | Low | **High** | **Q9 is RESOLVED 2026-10-03 as an OWNER ASSERTION that nothing external consumes `/health/`.** That is now the argument, not the absence of a repository record, and **its date must be in the commit body**. The residual risk is a false assertion rather than an unrecorded assumption, which is why the row stays open rather than closing | Low |
 | **18** | `/health/live/` is restricted and three containers begin a restart loop | **Availability** | Low | **High** | ✔ Constraint 2; the acceptance criteria require the reachability to be **verified, not assumed** | Low |
 | **18** | The deploy gate starts failing because the health check was restricted | Availability | Low | **High** | ✔ Constraint 3: the gate runs from inside `web`; verify it | Low |
 | **18** | Option (b) changes the `/health/` alias contract without anyone deciding to | Compatibility | Med | Med | Constraint 6 prefers nginx; the Django route change is the larger surface for a LOW finding | Low |
@@ -3744,7 +3984,8 @@ Phase 12 is complete when **all** of the following hold.
       **Silence is not an acceptable outcome for any of them.**
 - [ ] Each of **Q1 … Q14** is either answered with a record or explicitly re-routed with a named
       destination. **Q1, Q2, Q3, Q4, Q7, Q12, Q14** are Planner/Researcher rulings; **Q5, Q6,
-      Q8, Q9, Q10, Q11** are owner or coordinator decisions; **Q13** is routed with a stated
+      Q8, Q9, Q10 and Q11 were **Product Owner decisions, all answered on 2026-10-03** (§0.7 —
+      the plan's rulings section), and Q5/Q6 likewise; **Q13** is routed with a stated
       default (phase 12 allocates no lock id).
 - [ ] The `OPS-005` → `OPS-007` merge was honoured: the profile flags appear in every deploy
       compose invocation and `OPS-005` is not tracked as a separate item.

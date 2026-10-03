@@ -220,20 +220,20 @@ outcome for any of them.**
 
 | ID | Question | Block | Who decides | Status |
 |---|---|---|---|---|
-| **Q07-1** | With the seed manifest's `default.photos` empty (C-1), what is the **actual** cross-user shared-key population in a seeded environment? Re-measure from the `AdGenerator` category distribution and `image_count` 1–3, not from the report's 1004-filename narrative | **BLOCK 2** (measurement) → cited by **BLOCK 10** | **Researcher**, in BLOCK 2's pre-block step | **GATED.** The invariant is unaffected either way; the *documented* reach in BLOCK 10 is |
-| **Q07-2** | Does `auto_moderate` (or any publication gate) require **at least one** `AdImage`? If not, `technical-specification.md`'s ≥1-photo sentence is unbacked today and `MEDIA-002` needs a **new** enforcement point, not only a dedup re-scope | **BLOCK 1** | **Researcher**, then **Planner** | **GATED.** The answer changes BLOCK 1's scope, not just its shape |
-| **Q07-3** | Should `MEDIA-002`'s reclaim be `delete_photo` on the freshly staged key, and does it interact badly with phase-03 BLOCK 8's Option A (files living in a *second* sweep-excluded directory until commit)? Deleting a filesystem path from inside a transaction that may roll back is the **inverse desync** | **BLOCK 1** | **Planner**, re-checked against phase-03 BLOCK 8's Q7/Q8 outcome | **GATED.** Three options, materially different rollback semantics |
-| **Q07-4** | Exact shape of `MEDIA-001`'s reference check: which queryset, `exclude(pk=…)` or not, inline or a new service helper, and does the "`on_commit` means the departing row is already gone" property get its own assertion? | **BLOCK 2** | **Planner** (Researcher supplies the call-site and index inventory) | **GATED.** Inline-vs-helper is a real design choice with a `test_delete_photo_single_call.py` consequence |
-| **Q07-5** | Does `MEDIA-005`'s moderator action need a **new** `AdvisoryLockId` or a `select_for_update` on the `AdImage`? And does it route through the existing `apps/moderation/admin_actions.py` pattern, which phase 03 owns for locking and phase 06 owns for reason redaction? | **BLOCK 11** | **Planner + coordinator** | **GATED** |
+| **Q07-1** | With the seed manifest's `default.photos` empty (C-1), what is the **actual** cross-user shared-key population in a seeded environment? Re-measure from the `AdGenerator` category distribution and `image_count` 1–3, not from the report's 1004-filename narrative | **BLOCK 2** (measurement) → cited by **BLOCK 10** | **Researcher**, in BLOCK 2's pre-block step | **RESOLVED 2026-10-01 — MEASURED.** Cross-user shared keys are ROUTINE: ~33% of image rows and ~55% of seeded ads at shipped defaults. See §0.6 |
+| **Q07-2** | Does `auto_moderate` (or any publication gate) require **at least one** `AdImage`? If not, `technical-specification.md`'s ≥1-photo sentence is unbacked today and `MEDIA-002` needs a **new** enforcement point, not only a dedup re-scope | **BLOCK 1** | **Researcher**, then **Planner** | **RESOLVED 2026-10-01 — a gate DOES exist** (`_validate_image_count` + `ModerationCriteria.min_images` default 1), which INVERTS this block's impact statement. See §0.6 |
+| **Q07-3** | Should `MEDIA-002`'s reclaim be `delete_photo` on the freshly staged key, and does it interact badly with phase-03 BLOCK 8's Option A (files living in a *second* sweep-excluded directory until commit)? Deleting a filesystem path from inside a transaction that may roll back is the **inverse desync** | **BLOCK 1** | **Planner**, re-checked against phase-03 BLOCK 8's Q7/Q8 outcome | **RESOLVED 2026-10-01 — `on_commit` reclaim targeting `STAGING_PREFIX + key`, plus `permanent_keys` pruning.** The plan's `delete_photo(key)` draft is a SILENT NO-OP. See §0.6 |
+| **Q07-4** | Exact shape of `MEDIA-001`'s reference check: which queryset, `exclude(pk=…)` or not, inline or a new service helper, and does the "`on_commit` means the departing row is already gone" property get its own assertion? | **BLOCK 2** | **Planner** (Researcher supplies the call-site and index inventory) | **MOOT 2026-10-01 — SHIPPED in `64a9de6`.** BLOCK 2 and Q07-4 are RETIRED; do not re-implement. See §0.6 |
+| **Q07-5** | Does `MEDIA-005`'s moderator action need a **new** `AdvisoryLockId` or a `select_for_update` on the `AdImage`? And does it route through the existing `apps/moderation/admin_actions.py` pattern, which phase 03 owns for locking and phase 06 owns for reason redaction? | **BLOCK 11** | **Planner + coordinator** | **RESOLVED 2026-10-01 — ROW lock, single photo, `ModeratorActionType.OTHER`, canned reason, matching `inspect.getsource` guard.** No new `AdvisoryLockId`. See §0.6 |
 | **Q07-6** | If photo-level moderation is deliberately **deferred** for phase 1, what exactly changes? The report offers "the honest action is a one-line doc fix … not a finding" and that option was never closed | **BLOCK 11** (and BLOCK 12 inherits it) | **Owner (product) + coordinator** | **GATED.** This is a **scope** decision and it flips the block between S and M effort |
-| **Q07-7** | For `MEDIA-007`: is the byte budget **global** (`MEDIA_ROOT/staging` total) or **per-seller**? A global budget lets one seller trip a global rejection; a per-seller budget needs per-seller attribution, which the deliberately PII-free `staging/<uuid>.jpg` key format does **not** carry | **BLOCK 7** | **Researcher** (attribution feasibility) → **Planner** | **GATED** |
-| **Q07-8** | For `MEDIA-007`'s metric: a `Gauge` updated only on the hourly sweep is a **stale** reading for alerting. `django-prometheus` runs in **multiprocess** mode (`PROMETHEUS_MULTIPROC_DIR`) and the sweep runs in a **different process** from web and bot — gauge semantics across processes need stating | **BLOCK 7** | **Researcher** | **GATED** |
-| **Q07-9** | For `MEDIA-012`: should the dangling-row report cover `seed/` and `staging/`, and should it be a flag (`--check`), a distinct exit code, or both? `_walk_media_files` excludes both; `_collect_referenced_keys` does not | **BLOCK 6** | **Planner** | **GATED** |
-| **Q07-10** | Does any shipped test assert the **exact set** of `admin.site._registry` keys? If so, adding `apps/media/admin.py` is disruptive rather than additive | **BLOCK 8** | **Researcher** (one grep + one test run) | **GATED.** Determines whether the change is additive or needs a test update |
-| **Q07-11** | Re-confirm Pillow's default JPEG quality is still **75** for the pinned Pillow version. The Validator measured 75 on Pillow 12.3.0 by MD5 match; the code context did not re-measure, and the number *is* the finding | **BLOCK 4** | **Researcher** (one MD5 check, in-image) | **GATED** |
+| **Q07-7** | For `MEDIA-007`: is the byte budget **global** (`MEDIA_ROOT/staging` total) or **per-seller**? A global budget lets one seller trip a global rejection; a per-seller budget needs per-seller attribution, which the deliberately PII-free `staging/<uuid>.jpg` key format does **not** carry | **BLOCK 7** | **Researcher** (attribution feasibility) → **Planner** | **RESOLVED 2026-10-01 — per-seller attribution is INFEASIBLE (not open); the choice collapses to a GLOBAL budget, chosen.** See §0.6 |
+| **Q07-8** | For `MEDIA-007`'s metric: a `Gauge` updated only on the hourly sweep is a **stale** reading for alerting. `django-prometheus` runs in **multiprocess** mode (`PROMETHEUS_MULTIPROC_DIR`) and the sweep runs in a **different process** from web and bot — gauge semantics across processes need stating | **BLOCK 7** | **Researcher** | **RESOLVED 2026-10-01 — NO METRIC SHIPPED.** The gauge is structurally unexportable (scheduler has no `PROMETHEUS_MULTIPROC_DIR`; tmpfs is web-only). See §0.6 |
+| **Q07-9** | For `MEDIA-012`: should the dangling-row report cover `seed/` and `staging/`, and should it be a flag (`--check`), a distinct exit code, or both? `_walk_media_files` excludes both; `_collect_referenced_keys` does not | **BLOCK 6** | **Planner** | **RESOLVED 2026-10-01 — a `--check` MODE on `sweep_orphaned_media` reusing lock 103, with `CommandError`.** The plan's `on_disk` reuse is a guaranteed false positive. See §0.6 |
+| **Q07-10** | Does any shipped test assert the **exact set** of `admin.site._registry` keys? If so, adding `apps/media/admin.py` is disruptive rather than additive | **BLOCK 8** | **Researcher** (one grep + one test run) | **RESOLVED 2026-10-01 — the risk does NOT exist** (`_registry` has zero matches in `src/`). Delete the whole line of reasoning. See §0.6 |
+| **Q07-11** | Re-confirm Pillow's default JPEG quality is still **75** for the pinned Pillow version. The Validator measured 75 on Pillow 12.3.0 by MD5 match; the code context did not re-measure, and the number *is* the finding | **BLOCK 4** | **Researcher** (one MD5 check, in-image) | **RESOLVED 2026-10-01 — default MEASURED as 75, and `quality=75` is byte-identical.** `STORED_JPEG_QUALITY = 75` on `strip_photo_exif`; blast radius is ZERO. See §0.6 |
 | **Q07-12** | For `MEDIA-009`/`011` doc work: route the `technical-specification.md` edits to phase 06, and decide whether `docs/ops/docker-deployment.md` and `docs/04-user-stories/seller-stories.md` (both newly identified, C-5, neither in the report's list) are in phase 07's scope or a docs sweep's | **BLOCK 10** | **Coordinator** | **ROUTED + GATED** |
-| **Q07-13** | For `MEDIA-006`: does the dev config *intentionally* omit `/csp-report/` and `/metrics`? If the two configs are meant to be symmetric, the added block belongs in a shared include rather than be pasted twice. `docker/nginx/` has no include fragment beyond `mime.types`, so a third file would be a structural change | **BLOCK 9** | **Researcher** → **Planner** | **GATED** |
-| **Q07-14** | For `MEDIA-010`: is a **retention command** the right shape, or does `MediaDeletionError` want an admin action to clear rows? An admin-only read surface (the report's minimum) may be sufficient for a LOW | **BLOCK 8** | **Planner** | **GATED.** Effort flips between S and M depending on the answer |
+| **Q07-13** | For `MEDIA-006`: does the dev config *intentionally* omit `/csp-report/` and `/metrics`? If the two configs are meant to be symmetric, the added block belongs in a shared include rather than be pasted twice. `docker/nginx/` has no include fragment beyond `mime.types`, so a third file would be a structural change | **BLOCK 9** | **Researcher** → **Planner** | **RESOLVED 2026-10-01 — drift is THREE locations; duplicate, do NOT introduce an `include`.** Dev `/health/` omission is recorded as intentional. See §0.6 |
+| **Q07-14** | For `MEDIA-010`: is a **retention command** the right shape, or does `MediaDeletionError` want an admin action to clear rows? An admin-only read surface (the report's minimum) may be sufficient for a LOW | **BLOCK 8** | **Planner** | **RESOLVED 2026-10-01 — BOTH: a read-only admin AND a retention command.** No bulk clear, no retry action. See §0.6 |
 
 **Resolved in this plan, with the reasoning stated** (these are not open questions; they are
 rulings so a block does not re-derive them):
@@ -255,6 +255,117 @@ rulings so a block does not re-derive them):
   path would break a large block of the media-security suite.
 - **`MEDIA-008` after `MEDIA-004`, never before.** `MEDIA-008` *reuses* `MEDIA-004`'s
   stale-file-versus-race guard. Fixing 008 first re-introduces the defect class it inherits.
+
+---
+
+### 0.6 Gate resolutions — 2026-10-01 (Auditor → Researcher pass)
+
+**Scope.** The Auditor re-verified the tree and overturned several load-bearing premises,
+including one that retires a block outright. The Researcher then closed Q07-1, -2, -3, -5,
+-7, -8, -9, -10, -11, -13 and -14, and closed **Q07-4 as moot**.
+
+**Still open and NOT closed:** **Q07-6** (defer photo-level moderation for phase 1 — an
+owner/scope decision that flips BLOCK 11/12 between S and M effort) and **Q07-12** (doc
+routing). Both are routed to the coordinator.
+
+#### 0.6.1 BLOCK 2 is SHIPPED — retire it
+
+Commit `64a9de6` **is** `MEDIA-001`. Verified three ways. It shipped in
+`src/backend/apps/media/signals.py` → `delete_adimage_files_on_delete` as a
+**`pre_delete`** receiver, **fully inline**, using a **key-set membership test**
+(`AdImage.objects.filter(image__in=keys).exclude(pk=instance.pk).values_list("image", flat=True)`),
+with the reference check in the signal body and `on_commit` wrapping **only** the
+`delete_photo` loop. `technical-specification.md` line 88 already documents it verbatim.
+
+**Do not re-implement.** Three tripwires bind any future refactor:
+- `exclude(pk=instance.pk)` — dropping it **permanently stops all file deletion**, because
+  at `pre_delete` the row still exists, so a naive `filter(image=key).exists()` always
+  matches the row itself.
+- The module-level `delete_photo` binding in `apps.media.signals` — four test functions in
+  `apps/core/tests/test_delete_photo_single_call.py` patch that exact name (parametrized,
+  so 8 collected cases), plus one patching
+  `apps.media.management.commands.sweep_orphaned_media.delete_photo`. A helper that
+  re-imports `delete_photo` from `filesystem` makes all of them miss.
+- `apps/media/tests/test_media_config.py` asserts the **handler object identity** is in
+  `pre_delete._live_receivers(AdImage)` — a rename breaks it.
+
+**What BLOCK 10 must record instead.** Q07-1's measurement changes the documented reach
+materially. Cross-`AdImage` key sharing is a **routine production state, not an edge
+case**: `copy_ad` produces it by design, and at shipped seed defaults **~33% of image
+rows sit on a key shared by ≥2 ads, touching ~55% of ads**. Mechanism: uniform leaf-category
+draw, a category-keyed pool with `random_elements(unique=True)`, and
+`SeedService.run` calling `AdImage.objects.bulk_create` — **bypassing
+`create_or_skip` entirely**, so the seed deliberately manufactures the sharing population.
+Consequences: BLOCK 10's storage-key sentence **cannot claim a key "identifies" an ad**;
+the shared-key case is a first-class documented state; and **any BLOCK 1 test must build
+its own two-ad same-seller fixture** — seed data is not a usable substrate.
+
+#### 0.6.2 Resolved decisions
+
+| Gate | Decision | Why the alternatives lost |
+|---|---|---|
+| **Q07-2** | A ≥1-photo gate **does** exist: `auto_moderation._validate_image_count` against `ModerationCriteria.min_images` (default 1, admin-editable, cached 300 s). `technical-specification.md` line 149 already says "cannot publish without ≥1 photo" and the code already does it — **no doc drift**. | The plan assumed no gate. It exists. **This inverts BLOCK 1's impact statement**: a *full* dedup hit lands the ad in `ON_MODERATION_FAILED`, never PUBLISHED. The real user-visible bug is a **partial** hit publishing the ad with **silently fewer photos than the seller uploaded** — worse than the orphan leak, and not caught by `min_images`. That is `MEDIA-002`'s actual impact and is fixed by the predicate re-scope. |
+| **Q07-3** | **Two coordinated changes in `submit_ad`**, not one line in `AdImageService`: (1) prune `permanent_keys` in place; (2) register the reclaim via `transaction.on_commit` **before** the promote registration, targeting `STAGING_PREFIX + key`. | The plan's `delete_photo(key)` draft is a **silent no-op**: at reclaim time the key has already been rewritten to the *permanent* key by `plan_staging_promotion`, while the bytes are still at `staging/<key>` — and `delete_photo` **returns silently** on `FileNotFoundError`, so nothing is reclaimed and nothing is logged above WARN. Pruning is not an optional second half: without it, promotion `os.replace`s the surviving staged file into permanent storage with **no row referencing it**, defeating the reclaim entirely. **Pruning is also what makes the ordering free of noise** — once the key is out of `permanent_keys`, promotion never sees it, so there is no `FileNotFoundError` and no `logger.exception`. Rejected: inline reclaim (on rollback it destroys the seller's staged file while FSM state still lists it, manufacturing a worse unobservable failure than the leak it fixes). |
+| **Q07-11** | **`STORED_JPEG_QUALITY = 75` on `strip_photo_exif`.** The default was **measured**, not deferred: on the locked wheel (`pillow 12.3.0`) an explicit `quality=75` is **byte-identical** to the current output (same md5, `optimize` held constant); 74 and 76 differ, 85 is 606 bytes vs 534. | Because output is byte-identical, **the `sha256` blast radius is zero** — no stored original changes, no dedup key moves, seed unaffected. The gate the plan opened ("do not change the value unless a specific defect is demonstrated") is satisfied vacuously. The target is `strip_photo_exif` (the permanent original, re-encoded on every upload, served as-is) — **not** `ThumbnailService`, which has specified `QUALITY = 85` explicitly all along. Re-open for the coordinator only if a value ≠ 75 is proposed with a demonstrated defect; a synthetic-image delta at 85 is not evidence. |
+| **Q07-9** | **A `--check` mode on `sweep_orphaned_media`**, reusing lock 103, failing via `raise CommandError`. The check does its **own** `os.path.exists` probe and suppresses `staging/` as the only special case. | A new command would need an `AdvisoryLockId` (14 is free; 10 is reserved and reads like a typo), three edits to `test_sweep_lock_structure.py`'s set-equality lists, an **exact-list** `HOURLY_COMMANDS` edit, and three docs tables — all to duplicate a key-collection loop. `--check` has zero precedent in the repo but `--dry-run` means "preview a destructive action", so borrowing it would be a semantic lie; `--check` is the least surprising name. `CommandError` is the established idiom (`load_catalog`, `profile_queries`, `send_alerts`) and Django turns it into exit 1; `bootstrap_reference_data`'s numeric code is a one-off and the wrong precedent. **The plan's reuse of `_walk_media_files`'s `on_disk` set is a guaranteed false positive** — it excludes `seed/` while `referenced` *contains* `seed/…` keys, so every seed key would be flagged dangling. `seed/` needs no special case provided the join uses the stored key **verbatim**; stripping the prefix is the trap. |
+| **Q07-7** | **Per-seller attribution is INFEASIBLE — mark it closed, not open.** The choice collapses to a **global budget**, chosen. | `save_photo`'s key is pure `uuid4`; `SubmittedPhoto` carries **no `user_id` and no `ad_id`**; the FSM photo list is per-dialog and `state.update_data` overwrites, so abandoned dialogs are unreachable; the staging tree is flat and every writer shares one container uid; mtime yields age, not owner. No reliable mechanism exists without changing the key format, which BLOCK 7 is explicitly forbidden to do. Free rider: FSM-scoped reclaim is **already implemented** in `cmd_cancel`. |
+| **Q07-8** | **No metric ships.** A structured `logger.info` of staging bytes at the enforcement point instead. | A `Gauge` set by the hourly sweep is **structurally unexportable**, which is stronger than "stale": the sweep is not a gunicorn worker, so `mark_process_dead` never reaps its `gauge_*.db` file; and the **scheduler service has no `PROMETHEUS_MULTIPROC_DIR`**, while the `/tmp/prometheus_multiproc` tmpfs is mounted on **`web` only** — so the value is not merely unreaped, it is **invisible to the scraped directory**. The bot has the same defect. A future gauge needs a compose change (env + tmpfs on `scheduler` and `bot`) plus a non-gunicorn reaper: a separate, explicitly-scoped piece of work. Consequently **no `apps/media/metrics.py` is created** and `prometheus-slo-alerts.yaml` / `grafana-slo-dashboard.json` are **not** touched — adding a media alert to a file no media metric feeds would be a broken contract. `MEDIA-007` is "staging has no space budget"; the budget *is* the fix. |
+| **Q07-10 / Q07-14** | **Both** halves: a read-only `MediaDeletionErrorAdmin` **and** a retention command (lock 14, `DAILY_COMMANDS`, exact-list scheduler assertion updated). **No bulk clear, no retry action.** | `_registry` has **zero matches in `src/`**; `is_registered` appears twice, both per-model. The registry risk does not exist and the admin is purely additive with no migration. But admin alone does not fix unbounded accumulation, and a retention command alone leaves the table invisible. Rejected on evidence: the table has **no index on `storage_key`** and **no attempts threshold**, so a bulk action over either seq-scans an unbounded table and needs a migration; and re-driving deletions is a **new recovery mechanism**, not an admin feature — the hourly sweep already self-heals orphans, and a second differently-triggered deletion path is a second source of divergence. Precedent: `SupportTicketAdmin` is a read-only audit surface with add/delete disabled. |
+| **Q07-5** | **Row lock**, single photo, in `apps/moderation/admin_actions.py` alongside `soft_delete_ad`, following `ban_user_for_ad`. `ModeratorActionType.OTHER`, a **canned** `reason` constant, and a **matching `inspect.getsource` guard**. | `admin_actions.py` contains **zero** `advisory_lock` calls — advisory locks are the scheduled-job idempotency device, and here one would be a cross-process lock on a single row, semantically wrong and a deadlock vector against the sweep. The module's shape is `atomic()` + `order_by("pk")` + `select_for_update`, with `bulk_approve`'s comment stating the reason. A bulk photo-delete would bypass the per-row audit and reason. `OTHER` already covers "not reject/ban/soft-delete/criteria-change" and `action_type` drives every `list_filter` while no reader distinguishes a new value. A **canned** reason sidesteps redaction entirely — there is **no** redaction on this path today (`redact_search_query` is search-analytics only; `mask_telegram_id` is used for *logging*, never for the stored `reason`), and a free-text prompt would mean shipping an unredacted PII field. `test_bulk_ban_users_not_locked` proves the repo deliberately asserts **absence** where locking is out of scope, so a new destructive action without a structural pin would be the only unguarded function in the module. |
+| **Q07-13** | **Drift is THREE locations** (`/health/`, `/csp-report/`, `= /metrics`). **Duplicate** the block; do **not** introduce an `include`. Record the dev `/health/` omission as intentional. | An `include` fragment needs a **new mount line in all three compose files** — and `docker-compose.yml` and `docker-compose.dev.override.yml` mount to the *same target*, so omitting `docker-compose.prod.yml` **silently drops the control in production**. Worse, `test_nginx_config.py::_location_block` line-scans a file and brace-walks it, so an `include`d fragment is **invisible to the harness** — converting testable configuration into untestable. The shared surface is three `proxy_pass` + four header lines, already duplicated today for `/static/` and `/protected-media/`. Dev `/health/` is not fixed because the container healthcheck hits `web:8000/health/live/` **directly**, bypassing nginx; adding it is a behaviour change to an opt-in dev-only path, not symmetry. All three `limit_req_zone` definitions are already byte-identical, so **no new zone is needed**. |
+
+#### 0.6.3 Two reachability traps the implementor must not miss
+
+1. **BLOCK 11's action would be invisible under the current admin predicates.**
+   `AdImageAdmin` sets `has_add_permission`, `has_change_permission` **and**
+   `has_delete_permission` all to `False`. Django's `ModelAdmin.get_actions` filters on
+   `allowed_permissions`, and `delete_selected` carries `permissions=["delete"]` — so with
+   `has_delete_permission → False` **even the default delete action is filtered out**, and
+   `changelist_view` requires view-or-change. A new
+   `@admin.action(permissions=["delete"], …)` would therefore never appear in the UI. The
+   block must open **exactly one** predicate (`has_delete_permission` → `is_staff`),
+   deliberately leaving add/change `False`, test reachability through `get_actions(request)`
+   rather than by asserting the attribute exists, and decide **explicitly** whether
+   re-exposing Django's `delete_selected` on that changelist is acceptable — overriding
+   `get_actions` to drop it if not, rather than leaving it as an accident.
+2. **The `has_delete_permission` predicate is phase 15's surface.** It is a one-line,
+   one-symbol, additive change on a model whose images are not PII — and the alternative
+   finding is that a moderator cannot remove a photo at all. Route it to the coordinator
+   with that two-line argument; do not block BLOCK 11 on it.
+
+#### 0.6.4 Corrections to this plan's prose (tree wins)
+
+| # | Correction |
+|---|---|
+| 1 | **BLOCK 2 and Q07-4 are RETIRED as shipped** (`64a9de6`). See §0.6.1 for the three tripwires. |
+| 2 | **BLOCK 1 constraint 2 (`delete_photo(key)` on the key alone) is a silent no-op.** The key is already permanent; the bytes are at `staging/<key>`; `delete_photo` returns silently on `FileNotFoundError`. |
+| 3 | **BLOCK 1 is two coordinated changes in `submit_ad`**, not one line in `AdImageService`: prune `permanent_keys` in place **and** register the reclaim `on_commit` before the promote registration. Pruning is what removes the promotion noise — the ordering is only "noisy" if pruning is skipped. |
+| 4 | **BLOCK 1's impact statement is wrong** and must be replaced with the silent-partial-loss statement (see §0.6.2, Q07-2). There is no spec drift at `technical-specification.md`. |
+| 5 | **BLOCK 4's target is `strip_photo_exif`**, and the plan's own BLOCK 4 text already says so — the "inverted framing" critique applies to a misreading, not to the plan. What changed is that the default is now **measured**, so the coordinator gate closes. |
+| 6 | **BLOCK 4: declare the constant in `filesystem.py`,** beside `strip_photo_exif` — **not** in `thumbnails.py` as the plan says. `filesystem.py` and `thumbnails.py` have no import edge in either direction, so routing a constant from the high-level service into the low-level module creates a dependency existing for no other reason. Replace the plan's cross-module *proximity* assertion ("the two constants are declared adjacently") with a **behavioural** test: `strip_photo_exif`'s output is byte-identical to an explicit `quality=75` encode of the same image. |
+| 7 | **BLOCK 6: the plan's reuse of `on_disk` is a guaranteed false positive** on every `seed/` key. Also `ReferencedKey` (the plan's proposed dataclass) **does not exist in `src/`** — do not introduce it. |
+| 8 | BLOCK 6's test references are wrong: `test_delete_photo_called_within_lock_scope` lives in `apps/media/tests/test_sweep_orphaned_media.py::TestSweepLockScope`, **not** `apps/core/tests/test_sweep_lock_structure.py`; and that file has **9** tests in **2** classes, not 8. `db-retention.md`'s real path is `docs/02-database/db-retention.md`. |
+| 9 | **BLOCK 7 ships no metric** and creates no metrics module; the two ops files are untouched. Option (b) per-seller is **infeasible**, not open. |
+| 10 | **BLOCK 8: delete the "registry enumeration may break" risk entirely** (Q07-10). Add: **no bulk clear, no retry action**, with the missing-index reason stated; the retention command goes in `DAILY_COMMANDS` with the **exact-list** scheduler assertion updated, and `AdvisoryLockId` **14** re-read at allocation time (`test_advisory_lock_ids.py` validates members and references but does **not** catch reuse). |
+| 11 | **BLOCK 9's drift is three locations, not two**, and the mechanism is duplication, not an `include`. |
+| 12 | **BLOCK 11's advisory-lock framing is wrong** (row lock). Add: single photo (not a filtered set), `OTHER` (no new enum member), a **canned** reason, a matching `inspect.getsource` guard, and the `has_delete_permission` reachability trap in §0.6.3. |
+| 13 | BLOCK 1 should also add `.order_by("pk").first()` to `create_or_skip`'s duplicate lookup — one token, on a line the block rewrites anyway — so the winner is deterministic once an ad holds 2+ rows with the same digest. |
+| 14 | `apps/media/models.py`'s `MediaDeletionError` docstring says "Production path: none — diagnostics only" while being the sole persistence target of `filesystem.py::_record_deletion_error`. Correct it (comments only, one file). |
+
+#### 0.6.5 New findings filed by this pass
+
+- **`07-NEW-01`** — a **partial** dedup hit publishes an ad with silently fewer photos than
+  the seller uploaded. Owned by BLOCK 1's predicate re-scope; filed so the impact statement
+  is not lost.
+- **`07-NEW-02`** — `create_or_skip`'s duplicate lookup uses `.first()` with no
+  `ORDER BY`, so the winner is DB-order-dependent when one seller holds 3+ copies of the
+  same bytes. Pre-existing; fixed in BLOCK 1.
+- **`07-NEW-03`** — the scheduler service has no `PROMETHEUS_MULTIPROC_DIR` and the bot has
+  no `/metrics` endpoint at all, so **no non-web process can export a custom metric**.
+  Prerequisite for any future media metric; a compose-level change, not a media change.
+- **`07-NEW-04`** — the dev nginx has no `/health/` location, so any probe through nginx in
+  dev 404s. Recorded as intentional (the healthcheck bypasses nginx); route separately if
+  the coordinator disagrees.
 
 ---
 

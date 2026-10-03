@@ -259,22 +259,102 @@ it does not choose either of the two questions that are not the implementor's to
 |---|---|---|---|---|
 | **Q1** | May a moderator move an ad's status, and through which single write path? | **OPEN — owner decision.** Gating `AD-001`, and via `VAL-006` also `AD-008`, `AD-010`, `AD-011`, `VAL-003`. Nothing in `docs/` says whether the admin change form is a supported surface. | **User / product, via the coordinator** | Hard gate on **BLOCK 6**. Not an investigation. |
 | **Q2** | Which side of `ON_MODERATION` durability does the business want? | **OPEN — product decision.** Gating `AD-008` and constraining `VAL-003`'s final shape. | **User / product, via the coordinator** | Hard gate on **BLOCK 5**. **BLOCK 3 is deliberately built to be valid under all three answers** (§3.3.1). |
-| **Q3** | `AD-009`: a `PUBLISHED → PUBLISHED` matrix self-edge, or an explicit timer-bump service? | **OPEN — decision gate.** Genuinely two shapes with different costs. | Researcher + Planner | Inside **BLOCK 2** |
+| **Q3** | `AD-009`: a `PUBLISHED → PUBLISHED` matrix self-edge, or an explicit timer-bump service? | **RESOLVED 2026-10-01 — Option B′.** `Ad.reset_publish_clock(update_fields)`. See §0.6. | Researcher (closed) | **CLOSED.** BLOCK 2 |
 | **Q4** | `AD-004`: predicate change, index change, or both — and is the retention anchor a code change or a documentation change? | **OPEN — owner + technical.** Gating `AD-004`. `db-retention.md`, US-S7 and US-A5 disagree about the anchor. | **Owner** (anchor) + Researcher + Planner (shape) | Hard gate on **BLOCK 7** |
 | **Q5** | `AD-002`: what is the product rule for editing a failed ad? | **OPEN — product decision.** Gating `AD-002`. Options (a) and (c) hide the dead end without resetting the purge timer. | **User / product, via the coordinator** | Hard gate on **BLOCK 8** |
 | **Q6** | Which of `AD-006` and `MEDIA-002` is the record? | **OPEN — owner decision.** Same predicate, two records, two ratings (MEDIUM vs HIGH). | **Coordinator** | Hard gate on **BLOCK 13** |
 | **Q7** | Is `auto_moderate`'s bare `except Exception` in `_pass_moderation` (which converts a system error into a content verdict for the seller) a phase-05 finding? | **OPEN — scope decision, not a blocker.** The code context raises it and states it is **not** in the report's scope. | **Coordinator** | Inside **BLOCK 12**, non-blocking: BLOCK 12 ships either way; Q7 only decides whether one extra branch is added. |
-| **Q8** | Where does the `AdAdmin` audit row go, and with which `ModeratorActionType`? | **OPEN — technical, a sub-question of Q1(b).** `moderation_log.set_published` already writes `log_manual_publish` when a `moderator_id` is supplied, but `transition_to` returns `None`, so the form's save path must learn the previous status somehow. | Researcher + Planner | Inside **BLOCK 6** |
-| **Q9** | `AD-014`: do duplicate `(ad, position)` rows already exist? | **OPEN — data fact.** Cannot be answered without running a query against a production-shaped dataset. `AddConstraint` fails if they do. | Auditor (BLOCK 10 pre-flight) | Hard gate on **BLOCK 10**'s migration |
+| **Q8** | Where does the `AdAdmin` audit row go, and with which `ModeratorActionType`? | **RESOLVED 2026-10-01.** Mechanism closed: `transition_to` returns the source status; `save_model` triggers on `form.changed_data`; the audit row reuses `log_manual_publish` (`OTHER`). **Q1 itself stays OPEN.** See §0.6. | Researcher (closed); Q1 still owner | Mechanism **CLOSED** in BLOCK 6; Q1 remains a hard gate |
+| **Q9** | `AD-014`: do duplicate `(ad, position)` rows already exist? | **PARTIALLY RESOLVED 2026-10-01 — sizing closed, the data fact stands.** Ship the `UniqueConstraint`; the pre-flight is ONE query against the test DB plus a recorded static production-reachability argument. Not escalated to "production-shaped data as a hard gate". See §0.6. | Researcher (closed); Auditor BLOCK 10 pre-flight | Sizing **CLOSED**; the query remains BLOCK 10's pre-flight |
 | **Q10** | `VAL-002`: may the migration start by changing `create_test_ad`'s default status, and to which replacement status? | **DECIDED (mechanism) / OPEN (value).** The *mechanism* — change the default first, in its own commit, so the silent channel becomes loud failures — is the correct forcing function and the failure list is the migration map. The *value* must be chosen by the block's Planner step, because it trades unrelated breakage against clarity. | Planner, BLOCK 4 | Inside **BLOCK 4** |
-| **Q11** | `AD-010`: per-ad transaction, per-request transaction, or a bulk `QuerySet` rewrite — and what may the returned `error` string say? | **OPEN — decision gate.** A per-request `atomic()` contradicts the endpoint's own `{"completed": N, "errors": [...]}` partial-failure shape. The error string is operator-facing on an HTTP 200 and must be actionable without leaking internals. | Researcher + Planner | Inside **BLOCK 9** |
-| **Q12** | `AD-016`: what does "distinguishable" mean in `submit_ad`'s `tuple[bool, list[str]]` return? | **OPEN — decision gate.** A sentinel string is fragile; a richer return type breaks all three callers. Note `ad_edit`'s reactivation and text branches already render `errors[0]`, so they already consume it — the bot does not. | Researcher + Planner | Inside **BLOCK 12** |
+| **Q11** | `AD-010`: per-ad transaction, per-request transaction, or a bulk `QuerySet` rewrite — and what may the returned `error` string say? | **RESOLVED 2026-10-01.** Per-ad `atomic()` + `select_for_update()` over `sorted(ad_ids)`; a six-class failure taxonomy; response shape and HTTP 200 unchanged. See §0.6. | Researcher (closed) | **CLOSED.** BLOCK 9 |
+| **Q12** | `AD-016`: what does "distinguishable" mean in `submit_ad`'s `tuple[bool, list[str]]` return? | **RESOLVED 2026-10-01.** `SubmitAdOutcome(StrEnum)` + `SubmitAdResult(NamedTuple)` in `apps/ads/services/submission.py`, mirroring `ConsumeOutcome`/`ConsumeResult`. Five members; the lock timeout stays an exception. See §0.6. | Researcher (closed) | **CLOSED.** BLOCK 12 |
 
 **Question numbering note.** The user's summary lists "Q1 moderator-may-change-status
 ownership · Q2 which side of `ON_MODERATION` durability · Q4 the retention anchor · Q5 the
 failed-ad edit rule · Q6 which record owns `AD-006` vs `MEDIA-002` · Q9 whether duplicate
 `(ad, position)` rows exist". Those map exactly onto the code context's Q1, Q2, Q4, Q5, Q6
 and Q9 above. **All six stay open and are all gated** — none is decided by this plan.
+
+---
+
+### 0.6 Gate resolutions — 2026-10-01 (Auditor → Researcher → Planner pass)
+
+**Scope of this pass.** The Auditor re-verified the tree at HEAD against this plan's
+prose and overturned 20 claims. The Researcher then closed the five gates that are
+genuinely agent-resolvable (Q3, Q8, Q9-sizing, Q11, Q12). The Planner produced
+Implementor briefs for BLOCKs 2, 6, 9, 10 and 12.
+
+**Q1, Q2, Q4, Q5 and Q6 are NOT closed and must not be treated as closed.** They are
+product/owner decisions routed through the coordinator; no agent may answer them. Q7 is a
+scope question for the coordinator. Every block carrying one of those gates still cannot
+write code until the answer is recorded.
+
+**BLOCK 1 has not landed.** `ALLOWED_TRANSITIONS` is still a function-local literal inside
+`Ad.transition_to`; the `PUBLISHED` target branch still clears none of
+`archived_at` / `moderated_by` / `moderation_failed_at`; the three bare previous-cycle
+audit IDs are still in that function. The `1 → 2` and `1 → 6` hard edges are real.
+Re-confirm all of this at implementor time — do not restate it as shipped.
+
+#### 0.6.1 Resolved decisions
+
+| Gate | Decision | Why the alternatives lost |
+|---|---|---|
+| **Q3** | **`Ad.reset_publish_clock(update_fields: list[str]) -> None`** — sets `published_at` and appends `"published_at"` to the *caller's* list; `transition_to`'s `PUBLISHED` branch calls it; `ad_edit` keeps exactly one `save()`. The argument is non-negotiable: without it the caller must remember the field name, and an assignment without the append is a silent no-op. | The matrix self-edge (plan Option A) is **rejected on evidence**: `apps/moderation/signals.py::deliver_immediate_alerts_on_publish` does not inspect `update_fields`, and `apps/search/services/immediate_alerts.py::deliver_immediate_alerts` submits the send asynchronously with `record_notifications(ignore_conflicts=True)` and the receipt written *after* the send. A second `post_save` in the same transaction therefore registers a second `on_commit` and can produce a **duplicate Telegram message** for any saved-search pair still at `delivered_at IS NULL`. Plain Option B (a method that saves) has the same two-`post_save` problem. |
+| **Q8** | **Mechanism closed; Q1 stays open.** `transition_to` returns its source `AdStatus`; `AdAdmin.save_model` triggers on `"status" in form.changed_data`; the audit row reuses `moderation_log.set_published` → `log_manual_publish` with `action_type=OTHER`. When source `==` target (a concurrent writer already made the change) **no audit row is written** — that is what earns the return value. | The plan's stated cost for the return-type change ("touches every caller") is **wrong**: all ten production call sites discard the return, so there are zero production edits and exactly one test stub to re-annotate. A `values_list("status")` pre-read duplicates knowledge `transition_to` already holds *and* reads before the lock; re-reading a fresh instance is a full-row fetch including the four `tsvector` columns. |
+| **Q9** | **Ship the `UniqueConstraint`; pre-flight scaled to one query.** The argument is not "duplicates exist today" — it is that `position` has `default=0` and every direct writer can collide, so the constraint converts silent gallery corruption into a loud `IntegrityError`. Every sibling relation already carries a named `UniqueConstraint`; `ad_images` without one is the anomaly. | The plan's escalation to "production-shaped data as a hard gate" is disproportionate *and unmeetable inside the command contract* — the containerised `test` service is the only sanctioned DB access and a `--create-db` run is explicitly not representative. Run the one `GROUP BY ad_id, position HAVING COUNT(*) > 1` query against the test DB, report it verbatim, and record the static argument next to it. |
+| **Q11** | **Per-ad `atomic()` + `select_for_update()`, iterating `sorted(ad_ids)`** (pk order, matching `bulk_approve`'s documented rationale). Six failure classes; response shape `{"completed": N, "errors": [...]}` and HTTP 200 unchanged. `reject_ad` returns `bool` so `completed` is honest. | A per-request `atomic()` is **unexecutable** as the loop stands: the view catches the exception inside the `with`, the transaction is already `needs_rollback`, and the next iteration's `Ad.objects.get` raises `TransactionManagementError` → 500. It would only work with a savepoint per iteration, which *is* per-ad `atomic()`. A bulk `QuerySet` rewrite changes the endpoint's semantics from "these ids" to "this queryset" — overreach for MEDIUM. An `advisory_lock` is the wrong tool: advisory locks are the scheduled-job idempotency mechanism, row locks are the web-request primitive. |
+| **Q12** | **`SubmitAdOutcome(StrEnum)` + `SubmitAdResult(NamedTuple)`**, both in `apps/ads/services/submission.py`, mirroring `ConsumeOutcome`/`ConsumeResult`. Five members: `PUBLISHED`, `MODERATION_FAILED`, `PHOTO_UNAVAILABLE`, `DRAFT_GONE`, `INVALID_TRANSITION`. The lock timeout **stays an exception** — the enum houses business outcomes only. | The plan's "NamedTuple is near-zero churn" is **wrong** and the plan's "Option C has the largest churn" is only true for a dataclass: a 3-field result cannot be 2-tuple-unpacked, so 3 production + 11 test sites change mechanically. It is still the best option. Rejected: a sentinel string (crosses a translation boundary, rule 10); a 2-field legacy shim beside a 3-field variant (two public contracts for one service); a dataclass (a second result idiom in a repo with two `NamedTuple` results); Pydantic (rule 11 — a result is not a boundary input). |
+
+#### 0.6.2 Two traps the implementor must not fall into
+
+1. **Do not put the Q12 outcome in the `passed` / `errors` positions of the `NamedTuple`.**
+   `StrEnum` members are non-empty strings and therefore *truthy*, so `if passed:` would
+   silently succeed for every outcome. Silent corruption, not a `TypeError`.
+2. **Q12's "don't clear the FSM state" is not sufficient on its own.** `process_preview`
+   sits at `AdCreateForm.preview` and there is no route back to the earlier steps except
+   `state.clear()`. Bare retention leaves the seller pressing *confirm* against a dead
+   `ad_id` in a loop. The non-destructive outcome requires **re-pointing** — call the
+   existing `create_draft_ad(data["user_id"])` and `state.update({"ad_id": new_id})`.
+   Safety: `create_draft_ad` deletes any pre-existing `DRAFT` first, and in `DRAFT_GONE`
+   the draft is gone while in `INVALID_TRANSITION` the row is `DELETED`, not `DRAFT` —
+   nothing is destroyed in either case. That argument is the whole justification.
+
+#### 0.6.3 Corrections to this plan's prose (tree wins)
+
+| # | Correction |
+|---|---|
+| 1 | Next `apps/ads` migration is **`0009`**, not `0008` — `0008_remove_ad_ix_ads_draft_sweep_…` already exists (phase 03's `03-DB-003` follow-up). Affects §0.2.1, BLOCK 7, BLOCK 10, §1 "Fresh schema". |
+| 2 | `ModeratorActionType` has **five** members (`REJECT`, `BAN_ACCOUNT`, `SOFT_DELETE`, `CRITERIA_CHANGE`, `OTHER`); this plan lists four. `CRITERIA_CHANGE` has no writer in `apps/moderation/`. |
+| 3 | **`AD-007` is moot** — phase 03's `03-DB-003` landed; `sweep_drafts` already filters `updated_at__lt` and `IX_ads_draft_sweep` is already `(status, updated_at)`. |
+| 4 | `submit_ad` has **three** `False` returns, not two (the photo-reaped return landed with `03-DB-005`/`03-DB-008`). |
+| 5 | **BLOCK 12's `process_preview` description is stale.** It already probes `_get_ad_status`, already renders a dedicated expired string, and already clears state on that path with an in-code comment naming phase 05. |
+| 6 | The bulk endpoint's tests are **one** class (`apps/moderation/tests/test_priority_service.py::TestBulkModerationActionView`), not four. |
+| 7 | BLOCK 6's "exactly one `AnalyticsEvent`" is **wrong** — `_pass_moderation` writes two (`AD_PUBLISHED` + `MODERATION_APPROVED`), `set_published` writes zero. The implementor records which it chooses; a silent choice is not acceptable. |
+| 8 | The `moderator_id` non-persistence is a **missing column**, not a dropped kwarg — `ModeratorActionLog` has no moderator field at all. Fixing needs a new FK + migration; **file it separately**. |
+| 9 | **BLOCK 2's required "photo-only edit" test is unimplementable.** `ad_edit` never reads `request.FILES`, while `templates/ads/edit.html` advertises a multiple file input and the promise "Price/photo changes will be published immediately" — both silently discarded. Scope BLOCK 2 to price-only and **file the advertised-but-inert control as its own finding**. |
+| 10 | `TestPublishedTextEdit` has **six** methods, not four. |
+| 11 | `apps/ads/services/` has **no `__init__.py`** (namespace package). BLOCK 12's "re-export through `__init__.py` and `__all__`" is unexecutable — do not create one. |
+| 12 | `transition_to` never puts `updated_at` in `update_fields` on any non-`DELETED` branch; only the `DELETED` short-circuit does. |
+| 13 | `apps/ads/tests/test_ad_detail_queries.py`'s budget is `_QUERY_BOUND = 19`, and the module comment explicitly says not to re-tighten it to 16. |
+
+#### 0.6.4 New findings filed by this pass (not fixed by any phase-05 block)
+
+- **`05-NEW-01`** — `templates/ads/edit.html` advertises a photo-upload control and an
+  immediate-publish promise that `ad_edit` silently discards. MEDIUM. Owned by a future
+  phase; BLOCK 2 records the filing.
+- **`05-NEW-02`** — `ModeratorActionLog` has no moderator column, so four
+  `moderation_log` helpers accept a `moderator_id` they cannot persist, and
+  `log_manual_reject`'s docstring makes a literally false claim. Attribution currently
+  lives only on `Ad.published_by` / `Ad.moderated_by`, which is sufficient for US-A13.
+  MEDIUM; needs a new FK + a migration + a reporting decision.
+- **`05-NEW-03`** — `deliver_immediate_alerts_on_publish` fires on *any* save of a
+  `PUBLISHED` ad because it never inspects `update_fields`. Latent today
+  (`IMMEDIATE_ALERTS_ENABLED` defaults `False`), and `db-schema.md` already declares the
+  live-ad re-alert question open. BLOCK 2 must not widen it; fixing it is separate.
+- **`05-NEW-04`** — `bulk_moderation_action`'s `selected_items` has no uniqueness
+  validation, so a duplicate id is a client error the endpoint currently mis-reports as a
+  moderation failure.
 
 ---
 

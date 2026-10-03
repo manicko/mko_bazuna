@@ -191,16 +191,207 @@ and their consequences. **Silence is not an acceptable outcome for any of them.*
 
 | ID | Question | Block | Who decides | Status |
 |---|---|---|---|---|
-| **Q1** | **Who owns the cache-version-key lifetime after the 2026-09-28 handbook rewrite?** The report assigns the 300 s-counter-vs-360 s-entry inequality wholly to phase 08. The rewritten phase-08 handbook **block 10** assigns *"a freshness/version token's lifetime against the lifetime of the data it retires"* to **phase 13**, leaving 08 the *stale-read* half. This decides whether `SRCH-007` is a phase-08 item at all | **6** | **Coordinator** ruling, with Researcher input on what "phase 08 owns the cached result-set" still covers | **GATED — the highest-consequence open question in the plan.** BLOCK 6 carries both readings with their consequences |
-| **Q2** | **What is the correct `features` ceiling?** The report says 10 and warns any bound "must sit far below 20" (20 already costs 1.31 s; 40 costs 7.9 s; 60 kills the backend). But 10 is a *guess*, the resolved feature set is catalogue-driven, and **the UI cap must not land first** — if the shipped UI can already emit more than the cap, that is a separate UI defect | **1** | Researcher (measure the catalogue) + **Owner (product)** (state the ceiling) | **GATED.** A cap that lands before a UI cap is a rollout regression, not a fix |
-| **Q3** | **Does a catalogue-membership whitelist on `feature_slugs` cost more queries than it saves, and does it break `_QUERY_BOUND`?** `test_search_query_count.py::test_search_view_query_count_bounded` pins a total captured-SQL bound **and** explicitly forbids a hot-path FTS `COUNT(*)`; `test_search_slo.py` pins 2 s | **1** | Researcher + Planner | **GATED.** A per-slug membership query would fail the bound. Amend the test **explicitly in the commit body** if the bound must move — never silently |
-| **Q4** | **Is the NUL fix a strip, a rejection, or a shared normaliser — and what happens to the 200-vs-100 truncation contract?** `sanitize_query_for_log` already strips control characters but truncates to **100** (C-3); the documented `q` contract is **200**. Reusing it wholesale silently shortens `q` and would change `test_query_exceeding_max_length_returns_200` | **3** | Researcher (shape) + **Owner (product)** (whether a mutated query is acceptable) | **GATED.** All three shapes are argued in BLOCK 3 |
-| **Q5** | **Does `SavedSearch.query` need redaction as well as a length bound?** `PopularSearch.query` / `SearchHistory.query` store the **redacted** form; `SavedSearch.query` is stored **raw** and is fed straight to `websearch_to_tsquery` on both alert paths. A bound fixes `SRCH-011`/`VAL-006`; redaction is a different question that `06-PII-108` may or may not have considered for this table | **8** | **Phase 06 (owner of the PII policy)** + Planner | **GATED.** Do not assume. If phase 06 owns it, BLOCK 8 ships the bound only and records the redaction question in its commit body |
+| **Q1** | **Who owns the cache-version-key lifetime after the 2026-09-28 handbook rewrite?** The report assigns the 300 s-counter-vs-360 s-entry inequality wholly to phase 08. The rewritten phase-08 handbook **block 10** assigns *"a freshness/version token's lifetime against the lifetime of the data it retires"* to **phase 13**, leaving 08 the *stale-read* half. This decides whether `SRCH-007` is a phase-08 item at all | **6** | **Coordinator** ruling, with Researcher input on what "phase 08 owns the cached result-set" still covers | **GATED — the highest-consequence open question in the plan.** BLOCK 6 carries both readings with their consequences | **OPEN — COORDINATOR RULING (not an agent decision).** The evidence half is now answered and the mechanism is RECOMMENDED: option (a), a durable `timeout=None` version key across all four writers. Phase 13's own text states the split as settled and hard-depends on BLOCK 6. Four sub-rulings are listed in §0.6.2. See §0.6 |
+| **Q2** | **What is the correct `features` ceiling?** The report says 10 and warns any bound "must sit far below 20" (20 already costs 1.31 s; 40 costs 7.9 s; 60 kills the backend). But 10 is a *guess*, the resolved feature set is catalogue-driven, and **the UI cap must not land first** — if the shipped UI can already emit more than the cap, that is a separate UI defect | **1** | Researcher (measure the catalogue) + **Owner (product)** (state the ceiling) | **GATED.** A cap that lands before a UI cap is a rollout regression, not a fix | **RESOLVED 2026-10-03 (Product Owner) — option (b): NO hard-coded `?features=` ceiling. The bound is the catalogue invariant "the resolved feature set for any category", measured at seed volume, plus stated headroom, enforced by a guard test that keeps the ceiling honest as the catalogue grows.** BLOCK 1a's correlated subquery remains the real cost control, so the ceiling is a secondary parameter-list guard. The UI-cap-before-server-cap ordering constraint is **unchanged** and still binding. See §0.6 and §0.7 |
+| **Q3** | **Does a catalogue-membership whitelist on `feature_slugs` cost more queries than it saves, and does it break `_QUERY_BOUND`?** `test_search_query_count.py::test_search_view_query_count_bounded` pins a total captured-SQL bound **and** explicitly forbids a hot-path FTS `COUNT(*)`; `test_search_slo.py` pins 2 s | **1** | Researcher + Planner | **GATED.** A per-slug membership query would fail the bound. Amend the test **explicitly in the commit body** if the bound must move — never silently | **RESOLVED 2026-10-01 — option (d): the spec's correlated subquery over `AdFeature`, AND-semantics made explicit, NO whitelist.** BLOCK 1 owns a live spec deviation, not an invention. The bound-test premise is moot. See §0.6 |
+| **Q4** | **Is the NUL fix a strip, a rejection, or a shared normaliser — and what happens to the 200-vs-100 truncation contract?** `sanitize_query_for_log` already strips control characters but truncates to **100** (C-3); the documented `q` contract is **200**. Reusing it wholesale silently shortens `q` and would change `test_query_exceeding_max_length_returns_200` | **3** | Researcher (shape) + **Owner (product)** (whether a mutated query is acceptable) | **GATED.** All three shapes are argued in BLOCK 3 | **RESOLVED 2026-10-03 (Product Owner) — strip invisible/control characters at the input edge and search the CLEANED query.** Option (a)'s shape, with one hard constraint the block must honour: **`sanitize_query_for_log` must NOT be reused wholesale**, because it truncates to 100 while the view/column contract is 200. The **200-char contract and `test_query_exceeding_max_length_returns_200` are preserved**. **Positive control: a legal query returns byte-identical ads.** See §0.6 and §0.7 |
+| **Q5** | **Does `SavedSearch.query` need redaction as well as a length bound?** `PopularSearch.query` / `SearchHistory.query` store the **redacted** form; `SavedSearch.query` is stored **raw** and is fed straight to `websearch_to_tsquery` on both alert paths. A bound fixes `SRCH-011`/`VAL-006`; redaction is a different question that `06-PII-108` may or may not have considered for this table | **8** | **Phase 06 (owner of the PII policy)** + Planner | **GATED.** Do not assume. If phase 06 owns it, BLOCK 8 ships the bound only and records the redaction question in its commit body | **RESOLVED 2026-10-03 (Product Owner) — `SavedSearch.query` is stored REDACTED via `redact_search_query()`, and `query_normalized` is keyed on the redacted form. One rule for all query-persistence paths; redaction happens at write, and the stored redacted value is what feeds `websearch_to_tsquery`.** The question is **CLOSED, not deferred.** In this plan BLOCK 8's length bound **ships as planned**; the redaction call and its test are **phase 09's** `09-API-012` and the storage-layer `09-VAL-002`. **Propagation obligation on phase 06** (PII policy owner, `06-PII-108`). See §0.7 |
 | **Q6** | **Where does the ad-visibility predicate live, and does `06-VAL-003`'s shape constrain it?** A named function in `apps/ads`, **not** a default manager — a default manager would hide withdrawn users from the bot's `AccountStateMiddleware`. `IMMEDIATE_ALERTS_ENABLED` is sensitive to any queryset-level change | **14** | Phase 06 (predicate owner) + **coordinator** (sequencing against phase 03 BLOCK 9) | **GATED and largely answered by phase 06's own plan.** BLOCK 14 records the constraint; it does not write the predicate |
-| **Q7** | **Does a ban hide inventory?** `db-schema.md:61` says "account block (US-A4)"; `:77` expands it to login/publish enforcement only. Phase 06's validation: *"nothing in the spec says a banned account must be excluded from the market"* | **14** | **Owner (product)** | **GATED.** Two fully argued options in BLOCK 14; **neither is implemented here** |
-| **Q8** | **Does the single-word narrowing stay a hard filter?** `technical-specification.md:66` documents it verbatim, so the current behaviour is **specified**, not a regression. The finding is that the spec chose recall-reducing behaviour with no UI signal | **11** | **Owner (product)** | **GATED.** If the owner accepts the narrowing as intended, `SRCH-009` drops to LOW and resolves to a documentation change plus BLOCK 10's ambiguity fix |
-| **Q9** | **What is the rollback story for the `popular_searches` dedup?** Deduplication destroys rows; `migrate back` cannot restore them | **5** | Researcher (reverse shape) + Planner | **GATED, narrow.** A `RunPython.noop` reverse plus a documented pre-count, or a mandatory pre-migration dump. `docs/ops/restore.md` / `rollback.md` are phase 12's |
-| **Q10** | **Is `test_give_consent_restores_declined_ads_to_queryset` the only test encoding the cache-bypass workaround?** If others adopt the same "bypass the view because the cache is stale" pattern, BLOCK 7's blast radius is larger than one test | **7** | Auditor (search) | **Pre-block step, not a gate** — a grep over `apps/search/tests/` and `apps/ads/tests/` for the pattern, reported before the block starts |
+| **Q7** | **Does a ban hide inventory?** `db-schema.md:61` says "account block (US-A4)"; `:77` expands it to login/publish enforcement only. Phase 06's validation: *"nothing in the spec says a banned account must be excluded from the market"* | **14** | **Owner (product)** | **GATED.** Two fully argued options in BLOCK 14; **neither is implemented here** | **RESOLVED 2026-10-03 (Product Owner) — option (a): A BAN HIDES INVENTORY.** A banned seller's ads are excluded from the public ad-visibility predicate **across search, category, detail and the media gate**. It must be argued as a **moderation** decision and must **never** be bundled into a commit justified as fixing a consent violation. The `db-schema.md:61` amendment is **phase 06's file** — propagation obligation recorded. See §0.7 |
+| **Q7′** *(new, from the 2026-10-03 Product Owner rulings)* | **Does ban enforcement also cover creating and publishing a new ad?** The answer changes the scope of `SRCH-008` from a visibility term alone to a **write** boundary, and it closes a known gap recorded elsewhere in the plan set | **14** | **Owner (product)** | **RESOLVED 2026-10-03 (Product Owner) — a banned seller CANNOT create or publish a new ad.** Ban enforcement covers **relisting**, not only login. Where any plan records *"a banned seller can still relist"* as an accepted known gap, that gap is **now closed** and the known-gap test becomes a **positive control asserting the block**. The predicate work stays phase 06's; the publish/create gate is named in BLOCK 14 and in §5.5. See §0.7 |
+| **Q8** | **Does the single-word narrowing stay a hard filter?** `technical-specification.md:66` documents it verbatim, so the current behaviour is **specified**, not a regression. The finding is that the spec chose recall-reducing behaviour with no UI signal | **11** | **Owner (product)** | **GATED.** If the owner accepts the narrowing as intended, `SRCH-009` drops to LOW and resolves to a documentation change plus BLOCK 10's ambiguity fix | **RESOLVED 2026-10-03 (Product Owner) — the single-word narrowing STAYS a hard filter, AND the UI must signal it.** Option (a)'s disjunctive-branch fix is **NOT chosen**. BLOCK 11 ships the narrowing plus a results-page control reading *"showing results for &lt;Category&gt; only — search all categories"*, plus BLOCK 10's ambiguity fix. **`SRCH-009` therefore STAYS MEDIUM** and becomes an **implementation**, not a documentation change. **A new user-visible string is required → non-empty `ru` and `bs`.** See §0.7 |
+| **Q9** | **What is the rollback story for the `popular_searches` dedup?** Deduplication destroys rows; `migrate back` cannot restore them | **5** | Researcher (reverse shape) + Planner | **GATED, narrow.** A `RunPython.noop` reverse plus a documented pre-count, or a mandatory pre-migration dump. `docs/ops/restore.md` / `rollback.md` are phase 12's | **RESOLVED 2026-10-01 — `RunPython.noop` reverse using `0004_backfill_delivered_at`'s hazard framing; set-based dedup; pre/post counts in the migration log.** `rollback.md`/`restore.md` already exist, so no runbook is needed. Migration is `0005`. See §0.6 |
+| **Q10** | **Is `test_give_consent_restores_declined_ads_to_queryset` the only test encoding the cache-bypass workaround?** If others adopt the same "bypass the view because the cache is stale" pattern, BLOCK 7's blast radius is larger than one test | **7** | Auditor (search) | **Pre-block step, not a gate** — a grep over `apps/search/tests/` and `apps/ads/tests/` for the pattern, reported before the block starts | **ANSWERED 2026-10-01 — exactly ONE test** (`test_give_consent_restores_declined_ads_to_queryset`). BLOCK 7's blast radius is one function. See §0.6 |
+
+---
+
+### 0.6 Gate resolutions — 2026-10-01 (Auditor → Researcher pass)
+
+**Scope.** The Auditor overturned several load-bearing premises, including one that reframes
+BLOCK 1 from an invention into a conformance task. The Researcher closed Q3, Q9 and Q10 and
+**recommended** the BLOCK 6 mechanism.
+
+**Still open:** **Q1** is a **coordinator ruling**, not an agent decision — §0.6.2 lists the
+four sub-rulings needed. **Q6** is phase 06's predicate ownership plus coordinator sequencing.
+
+**Closed by the Product Owner on 2026-10-03 (§0.7):** **Q2** (catalogue-invariant ceiling),
+**Q4** (strip at the input edge, 200-char contract preserved), **Q5** (`SavedSearch.query`
+stored redacted; `query_normalized` keyed on the redacted form), **Q7** and **Q7′** (a ban
+hides inventory, and a banned seller cannot create or publish), **Q8** (the narrowing stays and
+the UI signals it). **No owner decision remains open in this plan.**
+
+#### 0.6.1 Resolved decisions
+
+| Gate | Decision | Why the alternatives lost |
+|---|---|---|
+| **Q3** | **Option (d) — implement the shape the spec already prescribes**, AND made explicit, **with no catalogue whitelist**. `ListingsQuery.build_queryset` replaces the per-slug chain + `.distinct()` with a counted subquery over `AdFeature`: `AdFeature.objects.filter(feature__slug__in=slugs).values("ad_id").annotate(n=Count("feature_id")).filter(n=len(distinct_slugs)).values("ad_id")`, then `ads.filter(pk__in=…)`. Cost becomes **2 joins + 1 subquery, O(1) in N**. `AdFeature.Meta.unique_together = [("ad","feature")]` makes `Count("feature_id")` already distinct; `feature__slug__in` means **zero** slug-resolution queries. | **The plan missed that `docs/01-spec/search-patterns.md` already prescribes this shape** — a correlated subquery over `AdFeature` with an `IN` clause, *"not a chaining `.filter()` per feature"* — while `build_queryset` does exactly the forbidden chain. **BLOCK 1 owns a live spec deviation, not an invention**, which makes it cheaper than the plan estimated. Rejected: (a) count cap alone leaves the N-join blowup intact and was the plan's default; (b) per-slug `exists()` is the same order problem; (c) a single `values_list` whitelist costs a query, a cache-lifetime question that collides with BLOCK 6, **and converts the spec's "match nothing" into a 400** — a spec change disguised as a fix. The naive reading of (d) — plain `EXISTS(... IN ...)` — yields **OR**; that is the spec's ambiguity, and the doc edit must replace "an ad must match *all* of" with a countable `COUNT(feature_id) = <number of distinct selected slugs>`. **Unknown slugs already "match nothing" for free**, because they are absent from `AdFeature` so `COUNT < N` — no whitelist needed. |
+| **Q9** | **`RunPython.noop` reverse**, using `0004_backfill_delivered_at`'s *hazard* framing rather than merely "no data to restore". Migration is **`0005`** (BLOCK 8 shifts to `0006`). Dedup rule — the plan states none of this, so it is decided here: **survivor** = greatest `hit_count`, tie → greatest `last_seen`, tie → lowest `pk` (determinism is required for re-entry safety); **`hit_count = Sum`** (the column's whole purpose); **`last_seen = Max`**; **`query` and `source` keep the survivor's own values, untouched** — `query` is the redacted display form that `increment_popular_search` keeps consistent with the key on every write, so borrowing another row's would re-introduce a display/key mismatch, and `source` is provenance, not an aggregate. Pre/post counts emitted by the migration's own log line. **Also constrain `SeedService._seed_popular_searches` to `source=SEED`** in the same block. | The runbook prerequisite is **already satisfied**: `docs/ops/rollback.md` §3 exists with the decision tree *and* a "Data backfill requirement" subsection stating reversing "cannot restore the data" — so Q9(b)'s "needs a phase-12 runbook step" is moot; option (a) plus migration-emitted counts is a strict subset with nothing routed. Rejected: a Python row loop — `0004` establishes the set-based idiom explicitly (*"no row loop, no per-row Python, safe at any table size"*) and the table is unbounded. `last_seen` is `auto_now=True`, a `pre_save` hook, so a set-based `MAX` update writes verbatim and is not silently overridden. **Seed scope is not optional:** `_clean` deletes only `source=SEED` rows, so an unconstrained `update_or_create` matches a user's real production row, **flips its `source` to `SEED`**, and the next `_clean` deletes it. The `UniqueConstraint` does not create this — it converts a duplicate into a **silent steal**. |
+| **Q10 / BLOCK 7** | **A `User` `post_save` receiver in `apps/search/signals.py`**, keyed on `{"is_declined"}` only, bumping via `transaction.on_commit(bump_search_cache_version)`. `deletion.py` gets a **zero-line diff**. Answer: **exactly one test** encodes the bypass. | `apps/search/signals.py` already owns the invalidation contract and its wiring is proven live; a new `apps/users/signals.py` would need a `UserConfig.ready()` import or an import *from* `apps/search/signals.py` — i.e. a users-owned module wired by search, which is worse than putting the third receiver beside the two it must be read against. **The two existing field sets are NOT reusable:** `update_fields is None` consults `_SEARCH_RESULT_AFFECTING_STATUSES` and the `else` branch consults `_SEARCH_RELEVANT_FIELDS` — different branches — and the `User` receiver needs **neither**, because `ListingsQuery.build_queryset` contains exactly **one** `User` predicate: `user__is_declined=False`. Keying on `ads_auto_publish`/`consent_*`/`is_deleted` would be unjustified over-bumping. Note the deliberate **asymmetry**: the two `Ad` receivers bump *inline, inside* the transaction; this one must use `on_commit`, because retiring cache keys against an uncommitted predicate is exactly wrong for a consent transition. **`deletion.py` needs no change:** `withdraw_consent` never writes `is_declined`, so there is no double-bump there and the per-ad `transition_to(DELETED)` bumps still cover visibility. `decline_consent` **does** double-bump (receiver + its existing explicit `on_commit`) — harmless on a monotonic counter, and **left untouched** to respect the binding constraint that `deletion.py` is phase 06's most contended file. |
+
+#### 0.6.2 Q1 — the coordinator ruling, and what BLOCK 6 should do
+
+**Q1 is NOT closed and must not be treated as closed.** It is an ownership ruling routed
+through the coordinator. The evidence half is answered; the mechanism is **recommended**:
+**option (a)**, a durable `timeout=None` version key adopted by all four writers in one
+commit, which is the only non-forking choice — phase 13's plan states the split as settled
+in three independent places and makes BLOCK 6 a **hard external dependency**
+(*"phase 08 owns the contract, phase 13 owns the relationship between the token's lifetime
+and the entries it retires"*; *"`docs/architecture/cache-strategy.md` is phase 08 BLOCK 6's
+sole owner. Same commit or strictly after; never in parallel."*). Option (b) renegotiates a
+settled split; option (c) is this plan's own *"not recommended and not offered as
+acceptable"*.
+
+**The four sub-rulings the coordinator must make:**
+1. Whether the handbook rewrite's *"phase 13 owns … a freshness token's lifetime against the
+   data it retires"* excludes the counter's **durability**. Phase 13 reads it the other way.
+   If the coordinator sides with phase 13's literal reading, BLOCK 6 shrinks to a doc
+   statement, `SRCH-007` is not a phase-08 implementation item, and the hard `6 → 7` edge
+   disappears.
+2. That `docs/architecture/cache-strategy.md` is unclaimed in the window — phase 13 says it
+   waits, but that must be asserted, not assumed.
+3. Whether a new shared helper module in `apps/core` is accepted. It is unreserved. Phase 09
+   owns cache-failure policy in `apps/core/utils/cache.py`, so the coordinator must either
+   accept the new file, relocate the helper there, or rule for the interim — legitimate
+   **only** if all four writers land in one commit.
+4. Whether `apps/categories/cache.py::bump_tree_version` sits in phase 07's or phase 09's
+   contention window. BLOCK 6 must edit it; leaving three writers behind is forbidden.
+
+**Two facts that make option (a) safe to assert:** no `maxmemory-policy` and no `maxmemory`
+appears anywhere in the compose files, so Redis runs the default **`noeviction`** and a
+TTL-less integer key is not evicted — four tiny keys, negligible. Name `noeviction`
+explicitly as the assumption in the helper's docstring, because that is the statement that
+will go stale. And **the fifth consumer needs no code change**: `category_fuzzy.get_active_category_names`
+keys on `category:fuzzy_names:{get_tree_version()}:{locale}` and therefore *inherits*
+`bump_tree_version` — once that writer is durable the counter never resets to `1`, so a
+retired fuzzy key can never become byte-identical again. **The consumer is fixed by the
+writer fix**; it becomes a test plus a doc statement, and should be marked read-only in the
+task YAML rather than listed as a code target.
+
+#### 0.6.3 BLOCK 1 must split into two commits
+
+- **1a — the queryset rewrite** (the actual `SRCH-001` remedy, closing the spec deviation).
+  No gate. Verifiable against `test_features_filter.py` alone. Ships first.
+- **1b — the input bound, the 400 mapping, and the doc edit.** Gated on **Q2**'s ceiling —
+  **now RESOLVED (2026-10-03, option b: the catalogue invariant plus a guard test)**. The split
+  is unchanged; 1b is simply no longer waiting on a decision.
+
+**Q2's evidence is void once 1a lands.** The 20 → 1.31 s / 40 → 7.88 s / 60 → 19.90 s curve
+was measured on the **chained** shape. After 1a the join count is O(1) in N, so "any bound
+must sit far below 20" no longer binds query cost. Either re-measure against the new shape,
+or state the cap as a **secondary parameter-list guard** with that reframing recorded.
+**Shipping the cap without 1a fixes nothing structural.** §1's one-commit-per-block rule
+must be amended for BLOCK 1.
+
+**Where a DTO `ValidationError` becomes a 4xx.** Only the count cap raises, and **neither
+`search()` nor `listings()` catches it today** — so the current behaviour is a **500**, and
+the plan's acceptance criterion *"rejection is a 4xx on `/search/` and `/` — not a 500"* is
+not achievable without a view-side change the plan's file surface does not mention. Chosen:
+add the minimal mapping to both views — `except ValidationError` → bare
+`HttpResponseBadRequest`. Not coercion or truncation, which silently change result
+semantics. **A bare 400 carries no body, so no new i18n surface** — no `{% trans %}`, no
+`ru`/`bs` `msgstr`. Both view files must therefore join BLOCK 1's file surface.
+
+**The `[""]` case, closed by the same validator.** A **bare** `?features=` yields `[""]`,
+which is truthy, so today's chain emits `features__slug=''` and returns zero results — while
+an **absent** `?features=` correctly short-circuits. One `mode="before"` `field_validator`
+that strips empty strings and dedupes, applied before `max_length`, closes both that and
+`?features=a&features=a` (which today returns matching ads but would fail an `n=2` count).
+The validator must **strip and dedupe only, never filter to a whitelist** — filtering would
+change `filters_hash` and break `TestSearchCacheKey::test_feature_slugs_are_order_independent`
+and `::test_different_features_produce_different_keys`.
+
+**BLOCK 7's test spec also needs correcting.** The exposure is **directional only**: the
+cache stores a serialized `list[int]`, and on a hit the view re-filters over the **live**
+queryset, so a newly-*hidden* ad is still excluded by the live predicate. **Only the
+"must show" direction is broken**, and `total_count`/`has_results` ride on `len(cached_ids)`
+so they are stale in the same direction. The rewritten test therefore needs exactly one
+assertion — decline (hidden) → warm the cache → assert absent → `give_consent` → a second
+request with **no manual cache clear and no manual bump** → assert present. Warmth must be
+**proven**, not assumed: the autouse `_clear_cache_between_tests` fixture guarantees a cold
+LocMem cache per test. And the plan's "negative" test is wrong as written — a **bare**
+`user.save()` **must** bump under the conservative `None` branch; only a **targeted**
+`update_fields` save on an unrelated field is a valid negative.
+
+#### 0.6.4 Corrections to this plan's prose (tree wins)
+
+| # | Correction |
+|---|---|
+| 1 | **Next free migration is `0005`, not `0003`.** `0003_add_delivered_at` and `0004_backfill_delivered_at` are phase-03 `03-DB-007` and equally off-limits; BLOCK 8 shifts to `0006`. Keep "re-read the directory immediately before generating" — the untracked `apps/users/migrations/0003_logintoken_browser_binding.py` proves the number space moves. |
+| 2 | **The column is `last_seen`, not `last_searched_at`.** Every dedup arithmetic rule, `code_hint` and acceptance criterion using that name is wrong. |
+| 3 | **`ListingsQuery` is in `apps/ads/services/listings_query.py`** — there is no `apps/search/services/listings_query.py`. (Phase 13's plan asserts a non-existent `apps/categories/services/cache.py`; the real module is `apps/categories/cache.py`.) |
+| 4 | **BLOCK 1 closes a spec deviation, not an invention** — `docs/01-spec/search-patterns.md` already prescribes the subquery-over-`AdFeature` shape, and `build_queryset` does the forbidden chain. The spec doc edit is mandatory. |
+| 5 | **Q3's bound-test premise is moot.** `test_search_query_count.py` sends `"?q=товар&lang=ru"` — **no `?features=`** — so `feature_slugs == []`, the `if` is False, and any check gated on non-emptiness adds **exactly zero** queries. `_QUERY_BOUND` needs **no amendment** under any candidate shape. |
+| 6 | **`TestSearchCacheKey` pins 17 tests, not 14**, plus the `invalidate_search_cache` alias assertion. |
+| 7 | **`docs/ops/rollback.md` and `restore.md` already exist** — phase-12-**owned**, not phase-12-pending. `rollback.md` §3 already carries a "Data backfill requirement" subsection. |
+| 8 | **The two field sets are used in different branches**: `update_fields is None` → `_SEARCH_RESULT_AFFECTING_STATUSES`; `else` → `_SEARCH_RELEVANT_FIELDS`. The plan's framing ("both in the first branch") is wrong, and BLOCK 7's "do not copy across" must be stated as *different branches, neither set reusable*. |
+| 9 | **The `apps/search/signals.py` docstring's "signals fire after commit" claim is false** for `post_save` — both receivers call `bump_search_version()` directly, **inside** the transaction. LOW impact (a rolled-back transaction still bumps a monotonic counter), but BLOCK 6 must not rely on the sentence and BLOCK 7's deliberate `on_commit` makes it actively misleading. Correct it in BLOCK 6's change. |
+| 10 | **`docs/02-database/db-indexes.md::Indexes — popular_searches` is missing from BLOCK 5's file surface.** It records the two `db_index=True` columns with no uniqueness note, alongside `db-schema.md::popular_searches`. |
+| 11 | **There is no documented 200-char `q` contract.** 200 exists only in `search.py::MAX_SEARCH_QUERY_LENGTH` and two `max_length=200` columns; the only documented contract is autocomplete's (stripped, `;'"\` removed, rejected when <2 or >100). The real collision is **100 (log/redact) vs 100 (autocomplete) vs 200 (view + columns)**. `test_query_exceeding_max_length_returns_200` asserts **only** `status_code == 200`, so a silent 200 → 100 would not be noticed. |
+| 12 | **`feature_slugs` needs no whitelist** — unknown slugs already "match nothing" under the counted subquery, for free, by construction. |
+| 13 | **BLOCK 1's file surface must add `apps/search/views/search.py` and `apps/ads/views/listings.py`** for the `ValidationError` → bare 400 mapping. |
+| 14 | **BLOCK 1 splits into 1a / 1b**; §1's one-commit-per-block rule needs amending for it. |
+| 15 | **Q2's latency curve is void after 1a** — it was measured on the chained shape. Re-measure or reclassify the ceiling as a secondary parameter-list guard. |
+| 16 | **The dedup's `query`/`source` disposition was never stated** and is now decided (§0.6.1): both keep the survivor's own values. |
+| 17 | **BLOCK 5 must add `apps/seed/services/seed_service.py::_seed_popular_searches`**, scoped to `source=SEED` — otherwise a real user's production row is flipped to `SEED` and deleted by the next `_clean`. |
+| 18 | **The seed row-count residue is closed** — zero matches for `PopularSearch`/`popular` across `src/backend/apps/seed/tests/`. Remove the flag. |
+| 19 | **BLOCK 6's task YAML should not list `category_fuzzy.get_active_category_names` as a code target** — it needs no change; it inherits `bump_tree_version`. Mark read-only/reference. |
+| 20 | **BLOCK 7's negative test is mis-specified** — a bare `user.save()` must bump; only a targeted `update_fields` save on an unrelated field is a valid negative. |
+| 21 | **BLOCK 7's file surface should drop `give_consent`/`decline_consent`** — under this design `deletion.py` has a **zero-line diff**. Record the phase-06 follow-up instead. |
+| 22 | **`cache-strategy.md`'s "Bump function" row contains a typo** (`bump_search_version()` calling `bump_search_version`; should name `bump_search_cache_version`). BLOCK 6 amends that file, so it should be fixed there. |
+
+#### 0.6.5 New findings filed by this pass
+
+- **`08-NEW-01`** — nothing prunes `popular_searches`, and `increment_popular_search` fires
+  on **every** `?q=` search including zero-result ones. Routed to the coordinator: pruning
+  long-tail rows and stopping zero-result recording has both a product dimension (what
+  belongs on the anonymous suggestion surface) and an index dimension (a trigram index is
+  phase 13's grading scope). **Not built in BLOCK 5.**
+- **`08-NEW-02`** — the dedup **can add rows to the anonymous suggestion surface**, because
+  `get_popular_suggestions` is global and cross-user on an unauthenticated endpoint and
+  `Sum` can push a merged group across `_MIN_HIT_COUNT = 10` (4+4+4 → one row at 12).
+  This is a false negative being fixed rather than a regression, so the floor is **not**
+  retuned — but it must be documented, with one test covering both the 9 (still hidden) and
+  12 (now eligible) edges. Record the free win too: merging rows narrows the
+  `LIKE 'x%'` scan the autocomplete runs on every keystroke.
+- **`08-NEW-03`** — `search.py::TestSearchViewInputRobustness::test_homoglyph_and_control_chars_query_returns_200`
+  asserts 200 for a URL containing a literal `u200B`, but Django does not decode it — so the
+  control character the test claims to exercise never reaches the view. The control-character
+  coverage BLOCK 3 adds must not repeat this.
+
+---
+
+### 0.7 Product Owner gate rulings — 2026-10-03
+
+**Authority.** These are Product Owner decisions, dated `2026-10-03`, recorded here so that no
+Implementor can re-derive a settled question or re-choose an option. **Every `GATED` row in
+§0.5 that maps to a ruling below is now closed.** Where a ruling changed a block's premise, the
+block section carries the change; where a ruling created work, it appears in the block's scope
+with an acceptance criterion.
+
+| Gate | Ruling (2026-10-03, Product Owner) | Chosen option | Block-level consequence |
+|---|---|---|---|
+| **Q2** — the `?features=` ceiling | **No hard-coded ceiling.** The bound is the **catalogue invariant** — *"the resolved feature set for any category"*, measured at seed volume, **plus stated headroom** — enforced by a **guard test** that keeps the ceiling honest as the catalogue grows | **(b)** | **BLOCK 1** ships 1a (the correlated subquery) **and** 1b (the invariant + guard test). `MAX_FEATURE_FILTER_SLUGS` is **not** a hard-coded literal; it is derived, or asserted against the catalogue. **Changed premise:** §0.6.3's *"re-measure or reclassify"* is discharged — the ceiling is **reclassified** as a secondary parameter-list guard, and BLOCK 1a's subquery is the real cost control. **Unchanged:** the UI-cap-before-server-cap ordering constraint (BLOCK 1 binding constraint 4) and *"the commit body names the measurement"*. **New obligation:** the guard test |
+| **Q4** — NUL / control characters | **Strip invisible/control characters at the input edge and search the cleaned query.** Constraint: **must NOT reuse `sanitize_query_for_log` wholesale** (it truncates to 100 while the view/column contract is 200) | **(a)**, narrowed by the Product Owner | **BLOCK 3** ships a strip at the input edge on **both** endpoints. The **200-char contract and `test_query_exceeding_max_length_returns_200` are preserved** — a binding acceptance criterion, not a preference. **Positive control: a legal query returns byte-identical ads.** C-3 stands (there is no documented 200-char contract) and BLOCK 3's binding constraint 2 is unchanged |
+| **Q5** — `SavedSearch.query` redaction | **`SavedSearch.query` is stored REDACTED via `redact_search_query()`, and `query_normalized` is keyed on the redacted form.** One rule for **all** query-persistence paths. Redaction happens **at write**; the stored redacted value is what feeds `websearch_to_tsquery` | **the product rule**, not a plan option | **BLOCK 8's length bound ships exactly as planned** and the redaction question is **CLOSED, not deferred** — BLOCK 8 no longer carries an unanswered question in its commit body. The redaction call itself is **not** phase 08's: it is **phase 09's `09-API-012`** (`save_search`) and the storage-layer `09-VAL-002`. **Propagation obligation on phase 06** (`06-PII-108`, PII policy owner) for the one-rule statement |
+| **Q7** — does a ban hide inventory? | **A ban hides inventory.** A banned seller's ads are excluded from the public ad-visibility predicate **across search, category, detail and the media gate** | **(a)** | **BLOCK 14** is no longer a two-option publication: it publishes the **ruling** and the phase-06 handoff. `SRCH-008` moves from *"owner product decision"* to *"owner product decision **taken**"*. **The change must be argued as a moderation decision and must NEVER be bundled into a commit justified as fixing a consent violation** — now a binding constraint, not a warning. **Propagation obligation on phase 06**: the `db-schema.md:61` amendment (phase 06 owns `db-schema.md`, BLOCKS 13/17) |
+| **Q7′** — does a ban cover creating/publishing? | **A banned seller cannot create or publish a new ad.** Ban enforcement covers **relisting**, not only login. Any plan recording *"a banned seller can still relist"* as an accepted known gap has that gap **closed**, and the known-gap test becomes a **positive control asserting the block** | **the product rule** | **BLOCK 14** names the write boundary alongside the read boundary, and §5.5 records it as a phase-06 obligation. `SRCH-008`'s scope widens from a visibility term to a **write** boundary; that does **not** give phase 08 the predicate |
+| **Q8** — does the single-word narrowing stay a hard filter? | **The narrowing stays a hard filter AND the UI must signal it.** The disjunctive-branch fix is **NOT** chosen. The results page renders a *"showing results for &lt;Category&gt; only — search all categories"* control, plus BLOCK 10's ambiguity fix | **(b)+(c) combined**, explicitly **not** (a) | **BLOCK 11** changes class: it ships **production code** (template + string) plus BLOCK 10's fix, and **no predicate change**. **`SRCH-009` STAYS MEDIUM** — it does **not** drop to LOW and the block is **not** cancelled. **New i18n deliverable**: a new user-visible string with **non-empty `ru` and `bs`**, in the same commit. The hard filter itself is unchanged, so the two `TestSearchViewDescendantCategories` tests **stay green unchanged** — the pinned narrowing is now the specified behaviour |
+
+**Rulings that do not change phase 08's work, recorded so they are not re-litigated.**
+
+- **A truncated result set displays `<SEARCH_CACHE_MAX_HITS>+`.** The true total is never
+  claimed when it cannot be computed. **Effect on this plan: none** — phase 08 renders no
+  result count at all (`total_count` is never displayed; §6.2). Recorded because BLOCK 12's
+  `has_results` derivation, and any future count display, must not contradict it.
+- **A new draft replaces the current one** (a Product Owner decision, not a plan default).
+  Recorded here only so that no phase-08 finding is re-opened on the grounds that the previous
+  behaviour was unspecified. **No phase-08 file records the old behaviour.**
+
+**Technical gates that are NOT Product Owner decisions and therefore remain exactly as they
+are.** **Q1** (cache-version-key ownership — a coordinator ruling, §0.6.2), **Q3** (resolved
+2026-10-01, option (d)), **Q6** (predicate location — phase 06's), **Q9** (resolved
+2026-10-01), **Q10** (answered 2026-10-01). No migration numbering, module placement, commit
+sequencing or cache-TTL arithmetic was changed by any 2026-10-03 ruling.
 
 ---
 
@@ -407,28 +598,30 @@ acceptance depends on a decision the Implementor was told not to make.
 
 | ID | Disposition | Block | Final severity | One-line reason |
 |---|---|---|---|---|
-| `SRCH-001` | **implement — but gated on Q2 (the ceiling) and Q3 (the whitelist's query cost).** Bounded at the boundary: a count cap **plus** a catalogue-membership check. A plain `max_length` alone is insufficient — any N nonexistent slugs is still a `2N+3`-join query returning zero rows | **1** | **CRITICAL** | Unauthenticated cluster-kill, reproduced end to end. `mem_limit: ${DB_MEM_LIMIT:-1g}` is the shipped **production** cap and no `statement_timeout` exists, so the memory limit is precisely what converts an expensive query into a cluster-wide outage. **Any bound must sit far below 20, not near the report's 120** |
+| `SRCH-001` | **implement — Q3 RESOLVED (option d, no whitelist) and Q2 RESOLVED 2026-10-03 (option b).** BLOCK 1 splits 1a/1b. 1b's bound is the **catalogue invariant** — the resolved feature set for any category at seed volume, plus stated headroom — enforced by a guard test, **not** a hard-coded literal. `ListingsQuery.build_queryset` is the real cost control | **1** | **CRITICAL** | Unauthenticated cluster-kill, reproduced end to end. `mem_limit: ${DB_MEM_LIMIT:-1g}` is the shipped **production** cap and no `statement_timeout` exists, so the memory limit is precisely what converts an expensive query into a cluster-wide outage. **Changed premise (2026-10-03):** "any bound must sit far below 20" no longer binds query cost once 1a's correlated subquery makes the join count O(1) in N. **The UI-cap-before-server-cap constraint is unchanged and still binding** |
 | `VAL-001` | **implement the documentation half only.** The `statement_timeout` half is `03-DB-004` and belongs to phase 03 | **2** | HIGH (rollout risk) | `DB_MEM_LIMIT` is unset in **every** `.env*` file including `.env.prod.example`, so 1 GB is the shipped default. It is a load-bearing safety parameter, not a tuning knob. `.env.prod.example` is **phase 02's and phase 06's** surface — this block is contention-gated |
-| `SRCH-006` | **implement — gated on Q4.** Reject at the input edge on **both** endpoints. **Not** a blanket `try/except` around the analytics call | **3** | HIGH | Reachable with zero matching ads, unauthenticated and cacheable, and it burns the full query cost before failing. `\x07` returns 200, so the defect is NUL specifically. **The report's "both views already call the sanitiser at the boundary" is false for `search()` (C-5)** |
+| `SRCH-006` | **implement — Q4 RESOLVED 2026-10-03: strip invisible/control characters at the input edge and search the cleaned query, on both endpoints.** **`sanitize_query_for_log` must NOT be reused wholesale**; the 200-char contract and `test_query_exceeding_max_length_returns_200` are preserved. **Not** a blanket `try/except` around the analytics call | **3** | HIGH | Reachable with zero matching ads, unauthenticated and cacheable, and it burns the full query cost before failing. `\x07` returns 200, so the defect is NUL specifically. **The report's "both views already call the sanitiser at the boundary" is false for `search()` (C-5)** |
 | `SRCH-002` | **implement the code half only** — one call site. The **policy** half is routed to phase 06 | **4** | HIGH | `redact_search_query` exists, works, and is already called on both **persistence** paths; it is simply not called on the **log** path, and `RedactingJsonFormatter.redact_string` only matches `key=value`, so it cannot rescue a bare quoted value. **The report's cited `docs/08-features/i18n.md` does not exist and has no logging policy to amend (C-1)** |
 | `SRCH-003` | **implement — migration first.** Dedup + `UniqueConstraint` in a new `apps/search/migrations/0003_*`, plus the `db-schema.md` correction. Gated on Q9 (reverse shape) | **5** | HIGH | A schema-invariant violation, not a race: `get_or_create`'s atomicity protects the `IntegrityError` path, and with no unique index there is nothing to catch. The report's "misleading `models.py` comment" does not exist (C-4) |
 | `SRCH-007` | **implement — gated on Q1.** Declare the contract in `apps/core`, migrate **five** surfaces (four writers + `category_fuzzy`'s inherited consumer), and **amend `docs/architecture/cache-strategy.md` in the same change** | **6** | HIGH | The counter is a correctness mechanism wearing a cache entry's 300 s TTL while the entries it retires live 360 s. **Wider than filed (C-10): five consumers, and the canonical doc prints the defective snippet** |
 | `SRCH-005` | **implement — hard dependency on BLOCK 6.** Ship the `post_save` receiver; the `give_consent()` call-site patch is the **fallback, not the destination**. Gated on Q10 (blast radius of the test rewrite) | **7** | HIGH | `give_consent` sets `is_declined=False` and saves; that is its entire invalidation story. **The report's `apps/ads/signals.py` and `apps/users/signals.py` do not exist (C-1)** — the receiver must be created or placed in `apps/search/signals.py` |
-| `SRCH-011` + `VAL-006` | **implement — gated on Q5 (redaction).** Bound at the **model** and at the view edge. `save_search` has **no** DTO today (C-6), so the "DTO constraint" is a boundary that must be created | **8** | MEDIUM | The field is unbounded and is fed to `websearch_to_tsquery` on **every** alert evaluation, once per active saved search, on an **ungated** daily job. A view-only cap is the convention-based contract that produced `SRCH-005` |
+| `SRCH-011` + `VAL-006` | **implement — Q5 RESOLVED 2026-10-03: the length bound ships as planned.** Bound at the **model** and at the view edge. `save_search` has **no** DTO today (C-6), so the "DTO constraint" is a boundary that must be created. **The redaction question is CLOSED, not deferred**: `SavedSearch.query` is stored redacted and `query_normalized` is keyed on the redacted form — but the redaction **call** is phase 09's `09-API-012` + `09-VAL-002`, and phase 06 owns the policy | **8** | MEDIUM | The field is unbounded and is fed to `websearch_to_tsquery` on **every** alert evaluation, once per active saved search, on an **ungated** daily job. A view-only cap is the convention-based contract that produced `SRCH-005` |
 | `SRCH-010` + `SRCH-013` | **implement as one unit.** One `get_client_ip` in `apps/core` reading `X-Real-IP` → `XFF[-1]` → `REMOTE_ADDR`; one budget table as a `StrEnum`; one 429 shape. Also closes `04-AUT-003` | **9** | MEDIUM | nginx **appends** the peer as the rightmost element, so `split(",")[0]` is attacker-controlled end to end. `X-Real-IP` is overwritten by `proxy_set_header` and cannot be influenced. Two byte-identical copies remain in `users/` and `core/` |
 | `VAL-003` | **implement — no decision gate.** Resolve a matched display name to **ids**; an ambiguous name is "no guess". Must close the **exact** path as well as the fuzzy one | **10** | MEDIUM | A first-hit resolution over a non-unique key turns a recall-reducing heuristic into a recall-**destroying** one, invisibly. `Category.name` has no unique constraint and `name_i18n` is free-form JSONB. **The report cited only the fuzzy path (C-9)** |
-| `SRCH-009` | **implement — gated on Q8 (owner product decision).** Option (a): disjunctive branch. Option (b): accept the narrowing, document it, and fix only the ambiguity. Depends on BLOCK 10 | **11** | MEDIUM | The behaviour is **specified** (`technical-specification.md:66`), so this is a design question, not a regression. The template renders no "guessed category" signal, and `test_search_view.py::TestSearchViewDescendantCategories` pins the narrowing |
+| `SRCH-009` | **implement — Q8 RESOLVED 2026-10-03: the single-word narrowing STAYS a hard filter and the UI must signal it.** The disjunctive branch (option a) is **NOT** chosen and the hard filter is unchanged. BLOCK 11 ships the *"showing results for &lt;Category&gt; only — search all categories"* control plus BLOCK 10's ambiguity fix, with a **new i18n string (`ru` and `bs` non-empty)**. **Severity stays MEDIUM** — it does not drop to LOW, and the block is not cancelled | **11** | MEDIUM (unchanged) | The behaviour is **specified** (`technical-specification.md:66`), so this is a design question, not a regression. The template renders no "guessed category" signal, and `test_search_view.py::TestSearchViewDescendantCategories` pins the narrowing — **which, after the ruling, those tests are correctly pinning** |
 | `SRCH-015` | **implement — the remaining half only.** Derive `has_results` from the rendered rows. **No count display may be added** (C-8) | **12** | LOW (partial) | The count/rows disagreement survives, but `total_count` is never rendered, so the symptom is a blank results area with no empty state. The report's reproduction shape needs the same stale-cache window BLOCKS 6 and 7 close |
 | `SRCH-014` + `VAL-005` | **implement — documentation only, one commit.** The three-line SWR docstring; the phase-08 handbook's finding-ID prefix line. The legacy in-source `SRH-` sweep is **phase 03's** and is forbidden here | **13** | LOW | The claim is about **latency on the search hot path**: a reader sizing the cache layer budgets for a non-blocking refresh that does not exist. Do not change the helper — a background task would need a worker this deployment does not run |
 | `SRCH-004` | **no implementation in phase 08 — handed to `06-PII-104`.** BLOCK 14 records the handoff, the acceptance criteria and the rollout gate | **14** | HIGH (absorbed) | `06-PII-104` rec. 2 is **verbatim** this finding (C-12). Two commits would create two predicates. The daily digest is live and ungated today |
-| `SRCH-008` | **no implementation in phase 08 — owner product decision (Q7).** BLOCK 14 publishes both options and the documentation obligation | **14** | MEDIUM (absorbed) | Phase 06 ruled a ban is a **moderation** action, not a consent action. Adding `user__is_banned=False` is an owner decision and must not be bundled into a commit justified as "fixing a consent violation" |
+| `SRCH-008` | **no implementation in phase 08 — owner product decision Q7/Q7′ TAKEN 2026-10-03: a ban hides inventory, and a banned seller cannot create or publish.** BLOCK 14 publishes the ruling, the moderation framing, the write boundary and the documentation obligation | **14** | MEDIUM (absorbed) | Phase 06 ruled a ban is a **moderation** action, not a consent action. Adding `user__is_banned=False` is an owner decision and **must never** be bundled into a commit justified as "fixing a consent violation". **The decision is now taken:** option (a), across search / category / detail / media gate, plus a relist-and-create block. **Propagation obligation: phase 06 owns the `db-schema.md:61` amendment** (BLOCKS 13/17) |
 | `SRCH-012` | **closed — no work item.** Restated so it is not silently re-filed | — | LOW (closed) | The four DECLINE assertions were removed by the 2026-09-28 wholesale handbook rewrite (C-11) |
 | `VAL-002` | **routed to the coordinator** — a convention to encode, not a file edit | — | MEDIUM (process) | Largely resolved by the same rewrite. What survives is "re-derive product-behaviour assertions from the current spec, and carry a positive control on any FTS/predicate assertion". §6.1 |
 | `VAL-004` | **binding constraint on verification, not a code change** | §1.1, §0.2.1 | MEDIUM (process) | The shared `mko-bazuna-test` database is the hazard. BLOCK 1's crash reproduction must run on a private container; a crash mid-validation makes every concurrent red/green result suspect |
 | **`Q1` (cache-version-key ownership)** | **GATED** — a coordinator ruling, not a Planner's choice | **6** | — | The 2026-09-28 handbook rewrite moved a freshness token's lifetime against the lifetime of the data it retires to **phase 13**, keeping the stale-read half in phase 08. This decides whether `SRCH-007` is a phase-08 item at all |
-| **`Q2` / `Q3` (features ceiling and whitelist cost)** | **GATED** — Researcher measurement + owner decision | **1** | — | 10 is a guess and the UI cap must not land first; a per-slug membership query would fail `_QUERY_BOUND`. Amend the bound test explicitly or design a single cached lookup |
-| **`Q5` (`SavedSearch.query` redaction)** | **GATED** — phase 06 owns the PII policy | **8** | — | A bound fixes the resource exposure; redaction is a separate question. Do not assume phase 06's `PII-108` covered this table |
-| **`Q8` (does the narrowing stay a hard filter?)** | **GATED** — owner product decision | **11** | — | The behaviour is specified. If accepted as intended, `SRCH-009` resolves to a documentation change plus BLOCK 10 |
+| **`Q2` (features ceiling)** | **RESOLVED 2026-10-03 (Product Owner) — option (b): the catalogue invariant, not a hard-coded number** | **1** | — | The ceiling is *"the resolved feature set for any category"* at seed volume plus stated headroom, kept honest by a guard test. BLOCK 1a's correlated subquery is the real cost control; the UI-cap-before-server-cap constraint is unchanged |
+| **`Q3` (whitelist query cost)** | **RESOLVED 2026-10-01 — option (d), the spec's correlated subquery, no whitelist** | **1** | — | See §0.6.1. The bound-test premise is moot |
+| **`Q5` (`SavedSearch.query` redaction)** | **RESOLVED 2026-10-03 (Product Owner) — stored REDACTED; `query_normalized` keyed on the redacted form. CLOSED, not deferred** | **8** | — | BLOCK 8 ships the bound as planned. The redaction call is phase 09's `09-API-012`/`09-VAL-002`; the policy statement is phase 06's (`06-PII-108`). One rule for all query-persistence paths |
+| **`Q8` (does the narrowing stay a hard filter?)** | **RESOLVED 2026-10-03 (Product Owner) — the narrowing stays AND the UI signals it. Option (a) is NOT chosen** | **11** | — | BLOCK 11 ships a new user-visible control with `ru`/`bs` non-empty, plus BLOCK 10's ambiguity fix. **`SRCH-009` stays MEDIUM** |
+| **`Q7` / `Q7′` (ban scope)** | **RESOLVED 2026-10-03 (Product Owner) — a ban hides inventory, and a banned seller cannot create or publish a new ad** | **14** | — | BLOCK 14 publishes the ruling and the moderation framing; phase 06 owns the predicate and the `db-schema.md:61` amendment |
 | **`Q9` (dedup rollback)** | **GATED, narrow** | **5** | — | Deduplication destroys rows. A `RunPython.noop` reverse plus a documented pre-count, or a mandatory pre-migration dump. Phase 12 owns the runbook |
 | **Required Fix 3 (a project-wide input-bounds framework on `BaseInputModel`)** | **declined as a work item** | — | — | `SRCH-001`, `006` and `011` share a cause, but the shared surface is three bounded edits, not a framework. `BaseInputModel` carries only `extra="forbid"`; a general bounds framework is a speculative abstraction with three consumers. Rule 5 applies. §6.2 |
 
@@ -440,9 +633,12 @@ Fourteen blocks: **twelve implementation blocks, one documentation block (13) an
 decision/handoff block (14) that ships no production behaviour.** **One Implementor,
 strictly sequential, one commit per block** (§1.3).
 
-Six blocks (**1**, **3**, **6**, **7**, **8**, **11**) carry a labelled **decision
-required before implementation** gate. A gated block does not start until the answer is
-written down; **the Implementor is forbidden from choosing an option** (§1.3, §8.1).
+Six blocks (**1**, **3**, **6**, **7**, **8**, **11**) carried a labelled **decision required
+before implementation** gate. **The Product Owner closed four of them on 2026-10-03** — Q2
+(BLOCK 1), Q4 (BLOCK 3), Q5 (BLOCK 8) and Q8 (BLOCK 11); each block now carries its **resolved**
+ruling and an Implementor may **not** re-choose. **The only gate still unanswered is BLOCK 6's
+Q1**, a **coordinator** ruling (§0.6.2) — not an owner decision, and not an Implementor's.
+BLOCK 7's Q10 was answered 2026-10-01 and its residual is a pre-block grep step, not a gate.
 
 BLOCK 1, BLOCK 5 and BLOCK 7 are prepared in parallel by the Auditor/Researcher while
 other blocks run, but the **serial execution order is 1 → 14** (§4.1), because BLOCK 1
@@ -462,19 +658,33 @@ is P0 and BLOCK 5's migration numbering constrains BLOCK 8.
 **Why this is first.** It is the only CRITICAL in the phase, it is unauthenticated, and
 it is already live. Nothing else in this plan has a curve measured in seconds-to-OOM.
 
-**Decision required before implementation — Q2: the ceiling**
+**Decision required before implementation — Q2: the ceiling — RESOLVED 2026-10-03 (Product
+Owner)**
+
+**The ruling is option (b): there is NO hard-coded `?features=` ceiling.** The bound is a
+**catalogue invariant** — *"the resolved feature set for any category"*, measured at seed
+volume, **plus stated headroom** — enforced by a **guard test** that keeps the ceiling honest
+as the catalogue grows. The options are retained below for traceability; the Implementor may
+**not** re-choose.
 
 | Option | What it is | Consequences |
 |---|---|---|
-| **(a)** | Adopt the report's **10** | **Gains:** an immediate, defensible bound far below the measured 20-feature cliff. **Costs:** unverified. 10 is a guess, and the shipped UI's ceiling is catalogue-driven (the number of resolved feature lookups), not a constant. If a real catalogue resolves more than 10 for some category, this becomes a **behaviour regression** on a legal query |
-| **(b)** | Derive the ceiling as a **catalogue invariant** — "the resolved feature set for any category", measured at seed volume, plus headroom | **Gains:** cannot break a legal query; states the bound as a rule rather than a magic number. **Costs:** needs a measurement (Auditor) and a stated policy; the number is data-dependent and will drift as the catalogue grows, so it needs a guard test rather than a constant |
-| **(c)** | Adopt (a) **and** land a UI cap in the same cycle | **Gains:** no regression surface. **Costs:** expands the block into a template change and an i18n string, and the UI is not where the defect is. **The report is explicit that the cap must land with or after a UI cap, never before** — if the UI can already emit more than 10, that is a separate UI defect this cap would expose |
+| ~~**(a)**~~ | Adopt the report's **10** | **REJECTED 2026-10-03.** A magic number that drifts as the catalogue grows, and unverified against a real catalogue |
+| **(b) — CHOSEN** | Derive the ceiling as a **catalogue invariant** — "the resolved feature set for any category", measured at seed volume, plus headroom | **Gains:** cannot break a legal query; states the bound as a rule rather than a magic number. **Costs:** needs a measurement (Auditor), a stated policy, and a **guard test** so the invariant is enforced rather than merely documented — that guard test is a new, required deliverable of 1b |
+| ~~**(c)**~~ | Adopt (a) **and** land a UI cap in the same cycle | **NOT CHOSEN.** Expanding the block into a template change and an i18n string, and the UI is not where the defect is. The UI-cap ordering constraint survives anyway (see below) |
 
-**The Implementor may not choose.** Whichever option is chosen, the commit body must name
-it and its measured basis. The evidence: 20 features already costs 1.31 s, 40 costs
-7.88 s, 60 costs 19.90 s and then the backend is `signal 9`-killed and the cluster
-crash-recovers. **Any bound must sit far below 20.** Framing the fix as "cap at 120"
-would be dangerously wrong.
+**What the ruling changed in this block.** `MAX_FEATURE_FILTER_SLUGS` is **not** a hard-coded
+literal. The constant is either derived from the catalogue at seed volume or asserted against
+it, the headroom over the measured maximum is **stated**, and **a guard test** fails if a
+category ever resolves more features than the invariant allows. The commit body must record
+the measured maximum, the headroom and the invariant.
+
+**What the ruling did NOT change.** BLOCK 1 splits 1a/1b exactly as §0.6.3 requires, BLOCK 1a's
+correlated subquery remains the **real cost control** (the join count is O(1) in N once it
+lands), and **the UI-cap-before-server-cap ordering constraint is unchanged and still binding**
+— if the shipped UI can already emit more than the invariant permits, the block **stops and
+reports** (binding constraint 4). "Any bound must sit far below 20" no longer binds *query
+cost*; it remains the reason the correlated subquery ships first.
 
 **Decision required before implementation — Q3: does the whitelist break `_QUERY_BOUND`?**
 
@@ -504,11 +714,14 @@ reject a solution that breaks `_QUERY_BOUND` or the 2 s SLO.
    a general input-bounds framework on `BaseInputModel` (§6.2).
 2. **AND-semantics are unchanged.** Selecting N features still requires an ad to carry
    all N.
-3. **The ceiling must be far below 20**, and the commit body states the option, the
-   measurement and the reason.
-4. **The UI cap must not land after this one.** If the Auditor finds the shipped UI can
-   already emit more than the chosen ceiling, **stop and report** — the cap would expose a
-   separate UI defect and must land with or after it.
+3. **The ceiling is a catalogue invariant, not a number** (Q2 resolved 2026-10-03). It is
+   measured at seed volume, the headroom is **stated**, and a guard test keeps it honest. Do
+   not ship a bare `10` or a bare `120`. Once 1a lands the join count is O(1) in N, so the
+   cap is a **secondary parameter-list guard** — which is why 1a, not 1b, is the fix.
+4. **The UI cap must not land after this one.** This constraint is **unchanged by the
+   2026-10-03 ruling.** If the Auditor finds the shipped UI can already emit more than the
+   invariant permits, **stop and report** — the cap would expose a separate UI defect and must
+   land with or after it.
 5. **Do not pin `CACHES["default"]["TIMEOUT"]`, do not set `statement_timeout`** (phase 03),
    and **do not change `DB_MEM_LIMIT`** (BLOCK 2 documents it; changing it is a capacity
    decision).
@@ -537,7 +750,7 @@ description: >
   nonexistent slugs build an N-join query that returns nothing.
 goals:
   - "make an unauthenticated ?features= list unable to exceed a measured-safe query cost"
-  - "reject nonexistent slugs without growing the query count per slug"
+  - "state the ceiling as a catalogue invariant with stated headroom, kept honest by a guard test"
   - "leave AND-semantics for a legal feature set byte-identical"
   - "stay inside test_search_query_count.py _QUERY_BOUND and the 2 s search SLO"
 files:
@@ -562,28 +775,33 @@ files:
 changes:
   - action: modify_code
     description: >
-      Declare a count cap on feature_slugs at the DTO boundary using the Q2 option
-      the Planner recorded, and a catalogue-membership rejection using the Q3
-      option. If Q3 option (b) was chosen, the per-request query cost is amended in
-      test_search_query_count.py in THIS SAME COMMIT with the delta stated in the
-      commit body - never silently. If Q3 option (c) was chosen, the membership
-      source must be a single query or an existing cached slug set, not one query
-      per slug.
+      Declare a count cap on feature_slugs at the DTO boundary. Q2 is RESOLVED 2026-10-03 as
+      option (b): the cap is the CATALOGUE INVARIANT (the resolved feature set for any
+      category, measured at seed volume, plus stated headroom) - not a hard-coded literal.
+      Q3 is RESOLVED 2026-10-01 as option (d): the spec's correlated subquery over AdFeature
+      with AND-semantics and NO catalogue-membership whitelist, so this block adds no
+      membership query and _QUERY_BOUND needs no amendment. Add the guard test that keeps the
+      invariant honest as the catalogue grows.
     code_hint: |
-      # Q2 option (a) - the ceiling is a decision, not a measurement:
-      MAX_FEATURE_FILTER_SLUGS: Final[int] = 10
+      # Q2 option (b), RESOLVED 2026-10-03 - the ceiling is an INVARIANT, not a magic number.
+      # The value is measured at seed volume and the headroom is stated; the guard test
+      # below is what keeps it honest as the catalogue grows.
+      MAX_FEATURE_FEATURES_HEADROOM: Final[int] = 4
+      MAX_FEATURE_FILTER_SLUGS: Final[int] = <measured max + headroom>  # never a bare guess
 
       feature_slugs: Annotated[
           list[str], PydanticField(max_length=MAX_FEATURE_FILTER_SLUGS)
       ] = Field(default_factory=list)
 acceptance_criteria:
-  - "a features list longer than the chosen ceiling is rejected at the boundary, and the rejection is a 4xx on /search/ and / - not a 500"
+  - "a features list longer than the invariant permits is rejected at the boundary, and the rejection is a 4xx on /search/ and / - not a 500"
+  - "the ceiling is derived from the catalogue at seed volume, NOT a hard-coded literal, and the stated headroom over the measured maximum is recorded in the commit body"
+  - "a guard test fails if any category's resolved feature set exceeds the ceiling - and that failure is demonstrated"
   - "a list at the ceiling containing a slug that is not in the catalogue is rejected, and no join is emitted for the rejected slug"
   - "a legal feature set of size <= the ceiling returns exactly the ads that carried every selected feature (AND-semantics unchanged)"
   - "test_features_filter.py passes UNCHANGED"
-  - "test_search_query_count.py::test_search_view_query_count_bounded passes, or the amendment is in the same commit with the delta and the reason stated"
+  - "test_search_query_count.py::test_search_view_query_count_bounded passes unchanged - Q3 option (d) adds no query, so no amendment is expected"
   - "test_search_slo.py::test_search_at_seed_volume_meets_slo passes"
-  - "the commit body names the Q2 option, the measurement behind the ceiling, and the Q3 option"
+  - "the commit body names the Q2 option (b) and the measured catalogue maximum, and the Q3 option (d)"
   - "the UI-cap check was performed and its result recorded in the commit body"
   - "no statement_timeout, no DB_MEM_LIMIT change, no CACHES TIMEOUT change"
 tests_to_run:
@@ -595,27 +813,35 @@ tests_to_run:
 
 **Tests required**
 
-1. **The bound** — a list one over the ceiling is rejected; a list far over the ceiling is
+1. **The bound** — a list one over the invariant is rejected; a list far over it is
    rejected. Assert on the **response**, not on the count of emitted SQL.
-2. **The membership check** — a list at the ceiling containing one nonexistent slug is
-   rejected, and the number of captured queries does not grow by one per rejected slug
-   (this is the assertion that decides Q3 (c) over Q3 (b) after the fact).
-3. **The positive control** — a legal list of size 3 returns exactly the ads carrying all
+2. **The invariant guard** — the guard test asserts every category's resolved feature set is
+   within the ceiling at seed volume, and **its failure is demonstrated** by temporarily
+   lowering the ceiling. A guard that has never been seen red is not a guard.
+3. **The membership check** — a list at the ceiling containing one nonexistent slug is
+   rejected, and the number of captured queries does **not** grow by one per rejected slug.
+   Under the resolved Q3 option (d) no membership query exists at all, so this asserts the
+   free behaviour the counted subquery already provides.
+4. **The positive control** — a legal list of size 3 returns exactly the ads carrying all
    three features; a single feature matches. `test_features_filter.py`'s existing cases
    must be untouched.
-4. **The SLO** — the seed-volume timing guard stays green; the new bound is a
+5. **The SLO** — the seed-volume timing guard stays green; the new bound is a
    pre-database check by construction, so this should be free.
 
 **Risk and rollback**
 
-- *Implementation risk:* **the wrong direction on the ceiling.** Mitigation: Q2 is gated
-  with three options and the measurement must be recorded; the Implementor may not choose.
+- *Implementation risk:* **shipping a bare literal instead of the invariant.** Mitigation: Q2
+  is **resolved** — the acceptance criteria require the derived value, the stated headroom and
+  a guard test that has been demonstrated red. The Implementor may not re-choose.
 - *Rollout risk:* **behaviour change for a legal consumer.** Mitigation: binding
-  constraint 4 — the UI-cap check precedes the change, and the block stops and reports if
-  the UI can already exceed the ceiling.
-- *Performance regression:* a per-slug membership check. Mitigation: Q3 (b) vs (c);
-  `_QUERY_BOUND` and the 2 s SLO are the tripwires, and the Validator may reject a
-  solution that misses them.
+  constraint 4 — unchanged by the ruling — the UI-cap check precedes the change, and the block
+  stops and reports if the UI can already exceed the invariant.
+- *Catalogue growth:* an invariant measured once drifts. Mitigation: the guard test; a category
+  that grows past the ceiling fails CI with a named failure, not a 400 at runtime.
+- *Performance regression:* a per-slug membership check. Mitigation: Q3 is **resolved as
+  option (d)** — the correlated subquery — so no membership query ships at all;
+  `test_search_query_count.py` and `test_search_slo.py` are the tripwires and the Validator may
+  reject a solution that misses them.
 - *Rollback:* a straight revert restores the unbounded path, which re-opens the CRITICAL.
   State that plainly in the commit body; the revert is a mitigation of a *worse* incident,
   not a fix.
@@ -759,16 +985,27 @@ deliberate.
 full query cost first. `record_event` is already guarded inside the analytics service —
 the raiser is the **second** call site.
 
-**Decision required before implementation — Q4: strip, reject, or normalise**
+**Decision required before implementation — Q4: strip, reject, or normalise — RESOLVED
+2026-10-03 (Product Owner)**
+
+**The ruling: strip invisible/control characters at the input edge and search the CLEANED
+query.** The options are retained below for traceability; the Implementor may **not** re-choose.
 
 | Option | What it is | Consequences |
 |---|---|---|
-| **(a)** | **Strip** control characters at the input edge, reusing `_CONTROL_CHAR_PATTERN` | **Gains:** smallest diff; a legal query still returns results; `\x07` already returns 200, so stripping is consistent with the existing loose control-char contract. **Costs:** silently mutates the user's query. `?q=велосипед%00abc` becomes a search for `велосипедabc`, which is a *different* query than the one asked for. And **the function that already has the pattern truncates to 100 (C-3)** — reusing it wholesale silently shortens the documented 200-char `q` contract and changes `test_query_exceeding_max_length_returns_200` |
-| **(b)** | **Reject** — a query containing a control character is treated as empty | **Gains:** loud, deterministic, and the analysed value and the logged value cannot diverge. **Costs:** changes the shape of `test_homoglyph_and_control_chars_query_returns_200` (project rule 2: fix the test, justify it); a legitimate query that happens to contain a control character gets no results. Note the existing test's payload contains **no real control byte** — a literal un-decoded `%u…` sequence — so the current control-char dimension is asserted only loosely |
-| **(c)** | **New shared normaliser** for the search input edge, used by both endpoints, that does not truncate | **Gains:** one declaration; both endpoints behave identically; the 100-vs-200 collision disappears. **Costs:** a new function in `apps/core/utils/sanitize.py` with two call sites — the project already prefers a small focused module, so this is in-convention rather than speculative, but the Implementor must not widen it into a general normaliser |
+| **(a) — CHOSEN, with a Product-Owner constraint** | **Strip** control characters at the input edge | **Adopted.** A legal query still returns results; `\x07` already returns 200, so stripping is consistent with the existing loose control-char contract. **The Product Owner's constraint: `sanitize_query_for_log` must NOT be reused wholesale** — it truncates to 100 while the view/column contract is 200 |
+| ~~**(b)**~~ | **Reject** — a control-character query is treated as empty | **NOT CHOSEN.** The owner accepts a mutated query, so the existing `test_homoglyph_and_control_chars_query_returns_200` shape survives |
+| ~~**(c)**~~ | **New shared normaliser** that does not truncate | **NOT CHOSEN as the product decision, but its *shape* is what (a) requires here.** Option (a) is only safe because it does not drag `_MAX_QUERY_LENGTH` in with it |
 
-**The Implementor may not choose.** All three are defensible; (a) and (b) differ in whether
-a mutated query is acceptable, which is a product question.
+**The 200-vs-100 collision is now closed by ruling, not by argument.** The **200-character
+`q` contract and `test_query_exceeding_max_length_returns_200` are preserved** — the strip
+must not shorten a legal query. Reusing `sanitize_query_for_log` end-to-end is therefore
+**forbidden by the ruling**, and binding constraint 2 stands. C-3 also stands: there is **no
+documented 200-char contract** — 200 lives only in `MAX_SEARCH_QUERY_LENGTH` and two columns —
+so the acceptance criteria assert it as a **contract** rather than inherit it as documentation.
+
+**The positive control is mandatory.** A legal query must return **byte-identical ads** before
+and after the change. That assertion is what distinguishes a strip from a bug.
 
 **File surface (semantic units)**
 
@@ -784,7 +1021,9 @@ a mutated query is acceptable, which is a product question.
 1. **Do not wrap `_record_search_analytics` in a blanket `try/except`.** That converts a
    correct, loud input-rejection failure into a silent one, and `BLE001` exists to stop
    exactly that shape. The fix belongs at the input edge.
-2. **Do not change the 200-char `q` contract** and do not change `_MAX_QUERY_LENGTH`.
+2. **Do not change the 200-char `q` contract** and do not change `_MAX_QUERY_LENGTH`. **This is
+   the Product Owner's explicit constraint** (2026-10-03): `sanitize_query_for_log` must not be
+   reused wholesale, because its 100-character truncation would shorten `q`.
 3. **Both endpoints must be covered.** A fix on `/search/` alone leaves the
    `LIKE`-parameter path reachable.
 4. `\x07` must continue to return 200 (it does today) — this is the control.
@@ -816,6 +1055,7 @@ description: >
 goals:
   - "make a control character in q impossible to reach the driver on either endpoint"
   - "keep the 200-char q contract and the 100-char log-sanitiser contract intact and separate"
+  - "search the cleaned query, and prove a legal query's results are byte-identical"
   - "keep the loudness of an input-rejection failure"
 files:
   - path: "src/backend/apps/core/utils/sanitize.py"
@@ -839,20 +1079,20 @@ files:
 changes:
   - action: modify_code
     description: >
-      Apply the Q4 option the Planner recorded, at the input edge on BOTH endpoints.
-      If option (c), add one small focused normaliser to apps/core/utils/sanitize.py
-      that strips or rejects control characters and does NOT truncate; call it from
-      search() before `if query:` and from autocomplete()'s existing read. If option
-      (a) or (b), keep the change to the two call sites plus whatever
-      sanitize_autocomplete_query needs. Do NOT wrap the analytics call in
-      try/except, and do NOT change _MAX_QUERY_LENGTH.
+      Q4 is RESOLVED 2026-10-03: STRIP invisible/control characters at the input edge and
+      search the cleaned query, on BOTH endpoints. Do NOT reuse sanitize_query_for_log
+      wholesale - it truncates to 100 while the view/column contract is 200; reuse its
+      control-character pattern or add a small focused helper that does not truncate. Call it
+      from search() before `if query:` and from autocomplete()'s existing read. Do NOT wrap
+      the analytics call in try/except, and do NOT change _MAX_QUERY_LENGTH.
 acceptance_criteria:
   - "GET /search/?q=<NUL> returns 200 with no DataError and with no analytics row written from the NUL value"
   - "GET /api/search/autocomplete?q=ab<NUL>cd returns 200 with no DataError"
   - "GET /search/?q=<0x07>abc still returns 200"
-  - "a legal query still returns the same ads it returned before the change"
-  - "a q longer than MAX_SEARCH_QUERY_LENGTH is still truncated to the same length, and the log line is still truncated at 100"
-  - "test_sql_injection_query_returns_200, test_query_exceeding_max_length_returns_200 and test_homoglyph_and_control_chars_query_returns_200 are green, or a rewrite is justified in the commit body under production-code-is-king"
+  - "a legal query returns byte-identical ads before and after the change - this is the Product Owner's mandated positive control"
+  - "the 200-character q contract is preserved: a q longer than MAX_SEARCH_QUERY_LENGTH is still truncated to the same length, and the log line is still truncated at 100"
+  - "sanitize_query_for_log is NOT reused wholesale on the search input edge - its 100-character truncation is not allowed to reach q"
+  - "test_sql_injection_query_returns_200, test_query_exceeding_max_length_returns_200 and test_homoglyph_and_control_chars_query_returns_200 are green UNCHANGED - the ruling is designed so no test rewrite is required, and a rewrite must be justified in the commit body under production-code-is-king"
   - "no blanket try/except was added around any DB call"
 tests_to_run:
   - "src/backend/apps/search/tests/test_search_view.py"
@@ -876,11 +1116,13 @@ tests_to_run:
 - *The real risk:* an implementer "simplifies" by wrapping `_record_search_analytics` in
   `try/except`. That converts a loud input rejection into a silent one and the analytics
   silently stops recording. Binding constraint 1, and `BLE001` is the tripwire.
-- *Regression risk:* option (a) changes what the user searched for. Test 3 is the
-  control; if it fails, the option is wrong and the block returns to the gate.
+- *Regression risk:* the strip changes what the user searched for. **This is accepted by
+  ruling** (Q4, 2026-10-03). Test 3 — a legal query returns byte-identical ads — is the
+  control that keeps it honest; if it fails, the implementation is wrong and the block
+  returns rather than amending the ruling.
 - *Regression risk:* reusing `sanitize_query_for_log` wholesale shortens `q` from 200 to
-  100. Binding constraint 2; `test_query_exceeding_max_length_returns_200` is the
-  tripwire.
+  100. **Forbidden by the Product Owner's ruling**, not merely discouraged. Binding
+  constraint 2; `test_query_exceeding_max_length_returns_200` is the tripwire.
 - *Rollback:* a straight revert. No schema, no data.
 - *Cross-phase:* none blocking. `sanitize.py` is a shared `apps/core` helper — no other
   phase claims it, but re-read it, since phase 06 BLOCK 5 touches the masking helpers
@@ -1604,7 +1846,7 @@ tests_to_run:
 | **Blocks** | nothing in-plan; bounds the daily alert job's input surface |
 | **Priority** | **P1** |
 | **Risk level** | **MEDIUM** — a schema change plus a boundary that does not exist yet (C-6) |
-| **Required agents** | **Auditor · Researcher · Planner · Validator.** Validator required because a **migration** ships. Researcher answers Q5 |
+| **Required agents** | **Auditor · Researcher · Planner · Validator.** Validator required because a **migration** ships. **Q5 is answered (2026-10-03) — no Researcher input is owed to this block any more** |
 
 **Why the model bound, not just the view.** `SavedSearch.query` is
 `models.TextField(blank=True, null=True)` with no `max_length`, and the view reads
@@ -1623,17 +1865,40 @@ Implementor must respect: `query_normalized` is the **dedup key** and holds the
 helper's **never-lengthen** invariant is what keeps 200 safe. `SavedSearch.query` is
 user-supplied and, today, un-redacted at write time.
 
-**Decision required before implementation — Q5: redaction as well as a bound**
+**Q5 RESOLVED 2026-10-03 (Product Owner) — redaction as well as a bound**
+
+**The ruling: `SavedSearch.query` is stored REDACTED via `redact_search_query()`, and
+`query_normalized` is keyed on the redacted form.** One rule for **all** query-persistence
+paths. Redaction happens **at write**, and the stored redacted value is what feeds
+`websearch_to_tsquery`. **The question is CLOSED, not deferred** — BLOCK 8 no longer carries
+an unanswered question in its commit body, and the Implementor may **not** re-choose.
+
+**What this block ships, unchanged.** The **length bound at the model and at the view edge**,
+exactly as planned. BLOCK 8's scope is **not** widened.
+
+**What this block does NOT ship, and why.** The **redaction call** is **phase 09's
+`09-API-012`** — the `save_search` view write path, which is in phase 09's BLOCK 13 — plus the
+storage-layer `09-VAL-002` for `query_normalized`. The **policy statement** ("one rule for all
+query-persistence paths") is **phase 06's** (`06-PII-108`, the PII policy owner). Both are
+recorded as propagation obligations (§5.5).
+
+**The interaction BLOCK 8 must respect.** Under the ruling, a redacted saved-search query can
+differ from what the seller typed, so a saved search whose text contained a digit run may match
+differently after phase 09/06 land. BLOCK 8's bound is orthogonal and must not encode any
+expectation about redaction; its tests assert the **bound**, not the stored content's shape.
+Phase 08 BLOCK 8 and phase 09 BLOCK 13 both touch `apps/search/views/save_search.py` — that
+file must be **re-read immediately before either block edits it** (§5.3).
+
+The options are retained below for traceability.
 
 | Option | What it is | Consequences |
 |---|---|---|
-| **(a)** | **Bound only.** `max_length` on the model plus a boundary check in the view | **Gains:** closes `SRCH-011` and `VAL-006` completely; the resource exposure is bounded on every writer. **Costs:** a stored saved-search query can still contain a phone number or an e-mail address, exactly as `PopularSearch.query` / `SearchHistory.query` do not. That is a **PII** question, not a search question |
-| **(b)** | Bound **and** redact `SavedSearch.query` at write time, mirroring the two persistence paths | **Gains:** closes the exposure and the PII question in one change. **Costs:** the value is fed to `websearch_to_tsquery`; a redacted query changes what the saved search **matches**, so an existing seller could stop receiving alerts for a query that contained a digit run. It is also a **data change on existing rows**, which needs its own migration and its own irreversibility statement |
-| **(c)** | Bound now; redaction is a **phase 06** work item | **Gains:** no search-phase migration touching user content; the PII policy stays with its owner. **Costs:** the stored content stays as-is until phase 06 acts, and this block must record the question in its commit body so it is not lost |
+| **(a)** | **Bound only.** `max_length` on the model plus a boundary check in the view | **What BLOCK 8 ships.** The redaction is owned by phase 09 / phase 06 under the ruling |
+| **(b)** | Bound **and** redact `SavedSearch.query` at write time | **Adopted by the Product Owner — and assigned to phase 09's `09-API-012`**, not to phase 08. Changing what a saved search matches, and a data change on existing rows, are real costs; they are now decided, not deferred |
+| **(c)** | Bound now; redaction is a **phase 06** work item | **Superseded.** The decision is made; the work is routed to a named owner rather than left open |
 
-**The Implementor may not choose.** Option (a) is always the floor. If phase 06 has not
-answered, the block ships (a) **or** (c) — never (b) unilaterally, because (b) changes
-what a saved search matches.
+**The Implementor may not choose** whether to redact, and may not add the redaction call to this
+block. BLOCK 8's floor is the bound, and the bound ships either way.
 
 **File surface (semantic units)**
 
@@ -1708,8 +1973,9 @@ changes:
       (re-check the directory - phase 06 BLOCK 7 may have taken a number). Add the
       matching boundary check at the read in save_search, returning a 4xx on an
       over-cap query. Do not introduce a Pydantic DTO on this path without a
-      recorded decision. Do not redact unless the Q5 decision says (b), and do not
-      change find_matching_ads or send_alerts.
+      recorded decision. Do NOT add redact_search_query() here: Q5 was resolved on
+      2026-10-03 (stored redacted), and the redaction call is phase 09's 09-API-012
+      plus phase 06's 06-PII-108. Do not change find_matching_ads or send_alerts.
 acceptance_criteria:
   - "a query at the cap round-trips through POST /save-search/ and is stored byte-identical"
   - "a query one over the cap is refused with a 4xx and nothing is stored"
@@ -1717,6 +1983,7 @@ acceptance_criteria:
   - "the model field itself refuses an over-cap value for a non-view writer, e.g. a management command or the admin"
   - "test_saved_search_create.py's existing happy path is green unchanged"
   - "find_matching_ads.py and send_alerts.py are unchanged"
+  - "no redact_search_query() call was added to save_search by this block - that is phase 09's 09-API-012 and phase 06's 06-PII-108 under the 2026-10-03 Q5 ruling"
   - "no timing measurement, EXPLAIN or index work was done"
   - "makemigrations --check is clean after the model change"
 tests_to_run:
@@ -1748,12 +2015,23 @@ tests_to_run:
   constraints 3 and 5.
 - *Product risk:* truncation would silently change what a saved search matches. Binding
   constraint 2 forbids it.
+- *Product risk (was: "the block is redaction without phase 06's answer, Q5").* **CLOSED
+  2026-10-03.** The owner ruled that `SavedSearch.query` is stored redacted and
+  `query_normalized` is keyed on the redacted form, so the "which side" question no longer
+  exists. The residual risk is now the opposite: **an Implementor adds the redaction call here
+  "because the ruling says redact"** and lands phase 09's / phase 06's work in phase 08. The
+  acceptance criterion above forbids it.
+- *Cross-block risk:* phase 08 BLOCK 8 and phase 09 BLOCK 13 both edit
+  `apps/search/views/save_search.py`. Re-read immediately before editing; stop and report on a
+  concurrent change (§5.3).
 - *Rollback:* a straight revert restores the unbounded field; **any rows the migration
   truncated or the boundary refused do not come back**, and the commit body must say so if
   the migration is destructive.
 - *Cross-phase:* `SavedSearch` is a **phase 06 PII surface** — `06-PII-104` owns the
-  retention policy and `06-PII-108` owns `SearchHistory.query_normalized`. Q5 is their
-  answer to give, not phase 08's.
+  retention policy and `06-PII-108` owns `SearchHistory.query_normalized`. **Q5 is no longer
+  their open question: it was answered on 2026-10-03.** Phase 06 now owes the *policy
+  statement* ("one rule for all query-persistence paths") and phase 09 owes the `save_search`
+  redaction call; BLOCK 8 ships the bound and nothing else.
 
 ---
 
@@ -2112,12 +2390,12 @@ tests_to_run:
 
 | | |
 |---|---|
-| **Findings owned** | `SRCH-009` (MEDIUM) |
-| **Depends on** | **BLOCK 10** (hard) — the branch must be built on the ambiguity fix |
+| **Findings owned** | `SRCH-009` (MEDIUM — **unchanged after the 2026-10-03 ruling**) |
+| **Depends on** | **BLOCK 10** (hard) — the control must render on the ambiguity-fixed branch |
 | **Blocks** | nothing in-plan |
-| **Priority** | **P2** — design, and the behaviour is **specified** |
-| **Risk level** | **MEDIUM** — a relevance change on the hot path with two tests pinning the current narrowing |
-| **Required agents** | **Auditor · Researcher · Planner · Validator (all four).** The owner decision is Q8; the Researcher supplies the consequence analysis |
+| **Priority** | P2 — the behaviour is **specified and now decided**; the work is the signal |
+| **Risk level** | **MEDIUM** — a template + i18n change on the search results page; the narrowing stays, so the recall exposure is a **decided, not discovered**, property |
+| **Required agents** | **Auditor · Planner · Validator.** Q8 is answered (2026-10-03) — the Researcher is no longer owed a consequence analysis, because there is no predicate change to analyse. **Validator required** to confirm `ru`/`bs` and that the two pinning tests are green **unchanged** |
 
 **This is a design question, not a bug.** `docs/01-spec/technical-specification.md:66`
 documents the behaviour verbatim — *"app-level fuzzy detect (`difflib`) sets `category_id`
@@ -2131,41 +2409,65 @@ match is applied as a **hard** AND-narrow *before* the FTS predicate:
 the template renders no indication that a guess was made. A one-word query returns 1
 result; the same search with one extra word returns 2.
 
-**Decision required before implementation — Q8**
+**Decision required before implementation — Q8 — RESOLVED 2026-10-03 (Product Owner)**
+
+**The ruling: the single-word narrowing STAYS a hard filter, AND the UI must signal it.** The
+disjunctive-branch fix is **NOT chosen**. The results page renders a
+*"showing results for &lt;Category&gt; only — search all categories"* control, plus BLOCK 10's
+ambiguity fix. **`SRCH-009` therefore stays MEDIUM** and becomes an **implementation**, not a
+documentation change. The options are retained below for traceability; the Implementor may
+**not** re-choose.
 
 | Option | What it is | Consequences |
 |---|---|---|
-| **(a)** | **Disjunctive branch.** A category guess **widens** recall instead of narrowing it: match the FTS predicate over the whole tree, and rank or surface the guessed branch higher. Optionally keep a pure-guess path as an explicit opt-in refinement on the category page | **Gains:** the guess can only ever help recall; a wrong guess costs ordering, not results. This is the report's recommendation. **Costs:** a predicate change on the hot path; `test_search_view.py::TestSearchViewDescendantCategories::test_category_match_expands_to_descendants` and `::test_single_word_category_match_rejects_non_published_descendants` pin the narrowing and must be rewritten (project rule 2, with the justification stated); a possible new user-visible "we guessed a category" signal, which is an **i18n** cost (`ru` and `bs` non-empty) and a UI decision; the query-count and SLO gates apply |
-| **(b)** | **Accept the narrowing as intended.** Document the recall trade-off and the missing signal, and ship only BLOCK 10's ambiguity fix | **Gains:** no hot-path predicate change, no test rewrites, no i18n. **Costs:** a buyer searching a one-word term can silently lose an entire branch. `SRCH-009` drops to **LOW** and resolves to a documentation change. The report notes this is the owner's call |
-| **(c)** | Add only the **UI signal** — tell the buyer a category was guessed, and offer an undo | **Gains:** the defect the report names (no UI signal) is closed without touching the predicate. **Costs:** a template change plus an i18n string; the recall loss remains. Between (a) and (b) |
+| ~~**(a)**~~ | **Disjunctive branch** — a guess widens recall | **REJECTED 2026-10-03.** The owner accepted the recall-reducing behaviour as intended. **No predicate change ships**, so `_fuzzy_category_match` and `_apply_fts_filtering` are untouched, `_QUERY_BOUND` and the 2 s SLO are unaffected, and the two `TestSearchViewDescendantCategories` tests **stay green unchanged** |
+| **(b) — CHOSEN** | **Accept the narrowing as intended** | **Adopted.** The hard filter remains, `is_declined`-style narrowing semantics are unchanged, and the recall trade-off is now a deliberate, documented product choice rather than an undocumented default |
+| **(c) — CHOSEN (combined with b)** | Add the **UI signal** — tell the buyer a category was guessed, and offer an undo | **Adopted, and it is the whole of this block's production change.** The control is an *undo* ("search all categories"), not merely a notice — which is what makes the retained narrowing defensible |
 
-**The Implementor may not choose.** Q8 is an owner product decision. If the decision is
-(b), this block ships **no production code** and BLOCK 10 alone closes the defect.
+**What this block is now.** A **template + i18n change plus BLOCK 10's ambiguity fix**. It is
+**not** a hot-path predicate change. Two consequences the Implementor must not undo:
 
-**File surface (semantic units)**
+1. **The narrowing is a feature now, not a defect.** The two tests that pin it are *correct*.
+   Under project rule 2, they are **production code's** specification and **must not be
+   rewritten or weakened** to make a change pass. A PR that alters
+   `test_category_match_expands_to_descendants` or
+   `test_single_word_category_match_rejects_non_published_descendants` is reversing a Product
+   Owner decision and needs the owner, not a justification.
+2. **A new user-visible string is an i18n deliverable in the same commit**, with **non-empty
+   `ru` and `bs`**. `en` may be empty (the msgid is English).
+
+**The visibility guarantee is unchanged and still binding.** Whatever the control does, a
+non-PUBLISHED descendant or an ad in an inactive category stays excluded. The undo control
+changes the *scope of the query*, not *who may see what*.
+
+**File surface (semantic units)** — *post-ruling: this block touches no Python predicate*
 
 | File | Symbol / target | Notes |
 |---|---|---|
-| `src/backend/apps/search/views/search.py` | `_apply_fts_filtering` (the single-word branch), `_is_single_word` | The only production file under option (a) |
-| `src/backend/apps/search/tests/test_search_view.py` | `TestSearchViewDescendantCategories` (2 tests pin the narrowing) | **Rewrite under option (a), with the justification in the commit body.** Keep the `non_published_descendants` guarantee — that is a visibility rule, not a relevance one |
-| `src/backend/templates/ads/partials/ad_list.html`, `ads/list.html` | the guessed-category signal (option (a) or (c) only) | `ad_list.html` branches on `page_obj` / `has_results` and re-emits filter query strings by hand; a template change needs `uv run djlint` |
-| `src/backend/locale/*/LC_MESSAGES/django.po` | the new string (option (a) or (c) only) | **Append only.** `ru` **and** `bs` non-empty. Run `test_i18n_completeness.py` |
-| `docs/01-spec/search-patterns.md` | the fuzzy-narrowing description | `technical-specification.md` is **phase 06's** — do not edit it for this |
+| `src/backend/templates/ads/partials/ad_list.html`, `ads/list.html` | the narrowing-signal + undo control | **The block's only production file.** `ad_list.html` branches on `page_obj` / `has_results` and re-emits filter query strings by hand; a template change needs `uv run djlint`. The control reads *"showing results for &lt;Category&gt; only — search all categories"* and its link clears the category narrowing |
+| `src/backend/apps/search/views/search.py` | `_apply_fts_filtering`, `_is_single_word` | **Read-only under the ruling.** Option (a) was rejected, so the predicate and the single-word test are untouched |
+| `src/backend/apps/search/tests/test_search_view.py` | `TestSearchViewDescendantCategories` (2 tests pin the narrowing) | **Green UNCHANGED and must stay that way** — they now encode a Product Owner decision. Under project rule 2, weakening either is forbidden |
+| `src/backend/locale/*/LC_MESSAGES/django.po` | the new string | **Append only.** `ru` **and** `bs` non-empty. Run `test_i18n_completeness.py` |
+| `docs/01-spec/search-patterns.md` | the fuzzy-narrowing description | `technical-specification.md:66` is **phase 06's** — do not edit it for this. `search-patterns.md` is unclaimed |
 
 **Binding constraints**
 
-1. **The Q8 option is recorded before implementation**, and named in the commit body.
-2. **Under option (a)**, the *visibility* guarantee must survive: non-PUBLISHED
-   descendants and ads in an inactive category stay excluded. Only the *relevance* branch
-   changes. The `non_published_descendants` test is the tripwire.
-3. **No silent behaviour change** under any option: if the narrowing stays (b) or is
-   signalled (c), the template states that a guess was made.
-4. **A new user-visible string is an i18n deliverable in the same commit** (option (a)/(c)).
+1. **The Q8 ruling is recorded before implementation** — option **(b)+(c)**, not (a) — and named
+   in the commit body.
+2. **The hard filter stays.** `_apply_fts_filtering`'s `category_id__in=descendant_ids`
+   narrow for a single-word query is **unchanged**. The block adds a *signal and an undo*, not a
+   different filter.
+3. **The visibility guarantee must survive.** Non-PUBLISHED descendants and ads in an inactive
+   category stay excluded, and the undo control must not widen that.
+4. **A new user-visible string is an i18n deliverable in the same commit**, `ru` **and** `bs`
+   non-empty.
 5. **Do not add a category filter on a multi-word query**, and do not change
    `_is_single_word`.
-6. **No query-count or SLO regression.** `test_search_query_count.py`'s `_QUERY_BOUND` and
-   `test_search_slo.py`'s 2 s apply; a disjunctive branch is a heavier predicate and must
-   be measured, not assumed.
+6. **No query-count or SLO regression.** `_QUERY_BOUND` and the 2 s SLO apply. Because no
+   predicate changes, this is expected to be free — **verify it, do not assume it**, and report
+   the measurement in the commit body.
+7. **Do not weaken or rewrite the two `TestSearchViewDescendantCategories` tests.** They are the
+   specification of a Product Owner decision, not obstacles to it.
 
 **Implementor task**
 
@@ -2183,43 +2485,42 @@ description: >
   with no disjunctive alternative and no template signal. A one-word query returns
   one branch where a two-word query returns both. technical-specification.md:66
   documents this behaviour, so it is specified rather than a regression - the
-  finding is the recall-reducing choice with no UI signal. Implement the Q8 option
-  the owner selected.
+  finding is the recall-reducing choice with no UI signal. Q8 was RESOLVED on 2026-10-03:
+  the narrowing stays a hard filter and the UI signals it with an undo control. Implement
+  that; do not implement the rejected disjunctive branch.
 goals:
-  - "make a category guess widen recall rather than silently narrow it (option a), or make it visible (option b or c)"
+  - "keep the category narrowing as a hard filter and make it visible and undoable in the UI"
   - "preserve the visibility guarantee: non-PUBLISHED descendants and inactive categories stay excluded"
   - "stay inside _QUERY_BOUND and the 2 s search SLO"
 files:
-  - path: "src/backend/apps/search/views/search.py"
-    targets:
-      - type: function
-        name: _apply_fts_filtering
-  - path: "src/backend/apps/search/tests/test_search_view.py"
-    targets:
-      - type: class
-        name: TestSearchViewDescendantCategories
   - path: "src/backend/templates/ads/partials/ad_list.html"
     targets:
       - type: module
         name: ad_list
+  - path: "src/backend/locale/ru/LC_MESSAGES/django.po"
+    targets:
+      - type: module
+        name: django
 changes:
   - action: modify_code
     description: >
-      Under option (a), replace the hard category AND-narrow for a single-word
-      query with a disjunctive branch: match the FTS predicate over the full
-      queryset and use the guessed branch for ordering or a secondary surface, so a
-      wrong guess costs ordering rather than results. Under option (b) or (c), do
-      not change the predicate; add the signal and its strings. In every case keep
-      the non-PUBLISHED-descendant and inactive-category exclusions intact.
+      Q8 is RESOLVED 2026-10-03 as (b)+(c): the narrowing stays a hard filter and the UI signals
+      it. Add the "showing results for <Category> only - search all categories" control to the
+      results partial, with a link that clears the category narrowing, and translate the new
+      string into ru and bs. Do NOT change _apply_fts_filtering or _is_single_word, and do NOT
+      rewrite TestSearchViewDescendantCategories - those two tests now encode the Product Owner's
+      decision. BLOCK 10's ambiguity fix ships in the same block.
 acceptance_criteria:
-  - "the commit body names the Q8 option and the owner's reasoning"
-  - "under option (a), a one-word query returns ads from BOTH branches, and the guessed branch is not penalised out of the first page"
-  - "under option (b)/(c), the template states that a category was guessed, and ru and bs msgstr are both non-empty"
-  - "test_single_word_category_match_rejects_non_published_descendants is green, or its rewrite is justified in the commit body"
+  - "the commit body names the Q8 ruling (options b + c, option a explicitly rejected) and the date 2026-10-03"
+  - "a one-word query still narrows to the guessed branch - the hard filter is unchanged"
+  - "the results page renders a control naming the category and offering to search all categories, and the link clears the narrowing"
+  - "the new string has non-empty ru and bs msgstr; en may be empty"
+  - "a non-PUBLISHED ad in a descendant category is still excluded, and an ad in an inactive category is still excluded, with the narrowing control rendered"
+  - "TestSearchViewDescendantCategories is green UNCHANGED - both tests, neither rewritten nor weakened"
+  - "_apply_fts_filtering and _is_single_word are byte-identical"
   - "a multi-word query is unchanged"
-  - "_is_single_word is unchanged"
-  - "test_search_query_count.py and test_search_slo.py are green"
-  - "test_i18n_completeness.py is green if a string was added"
+  - "test_search_query_count.py and test_search_slo.py are green, and the measurement is recorded"
+  - "test_i18n_completeness.py is green"
   - "technical-specification.md is unchanged"
 tests_to_run:
   - "src/backend/apps/search/tests/test_search_view.py"
@@ -2231,31 +2532,42 @@ tests_to_run:
 
 **Tests required**
 
-1. **The recall property** (option (a)) — a one-word query returns ads from both branches.
-   Under (b)/(c), the equivalent assertion is that the signal renders and an undo path
-   exists.
+1. **The control renders and works** — a one-word query that triggers a category narrowing
+   renders the *"showing results for &lt;Category&gt; only"* control, and following its link
+   returns results from the **whole** tree. This is the assertion that distinguishes a signal
+   with an undo from a notice.
 2. **The visibility control** — a non-PUBLISHED ad in a descendant category is still
-   excluded, and an ad in an inactive category is still excluded. This must be asserted
-   **explicitly** under option (a), because a disjunctive branch is exactly the kind of
-   change that can widen visibility by accident.
-3. **The multi-word control** — a two-word query is byte-identical to before.
-4. **The cost** — `_QUERY_BOUND` and the 2 s SLO. Option (a) makes a heavier predicate;
-   the measurement, not the assumption, is the deliverable.
+   excluded, and an ad in an inactive category is still excluded, **with the control rendered**.
+   The undo widens the *query*, never the *audience*; that distinction is the whole risk here.
+3. **The multi-word control** — a two-word query is byte-identical to before and renders no
+   control.
+4. **The narrowing still narrows** — the two `TestSearchViewDescendantCategories` tests are the
+   control and must be green unchanged. If this block made one fail, the implementation changed
+   a Product Owner decision.
+5. **The cost** — `_QUERY_BOUND` and the 2 s SLO. Expected to be free because no predicate
+   changed; **verify it and record the measurement** rather than asserting it.
+6. **i18n** — `test_i18n_completeness.py` green with `ru` and `bs` non-empty for the new string.
 
 **Risk and rollback**
 
-- *Relevance regression:* a disjunctive branch changes result ordering for **every**
-  single-word search, which is the majority of real traffic. Mitigation: test 1 asserts
-  recall, not order; the ordering rule is part of the Q8 decision and must be stated.
-- *Visibility regression:* a disjunctive branch can widen **visibility**, not only
-  relevance. Test 2 is the control and it is non-negotiable.
-- *i18n risk (option (a)/(c)):* a new user-visible string ships without non-empty `ru`
-  and `bs`. The locale files are shared; append, never regenerate. An i18n-gate failure
-  here is a **consequence of the fix**, not a regression.
-- *Process risk:* Q8 is answered implicitly. The block is gated; the commit body must
-  name the option.
-- *Rollback:* a straight revert restores the narrowing; if (a) is reverted the spec's
-  documented behaviour is restored, which is itself a coherent state.
+- *Product risk:* an Implementor "improves" recall by replacing the narrowing with the rejected
+  disjunctive branch. Mitigation: the ruling is recorded above, the file surface no longer
+  lists `search.py`, and acceptance criterion 2 requires the two pinning tests to be green
+  **unchanged**.
+- *UI regression:* the control renders on a page where it should not, or its link drops other
+  active filters. Test 1 and 3 are the controls; `ad_list.html`'s hand-rolled query strings are
+  the hazard.
+- *Visibility regression:* an implementer wires the undo as a category filter that bypasses the
+  visibility predicate. Test 2 is the non-negotiable control and it must be asserted **with**
+  the control rendered, not instead of it.
+- *i18n risk:* a new user-visible string ships without non-empty `ru` and `bs`. The locale
+  files are shared; append, never regenerate. An i18n-gate failure here is a **consequence** of
+  the fix, not a regression.
+- *Process risk:* Q8 answered implicitly, or answered as option (a). The block's commit body
+  must name the ruling and the date.
+- *Rollback:* a straight revert removes the control and its strings and restores the
+  undocumented-narrowing state. The narrowing itself is untouched by a revert, which is
+  correct — it is the decided behaviour.
 
 ---
 
@@ -2503,18 +2815,18 @@ records that BLOCKS 2, 13 and 14 add **no** behavioural tests, deliberately.
 
 | | |
 |---|---|
-| **Findings owned** | `SRCH-004` (HIGH, **absorbed by `06-PII-104`**) + `SRCH-008` (MEDIUM, **owner decision**) |
+| **Findings owned** | `SRCH-004` (HIGH, **absorbed by `06-PII-104`**) + `SRCH-008` (MEDIUM — **owner decision TAKEN 2026-10-03**, option (a)) |
 | **Depends on** | **nothing in-plan** |
 | **Blocks** | the `IMMEDIATE_ALERTS_ENABLED` rollout gate; phase 06's `06-PII-104` acceptance |
-| **Priority** | **P0 for the decision**, P2 for the code (which is phase 06's) |
-| **Risk level** | **Process** — no production behaviour ships. The cost of getting it wrong is a *second* predicate |
-| **Required agents** | **Auditor · Researcher · Planner** (all three). **Implementor not required** — this block ships no code. **Validator required** to confirm the decision is published, uncontradicted, and cited by the tracker |
+| **Priority** | **P0** — the ruling is published and the handoff is owed; the code is phase 06's |
+| **Risk level** | **Process** — no production behaviour ships. The cost of getting it wrong is a *second* predicate, or a moderation change mislabelled as a consent fix |
+| **Required agents** | **Auditor · Researcher · Planner.** **Implementor not required** — this block ships no code. **Validator required** to confirm the ruling is published, uncontradicted, and cited by the tracker. Q7 and Q7′ are **answered**; the block's remaining job is publication and handoff |
 
 **Why this block exists at all.** `SRCH-004` is already owned by phase 06 **verbatim**, and
 phase 08 must not edit `alert_query.py`. But the finding will not be *closed* by silence: it
-is live today on an **ungated** daily job, and the answer to `SRCH-008` is an owner
-product decision that nobody owns unless someone publishes it. This block publishes both
-and states what phase 06 must satisfy. **It is placed late in the serial order only
+is live today on an **ungated** daily job. This block publishes the phase-06 handoff and, since
+**2026-10-03**, the **Product Owner's ruling on `SRCH-008`** — option (a), a ban hides
+inventory, plus the Q7′ write boundary. **It is placed late in the serial order only
 because it needs no Implementor**; the Planner/Researcher may run it at any time, and
 running it early is encouraged.
 
@@ -2540,27 +2852,60 @@ are not the same predicate, and a fix that satisfies one does not satisfy the ot
 | `status=PUBLISHED` | yes | yes |
 | `user__is_declined=False` | **yes** | **no** |
 | null-safe `Q(category__isnull=True) \| Q(category__is_active=True)` | **yes** | **no** |
-| `user__is_banned` | no (`SRCH-008`) | no |
+| `user__is_banned=False` | **no — `SRCH-008`, ruled REQUIRED 2026-10-03** | **no — same ruling** |
 
 `find_matching_ads` is literally `Ad.objects.filter(status=AdStatus.PUBLISHED)`, and the
 alert path ships the result as a Telegram digest line (title + formatted price) — a
-**wider** disclosure than any web surface, because it leaves the site. `technical-specification.md:101`
-states that DECLINE *"hides the user's PUBLISHED ads from public search/listings, direct
-URL access (`ad_detail`), and the `media_gate` non-staff filter"*. An outbound message to
-every matching subscriber is a deviation from that statement, not a house-style
-inconsistency.
+**wider** disclosure than any web surface, because it leaves the site.
 
-**Decision required — Q7: does a ban hide inventory?**
+**A recorded contradiction between this block's text and the 2026-10-03 Product Owner rulings.**
+This block cites `technical-specification.md:101` — DECLINE *"hides the user's PUBLISHED ads
+from public search/listings, direct URL access (`ad_detail`), and the `media_gate` non-staff
+filter"* — as the reason an outbound digest to every matching subscriber is *"a deviation from
+that statement"*. **The Product Owner ruled on 2026-10-03 that DECLINE is REVERSIBLE and that
+already-published ads stay live until the seller acts** (`DECLINE` blocks publishing and
+messaging; the login is regained; consent may be restored at any time), and that
+**`technical-specification.md:101` and `docs/01-spec/spec-index.md:74` are superseded by that
+product rule and must be corrected by their owning phase**. The spec line this block relies on
+is therefore **no longer the rule**, and handoff item 1 below cannot be executed as written
+until phase 06 reconciles it. This is **recorded, not resolved here** — phase 06 owns
+`technical-specification.md` (BLOCKS 4/11/14) and `spec-index.md`. **The obligation is named in
+§5.5.** The critical consequence the Owner attached: **with DECLINE reversible, the publish gate
+is the ONLY control keeping a declined seller from posting**, so the missing `is_declined` term
+on the *publish* path is the whole control rather than a partial one.
+
+**Q7 RESOLVED 2026-10-03 (Product Owner) — does a ban hide inventory?**
+
+**The ruling: option (a). A BAN HIDES INVENTORY.** A banned seller's ads are excluded from the
+public ad-visibility predicate **across search, category, detail and the media gate**. The
+options are retained below for traceability; **the decision is made** and no Implementor may
+re-choose it.
+
+**Two binding rules ride on this ruling, and both are about how the change is argued.**
+
+1. **It must be argued as a MODERATION decision.** A ban is a seller-relationship sanction;
+   removing inventory is part of that sanction, not a consent matter.
+2. **It must NEVER be bundled into a commit justified as fixing a consent violation.** Doing
+   so mislabels the change, makes it materially harder to review, and hides a moderation
+   policy change inside a PII fix. The commit body must say *"moderation: a ban hides
+   inventory"* in those words.
+
+**Q7′ RESOLVED 2026-10-03 (Product Owner) — ban enforcement also covers creating and
+publishing.** **A banned seller cannot create or publish a new ad.** Ban enforcement covers
+**relisting**, not only login. Anywhere in the plan set the phrase *"a banned seller can still
+relist"* is recorded as an accepted known gap, that gap is **now closed**, and the test that
+documented it becomes a **positive control asserting the block**. `SRCH-008`'s scope therefore
+covers a **read** boundary (visibility) **and** a **write** boundary (create/publish) — both
+are phase 06's code.
 
 | Option | What it is | Consequences |
 |---|---|---|
-| **(a)** | **Ban hides inventory.** Add `user__is_banned=False` to the shared predicate **and** to `ad_detail` / `media_gate`, and amend `db-schema.md:61` to state the scope explicitly | **Gains:** a banned seller can no longer reach buyers through ads they can no longer manage; the three surfaces stop disagreeing. **Costs:** an explicit owner product decision with real revenue consequence — a ban is a seller-relationship sanction and removing inventory is a **second** sanction. It must be argued as a moderation decision, **never** bundled into a commit justified as "fixing a consent violation"; that mislabels the change and makes it much harder to review |
-| **(b)** | **Ban does not hide inventory.** Document that a ban is a seller-relationship sanction and that takedown is performed by transitioning the ads (`ARCHIVED` / `DELETED`) through the moderation path; amend `db-schema.md:61` to say so | **Gains:** cheaper, keeps moderation and visibility as separate concerns, and matches phase 06's reasoning that *"nothing in the spec says a banned account must be excluded from the market"*. **Costs:** a banned seller's ads stay listed until a human transitions them, so the operational burden moves to moderation. `db-schema.md:61` must then say so explicitly, because the doc's asymmetry with `is_declined` (line 63, which spells out the full search/listings/detail/media_gate scope) **is** the defect |
+| **(a) — CHOSEN 2026-10-03** | **Ban hides inventory.** Add `user__is_banned=False` to the shared predicate **and** to `ad_detail` / `media_gate`, and amend `db-schema.md:61` to state the scope explicitly | **Adopted.** A banned seller can no longer reach buyers through ads they can no longer manage; the four surfaces stop disagreeing. The `db-schema.md:61` amendment is **phase 06's file** and is a **propagation obligation**, not a phase-08 edit |
+| ~~**(b)**~~ | **Ban does not hide inventory.** Document that takedown is performed by transitioning the ads through the moderation path | **REJECTED.** The operational burden of manual takedown is accepted by the owner. Recorded here so that the reasoning is not re-derived |
 
-**Either way the answer belongs in `db-schema.md:61` and in the one predicate's
-docstring. Leaving it undocumented while three surfaces disagree is the defect.** Note
-`db-schema.md` is **phase 06's file** (its BLOCKS 13 and 17 edit the same lines) — the
-amendment is routed, not made here (§5.3).
+**Either way the answer belongs in `db-schema.md:61` and in the one predicate's docstring — and
+now the answer is known.** Note `db-schema.md` is **phase 06's file** (its BLOCKS 13 and 17
+edit the same lines) — the amendment is routed, not made here (§5.3).
 
 **Decision required — Q6: where the ad predicate lives**
 
@@ -2578,14 +2923,26 @@ amendment is routed, not made here (§5.3).
 
 1. `find_matching_ads` applies the **same** ad-visibility terms as
    `ListingsQuery.build_queryset`: `user__is_declined=False` and the null-safe active
-   category clause.
-2. A test asserts a DECLINED seller's ad and an INACTIVE-category ad are **excluded** from
+   category clause. **⚠ Premise changed 2026-10-03 — see the contradiction recorded above.**
+   The `user__is_declined=False` term is derived from `technical-specification.md:101`, which
+   the Product Owner's reversibility ruling **supersedes**: DECLINE no longer hides an
+   already-published ad. **Phase 06 must reconcile this term against the corrected spec before
+   the predicate is written**, and its decision must be recorded in the predicate docstring.
+   Phase 08 does not choose; it records the conflict.
+2. `user__is_banned=False` is applied **on all four public surfaces** — search, category
+   listing, ad detail and the media gate — per the Q7 ruling. **Argued as moderation.**
+3. A banned seller **cannot create or publish a new ad** (Q7′). Where phase 15 or phase 16
+   records *"a banned seller can still relist"* as an accepted known gap, that gap is closed
+   and the test becomes a **positive control asserting the block**.
+4. A test asserts a DECLINED seller's ad and an INACTIVE-category ad are **excluded** from
    `find_matching_ads`, **and** that an eligible seller's ad is still included — the
-   positive case matters as much as the exclusions.
-3. `IMMEDIATE_ALERTS_ENABLED` stays `False` until **both** predicates exist. The immediate
+   positive case matters as much as the exclusions. **With the reversibility ruling, the
+   DECLINED-seller assertion is only valid for the *publish* path, not the visibility path** —
+   phase 06 settles the exact shape.
+5. `IMMEDIATE_ALERTS_ENABLED` stays `False` until **both** predicates exist. The immediate
    path additionally ships a **working deep link** to a hidden ad via `build_alert_message`,
    which is strictly worse than the digest's title + price.
-4. The daily digest is **not** feature-gated and is live; the fix is required regardless of
+6. The daily digest is **not** feature-gated and is live; the fix is required regardless of
    the immediate-path flag.
 
 **Implementor task** — *none.* This block is a Planner/Researcher deliverable. No commit.
@@ -2667,10 +3024,11 @@ One Implementor, strictly sequential. Every implementation block is one commit (
 | **5 → 8** (hard) | Both ship a migration in the **`apps/search` app**. Migration numbers are sequential per app, and phase 06 BLOCK 7 may also be allocating one. Landing 8 first forces it to take `0003` and pushes 5 to `0004` — workable, but it means the destructive dedup and the cheap bound land in an order nobody chose, and the §5.3 reservation list is wrong. **Sequence deliberately: the destructive migration first, while the blast radius is being reasoned about** |
 | **6 → 7** (hard) | The report's rollout rule, verbatim: *"SRCH-005 and SRCH-007 must ship together or the restoration bug survives in a harder-to-reproduce form."* BLOCK 7's bump is correct but **unload-bearing only once the counter no longer resets to `1`**. Shipping 7 alone leaves the same user-visible outcome reachable by a second path; shipping 6 alone leaves the call site undeclared |
 | **7 → 12** (soft) | BLOCK 12's reproduction **is** BLOCKS 6/7's stale-cache window. The report instructs that the fix "belongs with the cache-coherency work so it is not reverted by the next caching change". Placing 12 last means the next caching change sees it already fixed and cannot silently undo it |
-| **10 → 11** (hard) | Under Q8 option (a) the guess becomes a **disjunctive branch** over a set of categories. If BLOCK 11 lands before BLOCK 10, that set is an arbitrary single branch and the branch **widens recall to the wrong subtree** — strictly worse than the hard filter, and invisible. The ambiguity fix is a precondition for every option of Q8 except (b), where it is the whole fix |
+| **10 → 11** (hard) | Under the **2026-10-03 Q8 ruling** the guess stays a single narrowed branch and BLOCK 11 adds a *control* rather than a *branch*. The edge survives on a different ground: **the control must render only for an unambiguous branch**, so BLOCK 11 cannot ship before BLOCK 10's ambiguity fix — otherwise it advertises a "search all categories" escape from an arbitrarily-guessed branch, which **widens recall to the wrong subtree** and is invisible. That is strictly worse than the hard filter and is exactly the defect `VAL-003` is filed for |
 | **1 → (external `03-DB-004`)** | The report is explicit that `statement_timeout` is a **prerequisite** for `SRCH-001`'s remediation, not a duplicate of it: with zero repo hits and `SHOW statement_timeout → 0`, there is no server-side bound of any kind, so input validation alone leaves an unstated band of attacker-chosen query cost between 1 and the ceiling that still runs unbounded. **The commit may land; the rollout may not** (§4.4) |
 | **9 → (external `04-AUT-003`)** | The identical mechanism in `login_rate_limit.py` is already filed as `04-AUT-003`, and phase 04's validator annotated it "search copy was missing from File(s)". One shared `get_client_ip` closes both. Phase 04 must be told so it does not ship a second, divergent fix — **this edge is external and phase 08 does not control it** |
-| **8 → (external phase 06)** | `SavedSearch` is a phase 06 PII surface (`06-PII-104` retention, `06-PII-108` the sibling `query_normalized`). Q5 asks phase 06 whether redaction is in its scope. **Sequenced, not parallelised** |
+| **8 → (external phase 09)** | **New edge, created 2026-10-03.** BLOCK 8 edits `save_search`'s `query` read (the bound) and phase 09's `09-API-012` edits the same read (the `redact_search_query()` call the Q5 ruling requires). **Sequenced, not parallelised**; the same file, two owners, two different concerns. §5.3 names the reservation |
+| **8 → (external phase 06)** | `SavedSearch` is a phase 06 PII surface (`06-PII-104` retention, `06-PII-108` the sibling `query_normalized`). **Q5 is closed (2026-10-03):** the rule is "one rule for all query-persistence paths, keyed on the redacted form", and phase 06 owns writing it down. **Sequenced, not parallelised** |
 | **14 → (external phase 06)** | BLOCK 14 publishes the acceptance criteria `06-PII-104` must satisfy and the `IMMEDIATE_ALERTS_ENABLED` gate. Phase 06's BLOCK 7 is the consumer. The coordinator sequences this, not the agents |
 
 ### 4.3 Where there is deliberately no edge, and why
@@ -2763,6 +3121,7 @@ to contact or negotiate with the other agents.
 | **`src/backend/apps/search/services/signals.py`** | **Phase 08: BLOCK 7** (adds a `User` receiver) | Phase 06 BLOCK 5 edits the same module for the immediate-alert log masking. **Sequenced, not parallelised.** Phase 06 BLOCK 7 is also nearby |
 | **`src/backend/apps/users/services/deletion.py`** | **Phase 08: BLOCK 7** (option (b) only — three lines) | **Phase 06's most contended file**: its BLOCKS 9, 10, 11 and 13 all edit it, and `give_consent` / `decline_consent` / `withdraw_consent` / `soft_delete_user_ads` all live there. Under option (a) this block does not touch the file at all — **which is one more reason option (a) is preferable** |
 | **`src/backend/apps/search/models.py` + `apps/search/migrations/`** | **Phase 08: BLOCKS 5, 8** | **The next free number is `0003`** — re-check the directory immediately before generating. **Phase 06 BLOCK 7 may add a `SavedSearch` migration.** Never renumber or edit an applied migration. BLOCK 5 before BLOCK 8 (§4.3) |
+| **`src/backend/apps/search/views/save_search.py`** | **Phase 08: BLOCK 8** (the `query` length bound) | **New two-way reservation, created 2026-10-03 by the Q5 ruling.** Phase 09's `09-API-012` edits the same read to add the `redact_search_query()` call, and phase 06's `06-PII-108` owns the policy statement. Two owners, two concerns, **one file**. Sequenced, never parallelised; re-read immediately before editing and stop on a concurrent change |
 | **`src/backend/apps/ads/services/listings_query.py`** | **Phase 08: BLOCK 1** (`feature_slugs`) | Phase 05 holds `apps/ads/models.py` and the next `ads/migrations/0008_*`; phase 15 audits permission predicates. BLOCK 1 touches the DTO field and reads the builder — it must not restructure `build_queryset`'s visibility terms, which are `SRCH-004`/`SRCH-008`'s surface |
 | **`src/backend/apps/core/utils/sanitize.py`, `json_logging.py`** | **Phase 08: BLOCKS 3, 4** (shared helper neighbourhood) | Phase 06 BLOCK 5 touches the masking helpers nearby. `redact_search_query` and its never-lengthen invariant are **shared**: BLOCK 4 must not change it, and BLOCK 3 must not change `_MAX_QUERY_LENGTH` |
 | **`src/backend/apps/categories/cache.py`, `categories/services/lookup_resolution.py`, `apps/lookups/services/cache_service.py`** | **Phase 08: BLOCK 6** (three of the four writers) | No other phase claims them. **Phase 13** claims key composition and lifetime as a grading concern; BLOCK 6 declares the contract, phase 13 grades it |
@@ -2770,7 +3129,7 @@ to contact or negotiate with the other agents.
 | **`docs/02-database/db-schema.md`** | **Phase 08: BLOCKS 5, 8** (the `popular_searches` and `saved_searches` rows) | **Phase 06 owns this file** (BLOCKS 13, 17 — the same lines `SRCH-008` wants to amend at `:61`). One commit each, different tables, disjoint regions; **re-read before editing**, and if a concurrent edit is present, stop and report |
 | **`.env.prod.example` (and the other `.env*.example` files)** | **Phase 08: BLOCK 2** (one `DB_MEM_LIMIT` line) | **Phase 02 BLOCK 6 and phase 06 BLOCK 4** both own these files. Gated in **both** directions by `config/settings/tests/test_env_allowlist.py`. `docs/ops/docker-deployment.md` has **unstaged edits from another agent** in the working tree |
 | **`docs/01-spec/technical-specification.md`** | **Phase 08: none, by design** | Phase 06 holds the reservation (BLOCKS 4, 11, 14). The advisory "state the `features` cardinality in the spec" is routed, not done — BLOCK 1 uses `docs/01-spec/search-patterns.md` instead, which no phase claims |
-| **`src/backend/locale/*/LC_MESSAGES/django.po`** | **Phase 08: BLOCK 11 only** (if a string is added) | Shared with phase 14 and phase 03. **Append; never regenerate.** `ru` and `bs` both non-empty |
+| **`src/backend/locale/*/LC_MESSAGES/django.po`** | **Phase 08: BLOCK 11** (a string is now added **unconditionally** — the 2026-10-03 Q8 ruling chose (b)+(c)) | Shared with phase 14 and phase 03. **Append; never regenerate.** `ru` and `bs` both non-empty |
 | **`src/backend/conftest.py`** | **Nobody in this plan** | The most contended file in the repository. **No phase-08 block may edit it.** If a block appears to need a new fixture, that is a signal the test is over-fitted |
 | **`.ai/audit/**`** | **Nobody.** Unmodifiable by mandate | 19 tracked deletions exist in the working tree. `git status --short .ai` must show **no new modifications** beyond the pre-existing deletions and this plan's own file |
 
@@ -2810,7 +3169,11 @@ to contact or negotiate with the other agents.
 |---|---|---|
 | **03 — `03-DB-004`** | `statement_timeout` on the `default` alias | The `?features=` cap becomes the **only** bound in the system, and any legitimate large filter set is still unbounded. Phase 08's BLOCK 1 commits; the **rollout** waits |
 | **03 — the legacy `SRH-` sweep** | Removing the eleven in-source `SRH-` markers | Phase 03's plan reserves it; phase 08 must not start it. Until it lands, any grep for `SRH-` in this repo returns false matches |
-| **06 — Q5** | Whether `SavedSearch.query` needs redaction, not just a bound | A bound closes the resource exposure; a phone number in a stored saved search stays. BLOCK 8 ships the bound either way and records the question |
+| **06 — Q5** *(CLOSED 2026-10-03 — replaced by the propagation obligations below)* | ~~Whether `SavedSearch.query` needs redaction~~ — **answered: yes** | The question no longer exists. BLOCK 8 ships the bound; the redaction call is phase 09's and the policy statement is phase 06's |
+| **06 — the PII policy statement (`06-PII-108`)** | **PROPAGATION OBLIGATION, 2026-10-03.** Record and own the rule that **every query-persistence path stores the redacted form, and `query_normalized` is keyed on the redacted form** — one rule, no exceptions. Owns `docs/01-spec/technical-specification.md`'s and the privacy page's search-query wording | BLOCK 8 and phase 09's `09-API-012` implement the rule; if phase 06 does not write it down, the third path added later stores raw queries again — which is exactly how this defect reached three writers |
+| **06 — `06-PII-105` / `06-PII-113`** | **PROPAGATION OBLIGATION, 2026-10-03.** Correct `docs/01-spec/spec-index.md:74` and `docs/01-spec/technical-specification.md:101`, and make the **publish gate** the control it is now required to be | Both spec lines are **superseded** by the reversibility ruling. With DECLINE reversible, the publish gate is the **only** control keeping a declined seller from posting, so the missing `is_declined` term on that gate is the whole control, not a partial one. BLOCK 14 records the conflict; phase 06 owns the resolution |
+| **06 — `db-schema.md:61`** | **PROPAGATION OBLIGATION, 2026-10-03.** Amend the `is_banned` row to state the ban's scope explicitly: the ads are excluded from search, category, detail and the media gate | Phase 06 owns `db-schema.md` (BLOCKS 13/17 edit the same lines). The asymmetry with the `is_declined` row at `:63` **was** the defect; the decision now exists, only the documentation does not |
+| **06 — the ad-visibility predicate (`06-PII-104`)** | **PROPAGATION OBLIGATION, 2026-10-03.** `user__is_banned=False` on all four public surfaces, **argued as moderation**; and a banned seller **cannot create or publish a new ad** (relisting) | `SRCH-008` is decided but unimplemented. Phase 08 publishes it and ships no code. The commit must never be justified as fixing a consent violation |
 | **06 — the predicate shape** | Confirmation of the audience predicate's shape before the ad predicate is written (Q6) | Two predicates fork, and the drift `VAL-003` exists to remove comes straight back |
 | **12 — the runbooks** | Crash recovery, the memory budget, the 429 behaviour, the dedup rollback | An operator's first encounter with each is unguided. Phase 08 states the parameters; phase 12 writes the procedure |
 | **13 — the `SRH-` / performance baseline** | A latency grading that assumes BLOCK 1 landed, and a ruling on Q1's lifetime half | Phase 13 re-measures an 08-owned defect as a 13 finding, and the key-lifetime question has no owner |
@@ -2849,7 +3212,7 @@ a re-filed finding.
 | Item | Routed to | Why |
 |---|---|---|
 | **`SRCH-004`** — the alert path's weaker visibility predicate | **Phase 06, `06-PII-104` (BLOCK 7)**, with phase 03 BLOCK 9 sequenced against it | Verbatim the same finding (C-12). `alert_query.py` is a three-way reservation and phase 08 must not touch it. BLOCK 14 publishes the handoff and the acceptance criteria (§5.4) |
-| **`SRCH-008`** — no `is_banned` term in the public-visibility predicate | **Owner (product)** via Q7; the code change lands with the phase-06 predicate commit; the `db-schema.md:61` amendment is **phase 06's file** (BLOCKS 13, 17) | An owner product decision, not a consent breach. Two fully argued options in BLOCK 14; **neither is implemented by this plan** |
+| **`SRCH-008`** — no `is_banned` term in the public-visibility predicate | **Phase 06** — the predicate commit (`06-PII-104`) and the `db-schema.md:61` amendment (BLOCKS 13, 17) | **Q7 and Q7′ were DECIDED on 2026-10-03** (Product Owner): a ban hides inventory across search / category / detail / media gate, and a banned seller cannot create or publish a new ad. **Not implemented by this plan**; BLOCK 14 publishes the ruling, the moderation framing and the read + write boundaries (§5.5). The code change must never be bundled into a consent-fix commit |
 | **The audience / account-state predicate** (`06-VAL-003`) | **Phase 06 (BLOCK 6)** | A different predicate on a different model, owned by `apps/users`. Phase 08 must not add it, and must not add a default-manager filter |
 | **The project-level logging policy** — *"never log raw user input; log a normalised, redacted, truncated form"*, enforced by a shared formatter or filter | **Phase 06** (`06-PII-102` validated rec. 5) | `SRCH-002` is the **third** instance of the same "no declared logging policy" root cause. A point fix in `apps/search` closes this instance, not the class. Phase 08 ships the one call site and records the class |
 | **`sanitize_query_for_log`'s `isalpha()` character handling** | **Phase 14** | It collapses Cyrillic and Montenegrin input to its letters and loses Serbian Latin characters and digits entirely, degrading log triage for two of three locales. Recorded inside `SRCH-002`; classification is deliberately deferred to avoid duplicating |
@@ -2928,10 +3291,12 @@ trust boundaries and rate limits.
 | **All** | A shipped green test that **encodes a defect** is "fixed" by changing production code instead | Correctness | Med | **High** | Project rule 2 restated in §1.4. BLOCK 7's rewrite of `test_give_consent_restores_declined_ads_to_queryset` is the only unconditional rewrite, and its commit body must name the test and state that the old docstring documented the defect. BLOCK 3 and BLOCK 11 **constrain** four more and each justification is in its commit body | Low |
 | **All** | A red gate captured during BLOCK 1's crash reproduction is reported as a product defect, or a probe takes the shared test DB into crash recovery | Process | Med | **High** | `VAL-004` is binding: BLOCK 1's reproduction runs on a **private** `postgres:18-alpine` on its own port. §1.1 and BLOCK 1's binding constraint 6 | Very low |
 | **All** | An FTS-dependent test passes with **0 hits** because the probe did not inherit the session fixture that re-asserts `ads_search_vector_update` | Correctness | **High** | **High** | §0.2.1's Method-trap rule: assert `trigger_present` from `pg_trigger` **and** run a positive control that must match. No FTS result may rest on a "0 hits" observation. This trap already produced one near-miss false refutation in this phase's own evidence | Low |
-| **All** | A new user-visible string ships without non-empty `ru` **and** `bs` | i18n | Low | Med | Only BLOCK 11 adds a string, and only under Q8 option (a)/(c). Append-only; the locale files are shared with phase 14 | Very low |
+| **All** | A new user-visible string ships without non-empty `ru` **and** `bs` | i18n | **High** | Med | BLOCK 11 adds a string — **now unconditionally**, because the 2026-10-03 Q8 ruling chose (b)+(c) rather than (b)-only. Append-only; the locale files are shared with phase 14 | Very low |
+| **All** | A ruling is re-chosen by an Implementor, or a settled question is reported as still open | Process | Med | **High** | §0.7 records every 2026-10-03 ruling with its date, owner and chosen option. The Implementor is forbidden from choosing; the block's commit body names the ruling | Very low |
 | **All** | An implementor "improves" production code to keep a test green rather than fixing the test | Correctness | Med | **High** | §1.4's production-code-is-king rule, restated per block. The three tests that constrain BLOCKs 3 and 11 are named explicitly so a change to any of them is deliberate and visible | Low |
-| **1** | The ceiling is too high, or the UI cap lands after the server cap | Rollout | Med | **High** | Q2 is a gate with three options; binding constraint 4 makes a UI-cap finding a **stop and report**. The measured curve is in §0.2.1 row 5 and must be re-derived, not copied from the report | Low |
-| **1** | A per-slug membership query breaks `_QUERY_BOUND` and is "fixed" by raising the bound silently | SLO | Med | **High** | Q3 offers a single-lookup option; `test_search_query_count.py` and `test_search_slo.py` are the tripwires; any bound amendment must be in the **same commit** with the delta stated | Low |
+| **1** | The ceiling ships as a bare literal, or the UI cap lands after the server cap | Rollout | Med | **High** | Q2 is **resolved** (option b): the bound is the catalogue invariant with stated headroom and a guard test whose failure is demonstrated. **Binding constraint 4 is unchanged** — the UI-cap finding is still a **stop and report** | Low |
+| **1** | A per-slug membership query breaks `_QUERY_BOUND` and is "fixed" by raising the bound silently | SLO | **Low** (was Med) | **High** | Q3 is **resolved** as option (d) — the spec's correlated subquery, **no whitelist**, so no membership query ships at all. `test_search_query_count.py` and `test_search_slo.py` remain the tripwires | Very low |
+| **1** | The catalogue grows past a ceiling measured once, and a legal query starts 400-ing | Regression | Med | Med | **This is the cost of the ruling and it is paid deliberately:** the guard test is the mitigation, and a category that outgrows the invariant fails CI with a named failure rather than a runtime 400 | Low |
 | **1** | The cap is rolled out before `03-DB-004` | Availability | Med | **High** | A **rollout** gate, not a code gate (§4.4 item 5). §8.4 records it as satisfied or open. The commit body must say the cap is not the only bound | Low |
 | **1** | The membership check is implemented as a per-request `LookupItem` queryset, making the fix worse than the defect on the hot path | SLO | Med | Med | Q3 option (c) is the single-lookup form; BLOCK 9's cache work is the precedent for reusing a cached slug set | Low |
 | **2** | `.env.prod.example` or `docs/ops/docker-deployment.md` is edited on a stale read and a concurrent agent's work is clobbered | Contention | **High** | Med | §1.3's staging rule; both files are phase 02's / phase 06's surface and the ops doc already has uncommitted changes from another agent. Re-read immediately before editing; stop and report on a concurrent change | Med — accepted |
@@ -2939,7 +3304,7 @@ trust boundaries and rate limits.
 | **3** | The implementer wraps `_record_search_analytics` in a blanket `try/except`, converting a loud input rejection into a silent one | Correctness | Med | **High** | Binding constraint 1; `BLE001` is the tripwire; BLOCK 4's test also fails (the analytics no longer records) | Very low |
 | **3** | `sanitize_query_for_log` is reused wholesale, silently truncating `q` from 200 to 100 | Regression | **High** | Med | C-3; binding constraint 2; `test_query_exceeding_max_length_returns_200` is the tripwire | Very low |
 | **3** | Only `/search/` is fixed, leaving the `LIKE`-parameter path on the autocomplete endpoint reachable | Correctness | Med | **High** | Binding constraint 3; the block requires one test per endpoint because the two fail at different call sites | Low |
-| **3** | Q4 option (a) is chosen and a user-visible query is silently mutated | Product | Low | Med | Test 3 (the legal query returns the same ads) is the control. If it fails, the option is wrong and the block returns to the gate | Low |
+| **3** | The strip mutates a legal query's results, and the "positive control" is skipped | Product | **Med** | Med | **The mutation is now a decided behaviour (Q4, 2026-10-03)**, so the risk is that it goes unverified. The byte-identical-ads control is a mandatory acceptance criterion, not an optional test | Low |
 | **4** | The Implementor redacts the value **before** the search, changing what is searched and what is cached | Correctness | Med | **High** | Binding constraint 1; the result-set, cache-key and analytics assertions are the tripwires | Very low |
 | **4** | A blanket "log nothing" change passes the redaction test and destroys triage capability | Observability | Low | Med | Test 2 is the negative case: a query with no identifiers still logs | Very low |
 | **4** | A global logging `Filter` is built "to be safe" | Design | Med | Med | Binding constraint 3; §6.2 records the decline and routes the policy to phase 06 | Very low |
@@ -2959,7 +3324,9 @@ trust boundaries and rate limits.
 | **8** | An existing saved search already holds an over-cap value and the `AlterField` fails in production | Migration | Med | **High** | The migration must inspect and handle the existing population, and the commit body states what it did with it. A bare `AlterField` that fails in production is not a ship | Low |
 | **8** | The boundary **truncates** instead of refusing, silently changing what a saved search matches | Product | Med | Med | Binding constraint 2 forbids truncation; test 1 asserts a refusal with nothing stored | Low |
 | **8** | A DTO is introduced on `save_search` "while we are there" (C-6) | Scope | Med | Low | Binding constraint 3: a DTO is a scope expansion and must return to the Planner | Very low |
-| **8** | The block is redaction without phase 06's answer (Q5), changing which ads an existing seller matches | Product | Low | **High** | Binding constraint: option (b) requires the recorded decision. BLOCK 8's default floor is the bound | Low |
+| **8** | ~~The block is redaction without phase 06's answer (Q5)~~ — **CLOSED 2026-10-03** | — | — | — | Q5 is **resolved**: `SavedSearch.query` is stored redacted and `query_normalized` is keyed on the redacted form. Replaced below by the real residual risk | Closed |
+| **8** | The Implementor adds the `redact_search_query()` call here "because the ruling says redact", landing phase 09's and phase 06's work in phase 08 | Scope | **Med** | Med | Acceptance criterion: no redaction call in `save_search` by this block. `09-API-012` + `09-VAL-002` own it; §5.5 names both | Very low |
+| **8** | Phase 08 BLOCK 8 and phase 09 BLOCK 13 collide on `save_search.py` | Contention | Med | Med | §5.3 names the shared file; re-read immediately before editing and stop on a concurrent change | Low |
 | **8** | The block makes a latency claim about the alert path | Scope | Med | Low | Binding constraint 5; `VAL-006` and `SRCH-011` deliberately make none. Phase 13 owns it | Very low |
 | **9** | The Implementer reads `XFF[0]` and the defect survives with a different shape | Security | Med | **High** | Binding constraint 2; test 1 (rotating vs fixed XFF maps to one key) is the tripwire, and the Validator may reject the block | Very low |
 | **9** | The key-namespace refactor merges `{namespace}_rl:{ip}` and `telegram_dl_rl:{ip}` and one limiter's counters contaminate the other | Correctness | Med | Med | `test_search_and_autocomplete_use_independent_counters` is the tripwire and must not be weakened | Low |
@@ -2970,18 +3337,21 @@ trust boundaries and rate limits.
 | **10** | The Implementer "fixes" this by adding a unique constraint on `Category.name` | Scope | Low | Med | Binding constraint 4 forbids it: it needs an i18n migration and a catalogue decision, and translated names can legitimately collide | Very low |
 | **10** | The reproduction runs on a stale schema and a correct fix looks broken | Method | Med | Med | §0.2.1 row 9: wipe the rows, re-assert the trigger, then assert. This exact artefact produced a false refutation in the phase's own evidence | Low |
 | **10** | Only the fuzzy path is fixed and the exact path keeps returning an arbitrary branch (C-9) | Correctness | Med | **High** | Binding constraint 1; the block requires the ambiguity case asserted through **both** paths | Very low |
-| **11** | Q8 is answered implicitly and the relevance change ships unargued | Process | Med | Med | The block is gated; the commit body names the option and the owner's reasoning | Low |
-| **11** | The disjunctive branch widens **visibility**, not only relevance, and a non-PUBLISHED ad in a descendant becomes visible | Correctness | Med | **High** | Test 2 is the non-negotiable control: non-PUBLISHED descendants and inactive categories stay excluded. `test_single_word_category_match_rejects_non_published_descendants` is the existing tripwire | Low |
-| **11** | The heavier predicate breaks `_QUERY_BOUND` or the 2 s SLO | SLO | Med | Med | Both gates are in the block's `tests_to_run`; the measurement, not the assumption, is the deliverable | Low |
+| **11** | Q8 answered implicitly, or answered as the rejected disjunctive branch (option (a)) | Process | Med | **High** | **Q8 is resolved 2026-10-03** as (b)+(c). The block's file surface no longer lists `search.py`; the two pinning tests must be green **unchanged**. A PR that rewrites either test is reversing an owner decision and needs the owner | Very low |
+| **11** | The undo control is wired as a category filter that bypasses the visibility predicate, and a non-PUBLISHED ad in a descendant becomes visible | Correctness | Med | **High** | Test 2 must be asserted **with the control rendered**, not instead of it. `test_single_word_category_match_rejects_non_published_descendants` is the existing tripwire and is now also the specification | Low |
+| **11** | The heavier predicate breaks `_QUERY_BOUND` or the 2 s SLO | SLO | **Low** (was Med) | Med | **No predicate changes under the ruling**, so this is expected to be free — but both gates stay in `tests_to_run` and the measurement is recorded rather than assumed | Very low |
 | **11** | The i18n gate fails on `ru` / `bs` and it is triaged as a regression | i18n | **High** | Low | A **consequence** of the fix (§1.2). The `.po` update is in the same commit as the template change | Very low |
 | **12** | "No results" and "page out of range" are conflated, so a valid page number renders the empty state | Regression | Med | Med | The derivation must distinguish the two; the out-of-range case is the test that distinguishes them | Low |
 | **12** | The implementer "simplifies" by changing `_resolve_search_count` or adding a second count | Correctness | Med | Med | Binding constraints 2 and 4; `TestSearchViewTotalCount`'s three tests, including the exact `COUNT(*)` at the cap, are the tripwire | Low |
 | **12** | A result-count display is added as a "fix" | Scope | Med | Low | C-8 and binding constraint 3; §6.2 records the decline | Very low |
 | **13** | A docstring change is "improved" into a behaviour change (e.g. an actual background refresh) | Design | Med | Med | Binding constraints 1 and 2; the 12-test SWR suite is the control, and a background task would need a worker this deployment does not run | Very low |
 | **13** | The handbook edit is broadened into a rubric-semantics change | Process | Low | Med | Binding constraint 3: the prefix line only. Phase 06's plan routes rubric corrections to the coordinator | Very low |
-| **14** | The decision is made implicitly by whoever implements first, and phase 06 forks the predicate | Process | Med | **High** | BLOCK 14 is the published record; its acceptance criteria are written here so phase 06's cannot drift; §5.4 states the stall | Very low |
+| **14** | ~~The decision is made implicitly by whoever implements first~~ — **CLOSED 2026-10-03**; Q7 and Q7′ are decided | — | — | — | Replaced by the two rows below | Closed |
+| **14** | `is_banned` is added and the commit is justified as "fixing a consent violation" | Product / Review | Med | **High** | **Now a binding constraint, not a warning** (ruling 2026-10-03): the change must be argued as a **moderation** decision and must never ship inside a consent-fix commit. The commit body must say so in those words | Very low |
+| **14** | Phase 06 writes the predicate against the **superseded** DECLINE semantics while reconciling the spec, and ships `user__is_declined=False` on the visibility path against the reversibility ruling | Process | Med | **High** | Recorded as an explicit contradiction in the block; §5.5 names phase 06's obligation for `spec-index.md:74` and `technical-specification.md:101`, and `06-PII-105` / `06-PII-113` for the publish gate. Phase 08 chooses nothing | Low |
+| **14** | The Q7′ write boundary (create/publish) is read as a visibility term and no publish gate is written | Correctness | Med | **High** | Handoff items 2 and 3 state the read boundary **and** the write boundary separately; where a plan records *"a banned seller can still relist"* as an accepted gap, the known-gap test becomes a **positive control asserting the block** | Low |
 | **14** | A planner working from the report's file list edits `alert_query.py` and collides with phase 06 **and** phase 03 | Contention | Med | **High** | §4.3's "no edge" table, §5.1 and §5.3 name the three-way reservation; the block's own file surface is documentation only | Very low |
-| **14** | `is_banned` is added and the commit is justified as "fixing a consent violation" | Product / Review | Med | Med | The report's warning is explicit and it materially affects review. Binding text: the change must be argued as a **moderation** decision. Option (b) is equally defensible and is cheaper | Low |
+| **14** | `is_banned` is added and the commit is justified as "fixing a consent violation" (historical row, retained for traceability) | Product / Review | Med | Med | **Superseded by the row above** — the option-(b) alternative was rejected on 2026-10-03, and the moderation framing is now mandatory | Very low |
 
 ---
 
@@ -2995,16 +3365,25 @@ Phase 08 is complete when **all** of the following hold.
       `003`, `005`, `006`, `007`, `009`, `010`, `011`, `013`, `014`, `015`,
       `VAL-001`, `VAL-003`, `VAL-005`, `VAL-006`) — plus the `SRCH-015` remainder,
       **1 absorbed by another phase** (`SRCH-004` → `06-PII-104`), **2 routed to owners
-      or phases** (`SRCH-008` → Q7; the logging-policy class → phase 06),
+      or phases** (`SRCH-008` → **ruled 2026-10-03, implemented by phase 06**; the
+      logging-policy class → phase 06),
       **1 already fixed** (`SRCH-012`, restated so it is not silently re-filed),
       **2 process-only** (`VAL-002` routed to the coordinator, `VAL-004` honoured as a
       verification constraint), **0 rejected**.
-- [ ] Every gated block (**1, 3, 5, 6, 7, 8, 11**) has a **written** decision for its open
+- [ ] Every gate-bearing block (**1, 3, 6, 7, 8, 11**) has a **written** decision for its open
       question, naming the option chosen and the consequences accepted. **Silence is not
-      an acceptable outcome for any of them.**
-- [ ] Each of Q1 … Q10 is either answered with a record, or explicitly re-routed with a
-      named destination. **Q1 is a coordinator ruling**; Q2, Q4, Q7 and Q8 are owner
-      decisions; Q3, Q5, Q6, Q9 and Q10 are engineering/Researcher steps.
+      an acceptable outcome for any of them.** **As of 2026-10-03 this is satisfied for
+      BLOCKS 1, 3, 8 and 11 by §0.7; BLOCK 6's Q1 remains a coordinator ruling and BLOCK 7's
+      Q10 was answered 2026-10-01.**
+- [ ] Each of Q1 … Q10 (and **Q7′**) is either answered with a record, or explicitly re-routed
+      with a named destination. **Q1 is a coordinator ruling.** Q2, Q4, Q5, Q7, Q7′ and Q8 were
+      **owner decisions, all taken on 2026-10-03** (§0.7); Q3, Q6, Q9 and Q10 are
+      engineering/Researcher steps, and **Q6 remains phase 06's predicate ownership**.
+- [ ] The four **propagation obligations owed to phase 06** by the 2026-10-03 rulings are
+      named in §5.5 and communicated to the coordinator: the `06-PII-108` one-rule policy
+      statement; the `06-PII-105` / `06-PII-113` corrections to `spec-index.md:74` and
+      `technical-specification.md:101` and the publish gate; the `db-schema.md:61` `is_banned`
+      amendment; and the `SRCH-008` predicate including the **relist** write boundary.
 - [ ] The `SRCH-004` → `06-PII-104` handoff (§5.4) was communicated to the coordinator,
       including the two acceptance criteria phase 06 must satisfy and the
       `IMMEDIATE_ALERTS_ENABLED` gate.
@@ -3037,19 +3416,24 @@ Phase 08 is complete when **all** of the following hold.
 
 ### 8.3 Per-item behavioural confirmation
 
-- [ ] **`SRCH-001`** — a `?features` list one over the ceiling is rejected with a 4xx on
-      `/search/` **and** `/`; a list at the ceiling containing a nonexistent slug is
+- [ ] `SRCH-001` — a `?features` list one over the invariant is rejected with a 4xx on
+      `/search/` **and** `/`; the ceiling is derived from the catalogue at seed volume with
+      **stated headroom**, not a hard-coded literal; the invariant guard test has been
+      **demonstrated red**; a list at the ceiling containing a nonexistent slug is
       rejected and no join is emitted for it; a legal list of size 3 returns exactly the
       ads carrying all three features. `test_features_filter.py` passes **unchanged**;
-      `_QUERY_BOUND` and the 2 s SLO pass. The Q2 and Q3 options and the UI-cap check
-      are named in the commit body.
+      `_QUERY_BOUND` and the 2 s SLO pass. The Q2 option (b) and Q3 option (d) are named
+      in the commit body together with the measured catalogue maximum, and the UI-cap
+      check is recorded.
 - [ ] **`VAL-001`** — `.env.prod.example` states the memory budget the profile expects and
       that changing it is a capacity decision; `statement_timeout` is named as `03-DB-004`;
       `docker-compose.yml` and `config/settings/base.py` are unchanged.
 - [ ] **`SRCH-006`** — a NUL byte in `q` returns 200 on `/search/` **and** on
       `/api/search/autocomplete` with no `DataError`; `\x07` and the homoglyph payload
-      still return 200; a legal query returns the same ads; the 200-char `q` contract and
-      the 100-char log contract are asserted **separately**; no blanket `try/except` was
+      still return 200; **a legal query returns byte-identical ads before and after the
+      change** (the Product Owner's mandated positive control); the 200-char `q` contract and
+      the 100-char log contract are asserted **separately**, and `sanitize_query_for_log`
+      was **not** reused wholesale on the search input edge; no blanket `try/except` was
       added around any DB call.
 - [ ] **`SRCH-002`** — the rendered production line for a zero-result search containing a
       phone number, an e-mail address and a multi-word capitalised name contains **none**
@@ -3083,8 +3467,10 @@ Phase 08 is complete when **all** of the following hold.
       the cap is refused with a 4xx and nothing is stored; **a non-view writer is rejected
       by the model**, which is what distinguishes a model bound from a view-only cap; an
       over-cap value cannot reach `send_alerts._collect_alerts`; `test_alert_query.py` is
-      green unchanged; **no timing measurement, `EXPLAIN` or index work** was done; the
-      Q5 answer is recorded in the commit body.
+      green unchanged; **no timing measurement, `EXPLAIN` or index work** was done; **no
+      `redact_search_query()` call was added by this block** — the redaction is phase 09's
+      `09-API-012` / `09-VAL-002` and phase 06's `06-PII-108` under the 2026-10-03 Q5 ruling,
+      and the commit body names that ruling rather than recording an open question.
 - [ ] **`SRCH-010` / `SRCH-013`** — a rotating and a fixed `X-Forwarded-For` reach the
       same limiter key; `X-Real-IP` wins over `XFF`; `REMOTE_ADDR` is the last fallback;
       refusals occur in the same proportion under a rotating header; `/search/` and `/`
@@ -3096,11 +3482,15 @@ Phase 08 is complete when **all** of the following hold.
       branch is visible; an unambiguous name still narrows; a slug match still scopes; the
       warm-cache path still performs **zero** category SELECTs; `test_search_fuzzy.py`
       passes **unchanged**; `Category.name` still has no unique constraint.
-- [ ] **`SRCH-009`** — the Q8 option is named in the commit body; under (a) a one-word
-      query returns ads from **both** branches while non-PUBLISHED descendants and
-      inactive categories stay **excluded**; under (b)/(c) the template states that a
-      category was guessed and `ru` and `bs` are non-empty; a multi-word query is
-      unchanged; `_is_single_word` is unchanged; `technical-specification.md` is unchanged.
+- [ ] **`SRCH-009`** — the Q8 ruling **(b)+(c), dated 2026-10-03, with option (a) explicitly
+      rejected** is named in the commit body; the one-word narrowing **still narrows**
+      (`_apply_fts_filtering` and `_is_single_word` byte-identical); the results page renders
+      the *"showing results for &lt;Category&gt; only — search all categories"* control and its
+      link widens the query to the whole tree; `ru` **and** `bs` are non-empty; non-PUBLISHED
+      descendants and inactive categories stay **excluded with the control rendered**;
+      `TestSearchViewDescendantCategories` is green **unchanged** — neither test rewritten nor
+      weakened; a multi-word query is unchanged; `_QUERY_BOUND` and the 2 s SLO are green with
+      the measurement recorded; `technical-specification.md` is unchanged.
 - [ ] **`SRCH-015`** — with a warm cache and an ad that no longer matches the live
       predicate, the page renders the **empty state** (not a blank area) at HTTP 200;
       `TestSearchViewTotalCount` passes **unchanged** (all three, including the exact
@@ -3112,9 +3502,14 @@ Phase 08 is complete when **all** of the following hold.
       `test_search_cache.py` passes **unchanged**; the handbook's prefix is `SRCH-` and
       records the `SRH-` collision; **no in-source `SRH-` marker was changed** and the
       rubric's semantics were not altered.
-- [ ] **`SRCH-004` / `SRCH-008`** — the decision record names the Q6 and Q7 options and the
-      owner's reasoning; phase 06's acceptance criteria for the alert path are published;
-      `IMMEDIATE_ALERTS_ENABLED` was **not** enabled anywhere;
+- [ ] **`SRCH-004` / `SRCH-008`** — the record names the **2026-10-03 Product Owner rulings**:
+      Q7 (**a ban hides inventory**, across search / category / detail / media gate, argued as
+      a **moderation** decision and never bundled into a consent-fix commit) and Q7′ (**a banned
+      seller cannot create or publish a new ad**); the **read** boundary and the **write**
+      boundary are stated separately; the contradiction between this block's DECLINE premise and
+      the reversibility ruling is recorded with the phase-06 obligation it creates; Q6's
+      predicate-ownership constraint is recorded; phase 06's acceptance criteria for the alert
+      path are published; `IMMEDIATE_ALERTS_ENABLED` was **not** enabled anywhere;
       `apps/search/services/alert_query.py` is **byte-identical** to before.
 
 ### 8.4 Cross-phase integrity

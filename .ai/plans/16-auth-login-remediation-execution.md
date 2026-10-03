@@ -3653,10 +3653,29 @@ pinned by `apps/users/tests/test_consent.py::TestConsentWithdrawIdempotency`,
 **including that no `LoginToken` deletion happens on the no-op path**. That test must
 stay green and unedited.
 
-#### `G-A` — CLOSED: the decode-scan revocation service is **OUT** (`04-AUT-002`, ban path)
+#### `G-A` — CLOSED: the decode-scan revocation service is **OUT** (`04-AUT-002`, ban path) — **the relist limb is now RULED by the Product Owner, 2026-10-03**
 
 **Decision: option (i) — out, with a loud named known-gap and a named owner (phase 15,
 `15-AUTHZ-001`). Not deferred silently, and not deferred to "later".**
+
+> ### ✅ 2026-10-03 UPDATE — the relist gap is CLOSED. This is no longer an accepted HIGH gap.
+>
+> **The Product Owner ruled on 2026-10-03 that a banned seller CANNOT create or publish a new ad.
+> Ban enforcement covers RELISTING, not only login.** The consequences in this plan:
+> 1. **The named known-gap test "a banned seller can still relist" is NO LONGER AN ACCEPTED HIGH
+>    GAP.** It becomes a **POSITIVE CONTROL asserting the block** — the test is inverted, and a
+>    regression turns it red.
+> 2. **The risk row moves from "HIGH, knowingly accepted" to CLOSED.**
+> 3. **The `15-AUTHZ-001` hand-off is WITHDRAWN FOR THIS SPECIFIC GAP ONLY.** The scan is still
+>    out of `B-07`'s scope (that half of the ruling is unchanged), and every *other* `15-AUTHZ-001`
+>    item — including the per-request session-revocation gate — is untouched.
+> 4. **The session-revival half of this gap is unaffected.** A banned seller who already holds a
+>    live session still keeps it for the remainder of its 14-day life. The ruling removes the
+>    *relisting* capability, not the *session-revival* capability.
+>
+> **The rest of this section is retained as the record of what was outstanding when the gap was
+> filed.** Its verification table is still the implementor's map of the chain — but the chain's
+> **endpoint is now a control, not a vulnerability.**
 
 The only two mechanisms that could revoke a **banned** user's sessions are (a) an O(live
 sessions) decode scan and (b) a per-request account-state check. **Both are owned by other
@@ -3672,23 +3691,30 @@ option (i) plus a named known-gap, because the difference is the *record*: a pha
 must be able to find this by grepping the plan, and a coordinator must be able to see that
 the phase knowingly accepted it.
 
-**The honest security consequence — stated plainly, because "out" must never be silent:**
+**The honest security consequence — stated plainly, because "out" must never be silent. ⚠ The second
+limb was RULED AGAINST on 2026-10-03; the first was not:**
 
-> **A banned seller who is already holding a web session keeps it for the remainder of its
-> 14-day life, and can therefore still reach the dashboard, ad edit, archive, reactivate,
-> delete, cabinet, settings, favourites, saved searches, search history and seller
-> analytics. Worse, the sanction is defeatable: `ad_edit` and `ad_reactivate` have NO
-> account-state check, `ad_reactivate` calls `auto_moderate(ad)` inline, `ad_edit`'s
-> text-change branch routes to `submit_ad(...)` which also runs `auto_moderate` — and
-> `auto_moderate` reads only `ModerationCriteria` and never `is_banned`. So a banned seller
-> can archive an ad, re-post it, and auto-moderation can return it to `PUBLISHED`.**
-> **A ban that lets the seller relist is not a ban.**
+> **(a) STILL OPEN — a banned seller who is already holding a web session keeps it for the
+> remainder of its 14-day life**, and can therefore still reach the dashboard, ad edit, archive,
+> reactivate, delete, cabinet, settings, favourites, saved searches, search history and seller
+> analytics. **This is unaffected by the 2026-10-03 ruling** and remains phase 15's
+> `15-AUTHZ-001`.
+>
+> **(b) ✅ RULED AGAINST 2026-10-03 — "a ban that lets the seller relist is not a ban" is now
+> fixed, not accepted.** At the time of filing it was: `ad_edit` and `ad_reactivate` had NO
+> account-state check, `ad_reactivate` called `auto_moderate(ad)` inline, `ad_edit`'s text-change
+> branch routed to `submit_ad(...)` which also ran `auto_moderate` — and `auto_moderate` read only
+> `ModerationCriteria` and never `is_banned`, so a banned seller could archive an ad, re-post it,
+> and auto-moderation could return it to `PUBLISHED`. **The Product Owner ruled that a banned seller
+> cannot create or publish a new ad. The chain above is therefore the surface the new control must
+> close, and test 4 in `B-07`'s ledger is now a POSITIVE CONTROL asserting exactly that.**
 
-**Severity: HIGH. Confidence: HIGH for the code path (verified source-by-source below),
-MEDIUM for the end-to-end behaviour (not executed at the time of planning — `B-07` converts
-it to an executed, pinned test).** `G-D`'s known-gap test exists to close that confidence gap
-by running it. **Owner: phase 15, `15-AUTHZ-001`.** It is not closable in phase 04 at any
-acceptable cost.
+**Severity: the relist limb is CLOSED by decision (2026-10-03); the session-revival limb remains
+HIGH and is not mitigable in phase 04.** Confidence: HIGH for the code path (verified
+source-by-source below), MEDIUM for the end-to-end behaviour (not executed at the time of planning
+— `B-07` converts it to an executed, pinned test, now a **positive** one). **Owner of what remains:
+phase 15, `15-AUTHZ-001` — for the session-revival limb only. The `15-AUTHZ-001` hand-off for the
+relist gap is WITHDRAWN.**
 
 **Verification of the relist chain, so no implementor re-derives it:**
 
@@ -3852,11 +3878,14 @@ worth keeping is *"a soft-deleted user never sees the consent banner"*, which be
 relative to `logout()` (phase 03 `DB-004`). Do not touch `consent_accept`. **Do not touch
 `consent_decline`** (`G-7b`). **Do not add `logout(request)` to `ban_user`** — wrong target
 (`G-D`). **Do not touch `src/backend/apps/users/admin.py`** (`G-B`). **Do not touch
-`auto_moderate` or `submit_ad`** — the ban-path relist capability is a *record* for phase 15,
-and making `auto_moderate` read `is_banned` would be a second gate in the moderation tier,
+`auto_moderate` or `submit_ad`** — ⚠ **the ban-path relist capability is no longer a *record* for
+phase 15: the Product Owner ruled on 2026-10-03 that a banned seller cannot create or publish a
+new ad, so that limb is CLOSED and its `15-AUTHZ-001` hand-off is WITHDRAWN. What remains phase 15's
+is the SESSION-REVOLATION limb only.** Independently of the ruling, making `auto_moderate` read
+`is_banned` would be a second gate in the moderation tier,
 which is phase 15's surface and not this finding's.
 
-#### Tests required — **6 new, 0 changed, 5 named known-gap**
+#### Tests required — **6 new, 0 changed, 5 named known-gap + 1 positive control**
 
 **CORRECTION — the previous brief named `src/backend/apps/moderation/tests/test_review.py`.
 That file DOES NOT EXIST.** Verified: `apps/moderation/tests/` contains `test_admin_actions.py`,
@@ -3877,7 +3906,7 @@ red-to-green target. Every one must carry a docstring naming the gap, its owner
 | 1 | `test_ban_leaves_the_banned_sellers_session_usable` | `apps/moderation/tests/test_moderation_views.py` (new class `TestBanUserSessionKnownGap`) | `G-A` / `G-D` — the banned seller's session survives `ban_user` | a session-revocation mechanism lands |
 | 2 | `test_ban_does_not_log_out_the_moderator` | same class | `G-D` — the **wrong-target trap**. Asserts the moderator's session still works after banning | someone adds `logout(request)` to `ban_user` — **this is the tripwire for the trap the existing five tests cannot see** |
 | 3 | `test_banned_seller_can_still_reach_the_dashboard` | same class | `G-A` — the web tier has zero per-request account-state enforcement | phase 15's gate lands |
-| 4 | `test_banned_seller_can_archive_and_reactivate_an_ad` | `apps/ads/tests/test_edit.py` (new class `TestBannedSellerRelistKnownGap`) | `G-A` — **the concrete harm.** Drives `ad_archive` then `ad_reactivate` on a `PUBLISHED` ad owned by a `is_banned=True` seller, with the real `auto_moderate` (not mocked), and asserts the ad ends `PUBLISHED` | `ad_edit`/`ad_reactivate` gain an account-state check, **or** `auto_moderate` starts reading `is_banned` |
+| 4 | `test_banned_seller_cannot_relist_an_ad` — **inverted 2026-10-03. It was `test_banned_seller_can_archive_and_reactivate_an_ad`, a known-gap test pinning the harm; it is now a POSITIVE CONTROL asserting the block** | `apps/ads/tests/test_edit.py` (class `TestBannedSellerRelistKnownGap` → **`TestBannedSellerRelistPositiveControl`**) | ~~`G-A` — the concrete harm~~ → **`G-A` / the 2026-10-03 Product Owner ruling: a banned seller cannot create or publish a new ad.** Drives `ad_archive` then `ad_reactivate` on a `PUBLISHED` ad owned by an `is_banned=True` seller, with the real `auto_moderate` (not mocked), and **asserts the ad does NOT end `PUBLISHED`** | **always — it is a control, not a gap. It is red only on a regression that lets a banned seller relist** |
 | 5 | `test_consent_decline_keeps_the_session_and_is_reversible` | `apps/users/tests/test_consent.py` (new class `TestConsentDeclineSessionKnownGap`) | `G-7b` — decline leaves the session usable **and** the user can re-accept through the authenticated `consent_accept`. Guards the one-way door: if a decline logout ever shipped, this goes red | a decline logout is added |
 | 6 | `test_withdraw_consent_leaves_other_sessions_intact` | `apps/users/tests/test_deletion.py` or `test_consent.py` | `G-A` — `consent_withdraw` flushes **only the current** session; a second session for the same user keeps up to 50 raw search queries (`search_history.py::_MAX_HISTORY = 50`) | multi-session revocation lands |
 
@@ -3926,12 +3955,12 @@ that `users/admin.py` is untouched, and that no **production** file changed at a
 
 | Risk | Severity | Mitigation |
 |---|---|---|
-| **A banned seller can still relist** (`G-A`'s residual) | **HIGH, knowingly accepted** | Not mitigated in this phase — it is **not mitigable here** without a second gate or an O(n) scan. Named known-gap test 4 executes and pins it; handed to `15-AUTHZ-001` |
+| ~~**A banned seller can still relist** (`G-A`'s residual)~~ — **CLOSED 2026-10-03 by the Product Owner: a banned seller cannot create or publish a new ad. Ban enforcement covers relisting, not only login.** | **CLOSED** | **No longer an accepted HIGH gap.** Named known-gap test 4 is **inverted into a positive control** (`test_banned_seller_cannot_relist_an_ad`) asserting the block. **The `15-AUTHZ-001` hand-off for this specific gap is WITHDRAWN.** The *session-revival* limb below is untouched |
 | **A wrong-target `logout(request)` in `ban_user`** — logs out the moderator, leaves the seller live, **and the existing five tests all stay green** | **HIGH** | Test 2 is the dedicated tripwire. Prohibited by name in the brief's `acceptance_criteria` and in "Out of scope" |
 | Shipping a second gate | HIGH | Validator diff check; `MIDDLEWARE` pinned at 15 |
 | A known-gap test is written without its owner docstring, so the gap becomes a silent pin | MEDIUM | Stated as a defect in the tests section; the docstring requirement is in the brief's acceptance criteria |
 | A known-gap test passes **vacuously** because `force_login` never ran or because state was set in a fixture rather than after login | MEDIUM | Vacuity guard in the tests section; the brief states it as an acceptance criterion |
-| Test 4 (`relist`) is flaky because it drives the real `auto_moderate` and real `ModerationCriteria` | MEDIUM | `ModerationCriteria.get_singleton()` is a fixture the suite already relies on; use the suite's existing criteria fixture, and assert on the ad's final status, not on moderation internals |
+| Test 4 (`relist`) is flaky because it drives the real `auto_moderate` and real `ModerationCriteria` | MEDIUM | `ModerationCriteria.get_singleton()` is a fixture the suite already relies on; use the suite's existing criteria fixture, and assert on the ad's final status, not on moderation internals. **Unchanged by the 2026-10-03 inversion — the test drives the same chain; only its asserted direction changed** |
 | The block is read as "nothing happened" | **MEDIUM — the real reputational risk of a zero-code block** | This section's opening note, the DoD's explicit `04-AUT-002` **not closed** statement, and the six named tests. §F.1's dominant failure mode is a green suite over a *silent* non-fix; six executed red-to-green specifications are not that |
 | Phase 06 reads `PII-107` as closed | MEDIUM | `G-B` states the decision in the plan, and the Phase-06 record's item 4 requires phase 06 to cite the **decision**, not the absence |
 
@@ -3961,9 +3990,12 @@ The plan edits stay.
   number). `test_banner_hidden_for_deleted_user` still green — `G-F`.
 - **The commit body states, in the finding's own words: `04-AUT-002` is NOT closed.** It is
   re-scoped to the web tier's per-request enforcement, handed to `15-AUTHZ-001`, and
-  `04-AUT-002`'s ban-path residual is named as a knowingly-accepted HIGH risk. **A commit
-  body that reads as a fix is a defect in this block.**
-- The hand-off note is written: six named gaps, one owner (`15-AUTHZ-001`), plus the
+  `04-AUT-002`'s ban-path **session-revival** residual is named as a knowingly-accepted HIGH
+  risk. **The relist limb is NOT named as an accepted gap: it was ruled on 2026-10-03 (a banned
+  seller cannot create or publish a new ad) and its `15-AUTHZ-001` hand-off is withdrawn.** A
+  commit body that reads as a fix is a defect in this block.
+- The hand-off note is written: five named gaps plus **test 4, now a positive control rather than a
+  gap**, one owner (`15-AUTHZ-001`, for the session-revival items only), plus the
   re-filed janitor (`G-E`, phase 12 / `db-retention.md`) and the `PII-107` decision (`G-B`,
   phase 06).
 
@@ -3991,9 +4023,9 @@ description: >
   they must not be written to pass against a fix.
 goals:
   - "zero production files changed - git diff --stat -- src/ shows only test files"
-  - "six named known-gap tests, each with an owner-naming docstring; test 4 executes the banned-seller relist chain end to end"
+  - "six named known-gap tests, each with an owner-naming docstring; test 4 is INVERTED into a positive control (test_banned_seller_cannot_relist_an_ad) per the 2026-10-03 ruling and drives the banned-seller relist chain end to end"
   - "the wrong-target logout trap in ban_user gets its own tripwire test, because the five existing tests cannot see it"
-  - "04-AUT-002 is recorded as NOT closed, with the ban-path residual named as a knowingly accepted HIGH risk"
+  - "04-AUT-002 is recorded as NOT closed, with the ban-path SESSION-REVELATION residual named as a knowingly accepted HIGH risk and owned by 15-AUTHZ-001. The RELIST limb is NOT named as an accepted gap: the 2026-10-03 ruling closed it, its hand-off is withdrawn, and test 4 is a positive control"
 extra_context: >
   READ FIRST, in the B-07 section of the plan: the "Verified starting state" table, "The
   wrong-target trap in ban_user", "The contact leak is ALREADY CLOSED", G-A, G-7, G-B, G-7b,
@@ -4051,10 +4083,10 @@ files:
   - path: src/backend/apps/ads/tests/test_edit.py
     targets:
       - type: class
-        name: TestBannedSellerRelistKnownGap
-        note: "NEW class. Highest-value deliverable in the block."
+        name: TestBannedSellerRelistPositiveControl
+        note: "NEW class. Highest-value deliverable in the block. RENAMED from TestBannedSellerRelistKnownGap on 2026-10-03 - it is a positive control asserting the ban, not a gap pinning a harm."
       - type: function
-        name: test_banned_seller_can_archive_and_reactivate_an_ad
+        name: test_banned_seller_cannot_relist_an_ad
     semantic_anchors:
       insert_after:
         type: function
@@ -4108,7 +4140,7 @@ acceptance_criteria:
   - "all six known-gap tests pass, each with an owner-naming docstring"
   - "the five tripwires are green AND unedited: test_bulk_ban_users_not_locked, test_ban_user_uses_select_for_update_and_atomic, TestConsentWithdrawIdempotency, TestCanLogin, TestConsentBannerGuard"
   - "each new test proves its session was live BEFORE asserting it survived (log in first, then mutate the flag)"
-  - "the commit body states in plain words that 04-AUT-002 is NOT closed, names the ban-path residual as a knowingly accepted HIGH risk, and points at 15-AUTHZ-001. A commit body that reads as a fix is a defect."
+  - "the commit body states in plain words that 04-AUT-002 is NOT closed, names the ban-path SESSION-REVELATION residual as a knowingly accepted HIGH risk, and points at 15-AUTHZ-001. It does NOT name the relist limb as an accepted gap - that limb was ruled on 2026-10-03 and its hand-off is withdrawn. A commit body that reads as a fix is a defect."
   - "no .po file and no template is edited; every new docstring is English"
 tests_to_run:
   - src/backend/apps/moderation/tests/test_moderation_views.py
@@ -4128,10 +4160,10 @@ known_gaps_handed_off:
     owner: "phase 15 - 15-AUTHZ-001"
     gate: G-A
     severity: HIGH
-  - gap: "a banned seller can archive an ad and reactivate it, and auto_moderate can return it to PUBLISHED - a ban that lets the seller relist is not a ban"
-    owner: "phase 15 - 15-AUTHZ-001"
+  - gap: "WITHDRAWN 2026-10-03 - a banned seller can archive an ad and reactivate it, and auto_moderate can return it to PUBLISHED. The Product Owner ruled that a banned seller CANNOT create or publish a new ad: ban enforcement covers relisting, not only login. This gap is CLOSED as a decision, its 15-AUTHZ-001 hand-off is withdrawn, and known-gap test 4 is inverted into a positive control (test_banned_seller_cannot_relist_an_ad)."
+    owner: "none - CLOSED 2026-10-03 by the Product Owner"
     gate: G-A
-    severity: HIGH
+    severity: CLOSED
   - gap: "a withdrawn user's OTHER sessions keep up to 50 raw search queries; consent_withdraw flushes only the current session"
     owner: "phase 15 - 15-AUTHZ-001"
     gate: G-A
@@ -4179,14 +4211,17 @@ cannot be softened by a reader in a hurry:
 - **Zero production lines change.** No `logout()` is added anywhere, because there is no path
   where adding one would be correct.
 - **`04-AUT-002` is NOT closed.** The ban-path residual — a banned seller keeps a working
-  session and can relist through `ad_edit`/`ad_reactivate`, with `auto_moderate` never reading
-  `is_banned` — is **accepted at HIGH and handed to `15-AUTHZ-001`**, because the only two
+  session, with no per-request account-state gate and no logout-all — is **accepted at HIGH and
+  handed to `15-AUTHZ-001`**, because the only two
   mechanisms that would close it (a per-request gate, or an unbounded decode scan) belong to
   other blocks, and shipping either here would be a second gate (`04-VAL-001`) or a
-  concurrency regression (`DB-004`).
+  concurrency regression (`DB-004`). ⚠ **The relist half of that residual was CLOSED on 2026-10-03
+  by the Product Owner — a banned seller cannot create or publish a new ad — and its
+  `15-AUTHZ-001` hand-off is withdrawn. Only the session-revival half remains.**
 - **What it does deliver is real, and it is not nothing:** the finding's most serious claim —
   that a ban is defeatable — moves from a MEDIUM-confidence *inference* to an **executed,
-  pinned demonstration** (test 4, the relist chain, real `auto_moderate`, not mocked). The
+  pinned demonstration** (test 4, the relist chain, real `auto_moderate`, not mocked — now
+  asserting the block rather than pinning the harm). The
   wrong-target trap in `ban_user` acquires a **dedicated tripwire** that the five existing
   tests structurally cannot provide. Six residuals get a name, an owner and a test. Seven
   gates are closed with reasons. **Four plan corrections land**, one of which was a hard
@@ -5378,12 +5413,14 @@ traps:
 | **Findings owned** | `04-AUT-006` (whole) · `04-VAL-002` (the `SESSION_*` half of the annotation, shared with `B-11`) |
 | **Depends on** | `G-10a`…`G-10i` — **all CLOSED 2026-10-02 by this Planner** · `B-03` (**must never merge with it**: two commits, never one) |
 | **Blocks** | `B-11` — hard, and the reason the two are not merged |
+| **Status** | ✅ **ADDITIVE AND INERT — unchanged by the 2026-10-03 ruling.** The block ships **one additive declaration and no behaviour change**. ⚠ **But the value it declares is now a Product Owner DECISION dated 2026-10-03 (14 days), not merely a declaration of the status quo** — which is what makes the declaration *honest* rather than *inherited*. Options (ii) 7 d and (iii) 24 h are **declined**, with their refusal rationale retained in `G-10a` |
 | **Priority** | P2 · **Risk LOW as shipped.** The plan recorded MEDIUM on the assumption that a global behaviour change might be chosen; `G-10b` chose the declaration, so the shipped diff is additive and inert. *The plan's risk band is superseded by this row, not by the Implementor.* |
 
 **Objective.** Establish what the session lifetime **is**, make it **declared** rather
 than inherited from a Django default, make the **refresh policy** declared too, and make
 the specification say what the code does. **No behaviour change.** One product question —
-*should the value be shorter?* — is recorded as owed and owned, not silently answered.
+*should the value be shorter?* — **was answered on 2026-10-03: 14 days, ruled by the Product
+Owner.** What remains owed is a documentation correction only (see *Named known-gaps*).
 
 ---
 
@@ -5408,12 +5445,15 @@ the specification say what the code does. **No behaviour change.** One product q
   The only two hits in product documentation are `docs/99-agent/architecture.md`'s own
   record of the residual (*"the remainder of its 14-day life"* and *"unset, so the backend
   is the DB and the lifetime is Django's 14-day default"*) — **both already describe the
-  inherited default, and both become accurate declarations once `B-10` ships.** No edit to
-  `architecture.md` is needed.
+  inherited default, and both become accurate declarations once `B-10` ships.** ⚠ **One
+  `architecture.md` statement is now FALSE and needs correcting (see the propagation obligation
+  in *Named known-gaps*): the § *Session Lifetime Policy (04-AUT-006)* bullet asserting *"No
+  product decision has been taken on the value."* The Product Owner took the value on
+  **2026-10-03**. The two hits above are a different section and are unaffected.**
 - The **number is a product decision, not an engineering derivation.** `TOKEN_TTL_SECONDS
   = 300` is a **one-time handshake handoff token** and is **not** a session-lifetime
   precedent; using it as one is a category error. Recorded so the next editor does not
-  make it.
+  make it. **That is exactly why the value was ruled rather than derived — 2026-10-03.**
 
 ---
 
@@ -5548,9 +5588,11 @@ DROPPED and must not be reinstated.** It documents a behaviour the code does not
 
 #### Gates — `G-10a` … `G-10i`, **all CLOSED 2026-10-02 by this Planner**
 
-**`G-10a` — the lifetime value. CLOSED: declare the status quo `1209600` (14 days), and
-record the *value* as an owed product decision with a named owner. Not (ii) 7 d, not (iii)
-24 h.**
+**`G-10a` — the lifetime value. CLOSED 2026-10-02 by this Planner: declare the status quo
+`1209600` (14 days). ⚠ THE VALUE ITSELF IS NOW RULED — 2026-10-03, Product Owner: the session
+lifetime is 14 DAYS, DECLARED EXPLICITLY IN SETTINGS. The "owed product decision with a named
+owner" framing is WITHDRAWN; known-gap #1 is CLOSED AS A DECISION. Not (ii) 7 d, not (iii)
+24 h — and the refusal rationale for both is retained below, unchanged.**
 
 The declaration is the deliverable and is deliverable at any value. The **value** has no
 engineering derivation — the tree-wide search returns nothing — so choosing 7 days or 24
@@ -5580,12 +5622,13 @@ options impose and no benefit that is demonstrable from the repository:
 finding names can no longer recur silently; the spec stops being wrong; the five tests
 below make all of it machine-checked and **value-agnostic**.
 **What (i) honestly does NOT deliver:** a shorter exposure window, and the spec's "long
-idle". Both are stated below as owed, not answered.
-**The product question is recorded, not buried:** *"should the seller/staff session
-lifetime be shorter than 14 days, and if so what value?"* — owner **the coordinator /
-product owner**, and it is **owed, not open** in the §H sense (nothing blocks `B-10` or
-`B-11`). It is named in *Named known-gaps* below with the exact reason it is a product
-call. **`04-AUT-006` is WEAKENED, not closed** — see *Honest bottom line*.
+idle". Neither is owed to anyone — the value is now **ruled**.
+**The product question is ANSWERED, not buried:** *"should the seller/staff session lifetime be
+shorter than 14 days, and if so what value?"* — **the Product Owner answered it on 2026-10-03:
+14 days, declared explicitly in settings.** It was **owed, not open** in the §H sense; it is now
+**closed as a decision**. The refusal rationale for options (ii) 7 d and (iii) 24 h is retained
+in `G-10a` and is the reason 14 days was the right answer on the merits. Known-gap #1 is marked
+closed. **`04-AUT-006` is WEAKENED, not closed** — see *Honest bottom line*.
 
 **`G-10b` — absolute or idle. CLOSED: option (i) — declare the age AND the refresh policy;
 do not introduce an idle window.**
@@ -5814,8 +5857,12 @@ contract is exactly the kind of well-meant widening that contract exists to prev
 command · merging with `B-03` (**two commits, never one**) · `ALLOWED_ENV_VARS`, `read_env()`
 and the `.env.*.example` templates (`G-10d`) · `HOURLY_COMMANDS` / `DAILY_COMMANDS`
 (`G-10f`) · `docs/02-database/db-retention.md` (the janitor's owner, not this block's) ·
-`docs/99-agent/architecture.md` (**no edit needed** — its two 14-day statements already
-describe the default and become accurate on landing) · `LOG_MASK_KEY` (phase 06) ·
+`docs/99-agent/architecture.md` — 🚧 **ONE correction is now owed, not "no edit needed": its
+§ *Session Lifetime Policy (04-AUT-006)* bullet stating *"No product decision has been taken on the
+value"* is **false as of 2026-10-03**. See the propagation obligation in *Named known-gaps* below.
+**Owner: the phase that next edits that file — phase 18 already owns a correction in it** (`docs/99-agent/architecture.md:643-649`); if phase 18 does not take it, it returns to the coordinator.
+Its **two other 14-day statements** still describe the default and become accurate declarations on
+landing · `LOG_MASK_KEY` (phase 06) ·
 any `.po` file (`G-10e` condition 4).
 
 ---
@@ -5857,12 +5904,32 @@ wall-clock SLO test that fails under load and is **not this block's**.
 
 A known-gap that is not named here is §F.1's *"a partial block silently counted as
 complete"* hazard. `B-07` shipped with **zero** production code and **five** named gap
-tests; `B-10` ships **one** code change and these records.
+tests (plus a sixth, test 4, **inverted into a positive control on 2026-10-03**); `B-10`
+ships **one** code change and these records.
+
+### 🚧 PROPAGATION OBLIGATION — `docs/99-agent/architecture.md` (raised 2026-10-03)
+
+> **`docs/99-agent/architecture.md`, § *Session Lifetime Policy (04-AUT-006)*, currently states:**
+> *"**No product decision has been taken on the value.** The number is a named, owned decision that
+> still belongs to the coordinator / product owner, not to a code commit."*
+>
+> **That statement is now FALSE.** The Product Owner took the value on **2026-10-03: the session
+> lifetime is 14 days, declared explicitly in `config/settings/base.py`.**
+>
+> **Owner: the phase that next edits that section** — phase 18 already owns a correction in this
+> file (`docs/99-agent/architecture.md:643-649`, the `04-AUT-002` false claim). **File it owns:
+> `docs/99-agent/architecture.md`.** If phase 18 does not take it, it returns to the coordinator.
+>
+> **The required correction, in substance:** replace *"no product decision has been taken on the
+> value"* with a record of the 2026-10-03 Product Owner decision and its date. **Everything else in
+> that section stands** — the 14-day window, the write-triggered (not sliding) semantics, the
+> population split, and the HIGH residual belonging to phase 15 `15-AUTHZ-001` are all unchanged by
+> the ruling. **Do not** close `04-AUT-006` as `FIXED` in the process (see the disposition below).
 
 | # | Known gap | Owner | Why it is not closed here |
 |---|---|---|---|
-| **1** | **The session age is 14 days and no product decision has ever been taken on it.** The finding's own classification is LOW/SPEC-DEVIATION and the *defect* was the undeclared state, which is now closed — but a 14-day unattended window on a `sessionid` remains | **Coordinator / product owner.** Owed, **not** open: nothing blocks `B-10` or `B-11` | The number is a product decision with **no engineering derivation** (`G-10a`). Recording it here rather than in a code comment is deliberate: a code comment cannot be tracked, assigned or closed |
-| **2** | **A holder of the `sessionid` value has unattended access for the remainder of the age.** The cookie is **not** rotated after login, there is **no per-request account-state gate** (`B-07` proved a banned seller keeps a live session and **can relist**), and there is **no logout-all endpoint** | **Phase 15 `15-AUTHZ-001`** (the per-request gate) — owned there, recorded here | **`04-VAL-001`** forbids this phase shipping a per-request gate, and `B-07`'s `G-A` already ruled the alternative (a decode-scan revocation service) out. **A janitor would not help** — it cannot shorten a live session (`G-10f`). **The decisive framing: the 14 days is not the root cause of that HIGH residual; the missing per-request gate is.** Shortening the age would shrink the window without touching the structural defect — which is exactly why `G-10a` does not pretend to fix it |
+| **1** | ✅ **CLOSED AS A DECISION 2026-10-03 (Product Owner) — the session age is 14 days, and the value is now TAKEN, not owed.** ~~The session age is 14 days and no product decision has ever been taken on it.~~ The finding's classification (LOW/SPEC-DEVIATION) and the *defect* (the undeclared state) are unchanged, and the 14-day unattended window on a `sessionid` is unchanged — **but the value is no longer "untaken".** **Owner: closed.** The "owed, not open" framing is **withdrawn**: nothing is outstanding, nothing blocks `B-10` or `B-11`, and no coordinator action remains. **PROPAGATION OBLIGATION (see below)** | **Product Owner — closed 2026-10-03** | The number had **no engineering derivation** (`G-10a`); it is now a **recorded product decision**, which is what makes the declaration in `base.py` honest rather than merely inherited. The refusal rationale for options (ii) 7 d and (iii) 24 h is **retained** in `G-10a` and is unchanged — the ruling took the value that rationale had already recommended |
+| **2** | **A holder of the `sessionid` value has unattended access for the remainder of the age.** The cookie is **not** rotated after login, there is **no per-request account-state gate** (`B-07` proved a banned seller keeps a live session — its *relist* capability was closed by decision on 2026-10-03, but the live session itself remains), and there is **no logout-all endpoint** | **Phase 15 `15-AUTHZ-001`** (the per-request gate) — owned there, recorded here | **`04-VAL-001`** forbids this phase shipping a per-request gate, and `B-07`'s `G-A` already ruled the alternative (a decode-scan revocation service) out. **A janitor would not help** — it cannot shorten a live session (`G-10f`). **The decisive framing: the 14 days is not the root cause of that HIGH residual; the missing per-request gate is.** Shortening the age would shrink the window without touching the structural defect — which is exactly why `G-10a` does not pretend to fix it |
 | **3** | **`clearsessions` is not registered**, so expired session rows are never reclaimed | **`B-07`'s `G-E` re-filing** → phase 12 / `db-retention.md` | `G-10f`. The re-filing currently exists **only in the execution plan**; `db-retention.md` has no `django_session` row. The hand-off note is in the brief and in the commit-body requirement |
 | **4** | **Anonymous session rows are created pre-authentication by the search path** — up to 43,200/IP/day from a cookie-refusing client, retained for the full age | Same as #3 | `G-10i`. It is a **rate-limiter**-bounded vector, not an age-bounded one, so no value of `SESSION_COOKIE_AGE` removes it. Recording it here is what keeps gap #3 from being deprioritised as "cosmetic cleanup" |
 | **5** | **A seller mid-`ad_edit` at expiry loses unsubmitted form input** on re-authentication | Accepted; product | `G-10a` finding 2. UX friction, not data loss — everything durable is a DB row or a long-lived cookie. Accepted knowingly; it is the cost side of the balance that decided `G-10a` |
@@ -5873,13 +5940,16 @@ acts on a record rather than re-deriving it:
 
 > **`04-AUT-006` → WEAKENED.** The *declaration* half is **closed**: the age and the refresh
 > policy are declared in `base.py` with the write-triggered semantics, and the specification
-> states the number and the population split. The *value* half is **not closed** and was
-> never a code defect — it is the undecided product question in known-gap #1. Severity
-> **LOW / SPEC-DEVIATION / P2 stands**, re-worded: the finding as originally written said
+> states the number and the population split. **The *value* half is ALSO now closed — as a
+> DECISION, not as a code change.** The Product Owner took the value on **2026-10-03: 14 days.**
+> Severity **LOW / SPEC-DEVIATION / P2 stands**, re-worded: the finding as originally written said
 > *"session lifetime falls back to the 14-day Django default"*, which is no longer true —
 > the default is now **declared and documented**, and the residual is a deliberate,
-> recorded 14-day policy plus the phase-15 per-request gate. **Do not close it as FIXED:**
-> the exposure window is unchanged, and a green suite is not closure (§F.1).
+> **product-approved** 14-day policy plus the phase-15 per-request gate. **Do not close it as
+> FIXED:** the exposure window is unchanged, a product decision does not remove an exposure, and a
+> green suite is not closure (§F.1). The HIGH residual (no per-request account-state gate, no
+> logout-all) remains **phase 15 `15-AUTHZ-001`'s** and is **not** shortened by anything here —
+> **a janitor would not help either**, it cannot shorten a live session.
 
 **Gates.** `G-10` → **CLOSED** by `G-10a`…`G-10i` (all CLOSED 2026-10-02 by this Planner).
 
@@ -6181,8 +6251,9 @@ traps:
   - "If a test goes red and the error names a symbol you did not touch, re-run before believing it: the known DeadlockDetected / unique-key shard collisions are test-DB flakes. A full gate reporting '3 failed, 1944 passed, 651 errors' dominated by post_migrate duplicate-key is the stale-shard artefact, not a regression."
 
 known_gaps_shipped:
-  - "04-AUT-006 value half — 14 days, never a product decision. Owner: coordinator / product owner. OWED, not open: nothing blocks this block or B-11."
-  - "04-AUT-006 HIGH residual — no per-request account-state gate, so a holder of the sessionid value has unattended access and a banned seller can relist. Owner: phase 15 15-AUTHZ-001. A janitor would NOT help; it cannot shorten a live session."
+  - "04-AUT-006 value half — 14 days, and the value is now a Product Owner DECISION dated 2026-10-03, not an unanswered question. Known-gap #1 is CLOSED as a decision; nothing blocks this block or B-11."
+- "the propagation obligation is named: docs/99-agent/architecture.md's Session Lifetime Policy bullet stating 'No product decision has been taken on the value' is now false and is owed to the phase that next edits that file (phase 18 already owns a correction in it)"
+  - "04-AUT-006 HIGH residual — no per-request account-state gate, so a holder of the sessionid value has unattended access. Owner: phase 15 15-AUTHZ-001. A janitor would NOT help; it cannot shorten a live session. The 'a banned seller can relist' clause was in this record until 2026-10-03; that limb is CLOSED by Product Owner decision and its 15-AUTHZ-001 hand-off is withdrawn."
   - "clearsessions not registered. Owner: B-07's G-E re-filing -> phase 12 / db-retention.md."
   - "Anonymous session rows created pre-auth by the search path, up to 43,200/IP/day, retained for the full age. Owner: same as the janitor. This is rate-limiter-bounded, not age-bounded — no value of SESSION_COOKIE_AGE removes it."
   - "A seller mid-ad_edit at expiry loses unsubmitted form input. Accepted knowingly; UX friction, not data loss."
@@ -6204,8 +6275,14 @@ number**, so the policy can be changed later by editing one line in `base.py`. T
 the finding names — a lifetime nobody stated, in a codebase where every comparable bound
 *is* stated — can no longer recur silently.
 
-**Leaves, deliberately and by name.** The window is still 14 days, because no one has ever
-decided what it should be and the tree contains nothing from which to decide it. The
+**Leaves, deliberately and by name.** The window is still 14 days — **not because no one has
+decided what it should be, but because the Product Owner decided on 2026-10-03 that 14 days is
+correct.** The refusal rationale recorded in `G-10a` is what recommended this value, and options
+(ii) 7 d and (iii) 24 h are **declined on the costs, not on taste**: re-auth is a **Telegram
+round trip** for both sellers and staff; a sporadic seller is **not** timed out by 14 days, so a
+shorter age **creates** friction where none exists; and nothing durable is lost (everything is a DB
+row or a long-lived cookie, and `B-03`'s `login_browser_id` has **no `max_age`**, so it is
+independent of the age). The
 HIGH residual — an unrevocable `sessionid` with no per-request account-state gate and no
 logout-all — is **not** this block's to fix and is **not** shortened by anything shipped
 here. `clearsessions` is still unregistered, so the anonymous rows the search path creates
@@ -6213,11 +6290,11 @@ keep accumulating for the full age. The spec edit can be lost to a phase-06 conf
 which case the obligation is named rather than done.
 
 **Verdict on the finding: WEAKENED, not closed, and the Validator owns the re-banding.**
-The declaration half is closed. The value half was never a code defect — it is an undecided
-product question, recorded as known-gap #1 with an owner. The severity `04-VAL-002`
+The declaration half is closed. **The value half is closed as a product decision dated 2026-10-03** —
+it was never a code defect, and it is no longer an undecided question. The severity `04-VAL-002`
 assigned — **LOW / SPEC-DEVIATION / P2** — **stands**, re-worded: the finding's premise
-(*"falls back to the 14-day Django default"*) is no longer true, and the residual is a
-deliberate, documented 14-day policy plus phase 15's missing gate. **Do not close it as
+(*"falls back to the 14-day Django default"*) is no longer true, and the residual is a deliberate,
+documented, **product-approved** 14-day policy plus phase 15's missing gate. **Do not close it as
 FIXED.** §F.2 row 7 (*"the premise is inverted and the plan documents a behaviour the code
 does not have"*) is discharged by `C-B10-1`: the source plan's option (c) is dropped and
 the honest edit ships instead.
@@ -6737,7 +6814,7 @@ keep passing after a fix has destroyed its only purpose.**
 | 1 | `test_ban_leaves_the_banned_sellers_session_usable` | `apps/moderation/tests/test_moderation_views.py` (new `TestBanUserSessionKnownGap`) | `G-A`/`G-D` | a session-revocation mechanism lands |
 | 2 | `test_ban_does_not_log_out_the_moderator` | same class | `G-D` — the wrong-target trap | someone adds `logout(request)` to `ban_user` |
 | 3 | `test_banned_seller_can_still_reach_the_dashboard` | same class | `G-A` | phase 15's gate lands |
-| 4 | `test_banned_seller_can_archive_and_reactivate_an_ad` | `apps/ads/tests/test_edit.py` (new `TestBannedSellerRelistKnownGap`) | `G-A` — **the concrete harm** | `ad_edit`/`ad_reactivate` gain a state check, **or** `auto_moderate` starts reading `is_banned` |
+| 4 | `test_banned_seller_cannot_relist_an_ad` — **inverted 2026-10-03 into a POSITIVE CONTROL** (was `test_banned_seller_can_archive_and_reactivate_an_ad`) | `apps/ads/tests/test_edit.py` (`TestBannedSellerRelistPositiveControl`) | **The 2026-10-03 Product Owner ruling — a banned seller cannot create or publish a new ad** | **a regression lets a banned seller relist** |
 | 5 | `test_consent_decline_keeps_the_session_and_is_reversible` | `apps/users/tests/test_consent.py` (new `TestConsentDeclineSessionKnownGap`) | `G-7b` — the one-way door | a decline logout is added |
 | 6 | `test_withdraw_consent_leaves_other_sessions_intact` | `apps/users/tests/test_deletion.py` | `G-A` — `consent_withdraw` flushes only the current session; the other keeps ≤50 raw search queries | multi-session revocation lands |
 
@@ -7057,7 +7134,7 @@ code context's contradictions that re-priced an option. Merged and renumbered as
 | **`G-6i`** (new) = `G-7` — the `UserAdmin` docstring | the class's own record | `B-06` | **Planner**, one recorded line | nothing blocks `B-06`. **Update it in the same change — docstring only.** Append that `ReadOnlyPasswordHashWidget` renders "Reset password" → `../password/`, which 404s because `password_url` is injected only by `django.contrib.auth.admin.UserAdmin.render_change_form` and this class declares no `get_urls()`; that the button **did not exist before `B-01`**; and that the gap is owned by phase 15 `15-AUTHZ-003`. **Correction to the Researcher's finding 3:** the "destructive illusion" framing describes the **pre-`B-01`** writable `CharField` (plaintext written verbatim, `has_usable_password() == True` yet permanently unloggable) — **the dead button is a new artifact `B-01` introduced**, the only new harm it caused, and an independent reason to treat it as more than cosmetic. Severity stays **LOW** |
 | **`G-7`** the session-revocation option (a)/(b)/(c) | `Q7` | **`B-07`** | ~~decision gate~~ | ~~`B-07` does not start~~ **✅ CLOSED by the B-07 Planner (2026-10-02) — option (b), re-scoped to ZERO production code.** Options (b) and (c) collapse into one shape once the reachability correction lands: there is no path where adding a `logout()` is correct. **The reachability count is 1 of 5 open paths, not 3** — the plan's 2026-10-01 `C-17` correction was itself wrong: `moderation/views/review.py::ban_user` does have a `request`, but it is `@staff_required` so `request.user` is **the moderator**, and the changed identity is `ad.user`; `django.contrib.auth.logout(request)` has **no target-user parameter**. So "has a `request`" is satisfied and the change is still impossible. Full argument, the five gates this opened, and the resulting zero-code scope in **`### B-07`** |
 | **`G-7b`** `Q8` — the decline-path logout | `Q8` | **`B-07`** | ~~HARD gate on the decline path only~~ | ~~`consent_decline` is untouched~~ **✅ CLOSED by the B-07 Planner (2026-10-02) — option (b): `consent_decline` is left untouched, and NOT merely deferred.** The plan and the code context both recorded only the weak reason (*"it pre-empts phase 06 `PII-105`"*). **The decisive reason is stronger and code-verified: decline + `logout()` is a PERMANENT ONE-WAY DOOR.** `can_login(is_declined=True) is False` (pinned by `TestCanLogin::test_declined_user_cannot_login` **and** `::test_banned_and_declined_cannot_login`); the only production writer of `is_declined = False` is `give_consent`, reachable only from an **authenticated** `consent_accept`; `consent_accept` is anonymous-accessible and an anonymous POST performs **no DB mutation**. So after decline+logout the user cannot log in and cannot clear the decline. The harm it would buy is near-zero — a declined user is **self-restricting** (`decline_consent` already sets `ads_auto_publish=False`, and listings already filter `user__is_declined=False` live). **Revisit only if `PII-105` makes DECLINE reversible AND restores web login for a declined user** |
-| **`G-A`** (new) is the decode-scan revocation service in or out? | — | **`B-07` → `15-AUTHZ-001`** | ~~Planner~~ | ~~the ban path ships unrecorded~~ **✅ CLOSED by the B-07 Planner (2026-10-02) — OUT, with a loud named known-gap and a named owner (phase 15 `15-AUTHZ-001`).** The only two mechanisms that could revoke a *banned* user's sessions are an O(live sessions) decode scan and a per-request account-state check, and **both are owned by other blocks**: the scan would run inside `ban_user`'s already-locked window (phase 03 `DB-004`), duplicates phase 15's `15-AUTHZ-001` mechanism, and has no index to make it cheap — `ConsentRecord.session_key` is unindexed **and semantically wrong**, because `auth_login` calls `cycle_key()` on the anonymous→authenticated transition. The per-request check is forbidden here by `04-VAL-001` and is phase 15's by design. **Honest consequence, stated in the finding's own terms: a banned seller keeps a working session and can relist — `ad_edit` and `ad_reactivate` have no account-state check, `ad_reactivate` calls `auto_moderate(ad)` inline, and `auto_moderate` never reads `is_banned`. A ban that lets the seller relist is not a ban.** Severity HIGH, knowingly accepted, `04-AUT-002` **NOT closed** |
+| **`G-A`** (new) is the decode-scan revocation service in or out? | — | **`B-07` → `15-AUTHZ-001`** | ~~Planner~~ | ~~the ban path ships unrecorded~~ **✅ CLOSED by the B-07 Planner (2026-10-02) — OUT, with a loud named known-gap and a named owner (phase 15 `15-AUTHZ-001`). ⚠ AMENDED 2026-10-03 (Product Owner): the RELIST limb of that known gap is CLOSED — a banned seller cannot create or publish a new ad; ban enforcement covers relisting, not only login. Test 4 is inverted into a positive control and the `15-AUTHZ-001` hand-off for that gap is WITHDRAWN. The scan remains out of `B-07`'s scope, and the SESSION-REVELATION limb is untouched and still HIGH.** The only two mechanisms that could revoke a *banned* user's sessions are an O(live sessions) decode scan and a per-request account-state check, and **both are owned by other blocks**: the scan would run inside `ban_user`'s already-locked window (phase 03 `DB-004`), duplicates phase 15's `15-AUTHZ-001` mechanism, and has no index to make it cheap — `ConsentRecord.session_key` is unindexed **and semantically wrong**, because `auth_login` calls `cycle_key()` on the anonymous→authenticated transition. The per-request check is forbidden here by `04-VAL-001` and is phase 15's by design. **Honest consequence, as filed and as now partly retired: a banned seller kept a working session and could relist — `ad_edit` and `ad_reactivate` had no account-state check, `ad_reactivate` called `auto_moderate(ad)` inline, and `auto_moderate` never read `is_banned`. The relist half is now a control; the session-revival half remains HIGH and knowingly accepted, `04-AUT-002` **NOT closed** |
 | **`G-B`** (new) register `withdraw_consent_action`, or not? | — (closes `G-7`'s mandatory sub-decision) | **`B-07` → phase 06 `PII-107`** | ~~Planner~~ | ~~the operator-erasure decision goes unrecorded~~ **✅ CLOSED by the B-07 Planner (2026-10-02) — DO NOT REGISTER. `src/backend/apps/users/admin.py` is not touched at all, and no test is written.** Reason 1 (the plan's): it is a **new, irreversible** operator capability — PII nulling, user *and* ad soft-delete, `LoginToken` deletion, no inverse — and `has_change_permission` is `is_staff` and ignores `obj`, so both `actions = (...)` **and** `permissions=["change"]` would be mandatory. **Reason 2 (new, and decisive): registering it while `G-A` is out would *increase* `04-AUT-002`'s residual** — the action is moderator-invoked about other users in a `queryset`, so it has the **identical wrong-target problem** as `ban_user`, and it is the one path that erases PII. The real choice is *capability* vs. *capability-plus-a-new-reachable-session-gap*. **Do not assert the action's absence** — that would pin a decision as an invariant. `PII-107` keeps its MEDIUM band and must cite **the decision, not the absence** |
 | **`G-D`** (new) where is the `ban_user` wrong-target trap recorded? | — | **`B-07`** | ~~Planner~~ | ~~the trap is left to the next editor~~ **✅ CLOSED by the B-07 Planner (2026-10-02) — as a NAMED KNOWN-GAP TEST in `apps/moderation/tests/test_moderation_views.py`, not handed to the next editor.** A hand-off note is insufficient here because the plan's *existing brief* named that exact `logout(request)` edit in its `changes` block and its `acceptance_criteria` did not exclude it. **The trap is worse than the plan assumed: FIVE tests would stay green, not four** — `TestBanUserView`'s four (each `force_login(staff_user)`, asserting only `status_code == 302` and `seller.is_banned`) **plus `TestModerationReviewLocking::test_ban_user_uses_select_for_update_and_atomic`**, which is an `inspect.getsource` **substring** check and is entirely indifferent to an added statement. This is a **plan correction** (the `ban_user` reachability premise is refuted), not a second mechanism — `04-VAL-001` forbids filing the same mechanism twice |
 | **`G-E`** (new) is the missing session janitor re-filed? | — | **`B-07` → phase 12 / `db-retention.md`** | ~~Planner~~ | ~~the janitor is neither shipped nor recorded~~ **✅ CLOSED by the B-07 Planner (2026-10-02) — RE-FILED as a retention/ops finding against `docs/02-database/db-retention.md`; explicitly NOT `04-AUT-002`'s scope.** Mechanism, not convenience: `clearsessions` is discoverable (`django.contrib.sessions` is in `INSTALLED_APPS` and `SessionMiddleware` is in `MIDDLEWARE`, so it needs no new file, no `AdvisoryLockId` and no migration) **but `clear_expired()` deletes only rows past `expire_date`, so it cannot shorten a live session and does nothing for `04-AUT-002`.** And the cost is not zero: `HOURLY_COMMANDS` 9→10 breaks `TestSchedulerConstants::test_hourly_commands_match_spec` and `DAILY_COMMANDS` 2→3 breaks `::test_daily_commands_include_send_alerts` — **both exact-`==`-pinned, in a phase-owned file `B-07` does not own.** `db-retention.md` has **no session row** and would need one |
@@ -7076,7 +7153,7 @@ code context's contradictions that re-priced an option. Merged and renumbered as
 | **`G-9d`** (new) the executable trust-model gate | `X-14`, `C-7`, `I.10` pt 3 | `B-09` | **Planner** — it is the only deliverable the block has left | ~~the shipped Python half depends on an nginx line no gate can see~~ **✅ CLOSED (2026-10-02) — THREE TEXTUAL TESTS in `src/backend/tests/test_nginx_config.py`, over BOTH `.conf` files, asserting the INVARIANT and never the current value.** This is the block's only code deliverable and it is the inverse of the original plan: the plan wanted an assertion that no location uses `$proxy_add_x_forwarded_for`, which would have to assert the **opposite** of today's config and would therefore **pin the forgeable-but-defended state as an invariant** — the mistake `B-07`'s `G-B` explicitly forbade (*"Do not assert the action's absence — that would pin a decision as an invariant"*). The gate instead pins what makes `B-08` correct. Full design, the three silent failures each test catches, and why a **fourth** test on `limit_req_zone` is deliberately **not** written, are in **`### B-09`** |
 | **`G-9e`** (new) a `docker compose config` gate? | `C-7` | `B-09` | **Planner** | ~~a new gate class is needed~~ **✅ CLOSED (2026-10-02) — NO. REJECTED on the repository's own recorded precedent, and because it would catch none of the four defects.** `src/backend/tests/test_compose_contract.py`'s module docstring records a **deliberate** decision to parse each compose file independently with `ruamel.yaml` (*"`ruamel.yaml` performs no Compose merge, so the contract is asserted per file … rather than via a merged `docker compose config` view"*). A shell-out gate would contradict that decision, require a compose binary inside the `test` service, and add runtime for no coverage gain. **Decisively: a merged compose view cannot observe any of `G-9b`'s four defects** — the host tree not being updated from git, the bind mount, the container-internal health gate and the rollback's service list are all invisible to `docker compose config`. The defect lives in the `.conf` **file**, so the gate that earns its keep is textual over the `.conf`. **`ruamel.yaml>=0.19.1,<0.20` is already a declared dependency** (`pyproject.toml`), so the textual gate adds **no new dependency** |
 | **`G-10`** the session lifetime | `Q6`, `U-9`, `X-11` | **`B-10`** | **Researcher (COMPLETE) + Planner (COMPLETE)** | ~~`B-10` does not start~~ **✅ CLOSED by the B-10 Planner (2026-10-02) — as `G-10a`…`G-10i`, all nine below.** `U-9` is answered: the project's own documents state **no number anywhere**. The shipped shape is (a) + (c): **declare `SESSION_COOKIE_AGE` and `SESSION_SAVE_EVERY_REQUEST` literally, and correct the spec paragraph** — no behaviour change, no idle window, no janitor, no env var. **`X-11` is refuted as written** (`C-B10-1`): the expiry is **write-triggered, not sliding**, and for authenticated users that means **absolute from login**. The plan's *"(b) breaks every `force_login`-based test"* line is **withdrawn** (`C-B10-2`). The plan's *`~14,400 rows/IP/day on `login_issue`* arithmetic is **refuted and re-attributed to the search path at ≤43,200/IP/day** (`C-B10-3`). Full reasoning, both halves of the population, the five tests, the file surface, the Implementor brief and the honest bottom line in **`### B-10`** |
-| **`G-10a`** the lifetime value | `U-9`, `X-11` | **`B-10`** | **Planner** | ~~the block cannot implement a value~~ **✅ CLOSED (2026-10-02) — declare the status quo `1209600` (14 d); the *value* is a named, owned product question, not a code decision.** Options (ii) 7 d and (iii) 24 h are **refused on the costs, not on taste**: re-auth is a **Telegram round trip** for both sellers and staff; a sporadic seller is **not** timed out by 14 days, so a shorter age **creates** friction where none exists; nothing durable is lost (everything is a DB row or a long-lived cookie, and `B-03`'s `login_browser_id` has **no `max_age`**, so it is independent of the age); and **no number is derivable from the tree**, so choosing one would be inventing a product requirement in a code commit. The **declaration is deliverable at any value** and ships now. Owner of the value question: **coordinator / product owner** — known-gap #1, **owed, not open** |
+| **`G-10a`** the lifetime value | `U-9`, `X-11` | **`B-10`** | **Planner** | ~~the block cannot implement a value~~ **✅ CLOSED (2026-10-02) — declare the status quo `1209600` (14 d). ⚠ THE VALUE IS NOW RULED: 2026-10-03, Product Owner — the session lifetime is 14 DAYS, DECLARED EXPLICITLY IN SETTINGS. Known-gap #1 is CLOSED AS A DECISION, and the "owed, not open" framing is WITHDRAWN.** Options (ii) 7 d and (iii) 24 h remain **refused on the costs, not on taste** — the ruling took the value that rationale had already recommended: re-auth is a **Telegram round trip** for both sellers and staff; a sporadic seller is **not** timed out by 14 days, so a shorter age **creates** friction where none exists; nothing durable is lost (everything is a DB row or a long-lived cookie, and `B-03`'s `login_browser_id` has **no `max_age`**, so it is independent of the age); and **no number is derivable from the tree**, so the value had to be a decision rather than a derivation. `B-10` **remains additive and inert** — it declares the now-ruled value, and changes no behaviour. 🚧 **Propagation obligation:** `docs/99-agent/architecture.md`'s § *Session Lifetime Policy (04-AUT-006)* bullet stating *"No product decision has been taken on the value"* is now false and must be corrected by the phase that next edits that file |
 | **`G-10b`** absolute or idle | — | **`B-10`** | **Planner** | **✅ CLOSED (2026-10-02) — option (i): declare the age AND the refresh policy. No idle window.** `SESSION_SAVE_EVERY_REQUEST` is declared `False` deliberately, which makes "a seller is never timed out" machine-checkable. **Option (ii) is refused for a reason stronger than cost: it *increases* exposure.** A login-once seller is identical (idle ⇒ window never moves), while a seller who keeps browsing is **worse** off (every read re-stamps, so the window never closes while active) — and it is exactly the long-lived users whose exposure grows. The genuine anti-theft benefit is a function of the **age**, not the flag. Avoided cost: +1 `django_session` `UPDATE` per non-empty-session response on `/dashboard/`, `/cabinet/`, `/admin/`, `/moderation/**`, plus `SessionInterrupted` |
 | **`G-10c`** global flag or targeted `set_expiry` | — | **`B-10`** | **Planner** | **✅ CLOSED (2026-10-02) — NOT APPLICABLE: `G-10b` introduces no idle window, so there is no mechanism to choose between.** Recorded so the question is not reopened silently. Option (iii) is separately refused: **nothing in the tree calls `set_expiry`** (verified), so `_session_expiry` is never set; adding one would itself write into the session dict (a new write at that point) and would introduce a **per-session override silently diverging** from the declared global policy. **Its one live consequence is promoted into the test list:** test 5 pins both facts, so a future targeted `set_expiry` trips a test instead of shipping undeclared |
 | **`G-10d`** literal or env-driven | `D-6` | **`B-10`** | **Planner** | **✅ CLOSED (2026-10-02) — LITERAL, in `base.py`.** Decided on the merits. Every comparable bound in the tree is a literal module constant — `TOKEN_TTL_SECONDS: Final[int] = 300`, `RATE_LIMIT_REQUESTS`/`RATE_LIMIT_PERIOD` = 10/60, 30/60 and 60/600 in three services, `_MAX_HISTORY: int = 50`, `DAILY_HOUR_UTC: int = 8`, `LOCK_TIMEOUT_SECONDS`, `SECURE_HSTS_SECONDS = 3600` — and `docs/02-database/db-retention.md` states the rule in the project's own words: *"it is the number that bounds the production lock hold, **so it must not be operator-variable**."* **Env-driving would be the exception, and there is no correct value to put in an env var** because none is derivable from the repository. Gate cost, for the record and **not** the reason: `test_env_allowlist_reverse.py::test_consumed_env_vars_are_allowlisted` (`consumed ⊆ ALLOWED_ENV_VARS`) fails an env read without an allowlist entry, and `test_env_allowlist.py::test_example_keys_in_allowlist` needs a template entry too — **one `ALLOWED_ENV_VARS` line + up to four `.env.*.example` edits in the same commit, all outside `B-10`'s surface**. The `# env-contract:` opt-out is documented for *"not a deployment variable"* and this **is** one. **Promotion path, named so it is not lost:** env-backing becomes defensible only when a product owner supplies a value **and** states the condition under which a shorter one is correct (e.g. staff vs seller) — not a mechanical follow-up. **`_TRANSPORT_SETTINGS` keeps exactly SEVEN members:** a lifetime is not a transport setting |
@@ -7085,7 +7162,7 @@ code context's contradictions that re-priced an option. Merged and renumbered as
 | **`G-10g`** the `B-10` → `B-11` order | — | **`B-10` → `B-11`** | **Planner**, one recorded line | **✅ CLOSED (2026-10-02) — SERIAL, DO NOT MERGE.** `B-11` declares `B-10` a hard dependency (*"annotates the **final** state, so it runs last"*), and an annotation pass that omitted the age would document an **incomplete** policy — the same class of defect `04-AUT-006` is about. `B-03`'s `LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX` is the working append-then-annotate precedent. **`base.py` rule, binding on the Implementor: APPEND-ONLY across `B-02`, `B-03`, `B-08`, `B-10` and `B-11`** — never reorder, move or re-wrap a setting another block annotated; `B-10`'s two lines go **immediately after `SESSION_COOKIE_SAMESITE`**, inside the existing `# Security settings (TLS/SSL ready)` block, so no new heading is created and no existing line moves; re-read the file immediately before editing and **stop on a concurrent change**. `B-11` annotates afterwards and does not move what `B-10` placed |
 | **`G-10h`** the test design | — | **`B-10`** | **Planner** | ~~one test that exercises only the anonymous path~~ **✅ CLOSED (2026-10-02) — assert the SEMANTICS (both populations) and the DECLARATION without pinning a number. Three rules.** (1) **Both halves or the test is theatre:** the plan's single `test_session_lifetime_matches_the_declared_policy` would pass without ever touching an authenticated session — the population the finding is about. Test 3 = the authenticated half (`expire_date` unchanged across read-only requests ⇒ absolute from login); test 4 = the anonymous half (`expire_date` strictly later after a second recorded search ⇒ refreshed). (2) **No test may pin 14 days.** Test 1 asserts the setting is declared **in `config.settings.base`** — a Django default is not an attribute of that module, so *presence is the claim* (the `_THEME_STATICFILES_BACKEND` shape). Test 2 satisfies `04-VAL-002`'s required gap with `override_settings` and a small value, so it is number-independent. **The declared value is never written in a test**, so answering `G-10a` later changes one line in `base.py` and no test goes red. (3) **The semantics are asserted through the PERSISTED `django_session` row**, not a session-dict value in memory — which is only *possible* because `C-B10-2` established that no `force_login` test can detect an age change. Plus test 5, `G-10c`'s structural tripwire |
 | **`G-10i`** why the janitor is still required | `C-B10-3` | **`B-10` → phase 12** | **Planner**, one recorded line | **✅ CLOSED (2026-10-02) — recorded, with the two ingress numbers SEPARATED.** **`login_issue` creates zero `django_session` rows today** (it only calls `response.set_cookie(...)` for the `login_browser_id` binding; nothing marks the session modified, so `process_response` skips `save()`). The plan's `~14,400/IP/day` is therefore **upheld for what it measured** — the cost the **rejected `B-03` options `A″`/`B`** would have incurred on that endpoint at `login_rate_limit.RATE_LIMIT_REQUESTS = 10` / `RATE_LIMIT_PERIOD = 60` — and **§H.1`'s `B-03` dominance argument stands unchanged**. The number describing **`B-10`'s actual production vector** is different and larger: the **search path**, `apps/search/views/search.py::search` → `record_search_history(..., session=request.session)` on the `user_id is None` branch, at `search/services/rate_limit.RATE_LIMIT_REQUESTS = 30` / `RATE_LIMIT_PERIOD = 60` per IP and only for a non-empty `?q=` ⇒ **ceiling 30 × 60 × 24 = 43,200 anonymous rows per IP per day**, up to ~604,800 resident per IP at steady state from a cookie-refusing client. **The conclusion is what keeps `G-10f`'s re-filing alive: the vector is PRE-authentication and rate-limiter-bounded, not age-bounded, so no value of `SESSION_COOKIE_AGE` removes it** — a shorter age reduces the residue proportionally and is a mitigation, not a substitute |
-| **`G-10j`** (new) the `04-AUT-006` disposition | — (owed) | **`B-10` → `Validator`** | **NOT a gate — an owed action** | Ship proceeds. **The disposition text is written out in `### B-10` so the Validator acts on a record:** **`04-AUT-006` → WEAKENED, not closed.** The *declaration* half is closed (the age and the refresh policy are declared and documented; the spec states the number and the population split). The *value* half was never a code defect — it is the undecided product question in known-gap #1. Severity **LOW / SPEC-DEVIATION / P2 stands**, re-worded: the premise *"falls back to the 14-day Django default"* is no longer true. **Do not close it as FIXED** — the exposure window is unchanged and a green suite is not closure (§F.1). The HIGH residual (no per-request account-state gate, no logout-all, a banned seller who can relist) is **phase 15 `15-AUTHZ-001`'s** and is **not** shortened by anything in this block; **a janitor would not help either** — it cannot shorten a live session |
+| **`G-10j`** (new) the `04-AUT-006` disposition | — (owed) | **`B-10` → `Validator`** | **NOT a gate — an owed action** | Ship proceeds. **The disposition text is written out in `### B-10` so the Validator acts on a record:** **`04-AUT-006` → WEAKENED, not closed.** The *declaration* half is closed (the age and the refresh policy are declared and documented; the spec states the number and the population split). **The *value* half is also closed, as a Product Owner decision dated 2026-10-03 (14 days) — it was never a code defect and is no longer an undecided question.** Severity **LOW / SPEC-DEVIATION / P2 stands**, re-worded: the premise *"falls back to the 14-day Django default"* is no longer true. **Do not close it as FIXED** — the exposure window is unchanged, a product decision removes no exposure, and a green suite is not closure (§F.1). The HIGH residual (no per-request account-state gate, no logout-all) is **phase 15 `15-AUTHZ-001`'s** and is **not** shortened by anything in this block; **a janitor would not help either** — it cannot shorten a live session. *(The "a banned seller who can relist" limb was in this record until 2026-10-03; it is closed as a decision and no longer part of `04-AUT-006`'s residual)* |
 | **`G-11`** the audit-id qualification rule | `U-10` | `B-11` | **CLOSED BY BOUNDARY** — §D item 14, phase 03 reserves the sweep. **No sweep, no qualification.** | nothing; recorded so it is not "helpfully" reopened |
 | **`G-12`** / `U-11` — `--create-db` after a DB restart | `U-11`, `C-23` | **every block** | **not a gate — an execution rule** (§G.0) | the implementor chases ~33 phantom failures and reports a green block as broken, or vice versa |
 | `Q4` — is `04-AUT-004`'s premise wrong? | `Q4`, `U-3`, `C-22` | `B-05` | **ANSWERED BY THE AUDIT.** Django enforces `is_active` on every authenticated request; the only unmediated path is `login_status` returning 200 plus a session cookie | nothing — but the severity must still be re-banded by the **Validator** |
@@ -7373,10 +7450,14 @@ exists so the trade-offs are on the record and are not re-derived by the next ed
 
 **The two questions the table above cannot answer, and where they are recorded instead:**
 
-1. **What should the value be?** No number exists in `docs/`, `src/` or `.env*`, so it is a
-   **product decision**, not an engineering derivation. Recorded as known-gap #1 with the
-   coordinator / product owner as owner — **owed, not open**; nothing blocks `B-10` or
-   `B-11`. `TOKEN_TTL_SECONDS = 300` is a **one-time handshake handoff token** and is
+1. **What should the value be? ✅ ANSWERED 2026-10-03.** No number exists in `docs/`, `src/` or `.env*`,
+   so it was a **product decision**, not an engineering derivation. **The Product Owner ruled: 14
+   days, declared explicitly in settings.** Known-gap #1 is therefore **CLOSED AS A DECISION** and
+   nothing blocks `B-10` or `B-11`. **The obligation that remains is narrow and is owed rather
+   than open only in that sense: the documentation correction in `docs/99-agent/architecture.md`**
+   § *Session Lifetime Policy (04-AUT-006)*, whose bullet *"No product decision has been taken on
+   the value"* is now false — owner **the phase that next edits that file** (phase 18 already owns
+   a correction in it). `TOKEN_TTL_SECONDS = 300` is a **one-time handshake handoff token** and is
    **not** a lifetime precedent; using it as one is a category error.
 2. **What is the residual?** An attacker holding the `sessionid` value has unattended,
    unrevocable access for the remainder of the age, and **no amount of age reduction

@@ -204,7 +204,7 @@ is split and only its permitted half is implemented.**
 | Disposition | Count | IDs |
 |---|---|---|
 | **Implemented, unchanged in severity** | 11 | `PERF-001`, `PERF-003`, `PERF-004`, `PERF-005`, `PERF-008`, `PERF-009`, `PERF-010`, `PERF-012`, `PERF-013`, `PERF-014`, `PERF-015` |
-| **Implemented behind a gate** | 3 | `PERF-006` (#1 unconditional; #2 gated on **Q9**), `PERF-011` (observability half only; gated on **Q12**), and the `SRCH-007` TTL limb (gated on **Q5**) |
+| **Implemented behind a gate** | 2 | `PERF-011` (observability half only; gated on **Q12**) and the `SRCH-007` TTL limb (gated on **Q5**). **`PERF-006` #2 left this count on 2026-10-03 — `Q9` was answered and BLOCK 7 is now unconditional** |
 | **Merged out of the phase** | 1 | `PERF-002` → `SRCH-001` (phase 08, **still unimplemented**) — §6.2 |
 | **Rejected upstream, recorded, not re-litigated** | — | `PERF-006` #3 `work_mem`; `PERF-011` capacity limb (`workers`); `PERF-009`'s `prefetch_related("children")` |
 | **Re-routed to a named owner** | — | the legacy `search_vector` + `IX_ads_search_gin` removal (**Q13**), the `?features=` ceiling (**Q14**), `DB-004`, `DB-008`, the `cache_hit_rate_slo` metric identity — §6.2 |
@@ -281,16 +281,16 @@ option** (§1.3, §8.1).
 | **Q2** | What does the positive control assert, and where does it live? (a) extend `testpaths` to collect `src/benchmark/tests/`; (b) place the test under `src/backend/apps/core/tests/`; (c) both a unit test of the hook's arithmetic **and** a CI-step assertion that the parsed p95 is non-empty | **1** | Planner | **GATED.** `pyproject.toml` `testpaths = ["src/backend", "src/telegram_bot"]` does **not** collect `src/benchmark/`. Editing `testpaths` touches a table nobody else edits but is a whole-suite behaviour change; option (b) hides benchmark tooling in a package that does not own it. Option (c) is the strongest and is this Planner's recommendation — **but "two parsers of one format" is the failure mode that produced this finding**, so the control must be one parser with a non-empty assertion, not a second parser |
 | **Q3** | For `PERF-012a`: which URL targets, and what failure-rate threshold? (a) `/category/electronics/` and `/category/electronics/phones/` with a hard 0 % failure assertion; (b) the same URLs with a small non-zero tolerance; (c) derive the URLs from `categories.yaml` at run time | **2** | Planner | **GATED.** (c) would make the load test depend on catalogue contents and could silently stop testing a category. Five config values are currently restated as bare literals in the step and are candidates to be sourced from the same place as the app config |
 | **Q4** | For `PERF-012b`: should `--min-rows` keep the **table-size** axis, or move to a **match-count** axis? | **3** | Planner + Researcher | **GATED.** FTS cost scales with **match count**, not table size; but a match-count target needs a way to guarantee N matches, which **no shipped environment can do** (the report's own 14 194-match term is synthetic). Whichever is chosen, the **skip must stop printing green** and must exit non-zero |
-| **Q5** | For the cache-version-key lifetime: (a) retune `SEARCH_CACHE_TTL` / `SEARCH_CACHE_STALE_TTL` so the entry lifetime is strictly below any plausible counter lifetime; (b) state the invariant `version-key lifetime ≥ entry lifetime` in `cache-strategy.md` and leave the constants alone; (c) both — state the invariant **and** raise the entry TTLs' headroom | **4** | **Owner ruling**, escalated by Planner | **GATED, and it is a graded relationship, not a bug fix.** Two further facts make it non-trivial: (i) `CACHES["default"]` sets **no `TIMEOUT`**, so the counter evicts at Django's 300 s default while entries live 360 s; (ii) **phase 08 BLOCK 6 will make the counter durable (`timeout=None`)**, which makes the inequality *more* visible, not less. **Whether this is solvable independently of phase 08 BLOCK 6 is itself part of this gate** — if BLOCK 6 has not landed, option (a) is a fix to a condition that is about to change underneath it |
+| **Q5** | For the cache-version-key lifetime: (a) retune `SEARCH_CACHE_TTL` / `SEARCH_CACHE_STALE_TTL` so the entry lifetime is strictly below any plausible counter lifetime; (b) state the invariant `version-key lifetime ≥ entry lifetime` in `cache-strategy.md` and leave the constants alone; (c) both — state the invariant **and** raise the entry TTLs' headroom | **4** | **Owner ruling**, escalated by Planner | **GATED, and it is a graded relationship, not a bug fix.** Two further facts make it non-trivial: (i) `CACHES["default"]` sets **no `TIMEOUT`**, so the counter evicts at Django's 300 s default while entries live 360 s; (ii) **phase 08 BLOCK 6 will make the counter durable (`timeout=None`)**, which makes the inequality *more* visible, not less. **Whether this is solvable independently of phase 08 BLOCK 6 is itself part of this gate** — if BLOCK 6 has not landed, option (a) is a fix to a condition that is about to change underneath it. **Still GATED after the 2026-10-03 Product Owner round — a technical gate, deliberately left open. The gate must be RE-READ AT IMPLEMENTATION TIME: if phase 08's BLOCK 6 durable-key contract has landed by then, `Q5` collapses to a retune under option (a) or (c); if it has not, option (a) is tuning against a state that is about to change underneath it and the answer must say so explicitly** |
 | **Q6** | Is `categories/partials/mega_submenu.html`'s `child.get_children.exists()` in phase 13's scope? (a) in scope, all three sites; (b) in scope, `header_catalog.html` only, `mega_submenu` reported; (c) in scope, all three, with the `mega_submenu` site handled by a different mechanism because the fragment is cached | **5** | **Planner** (this is a scope ruling, not a technical one) | **GATED.** (b) leaves a known N+1 in place and would make `test_listings_context`'s bound depend on whether that fragment rendered. (c) is coherent — a cached fragment renders from cache and pays no per-request query, so the "N+1" there is a cache-miss cost, not a per-request cost. **The Implementor may not assume any of the three** |
-| **Q7** | What is the post-`PERF-004` + `PERF-009` `_QUERY_BOUND`? | **5** | Researcher (measure) + Planner (accept) | **GATED, and the gate is "measure it".** The shipped comment prescribes "tighten toward the ~32-query base". **That number is unmeasured and this plan will not publish it.** The bound must be derived from a real instrumented run at the tripwire's own seed volume, recorded with the command in the commit body. **A number nobody has measured is a defect, not a default** |
+| **Q7** | What is the post-`PERF-004` + `PERF-009` `_QUERY_BOUND`? | **5** | Researcher (measure) + Planner | **GATED, and the gate is "measure it".** The shipped comment prescribes "tighten toward the ~32-query base". **That number is unmeasured and this plan will not publish it.** The bound must be derived from a real instrumented run at the tripwire's own seed volume, recorded with the command in the commit body. **A number nobody has measured is a defect, not a default** |
 | **Q8** | Does pushing `[:1000]` into SQL (the producer) change the query **plan** enough to affect the hot-path FTS `COUNT(*)` ban in `test_search_query_count`? | **6** | Researcher (run the tripwire) | **GATED — resolved by running the test, not by reasoning.** A bounded top-N `values_list` may or may not retain the `search_vector_` marker the ban matches on. **If the ban's matcher no longer fires, that is a tripwire regression and BLOCK 6 must repair the matcher, not the assertion's intent** |
-| **Q9** | `PERF-006` #2: should the search results page display `SEARCH_CACHE_MAX_HITS + 1` ("1 001+") instead of the true total when the result set is truncated? | **7** | **Owner (product)** — not the Planner, not the Implementor | **GATED, and it is a product decision, not an engineering one.** The displayed count stops being the true total; that is user-visible and is **not** a performance change. Block 7 is `conditional`: it ships a reduced deliverable if the gate is declined, and the reduced deliverable is BLOCK 6 alone |
+| **Q9** | `PERF-006` #2: should the search results page display `SEARCH_CACHE_MAX_HITS + 1` ("1 001+") instead of the true total when the result set is truncated? | **7** | **Product Owner** — not the Planner, not the Implementor | **✅ RESOLVED 2026-10-03 — Product Owner, option (a), with a binding sub-rule: a truncated result set displays `<SEARCH_CACHE_MAX_HITS>+` and the true total is NEVER claimed when it cannot be computed.** Consequences: **BLOCK 7 is no longer `conditional` — the full deliverable ships, and BLOCK 6 alone is no longer the reduced scope.** The wording is a wording decision inside option (a), unchanged in shape. **A new user-visible string is required (the truncation notice's wording), so `ru` and `bs` `msgstr` must both be non-empty and `test_i18n_completeness.py` must be green.** Options (b) and (c) are declined |
 | **Q10** | For `PERF-003`: is `bulk_create(update_conflicts=True, unique_fields=["ad","date"])` sufficient, or does the model/constraint state make it unsafe? | **8** | Researcher (verify constraint) + Planner | **GATED.** The validator verified `DailyAdMetrics` carries `uq_daily_ad_metrics_ad_date`. The gate exists because **`bulk_create(update_conflicts=True)` on Django 5.2 + psycopg requires an exact constraint match**, and a wrong `unique_fields` raises at runtime inside a nightly job nobody is watching. **The before/after numbers must be measured on a private instance; the report's "305 s → a few seconds" projection is not a promise this plan repeats** |
 | **Q11** | For `PERF-005`: what is the grouping key, and has either phase 06 or phase 03 landed on `alert_query.py`? | **9** | Researcher (re-read) + Planner | **GATED.** Grouping by `(language, query)` changes result-set construction: the per-search structural filters and the 10-per-digest cap must be preserved **exactly**. And `alert_query.py` is a **three-way reservation** — phase 06 BLOCKS 5/7 (eligibility), phase 03 BLOCK 9 (delivery state), phase 13 **none** until it re-reads. **If either phase has landed, re-read; do not assume** |
 | **Q12** | For `PERF-011`: what is the correct alert scope, and how is it sequenced against phase 12 BLOCK 11 on the same file? | **10** | **Coordinator** (sequencing) + Planner (scope) | **GATED.** The scope extension beyond `handler="search:search"` is free; the file is the constraint. Separately: `cache_hit_rate_slo` reads **Redis keyspace hits**, not application cache hits — **it is ~100 % by construction**, and phase 13 must not build anything on it. **Phase 13 does not touch the file until phase 12's block has landed** (§5.3) |
 | **Q13** | *Planner-raised.* Does the legacy `search_vector` column + `IX_ads_search_gin` removal belong in this plan? | **§6.1** | **Coordinator** | **ROUTED, default is NO.** Phase 08 routed it to phase 13 as an "index-grading item". It is a **write-amplification win, not a latency win**; it needs a migration in **phase 05's number space**; it **breaks `test_search_triggers.py`** and `test_setup_search_triggers.py`; and the column is also a **phase-08 FTS surface**. **Phase 13 takes it only if the coordinator rules so, and then as a separate plan-level decision — not inside a block here** |
-| **Q14** | *Planner-raised.* What is the correct `?features=` ceiling? | **§6.2** | **Owner**, via **phase 08's `Q2`** | **ROUTED — do not duplicate.** Phase 13's `PERF-002` remediation quality depends on it, but the gate is phase 08's and it is already open there. **Phase 13 implements nothing for `PERF-002`** |
+| **Q14** | *Planner-raised.* What is the correct `?features=` ceiling? | **§6.2** | **Owner**, via **phase 08's `Q2`** | **ROUTED — do not duplicate — but ANSWERED 2026-10-03 by the Product Owner.** The ruling is: **no hard-coded `?features=` ceiling; the ceiling is a catalogue invariant plus headroom, enforced by a guard test.** Phase 13's `PERF-002` remediation quality is therefore satisfied by phase 08's catalogue-invariant ceiling, and **phase 13 still implements nothing for `PERF-002`** and still duplicates no gate. The routing stands; only the question's answer now exists |
 
 **Resolved in this plan, with the reasoning stated** — these are *rulings*, not open questions, so
 that a block does not re-derive them:
@@ -555,8 +555,8 @@ shipped test, or is gated. `structural` = introduces a contract or a source of t
 | `PERF-003` | **behavioural** | **implement — gated on Q10.** Replace the per-day `update_or_create` loop with `bulk_create(update_conflicts=True, unique_fields=[...])`, preserving the advisory lock and the transaction shape | **8** | **HIGH** | ~120 000 statements inside one transaction that also holds an advisory lock for its whole duration. ✔ The unique constraint is verified present, but `update_conflicts=True` needs an **exact** constraint match and a mismatch raises at runtime **inside a nightly job nobody is watching** |
 | `PERF-004` | **behavioural** | **implement, with PERF-009 and PERF-014, as one change.** Fix the prefetch detection; delete the false comment | **5** | MEDIUM | `RelatedObjectDoesNotExist` subclasses `AttributeError`, so `getattr(user, "trust_score", None)` swallows it and the `.get()` fallback fires **even on a correctly prefetched queryset** — the detection can never fire. The cost is bounded (index-backed `SELECT`s only when the row is absent) and the finding's second leg rests on a quote that does not exist, but the mechanism is exactly the `VAL-003` class this phase exists to remove |
 | `PERF-005` | **behavioural** | **implement — gated on Q11.** Group the daily loop by distinct `(language, query)`; add per-search progress logging | **9** | MEDIUM | One FTS evaluation per saved search, inside a lock-held transaction. Linear and bounded against a 1 800 s command timeout — so **not** the "monopolising" failure the report claimed — but the loop is the wrong shape and the lock is held for its whole duration. **`alert_query.py` is a three-way reservation (phases 06, 03, 13); re-read before editing** |
-| `PERF-006` | **conditional** | **implement #1 unconditionally, as one change with `PERF-010`; gate #2 on Q9** | **6** (#1), **7** (#2) | MEDIUM | At/over the cap the view builds a **fresh** FTS-filtered queryset and runs `COUNT(*)` on it, so every page view of a large result set pays a second full FTS evaluation. ✔ **Fix #3 (`work_mem`) is rejected** — a per-connection × per-node multiplier against a 1 GB `DB_MEM_LIMIT` that ships to production, and unnecessary once #1 lands. **Fix #2 is a product decision, not an engineering one** |
-| `PERF-007` | **mechanical** | **implement as a documented-ruling change, or leave alone** — the decision is BLOCK 7's gate or an explicit de-scoping | **§6.1** | LOW | The single-flight lock covers the **cold-miss** path only; on the stale-window path — the common case — losers correctly serve stale and only the winner recomputes. The report's "it is not a stampede guard" is **false there**. The `default`-and-fall-back contract is documented and intentional. **A task queue for cold-miss coalescing is overengineering against a 3-worker sync deployment** and is rejected |
+| `PERF-006` | **behavioural** (was `conditional`) | **implement #1 unconditionally, as one change with `PERF-010`; #2 is now ALSO unconditional** — `Q9` was **answered 2026-10-03** by the Product Owner (option (a): display `<SEARCH_CACHE_MAX_HITS>+`, never a true total that cannot be computed) | **6** (#1), **7** (#2) | MEDIUM | At/over the cap the view builds a **fresh** FTS-filtered queryset and runs `COUNT(*)` on it, so every page view of a large result set pays a second full FTS evaluation. ✔ **Fix #3 (`work_mem`) is rejected** — a per-connection × per-node multiplier against a 1 GB `DB_MEM_LIMIT` that ships to production, and unnecessary once #1 lands. **Fix #2 was a product decision, not an engineering one, and it is now made — so the block that carries it ships its full deliverable and BLOCK 7 is no longer `conditional`** |
+| `PERF-007` | **mechanical** | **implement as a documented-ruling change, or leave alone** — the decision is BLOCK 7's ruling (made 2026-10-03) or an explicit de-scoping | **§6.1** | LOW | The single-flight lock covers the **cold-miss** path only; on the stale-window path — the common case — losers correctly serve stale and only the winner recomputes. The report's "it is not a stampede guard" is **false there**. The `default`-and-fall-back contract is documented and intentional. **A task queue for cold-miss coalescing is overengineering against a 3-worker sync deployment** and is rejected |
 | `PERF-008` | **mechanical** | **implement the positive-ROI limb only** — remove the **duplicate** `cities` key from `search()`'s context | **11** | MEDIUM | The design property is real at three sites, but the shipped city list is **15** rows (~8 KB, ~0.2 ms) and every reported figure came from 5 015 injected rows. Only the **duplicate** costs anything today, because it re-runs a query the context processor already ran. ✔ **The report's prescribed target `save_search_cities` does not exist** — the real key is `cities` (C-7). **Caching the header list is de-scoped**: the city-data source is a phase-06/07 question |
 | `PERF-009` | **behavioural** | **implement all three call sites, with PERF-004 and PERF-014, as one change — gated on Q6 for the third** | **5** | MEDIUM | One indexed `SELECT 1 … LIMIT 1` per non-leaf root per site. ✔ **The report's recommended `prefetch_related("children")` is a no-op** against `mptt`'s `get_children`; the correct instrument is an `Exists` annotation. ✔ **The report says there are two call sites; the tree has three** (C-2) |
 | `PERF-010` | **behavioural** | **implement, as one change with `PERF-006` #1** | **6** | MEDIUM | The cache-hit branch restores rank with a positional `Case`/`When` over the **whole** cached id list, so statement size and bind count scale with `SEARCH_CACHE_MAX_HITS` (1 000), not with page size. Hardware-independent and derivable statically — **no latency figure exists, and none will be invented** |
@@ -569,15 +569,16 @@ shipped test, or is gated. `structural` = introduces a contract or a source of t
 | `VAL-002` | — | **not a code change here** — the target file is deleted; the correction is recorded in §0.4 | **§0.4** | HIGH for the report as a repair source | Six quoted artefacts do not exist. The *findings* stand on independent evidence; the *citations* must not be trusted as repair instructions. **Phase 13 creates, restores or edits nothing under `.ai/audit/`** (C-6) |
 | `VAL-003` | **mechanical** | **implement as a convention** — enforced by §1.5 and by every block's `acceptance_criteria`. Ships no file | all | informational | A single-request timing is a smoke measurement: it may establish order of magnitude, never a percentile-SLO breach. **Two findings in the source report already turned on it** — including one that justified a HIGH severity |
 | `VAL-004` | — | **rolled into the block order** — the four coupled changes and the one ordering constraint are BLOCKS 1 → 2, 5 (one change), 6 (one change), 10 | **§4.2** | MEDIUM (procedural) | ✔ The gate must land first, or the rest of the phase is unobservable. ✔ The three N+1-bound findings are one change, or `_QUERY_BOUND` publishes a number nobody measured. ✔ The two `cached_ids` findings are one change, or the second is written against the first's assumption |
-| **Q1 … Q14** | — | **GATED** (Q1–Q12, each inside its block, with options and consequences written down) or **ROUTED** (Q13, Q14) | **1–12**, **§6** | — | Fourteen questions. **Nine are Planner/Researcher rulings** (Q1, Q2, Q3, Q4, Q6, Q7, Q8, Q10, Q11) · **three are owner or coordinator decisions** (Q5, Q9, Q12) · **one is a Planner scope ruling with a stated default** (Q6 — counted above) · **two are routed with a stated default** (Q13 → §6.1, no; Q14 → phase 08's open `Q2`) |
+| **Q1 … Q14** | — | **GATED** (Q1–Q8, Q10–Q12, each inside its block, with options and consequences written down) or **ROUTED** (Q13, Q14) | **1–12**, **§6** | — | Fourteen questions. **Nine are Planner/Researcher rulings** (Q1, Q2, Q3, Q4, Q6, Q7, Q8, Q10, Q11) · **three are owner or coordinator decisions** (Q5, Q9, Q12) · **two are routed with a stated default** (Q13 → §6.1, no; Q14 → phase 08's `Q2`). **Updated 2026-10-03: `Q9` is RESOLVED by the Product Owner (option (a)) and BLOCK 7 is no longer `conditional`; `Q14` is ROUTED *and* answered (phase 08's catalogue-invariant ceiling). Every other question is untouched** |
 
 **Note on `PERF-007`.** It is **not** implemented as a code change, and that is a decision rather
 than an oversight. The lock's cold-miss-only scope is real, but the report's own framing is
 **refuted on the stale path**, the exposure is bounded by a 3-worker sync deployment, and the
 "fix" the report implies (a task queue or an async coalescer) is exactly the overengineering
-§0.2.2 rule 3 forbids. **The contract is documented and intentional; BLOCK 7's gate and §6.1's
-ruling are where the decision is recorded.** If Q9 is declined, this ruling is the only thing
-`PERF-007` produces — a documented, measured, unchanged behaviour.
+§0.2.2 rule 3 forbids. **The contract is documented and intentional; BLOCK 7's ruling and §6.1's
+ruling are where the decision is recorded.** `Q9` was **answered** on 2026-10-03, so this
+documented, measured, unchanged behaviour is now `PERF-007`'s permanent disposition rather than
+the consolation left by a decline.
 
 **Note on `PERF-006` and `PERF-010`.** They are two findings and **one commit**. The report and
 `VAL-004` both require it, and the reason is structural: both change the producer/consumer
@@ -586,7 +587,10 @@ named *sub-items* is deliberate — it delivers the single review window the rep
 while leaving each sub-item independently checkable.
 
 **Block classification summary:** `mechanical` = **3, 11, 12** ·
-`behavioural` = **2, 5, 6, 8, 9, 10** · `structural` = **1** · `conditional` = **7**.
+`behavioural` = **2, 5, 6, 7, 8, 9, 10** · `structural` = **1** ·
+`conditional` = **none** — **BLOCK 7 was `conditional` on `Q9` and is `behavioural` as of the
+2026-10-03 Product Owner ruling.** (`PERF-011`'s observability half remains gated on `Q12`, which
+the 2026-10-03 round did not reach; BLOCK 10 keeps its recorded reduced scope.)
 
 ---
 
@@ -599,7 +603,7 @@ the next change can be trusted?**
 ```
 src/benchmark/locustfile.py         1 only            (the gate; nothing else is detectable first)
 .github/workflows/ci.yml            1, 2              (load-test job only, in place, twice)
-apps/search/views/search.py         6, 7             (one commit, then a conditional one)
+apps/search/views/search.py         6, 7             (one commit, then the unconditional display change)
 test_search_query_count.py          5 only            (with the changes it describes)
 apps/search/tests/test_search_slo.py  2 only          (the honest description, incidental rewrite)
 apps/core/context_processors.py     5                (the annotation's home)
@@ -611,9 +615,10 @@ management commands                 8, 9, 12         (background paths, last)
 docs/ops/profiling.md               12 only           (documentation, last)
 ```
 
-**Ten blocks carry a labelled `decision required before implementation` gate or an external
-gate.** A gated block does not start until the answer is written down; **the Implementor is
-forbidden from choosing an option** (§1.3, §8.1).
+**Nine blocks carry a labelled `decision required before implementation` gate or an external
+gate** (was ten: BLOCK 7's gate was closed by the 2026-10-03 Product Owner ruling, so BLOCK 7 now
+ships unconditionally). A gated block does not start until the answer is written down; **the
+Implementor is forbidden from choosing an option** (§1.3, §8.1).
 
 **The measurement contract, stated once and binding on every block.** No block ships with
 "feels faster". Every block states, in its `acceptance_criteria`, **which of the two proofs it
@@ -1576,7 +1581,8 @@ still fires under a bounded plan is not something to reason about.** Run the tri
 3. **The hot-path FTS `COUNT(*)` ban may not be weakened.** If the matcher needs re-pointing, it
    is re-pointed **to the same intent** and the change is explained — under **Q8**.
 5. **`results_truncated` semantics are unchanged by 6a.** 6a changes *how* the count is obtained,
-   not *what is displayed*. Changing the displayed value is BLOCK 7, under **Q9**.
+   not *what is displayed*. Changing the displayed value is BLOCK 7, under the
+    **Q9 ruling of 2026-10-03**.
 6. **No new cache key, no new entry shape, no new settings constant.**
 
 **Implementor task**
@@ -1614,7 +1620,7 @@ extra_context: |
   4. Never weaken the hot-path FTS COUNT(*) ban in test_search_query_count.py. If the matcher
      needs re-pointing, re-point it to the SAME INTENT and explain it.
   5. results_truncated semantics are unchanged by 6a. Changing the DISPLAYED value is BLOCK 7
-     under Q9 and must not leak in here.
+     under the Q9 ruling of 2026-10-03 and must not leak in here.
   6. No new cache key, no new entry shape, no new settings constant. work_mem is REJECTED.
   GATE Q8 (does the plan change break the ban's matcher) is resolved by RUNNING
   test_search_query_count.py, not by reasoning. The result MUST be recorded in the commit body.
@@ -1658,54 +1664,72 @@ tests_to_run:
 
 ---
 
-### BLOCK 7 — The truncated-count UX, if the owner rules for it (`PERF-006` #2)
+### BLOCK 7 — The truncated-count UX (`PERF-006` #2) — **unconditional since 2026-10-03**
 
 | | |
 |---|---|
-| **Findings owned** | `PERF-006` #2 — **conditional** |
-| **Class** | **conditional** — ships a reduced deliverable if the gate is declined |
-| **Depends on** | **BLOCK 6** (hard, dependency) and **Q9** (hard, external) |
+| **Findings owned** | `PERF-006` #2 — **no longer conditional** |
+| **Class** | **behavioural** — it changes a rendered, user-visible number. **It was `conditional`; the 2026-10-03 Product Owner ruling on `Q9` made it unconditional and it now ships its FULL deliverable** |
+| **Depends on** | **BLOCK 6** (hard, dependency). **`Q9` is RESOLVED — the external gate is closed and is no longer a dependency** |
 | **Blocks** | nothing |
 | **Priority** | **P2** |
-| **Risk level** | **HIGH for a MEDIUM finding**, because the change is **user-visible** and its main risk is being wrong about what the user should see |
+| **Risk level** | **MEDIUM** (lowered from HIGH). The "owner not consulted" risk is **CLOSED**: the owner was consulted and ruled on 2026-10-03. The remaining risk is purely the wording of a number a buyer reads |
 | **Blast radius** | the search results page — the highest-traffic page in the product |
 | **Required agents** | **Auditor · Researcher · Planner · Validator** — all four |
 
-**This is not a performance block and must not be allowed to become one.** `PERF-006` #2 would
-change the search results page from showing the **true total match count** to showing
-`SEARCH_CACHE_MAX_HITS + 1` (i.e. "1 001+") whenever the result set is truncated. That is a
-**product decision about what a buyer is told**, and under §0.2.2 rule 1 it is **not** a
-performance change by any reading. It is in this plan because it is the *other half* of a
-finding this plan must close completely, and because leaving it unaddressed leaves `PERF-006`
-half-remediated.
+**This is not a performance block and must not be allowed to become one.** `PERF-006` #2 changes
+the search results page from showing the **true total match count** to showing
+`SEARCH_CACHE_MAX_HITS + 1` (i.e. "1 001+") whenever the result set is truncated. Under §0.2.2
+rule 1 it is **not** a performance change by any reading. It is in this plan because it is the
+*other half* of a finding this plan must close completely, and because leaving it unaddressed
+leaves `PERF-006` half-remediated. **That obligation is now discharged: `Q9` is answered and the
+half ships.**
 
-**The gate is Q9, and it belongs to the owner (product), not to the Planner and not to the
-Implementor.** The options, with consequences:
+**GATE Q9 — ✅ RESOLVED 2026-10-03 by the Product Owner: option (a).**
+
+> **The ruling, verbatim in effect: a truncated result set displays `<SEARCH_CACHE_MAX_HITS>+`;
+> the true total is never claimed when it cannot be computed.** Options (b) (keep the true count)
+> and (c) (compute an exact count by cheaper machinery) are **declined**. The binding sub-rule is
+> the second clause: **this is not merely "show the cap" — it is "never assert a total you have
+> not computed."** An Implementor who renders a cached, remembered or previously-computed total in
+> the truncated branch has not implemented the ruling.
+>
+> **Block-level consequences:**
+> 1. **BLOCK 7 is no longer `conditional`.** The **full** deliverable ships.
+> 2. **BLOCK 6 alone is no longer the reduced scope** — that framing is withdrawn.
+> 3. **A new user-visible string is required** (the truncation notice's wording under option (a)),
+>    so `ru` **and** `bs` `msgstr` must both be non-empty and `test_i18n_completeness.py` green.
+>    The catalogue is appended to, never regenerated.
+> 4. The **"owner is not consulted and the displayed count changes by default"** risk (§7, block 7)
+>    is **CLOSED**. §7's row is restated, not deleted.
+> 5. The displayed value remains **exactly `SEARCH_CACHE_MAX_HITS + 1`** — the ruling changes the
+>    block's *status*, not its arithmetic. A cap that produces "1 000" while the cap is 1 000 is
+>    indistinguishable from the true count and fails the user's intent.
+
+The options table below is **retained as the record of what was chosen against** — it is not a
+live choice and an Implementor may not re-pick (b) or (c).
 
 | Option | Displayed count | Maintains | Future evolution | Consequence |
 |---|---|---|---|---|
-| (a) | `SEARCH_CACHE_MAX_HITS + 1`, with the existing truncation notice | Honest about the cap; a buyer sees a bounded number | Follows the cap automatically; every cap change is visible | **A buyer is told "1 001+" when 4 000 ads match.** Some will read that as "about a thousand". The existing notice must therefore be unambiguous, and that is a wording decision |
-| (b) | The true count (today) | Correct information | Every page view of a large result set pays a second FTS evaluation — **the defect** | The finding stays open |
-| (c) | An exact count computed by a cheaper mechanism (an approximate-count query, a maintained counter) | Correct and cheap | **Adds state** — a counter needs invalidation, and `search` is not the only writer | New machinery for a 60-ad-seeded product's slowest path; overengineering (rule 3) unless volume justifies it |
+| (a) — **CHOSEN, 2026-10-03** | `SEARCH_CACHE_MAX_HITS + 1`, with the existing truncation notice | Honest about the cap; a buyer sees a bounded number | Follows the cap automatically; every cap change is visible | **A buyer is told "1 001+" when 4 000 ads match.** Some will read that as "about a thousand" — which is why the ruling binds the notice wording and why the notice must be unambiguous |
+| (b) — **declined** | The true count (today) | Correct information | Every page view of a large result set pays a second FTS evaluation — **the defect** | The finding stays open |
+| (c) — **declined** | An exact count computed by a cheaper mechanism (an approximate-count query, a maintained counter) | Correct and cheap | **Adds state** — a counter needs invalidation, and `search` is not the only writer | New machinery for a 60-ad-seeded product's slowest path; overengineering (rule 3) unless volume justifies it |
 
-**If Q9 is declined, this block ships the reduced deliverable and nothing else:** BLOCK 6 alone
-is `PERF-006` #1's complete remediation, and the commit body says *"the truncated-count display
-remains the true count; `PERF-006` #2 was declined by <owner> on <date>; the second FTS
-evaluation at the cap therefore remains, and the cost is bounded by
-`SCHEDULER`-independent per-request work — see §6.1."* **Declining is a legitimate outcome and
-must be recorded, not silently skipped.**
+**No reduced deliverable remains.** BLOCK 6 alone was the reduced scope when `Q9` was open; that
+sentence is **withdrawn**, and a commit for BLOCK 7 that ships nothing is a defect.
 
 **Binding constraints**
 
-1. **Q9's answer is required before implementation, and the Implementor may not choose.**
-2. **The truncation notice already exists and is already translated.** If the wording changes,
-   `msgstr` must be **non-empty** for `ru` and `bs` and `test_i18n_completeness.py` must be
-   green. **Append to the catalogue; never regenerate it wholesale.** No `makemessages` sweep.
+1. **`Q9` is answered (2026-10-03, Product Owner, option (a)).** The Implementor may not choose,
+   and may not "decline on the owner's behalf".
+2. **The truncation notice's wording is the deliverable's remaining product surface, and it is a
+   new user-visible string.** `msgstr` must be **non-empty** for `ru` and `bs` and
+   `test_i18n_completeness.py` must be green. **Append to the catalogue; never regenerate it
+   wholesale.** No `makemessages` sweep.
 3. **The rendered-page assertion is mandatory**, and it is the tripwire: the page must render
    the notice **iff** the result set is truncated, and must **not** render it otherwise.
-4. **Under option (a), the total is `SEARCH_CACHE_MAX_HITS + 1` — exactly, not approximately.**
-   A cap that produces "1 000" while the cap is 1 000 is indistinguishable from the true count
-   and fails the user's intent.
+4. **The total is `SEARCH_CACHE_MAX_HITS + 1` — exactly, not approximately — and no true total is
+   ever claimed when it cannot be computed.**
 5. **The analytics and the `has_results` semantics are unchanged.** `has_results` is derived
    from `total_count > 0` and a truncated result set is never empty; do not let a refactor
    quietly change that.
@@ -1716,7 +1740,7 @@ must be recorded, not silently skipped.**
 
 ```yaml
 id: task_13_b07_truncated_count_ux
-title: "Decide and implement the truncated-count display, or record the decline (13 PERF-006 #2, validated 2026-09)"
+title: "Implement the truncated-count display ruled on 2026-10-03: <SEARCH_CACHE_MAX_HITS>+, never a true total that cannot be computed (13 PERF-006 #2, validated 2026-09)"
 priority: medium
 depends_on: [task_13_b06_cap_in_sql_page_scoped_rank]
 source_reference: ".ai/plans/13-performance-remediation.md"
@@ -1724,52 +1748,60 @@ source_section: "BLOCK 7 - The truncated-count UX"
 source_blocks: ["BLOCK 7"]
 description: >
   When a search result set reaches SEARCH_CACHE_MAX_HITS the view today recomputes the true total
-  with a second FTS evaluation so the page can display the real match count. The alternative is to
-  display SEARCH_CACHE_MAX_HITS + 1 and rely on the existing truncation notice. That is a product
-  decision about what a buyer is told, not an engineering one, and it is gated on the owner. If
-  declined, the block ships no code and records the decline so PERF-006's disposition is complete
-  rather than silent.
+  with a second FTS evaluation so the page can display the real match count. The Product Owner
+  ruled on 2026-10-03 that a truncated result set displays <SEARCH_CACHE_MAX_HITS>+ and that the
+  true total is never claimed when it cannot be computed. This block therefore ships its FULL
+  deliverable unconditionally: no code change is a defect, and BLOCK 6 alone is no longer the
+  reduced scope.
 goals:
-  - "the owner's ruling is recorded with its date and its consequences"
-  - "if implemented, the page shows exactly SEARCH_CACHE_MAX_HITS + 1 when truncated and the true count otherwise, with the notice rendered iff truncated"
-  - "if declined, the second FTS evaluation at the cap is documented as remaining, with its bound"
+  - "the truncated branch shows exactly SEARCH_CACHE_MAX_HITS + 1 and never a true total it did not compute"
+  - "the truncation notice renders IFF the result set is truncated, demonstrated both ways"
+  - "the new user-visible wording has non-empty ru and bs msgstr"
 extra_context: |
+  Q9 IS RESOLVED - 2026-10-03, Product Owner, option (a). The block is UNCONDITIONAL and ships its
+  full deliverable. The Implementor may not choose, and may not decline on the owner's behalf.
+  The ruling's binding sub-rule is that the TRUE TOTAL IS NEVER CLAIMED WHEN IT CANNOT BE
+  COMPUTED - rendering a cached, remembered or previously-computed total in the truncated branch
+  is not an implementation of the ruling.
   BINDING CONSTRAINTS
-  1. Q9 is an OWNER (product) decision. The Implementor may not choose an option.
-  2. The truncation notice already exists and is already translated. If wording changes, ru and bs
-     msgstr must be non-empty and test_i18n_completeness must be green. Append; never regenerate
-     the catalogue. No makemessages sweep.
-  3. The rendered-page assertion is the tripwire: notice rendered IFF truncated.
-  4. Under option (a) the displayed value is exactly SEARCH_CACHE_MAX_HITS + 1, not approximately.
-  5. has_results and the analytics semantics are unchanged; a truncated result set is never
-     empty.
+  1. Q9 is answered; option (a) is the ruling. No option choice remains.
+  2. The truncation notice's wording is a NEW user-visible string. ru and bs msgstr must be
+     non-empty and test_i18n_completeness must be green. Append; never regenerate the catalogue.
+     No makemessages sweep.
+  3. The rendered-page assertion is the tripwire: notice rendered IFF truncated, both ways.
+  4. The displayed value is exactly SEARCH_CACHE_MAX_HITS + 1, not approximately, and no true
+     total is claimed when it cannot be computed.
+  5. has_results and the analytics semantics are unchanged; a truncated result set is never empty.
   6. Do not change the cache, the producer, or the CASE slice - those are BLOCK 6's.
-  DECLINE IS A VALID OUTCOME. If Q9 is declined, ship no code, and record in the commit body that
-  the second FTS evaluation at the cap remains, why, and what bounds it.
+  THERE IS NO REDUCED DELIVERABLE. Shipping no code is a defect, not a recorded decline.
 files:
   - path: src/backend/apps/search/views/search.py
     targets:
       - type: function
         name: _resolve_search_count
     changes:
-      - "Only under Q9 option (a): return the capped value with results_truncated set."
+      - "Return the capped value with results_truncated set; never return a total that was not computed."
   - path: src/backend/templates/ads/list.html
     targets:
       - type: template_block
         name: results_truncated
     changes:
-      - "Only under Q9 option (a), and only if the notice wording changes."
+      - "Render the truncation notice whose wording is the new user-visible string; ru and bs non-empty."
 changes:
+  - action: add_code
+    description: >
+      Return the capped value from _resolve_search_count when the result set is truncated, and never
+      assert a true total that was not computed.
   - action: add_code
     description: >
       Add a rendered-page test asserting the notice appears exactly when the result set is
       truncated, and that the displayed total is exactly SEARCH_CACHE_MAX_HITS + 1 in that case
       and the true count otherwise. Demonstrate both branches.
 acceptance_criteria:
-  - "Q9's answer, its date, and its accepted consequences are recorded in the commit body"
-  - "if implemented: the notice renders iff truncated, demonstrated both ways; the truncated total is exactly SEARCH_CACHE_MAX_HITS + 1"
-  - "if declined: no code changed, and the commit body states that the second FTS evaluation remains and what bounds it"
-  - "ru and bs msgstr are non-empty for any changed string; test_i18n_completeness is green"
+  - "the Q9 answer (Product Owner, 2026-10-03, option (a)) and its accepted consequences are recorded in the commit body"
+  - "the truncated total is exactly SEARCH_CACHE_MAX_HITS + 1 and no un-computed true total is ever claimed; the notice renders iff truncated, demonstrated both ways"
+  - "the block shipped code - a no-code commit is a defect"
+  - "ru and bs msgstr are non-empty for the new/changed string; test_i18n_completeness is green; no catalogue regeneration"
   - "has_results and analytics semantics unchanged"
   - "the fast Docker gate is green"
 tests_to_run:
@@ -2457,7 +2489,7 @@ trusted?**
 | 4 | Version-key lifetime invariant | `SRCH-007` TTL limb | **S** | — | **Q5** + **phase 08 BLOCK 6** | **HIGH** |
 | 5 | The three N+1s, one change | `PERF-004`, `PERF-009`, `PERF-014` | B | 4 | **Q6, Q7** | **HIGH** |
 | 6 | Cap in SQL, page-scoped rank | `PERF-006` #1, `PERF-010` | B | 5 | **Q8** | MED |
-| 7 | Truncated-count UX | `PERF-006` #2 | **C** | 6, **Q9** | **Q9** (owner) | **HIGH** (user-visible) |
+| 7 | Truncated-count UX | `PERF-006` #2 | **B** | 6 | **— (was `Q9`; RESOLVED 2026-10-03)** | **MED** (user-visible; was HIGH) |
 | 8 | `rollup_daily_metrics` bulk upsert | `PERF-003` | B | 7 (soft) | **Q10** | MED |
 | 9 | `send_alerts` grouping | `PERF-005` | B | 8 (soft) | **Q11** | MED |
 | 10 | Alert scope extension | `PERF-011` (obs. half) | B | 9 (soft) | **Q12** + **phase 12 BLOCK 11** | LOW / **HIGH** if unsequenced |
@@ -2482,7 +2514,7 @@ trusted?**
                  |                                                   [6 cap in SQL + page rank] --Q8
                  |                                                          |
                  |                                                          v
-                 |                                                   [7 truncated-count UX] --Q9 (OWNER)
+                 |                                                   [7 truncated-count UX] --Q9 RESOLVED 2026-10-03
                  |                                                          |
                  |                                                          v
                  |                                                   [8 rollup bulk upsert] --Q10
@@ -2504,12 +2536,12 @@ trusted?**
 | **1 → 2** | hard, dependency | ✔ `VAL-004` item 1 and the report's rollout row 4: *"Re-baseline the p95 afterwards, **after** fix 1."* Fixing the URLs makes the measured p95 **materially worse** — the current number includes 404s, which are fast. Reading a worse p95 off a broken gate is meaningless. **This is the phase's only non-negotiable ordering claim** |
 | **1 → everything** | hard, gate | ✔ Every other finding in this phase is a regression a working gate would have to catch. The gate lands first so a later block's red step is unambiguously its own. **It is also the guard against the `locust>=2.20.0` drift** (C-8) |
 | **2 → 3** | soft, ordering | No file overlap. `profile_queries` does not depend on the locust fix. Placed here so the re-baseline BLOCK 3 enables is taken from a fixed harness. **Soft** — BLOCK 3 would be correct in any position |
-| **(none) → 4** | **hard, external** | ✔ BLOCK 4's gate is **phase 08 BLOCK 6's landing state**. It is not a soft edge to BLOCK 3: it is a dependency on work in another plan. If phase 08's block has not landed, Q5's answer must say whether retuning means anything at all, because phase 08's change would immediately re-open the window |
+| **(none) → 4** | **hard, external** | ✔ BLOCK 4's gate is **phase 08 BLOCK 6's landing state**. It is not a soft edge to BLOCK 3: it is a dependency on work in another plan. If phase 08's block has not landed, Q5's answer must say whether retuning means anything at all, because phase 08's change would immediately re-open the window. **`Q5` is still GATED after the 2026-10-03 round (it is a technical gate, deliberately left open) and MUST be re-read at implementation time: landed ⇒ retune; not landed ⇒ the answer must say so explicitly** |
 | **4 → 5** | hard, file | ✔ Both touch the **submenu TTL surface**: BLOCK 4 may adjust `SUBMENU_CACHE_TTL`/`STALE_TTL` under Q5(c), and BLOCK 5's `mega_submenu` limb annotates the fragment those TTLs govern. Running 5 first means its annotation lands on TTLs that are about to move |
 | **3 ↔ 4** | **no edge** | Different surfaces: `profile_queries` and the cache services share no file, no constant, no test. Making an edge would serialise two blocks that are independently correct |
 | **5 → 6** | hard, dependency | ✔ `VAL-004` item 4: the three N+1-bound findings are **one change**, or `_QUERY_BOUND` publishes a number nobody measured. BLOCK 6 then re-measures the search view — and it can only interpret its result against a bound BLOCK 5 has re-derived |
 | **6 → 7** | hard, dependency | ✔ #2 changes what `_resolve_search_count` **returns**; #1 changed how it obtains the value. Landing #2 first means it is written against a `COUNT(*)` path BLOCK 6 has already removed |
-| **6, 7 → 8/9** | soft, ordering | No file overlap — 8 and 9 are management commands, 6 and 7 are the search view. Placed after so the **request path is finished** before the background paths are touched, and so the request-path gates (Q7, Q8, Q9) are resolved while the Implementor's context is fresh. **Soft** — 8 and 9 would be correct in any position |
+| **6, 7 → 8/9** | soft, ordering | No file overlap — 8 and 9 are management commands, 6 and 7 are the search view. Placed after so the **request path is finished** before the background paths are touched, and so the request-path gates (Q7, Q8) are resolved while the Implementor's context is fresh. **Soft** — 8 and 9 would be correct in any position |
 | **9 → 10** | soft, ordering | No file overlap. `send_alerts` and the alert YAML are unrelated. Placed here because the alert rules cover the **listings path**, and BLOCK 5 changed that path's query inventory — the rules should be scoped against a settled path |
 | **10 → 11** | soft, ordering | No file overlap. `search()`'s context and the alert file share nothing. **Soft** — 11 is the cheapest block in the plan and is placed late only so the alert question is not left dangling |
 | **11 → 12** | hard, dependency | ✔ The same rule as phase 12's BLOCK 14 → 15: **the truth sweep lands after every code change it documents.** `docs/ops/profiling.md` describes a system that BLOCKS 1–11 have changed. Documenting first encodes numbers this phase invalidates. **There is no soft variant of this edge** |
@@ -2606,7 +2638,7 @@ this plan records another phase's state, it records only what it verified in the
 | **Phase 12 BLOCK 11** (`OPS-003`) | Not yet landed. Making `docs/ops/prometheus-slo-alerts.yaml` a **verified contract** | ✔ **Direct overlap with `PERF-011`'s observability half.** Phase 12 corrects the selectors, corrects the **stale** multiprocess caveat, and adds the scrape-contract test. **BLOCK 10 is externally gated on it** (§4.2) and **must not restate any of its corrections** |
 | **Phase 12 BLOCK 12** (`OPS-012`) | `gunicorn.conf.py` log format | ✔ **Phase 13 has no `gunicorn.conf.py` edit at all** — `PERF-011`'s capacity half is rejected. Phase 12's `child_exit` hook is untouched by phase 13 |
 | **Phase 12** on runbooks | Runbook procedures (crash recovery, DB memory budget, 429) | **Phase 13 states parameters; phase 12 writes the procedure.** Phase 13 edits no runbook |
-| **Phase 14** | Locale files; the language component of a cache key | ✔ **Phase 13 adds no user-visible string** except possibly BLOCK 7's truncation notice — which **already exists** in `ad_list.html` and is already translated. **No `makemessages` regeneration**, and the catalogue is appended to, never regenerated |
+| **Phase 14** | Locale files; the language component of a cache key | ✔ **Phase 13's ONLY user-visible string is BLOCK 7's truncation notice**, and the 2026-10-03 Product Owner ruling makes that string **required, not optional**: the existing notice in `ad_list.html` is reworded, its `ru` and `bs` `msgstr` must be non-empty, and `test_i18n_completeness.py` green. **No `makemessages` regeneration**, and the catalogue is appended to, never regenerated |
 | **Phase 15** | The authorization framework | **Out of scope** |
 
 ### 5.2 What phase 13 must **not** do, for other phases' sake
@@ -2688,7 +2720,7 @@ does not negotiate.**
 | `src/backend/conftest.py` | **None** | Every phase | ✔ Untouchable |
 | `pyproject.toml` | **None**, unless Q2 answers explicitly | Phase 11 (`[tool.pytest.ini_options]`) | ✔ **No dependency; `testpaths` only under Q2** |
 | `.ai/audit/**` | **None** | Every phase | ✔ **This plan creates, restores or edits nothing here** |
-| Locale files | **None** | Phase 14 | ✔ No `makemessages` regeneration; BLOCK 7's string is already translated |
+| Locale files | **BLOCK 7** (append-only; **required** since the 2026-10-03 ruling) | Phase 14 | ✔ No `makemessages` regeneration. BLOCK 7's reworded truncation notice needs non-empty `ru` and `bs` `msgstr`; the existing msgid entry is edited in place, never regenerated |
 
 ### 5.4 What phase 13 needs from other phases (forward dependencies)
 
@@ -2698,11 +2730,11 @@ does not negotiate.**
 | **A corrected, contract-backed alert file** | **Phase 12 BLOCK 11** (`OPS-003`) | 🔴 **Externally blocking BLOCK 10.** Two owners of one file. Phase 13 does not negotiate the order |
 | The `ci-nightly.yml` region for `profile_queries` | Phase 11 BLOCK 2 | 🟡 **Soft.** Disjoint region; phase 11 is the first to touch the file and re-read is required |
 | The `test` job's pytest step and job timeouts | Phase 11 | 🟢 **None.** Phase 13 does not touch that region |
-| `SRCH-001`'s `?features=` bound | Phase 08 BLOCK 1 / `Q2` | 🟢 **None.** `PERF-002` is merged out; phase 13 implements nothing and duplicates no gate (**Q14**) |
+| `SRCH-001`'s `?features=` bound | Phase 08 BLOCK 1 / `Q2` | 🟢 **None.** `PERF-002` is merged out; phase 13 implements nothing and duplicates no gate (**Q14**). **`Q14` was ANSWERED on 2026-10-03 — no hard-coded ceiling; a catalogue invariant plus headroom, enforced by a guard test — so `PERF-002`'s remediation quality is satisfied by phase 08. Phase 13 still implements nothing for it** |
 | `media_gate`'s de-duplicated lookup | Phase 09 BLOCK 10 | 🟢 **None.** Phase 13 files nothing about `media_gate` |
 | `statement_timeout` / `lock_timeout` | Phase 03 `DB-004` | 🟡 **Measurement only.** Phase 13 measures against whatever is chosen and sets nothing. **BLOCK 12 records that three lock-holding tests break below ~1 s** |
 | A production-sized dataset for BLOCKS 8, 9, 12 | A private `postgres:18-alpine` instance | 🟡 **Verification, not implementation.** The plan ships tripwires whether or not the measurement is taken, and records "not measured" when it is not |
-| The owner rulings | Owner | **Q5, Q9, Q12** — the phase's real external dependencies, all recorded as decisions, not tasks |
+| The owner rulings | Owner | **`Q9` — ANSWERED 2026-10-03 (Product Owner, option (a)); BLOCK 7 is unconditional and ships its full deliverable. `Q5` and `Q12` remain open** — those two are the phase's remaining real external dependencies, both recorded as decisions, not tasks |
 
 ---
 
@@ -2724,7 +2756,7 @@ re-filed finding.
 | **Restructuring the sweep transactions** (`DB-008`) | **Phase 03 BLOCK 7's.** `PERF-013` is cost quantification only, and `send_alerts`' immediate-alert write batching is the same territory. **Phase 13 groups a loop; it does not move a transaction boundary** |
 | **`prefetch_related("children")` for the header N+1** (`PERF-009`) | **A no-op against `mptt`'s `get_children`** — rejected upstream. The correct instrument is an `Exists` annotation, which is what BLOCK 5 uses. Recording it here so nobody re-proposes it |
 | **Restructuring `recompute_normalized_prices`** (`PERF-013`) | **Phase 03's.** ✔ The command is **absent from both `HOURLY_COMMANDS` and `DAILY_COMMANDS`** and runs only on demand, so its transaction shape is a phase-03 decision with real concurrency tests (`TestRecomputeRowLockConcurrency`) guarding it. **BLOCK 12 measures and documents; it does not restructure** |
-| **The `?features=` ceiling** (**Q14**) | **Phase 08's open `Q2`, gated on an owner product decision and a catalogue measurement.** **Phase 13 duplicates no gate** and implements nothing for `PERF-002` |
+| **The `?features=` ceiling** (**Q14**) | **Phase 08's `Q2` — ANSWERED 2026-10-03** (no hard-coded ceiling; a catalogue invariant plus headroom, enforced by a guard test). **Phase 13 duplicates no gate** and implements nothing for `PERF-002` |
 | **Extending `testpaths`, adding a pytest dependency, or consolidating the tripwire test files** | Phase 11 holds the test toolchain and the ordered test-change schedule. Phase 13 edits `test_search_query_count.py` and `test_search_slo.py` **only as incidental rewrites**, and **only if Q2 explicitly answers for a `testpaths` change** |
 | **Any environment tuning to make a benchmark look better** (`WEB_CPUS`, `WEB_MEM_LIMIT`, `DB_CPUS`, `DB_MEM_LIMIT`, `SCHEDULER_CPUS`) | Those variables are **runtime-verified as unset in every `.env.*`**, which is why `PERF-011`'s capacity half is rejected. **Changing them is an env-key change** (phase 02's allowlist) and a capacity decision, and this plan adds **no** env key |
 | **A multi-level category fixture in `conftest.py`** | It is the most contended file in the repository, and adding a fixture to it for one measurement is a poor trade. **`PERF-009` is measured on the dev stack** (7 active roots, 205 categories) and the committed tripwire asserts the **shape** — a constant number of child-existence queries — which needs no new fixture |
@@ -2814,7 +2846,7 @@ finding's severity. "Blast" covers what else feels the change. "Contention" cove
 | **All** | A perf block ships with "feels faster" and no proof | Quality | **High** | **High** | The §3 measurement contract — every block declares **(M)** measured before/after, **(T)** tripwire, or **(M+T)**, in its `acceptance_criteria`. **A block that can state neither does not ship** | Low |
 | **All** | A guard is added and never observed failing, reproducing `VAL-003` in the guard that exists to close it | Quality | **High** | **High** | §1.5; **every** new guard's acceptance criteria include "and that failure is demonstrated before the commit" | Low |
 | **All** | A number from the report is repeated as a phase-13 result — most likely the 510 ms single sample | Correctness | **High** | **High** | §0.2.3 row 5 and `VAL-003`; the "no latency claim" constraint is in BLOCKS 1, 2 and 6; §6.3 item 17 | Low |
-| **All** | A performance change alters semantics and is described as a speedup | **Correctness** | Med | **High** | §0.2.2 rule 1; every ordering/display/freshness change is §6 or a gate (Q9); `test_search_query_count`'s `COUNT(*)` ban and the SLO tripwire are the detectors | Low |
+| **All** | A performance change alters semantics and is described as a speedup | **Correctness** | Med | **High** | §0.2.2 rule 1; every ordering/display/freshness change is §6 or a gate (`Q9`, now ruled 2026-10-03); `test_search_query_count`'s `COUNT(*)` ban and the SLO tripwire are the detectors | Low |
 | **All** | The Implementor works from the **report's** file list and follows a quoted artefact that does not exist | Process | **High** | **High** | ✔ C-1, C-2, C-6, C-7 and §0.2.4's re-verification table. Every block's `extra_context` names the tree-correct target; the report is evidence, not instruction | Low |
 | **All** | A `13-PERF-00N` citation is written into a new comment and re-points a reader to a different finding | Correctness | Med | Med | §0.1's mandatory convention; §6.3 item 1. **The six collided strings are phase 03 BLOCK 11's to sweep** | Med — accepted, by reservation |
 | **All** | A red gate is captured while another phase agent runs and a teardown race is reported as a product defect | Process | **High** | Med | Concurrent runs collide on one `test_mko_bazuna`. Re-run serially before reporting. The symptom is `test_mko_bazuna does not exist` / `relation "..." does not exist` | Low |
@@ -2839,7 +2871,8 @@ finding's severity. "Blast" covers what else feels the change. "Contention" cove
 | **6** | The `[:1000]` plan change stops the hot-path `COUNT(*)` ban's matcher from firing, and the tripwire becomes inert | **Correctness** | Med | **High** | Q8, **resolved by running the test, not by reasoning**; constraint 4 re-points the matcher **to the same intent** and explains it | Low |
 | **6** | Slicing the `Case`/`When` arms to the page changes the rendered order | **Behaviour** | Med | **High** | Constraint 2: a multi-page ordering test, demonstrated against the pre-change ordering. **Changing ordering is a semantics change, not a performance change** | Low |
 | **6** | A latency figure is invented to "prove" the block | Quality | Med | Med | Constraint 3: the measurement is the compiled statement's length and bind count, and needs no database. **A latency number here is fabrication** | Very low |
-| **7** | The owner is not consulted and the displayed count changes by default | **Behaviour** | Med | **High** | Q9 is an **owner** gate; the block is `conditional` and its reduced deliverable is BLOCK 6 alone; a decline is recorded, not silently taken | Very low |
+| **7** | ~~The owner is not consulted and the displayed count changes by default~~ — **CLOSED 2026-10-03** | **Behaviour** | **CLOSED** | — | The owner was consulted and ruled on 2026-10-03: option (a). The block is no longer `conditional`, there is no reduced deliverable, and a no-code commit is a defect. **The row is retained, not deleted, so the closure is visible** | **Closed** |
+| **7** | The truncated branch renders a cached, remembered or previously-computed total instead of the capped value — i.e. the true total is claimed when it cannot be computed | **Behaviour** | Low | **High** | The ruling's binding sub-rule is stated in the block, in constraint 4 and in the task's `extra_context`; the rendered-page test asserts the truncated value is **exactly** `SEARCH_CACHE_MAX_HITS + 1` | Low |
 | **7** | The truncation notice's wording changes and a locale is left with an empty `msgstr` | Correctness | Low | Med | Constraint 2: `ru` and `bs` non-empty, `test_i18n_completeness` green, **append, never regenerate** | Very low |
 | **8** | `update_conflicts=True` names a `unique_fields` that does not match the real constraint, and the command **raises at 3 a.m.**, nightly, unnoticed | **Correctness** | Med | **High** | Q10; constraint 3 — the constraint's name and its verification site are recorded; the test runs the rollup **twice** and asserts an in-place update rather than a duplicate or a silent drop | Med — accepted, by gate |
 | **8** | The lock is moved, session-scoped, or duplicated | Correctness | Low | **High** | Constraint 1; `test_sweep_lock_structure` asserts exactly one, `in_atomic_block is True`, **`session is False`**; phase 13 allocates no lock id | Very low |
@@ -2864,19 +2897,22 @@ Phase 13 is complete when **all** of the following hold.
 
 ### 8.1 Scope
 
-- [ ] All **15** finding-units have a recorded disposition: **13 implemented** (11 unchanged, 2
-      gated — `PERF-006` #2 under Q9 and `PERF-011`'s observability half under Q12),
-      **1 merged and remediated elsewhere** (`PERF-002` → `SRCH-001`, phase 08), **0 rejected**,
+- [ ] All **15** finding-units have a recorded disposition: **13 implemented** (11 unchanged, 1
+      gated — `PERF-011`'s observability half under **Q12**, which the 2026-10-03 round did not
+      reach), **1 merged and remediated elsewhere** (`PERF-002` → `SRCH-001`, phase 08), **0 rejected**,
       **0 dropped without a destination**, plus the `SRCH-007` TTL limb implemented in BLOCK 4
       and `PERF-007` dispositioned as accepted-and-unchanged (§6.1).
-- [ ] Every gated block (**1, 2, 3, 4, 5, 6, 7, 8, 9, 10**) has a **written** answer for each of
+      **`PERF-006` #2 is no longer in the gated count — `Q9` was answered on 2026-10-03.**
+- [ ] Every gated block (**1, 2, 3, 4, 5, 6, 8, 9, 10**) has a **written** answer for each of
       its open questions, naming the option chosen and the consequences accepted. **Silence is
-      not an acceptable outcome for any of them.**
+      not an acceptable outcome for any of them.** **BLOCK 7 has no open question: its gate was
+      answered by the Product Owner on 2026-10-03 and it ships unconditionally.**
 - [ ] Each of **Q1 … Q14** is either answered with a record or explicitly re-routed with a named
       destination. **Q1, Q2, Q3, Q4, Q6, Q7, Q8, Q10, Q11** are Planner/Researcher rulings ·
-      **Q5, Q9, Q12** are owner or coordinator decisions · **Q13, Q14** are routed with a stated
-      default (`Q13` → out of scope, the coordinator must place the legacy `search_vector`
-      removal; `Q14` → phase 08's open `Q2`).
+      **Q9 is answered** (Product Owner, 2026-10-03, option (a)) · **Q5, Q12** remain open
+      owner/coordinator decisions · **Q13, Q14** are routed with a stated default (`Q13` → out of
+      scope, the coordinator must place the legacy `search_vector` removal; `Q14` → phase 08's
+      `Q2`, **answered 2026-10-03**).
 - [ ] **Every commit body that cites a finding uses the §0.1 convention** —
       `PERF-0NN (validated 2026-09)`. **No bare `13-PERF-00N` was added**, and **none of the six
       shipped collided strings was touched** (phase 03 BLOCK 11's sweep).
@@ -2905,8 +2941,9 @@ Phase 13 is complete when **all** of the following hold.
       `test_cache_key_convention.py` (both copies) — **and was run before BLOCK 1 as well as
       after** (§0.2.3 row 10: this audit ran no pytest).
 - [ ] No env key was added; `test_env_allowlist.py` is **untouched and green**.
-- [ ] No locale file was regenerated. If BLOCK 7 changed a string, `test_i18n_completeness.py` is
-      green and the `ru` and `bs` `msgstr` values are non-empty.
+- [ ] No locale file was regenerated. **BLOCK 7 DID change a user-visible string** — the
+      truncation notice's wording is required by the 2026-10-03 ruling — so
+      `test_i18n_completeness.py` is green and the `ru` and `bs` `msgstr` values are non-empty.
 - [ ] **The load test was run at least once end-to-end against the dev stack** after BLOCK 2, and
       its failure rate and p95 are recorded — **never against the shared test stack or a
       production host** (§1.2).
@@ -2943,8 +2980,10 @@ Phase 13 is complete when **all** of the following hold.
 - [ ] **`PERF-006`** — the at/over-cap path issues no second FTS evaluation; the hot-path
       `COUNT(*)` ban is **byte-identical or re-pointed to the same intent with the change
       explained**; `results_truncated` and `total_count` are unchanged for every non-truncated
-      case; **#2 is either implemented under a recorded owner ruling, or explicitly declined with
-      the remaining cost documented.**
+      case; **#2 shipped under the 2026-10-03 Product Owner ruling (option (a)) — the truncated
+      total is exactly `SEARCH_CACHE_MAX_HITS + 1`, no true total is claimed when it cannot be
+      computed, the notice renders iff truncated, and the new wording has non-empty `ru` and `bs`
+      `msgstr`.**
 - [ ] **`PERF-007`** — dispositioned as **accepted-and-unchanged** with the rationale recorded
       (§6.1). No queue, no coalescer, no lock change.
 - [ ] **`PERF-008`** — the city list renders completely on a search response; the `cities` query

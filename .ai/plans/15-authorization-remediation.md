@@ -239,7 +239,7 @@ available, it is **not taken silently** and it **does not propagate** to another
 | `AUTHZ-001` | HIGH | **HIGH, unchanged** | Taxonomy-mandated and reproduced end-to-end through the real `ban_user_for_ad` path. **And the revocation-path count is corrected once more: there are five account-state-changing paths of which **four** are open, not "three of the four".** `consent_withdraw` is the only closed one; self-service **`consent_decline`**, `UserAdmin.withdraw_consent_action`, `ban_user_for_ad` and `bulk_ban_users` are open. Phase 04's own headline says "3 of 4" while its evidence table lists five rows with one closed — **the code is the tie-breaker, and this plan does not regress to "3 of 4"** |
 | `AUTHZ-002` | HIGH | **HIGH, unchanged, and explicitly labelled unreachable** | The taxonomy's HIGH band ("no ownership check on one resource type, even if never exploited in testing") describes this almost verbatim, so the band is handbook-mandated and not overridden. **But operational risk today is zero**: all three call sites are internally consistent. The finding is a **latent** defect that becomes an exploit the first time a fourth caller appears. **The acceptance test is "the row is unchanged", never "the call returned `True`"** — the return value is content-dependent, because `auto_moderate` runs inside the same transaction |
 | `AUTHZ-003` | HIGH | **HIGH, held on taxonomy grounds — and the band is explicitly contested** | The impact is materially reduced (the role **is** self-provisionable, §0.2.5-adjacent F9/U4), while a *different* escalation is owned by `04-AUT-005`. The report's own note is that banding on the **residual** gives MEDIUM, with the **combined** `AUTHZ-003 + 04-AUT-005` pair at HIGH. **This Planner does not make that call: it is GATE Q9, a coordinator ruling, non-blocking for the code.** The hard rule is that **a re-band must not silently drop the escalation** |
-| `AUTHZ-005` | MEDIUM, reclassified **SPEC-DEVIATION** | **MEDIUM, unchanged; the *type* is itself gated** | Reclassification is well founded — the spec references the behaviour, so it is a missing integration, not dead code. **But its type rests on the contested DECLINE sentence** (`spec-index.md` "blocks seller **login only**" vs `technical-specification.md` "blocks seller login/**actions**"), which is **phase 06 `PII-113`'s** to resolve. **GATE Q4 + GATE Q5** |
+| `AUTHZ-005` | MEDIUM, reclassified **SPEC-DEVIATION** | **MEDIUM, unchanged; the *type* is no longer gated** | Reclassification is well founded — the spec references the behaviour, so it is a missing integration, not dead code. **As of 2026-10-03 the finding's type no longer rests on the contested DECLINE sentence** (`spec-index.md` "blocks seller **login only**" vs `technical-specification.md` "blocks seller login/**actions**"): **`Q4` and `Q5` are answered, the product rule governs, and phase 06 owns the amendment.** **The severity is unchanged** |
 | `AUTHZ-006` | MEDIUM | **MEDIUM, and the impact statement is corrected downward** | There is **no current exploit**: `AdminSite.has_permission` is Django's and **nothing in this project overrides it**, so anon and seller are stopped at the site level. This is a **defence-in-depth defect**. The block's commit body must say so, and must **not** imply a live anonymous-delete capability |
 | `AUTHZ-007` | MEDIUM | **MEDIUM, unchanged** | Distinct root cause from `AUTHZ-002` — **caller scope vs service scope**. They compose and are ordered (`2 → 4`), but **merging them would hide one behind the other's diff** |
 | `AUTHZ-008` | LOW | **LOW, unchanged — and one sub-claim is deleted** | The `422`-instead-of-`405` consequence is **refuted**: the decorator's third branch is a `return`, so the view body is never entered on a non-`POST`. **Delete the `422` claim and the `staff_required_api(ADMIN, GET) -> OK` probe line from the tracker.** What survives is a diagnostic-status consistency improvement plus a factually wrong `WWW-Authenticate: Bearer` challenge |
@@ -263,26 +263,43 @@ consequences, written into the block), or **`ROUTED`** (owned elsewhere; recorde
 
 | # | Question | Blocks | Owner | Disposition here |
 |---|---|---|---|---|
-| **Q1** | **Is `is_active` a kill-switch or dead?** The report's own matrix says `is_active=False` **already** yields a 302 on the web, which would refute `04-AUT-004`'s premise for that tier. `AUTHZ-001`'s DENY set deliberately carves it out. **Both phases' reports cannot both be right, and neither plan has landed** | 6 | phase 04 (Q3/Q4) + phase 15 (vocabulary) | **`GATED` — GATE Q1**, inside BLOCK 6, and it is a **hard gate**: it requires U1 to be re-derived first. **A silent ship here is how a control is added in one phase and removed in the next** |
+| **Q1** | **Is `is_active` a kill-switch or dead?** The report's own matrix says `is_active=False` **already** yields a 302 on the web, which would refute `04-AUT-004`'s premise for that tier. `AUTHZ-001`'s DENY set deliberately carves it out. **Both phases' reports cannot both be right, and neither plan has landed** | 6 | phase 04 (Q3/Q4) + phase 15 (vocabulary) | **`GATED` — GATE Q1**, inside BLOCK 6, and it is a **hard gate**: it requires U1 to be re-derived first. **UNCHANGED by the 2026-10-03 round: D03 (DECLINE reversibility) and D04 (moderator write scope) do not change it** — both concern *what the gate enforces*, not whether `is_active` is a kill-switch. **A silent ship here is how a control is added in one phase and removed in the next** |
 | **Q2** | **Does the shared predicate expose queryset-level terms from one declaration?** (a) two levels from one source — per-request verdict + named `User` flag terms; (b) instance-level only | 5 (and transitively `06-VAL-003` and `SRCH-004`) | phase 15 (shape); phase 06 + phase 08 (semantics) | **`RULED` — R1: option (a), two levels from one declaration.** There is no unresolved *technical* uncertainty here: option (b) is precisely the defect one module over — `get_account_state()` is instance-level, so no queryset filter can call it, which is why `06-VAL-003` and `SRCH-004` have been blocked for **two** phases and would be blocked for a fourth. **Consequence recorded: phase 15 owns the *shape* and the *terms*; phase 06 owns the `User` audience predicate's semantics, phase 08 owns the `Ad` ad-visibility predicate's semantics, and neither may be inferred from phase 15's declaration.** If a Reader wants (b), the cost is recorded in §4.3 |
-| **Q3** | **What may `is_staff` do?** Does a plain moderator get write access to the moderation criteria, the audit log, and the support desk? Today the answer is "no, and there is no documented reason" | 9 | **owner / product** | **`GATED` — GATE Q3**, inside BLOCK 9. **Both candidate fixes are privilege *expansions*** — the *correct* one grants moderators more, the *proposed* one grants write to seven read-only models. It needs an explicit review of the 17-model matrix, **not a rubber stamp** |
-| **Q3′** | **Which route reconciles `AdminSite.has_permission` with `User.role`?** (i) override it to `is_active and role == ADMIN`; (ii) declare that a superuser is *always* `is_staff` and enforce it at provisioning | 9 | phase 15 + owner | **`GATED` — GATE Q3′**, inside BLOCK 9, and it **cannot be answered before U13**. If `create_admin_user` does not exist or does not set both, option (ii) has **no enforcement point** and only (i) is coherent |
-| **Q4** | **Is `PII-105` option (a) taken** — DECLINE becomes reversible and web login is regained? | 7 (hard sequencing) | **phase 06** | **`GATED` — GATE Q4**, inside BLOCK 7. If (a), the publish gate becomes the **only** control keeping a declined seller from posting, so AUTHZ-005's missing `is_declined` term becomes *the whole control*. **BLOCK 7 does not start until the ruling is written down** |
-| **Q5** | **Which line governs DECLINE semantics?** `spec-index.md:74` ("blocks seller **login only**") vs `technical-specification.md:101` ("blocks seller login/**actions** AND hides the user's PUBLISHED ads") | 7 (the finding's *type*) | **phase 06 · `PII-113`** | **`GATED` — GATE Q5**, inside BLOCK 7. Both sentences exist in the tree today |
-| **Q6** | **Should a banned seller's ads stay publicly visible?** | — | **product owner** | **`ROUTED` — not phase 15's, and it gates nothing here.** Open across **three** phases (08, 06, 15). Phase 08 folded `SRCH-008` into `SRCH-004` deliberately so it is argued as **one product decision**. **No amount of work in phase 15 settles it.** The recommended next step is the one-paragraph trade-off in front of the product owner, not a fourth filing. **Phase 15 files nothing about it** |
+| **Q3** | **What may `is_staff` do?** Does a plain moderator get write access to the moderation criteria, the audit log, and the support desk? Today the answer is "no, and there is no documented reason" | 9 | **Product Owner** | **✅ RESOLVED 2026-10-03 (Product Owner) — a moderator (`is_staff`) may write to: the moderation queue, the moderation criteria, the audit log, and the support desk.** Option (a) — `is_staff` is a *full* `ADMIN` with a per-model write policy declared per class. **The ruling chose a privilege EXPANSION**, and it **requires an explicit, reviewed pass over the 17-model matrix** recorded as a named pre-block step with its own acceptance criterion. **A blanket grant is not acceptable and neither is a rubber stamp**; option (c) (a seeded `Group`) remains rejected in the report's own words. BLOCK 9 starts once the matrix review is written down |
+| **Q3′** | **Which route reconciles `AdminSite.has_permission` with `User.role`?** (i) override it to `is_active and role == ADMIN`; (ii) declare that a superuser is *always* `is_staff` and enforce it at provisioning | 9 | phase 15 + owner | **`GATED` — GATE Q3′**, inside BLOCK 9. **UNCHANGED by the 2026-10-03 round: D03 and D04 do not touch it.** It remains **conditional on the `create_admin_user` verification (R2 / U13)**: if `create_admin_user` sets **both** `is_staff` and `is_superuser`, the **provisioning route (ii)** stands; **otherwise the `AdminSite.has_permission` override (i) is required**, because option (ii) would have no enforcement point. Option (iii) remains the Planner's leading candidate and is still gated |
+| **Q4** | **Is `PII-105` option (a) taken** — DECLINE becomes reversible and web login is regained? | 7 (was hard sequencing) | **Product Owner** | **✅ RESOLVED 2026-10-03 (Product Owner) — DECLINE IS REVERSIBLE, `PII-105` option (a) taken.** Semantics: DECLINE **blocks publishing and messaging**; the **login is regained**; **already-published ads stay live until the seller acts**; the seller **may restore consent at any time**. **BLOCK 7 NO LONGER WAITS ON PHASE 06 — IT STARTS.** Consequence to state plainly: with DECLINE reversible, **the publish gate becomes the ONLY control keeping a declined seller from posting**, so the missing `is_declined` term becomes **the whole control** rather than a partial one — the block's rationale and risk both worsen |
+| **Q5** | **Which line governs DECLINE semantics?** `spec-index.md:74` ("blocks seller **login only**") vs `technical-specification.md:101` ("blocks seller login/**actions** AND hides the user's PUBLISHED ads") | 7 (the finding's *type*) | **Product Owner** (the product rule supersedes both spec lines) | **✅ RESOLVED 2026-10-03 (Product Owner) — neither spec line governs; the product rule does.** DECLINE **blocks publishing and messaging**, the **login is regained**, **already-published ads stay live until the seller acts**, and the seller **may restore consent at any time**. **Both spec sentences are superseded and must be corrected by phase 06 — the owning phase: `docs/01-spec/spec-index.md:74` and `docs/01-spec/technical-specification.md:101`, under `06-PII-105` / `06-PII-113`.** See §6.2's propagation obligation. **Consequence for `AUTHZ-005`: its severity is UNCHANGED, but its _type_ no longer rests on the contested DECLINE sentence** — the finding no longer argues from a line two documents contradict |
+| **Q6** | **Should a banned seller's ads stay publicly visible?** | — (**phase 15 files nothing**; the predicate change lands with its owning phase) | **Product Owner** | **✅ ANSWERED 2026-10-03 (Product Owner) — A BAN HIDES INVENTORY. No longer `ROUTED`.** A banned seller's ads are excluded from the **public ad-visibility predicate** across **search, category, detail and the media gate** (`SRCH-004` / `SRCH-008`). **It must be argued as a MODERATION decision and must NEVER be bundled into a commit justified as fixing a consent violation** — phase 08 folded `SRCH-008` into `SRCH-004` deliberately so it is decided as one product decision. **Phase 15 files nothing about it and implements nothing about it; the predicate change lands with the owning phase. The "gates nothing here" deferral is withdrawn — the question was routed for an *answer*, and it now has one.** Amendment owed to phase 06 for `docs/02-database/db-schema.md:61` (§6.2). **Also settled by the same ruling: a banned seller cannot create or publish a new ad** (relisting is covered), which closes plan 16's "a banned seller can still relist" known gap and withdraws its `15-AUTHZ-001` hand-off |
 | **Q7** | **`VAL-001`'s CSRF ruling** — is a state-changing `GET` CRITICAL or MEDIUM? The handbook's §8 and §5(h) contradict each other | 10 (the **band** only) | **the audit programme, not phase 15** | **`GATED` — GATE Q7, non-blocking for the code and blocking for the tracker.** The remedy (`@require_POST` + CSRF) is correct under either reading; only the severity is in question. **The ruling must be made once, centrally, and applied to every phase that finds a state-changing `GET` — it must not be decided locally.** Phase 15 records the recommended amendment verbatim (§3, BLOCK 10) and does not apply it |
-| **Q8** | **The deep-link UX decision**: a `GET` deep link from a bookmark, a messenger or a headless client must degrade gracefully once the route becomes POST-only | 10 | **owner / product** | **`GATED` — GATE Q8**, inside BLOCK 10. Phase 04's plan names this as the reason phase 04 **may not** add `@require_POST`; phase 15 may, **but only with the UX decided** |
-| **Q9** | **Is `AUTHZ-003` banded on the finding or on the residual?** | 9 (the **tracker** only) | **coordinator** | **`GATED` — GATE Q9, non-blocking for the code.** This Planner records both bands and the combined-pair band and **does not choose**. The hard rule travels with the gate: **a re-band must not silently drop the escalation** |
+| **Q8** | **The deep-link UX decision**: a `GET` deep link from a bookmark, a messenger or a headless client must degrade gracefully once the route becomes POST-only | 10 | **Product Owner** | **✅ RESOLVED 2026-10-03 (Product Owner) — a `GET` on a state-changing route renders a page; the action executes only on `POST`.** Bookmarks, messenger previews and headless clients **degrade gracefully and cannot act by prefetch**. **This supersedes phase 04's stated reason for not adding `@require_POST`, and the POST-only conversion is unblocked.** For `/login/issue/` this selects **option (b)**: the `GET` renders the landing page **without issuing a token** and the `POST` issues it. Rationale for the mapping: the ruling's stated shape is *a `GET` renders a page (200), the `POST` performs the action*, and (b) is the only option in BLOCK 10's table whose `GET` is a rendered page rather than an error status. **(a) is declined: its 405 landing is the dead-end this ruling forbids** |
+| **Q9** | **Is `AUTHZ-003` banded on the finding or on the residual?** | 9 (the **tracker** only) | **coordinator** | **`GATED` — GATE Q9, non-blocking for the code. UNCHANGED by the 2026-10-03 round: D03 and D04 do not change it.** This Planner records both bands and the combined-pair band and **does not choose**. The hard rule travels with the gate: **a re-band must not silently drop the escalation** |
 | **Q10** | **Does `create_admin_user` exist, and does it set both `is_staff` and `is_superuser`?** | 9 | phase 15 (verify) | **`RULED` — R2: it is a verification step, not a decision.** U13's search runs inside BLOCK 9's pre-block step and its result is written into the gate. **A block that cannot find it must say so in the gate answer** rather than assume the premise |
-| **Q11** | **What does an invalid `reason_category` do in `reject_ad`?** Today *any* client string is concatenated into `ModeratorActionLog.reason` | 11 | **routed by phase 10 to phase 15** | **`GATED` — GATE Q11**, inside BLOCK 11. **Not in the validated report.** If the gate is declined or unanswered, **BLOCK 11 ships nothing and that is a legitimate outcome** |
-| **Q12** | **Is a `GET` on `reject_ad` / `ban_user` a 302 (today) or a 405?** Two shipped tests assert 302; the sibling `approve_ad` already returns 405 | 11 | **routed by phase 10 to phase 15** | **`GATED` — GATE Q12**, inside BLOCK 11. **Not in the validated report.** A 302→405 change is **user-visible** and breaks recorded behaviour — see BLOCK 11's alternatives table |
+| **Q11** | **What does an invalid `reason_category` do in `reject_ad`?** Today *any* client string is concatenated into `ModeratorActionLog.reason` | 11 | **Product Owner** (routed by phase 10) | **✅ RESOLVED 2026-10-03 (Product Owner) — an invalid `reason_category` RE-RENDERS the review page with an error and PRESERVES the moderator's input.** **Nothing is coerced to empty and no arbitrary client string reaches `ModeratorActionLog.reason`.** Option (a)'s closed `StrEnum` vocabulary is the mechanism, and the re-render — not a 400 — is the response. **A new user-visible error string is required, so `ru` and `bs` `msgstr` must both be non-empty.** Option (b) (normalise + a second redacted field) remains declined because it overlaps phase 06 BLOCK 16's redaction work |
+| **Q12** | **Is a `GET` on `reject_ad` / `ban_user` a 302 (today) or a 405?** Two shipped tests assert 302; the sibling `approve_ad` already returns 405 | 11 | **Product Owner** (routed by phase 10) | **✅ RESOLVED 2026-10-03 (Product Owner) — the `GET` returns a CONFIRMATION PAGE (200); the `POST` performs the action.** Same ruling as `Q8`, and it settles the 302-vs-405 question: **not 302, not a bare 405 — a 200 confirmation page that degrades gracefully and cannot act by prefetch.** **The two shipped tests asserting 302 change in the same commit, with the justification recorded.** **BLOCK 11 becomes UNCONDITIONAL** |
 | **Q13** | **Does the `technical-specification.md` sentence *"No web-side middleware redirects soft-deleted users"* get edited, or does the doc diverge?** | 6 (doc impact), 12 (routing) | **phase 06 holds the reservation**; phase 15 must **request** | **`ROUTED`, with a hard rule in BLOCK 6: phase 15 records the request and does not edit the file.** A documented divergence is an acceptable outcome; a unilateral edit is not |
 | **Q14** | **Where does the denial-reason `StrEnum` live, and does phase 15 allocate in `apps/core/enums.py`?** | 6, 8 | phase 15 + coordinator | **`RULED` — R3: one new `StrEnum` appended to `apps/core/enums.py`; nothing is reordered and no `AdvisoryLockId` is allocated.** `enums.py` is **five-way contended** (phases 02/03/05/06/07), and phase 10 follows the same discipline. R3's precondition is an **immediate re-read**: if the file is under concurrent edit when BLOCK 6 starts, BLOCK 6 **stops and reports** rather than reordering another phase's work |
-| **Q15** | **What response shape does the new gate return — 403, or a redirect?** The report says "`logout(request)` plus a 403/redirect on deny" **without choosing** | 6 | phase 15 (Planner) | **`GATED` — GATE Q15**, inside BLOCK 6, with the three options and their rollout consequences in BLOCK 6's alternatives table. **A 403 on every `/dashboard/` request after a moderator's bulk ban reads as a site-wide breakage in the first 24 hours**, and the report itself calls this the phase's highest rollout risk |
+| **Q15** | **What response shape does the new gate return — 403, or a redirect?** The report says "`logout(request)` plus a 403/redirect on deny" **without choosing** | 6 | phase 15 (Planner) | **`GATED` — GATE Q15**, inside BLOCK 6, with the three options and their rollout consequences in BLOCK 6's alternatives table. **UNCHANGED by the 2026-10-03 round: D03 and D04 do not change it.** D13's confirmation-page ruling governs **moderation routes**, not the `AUTHZ-001` DENY set, so it must not be read across as answering this. **A 403 on every `/dashboard/` request after a moderator's bulk ban reads as a site-wide breakage in the first 24 hours**, and the report itself calls this the phase's highest rollout risk |
 
 **Fifteen questions. Three are `RULED` (Q2, Q10, Q14) and each ruling carries its alternatives and
-consequences in the row above. Nine are `GATED` inside their block. Two are `ROUTED` out (Q6, Q13).
-Not one of them is left as an undecided choice presented as settled.**
+consequences in the row above. `Q6` and `Q13` are `ROUTED` out (Q13 unchanged; **Q6 is now
+`ANSWERED` — see below**). The rest are `GATED` inside their block. Not one of them is left as an
+undecided choice presented as settled.**
+
+**Updated 2026-10-03 — the Product Owner decision round.** Seven questions moved from `GATED` or
+`ROUTED` to a recorded answer, and **no implementor may re-choose any of them**:
+
+| Question | Outcome | Block-level consequence |
+|---|---|---|
+| **`Q3`** | RESOLVED — moderator write scope is the moderation queue, criteria, audit log and support desk | **BLOCK 9** — privilege **expansion**; a named 17-model-matrix review becomes a pre-block step |
+| **`Q4`** | RESOLVED — DECLINE reversible, `PII-105` option (a) | **BLOCK 7** — **no longer waits on phase 06; it starts** |
+| **`Q5`** | RESOLVED — the product rule supersedes both spec lines | **BLOCK 7** / phase 06 amendment |
+| **`Q6`** | ANSWERED (was `ROUTED`) — a ban hides inventory | **Phase 15 files nothing**; phase 06 `db-schema.md` amendment; plan 16's relist gap closes |
+| **`Q8`** | RESOLVED — `GET` renders a page, action on `POST` | **BLOCK 10** — POST-only conversion unblocked; option (b) |
+| **`Q11`** | RESOLVED — re-render with an error, input preserved | **BLOCK 11** — unconditional |
+| **`Q12`** | RESOLVED — `GET` → 200 confirmation page, `POST` acts | **BLOCK 11** — unconditional; two 302 assertions change |
+
+**`Q3′` remains `GATED`** (conditional on the `create_admin_user` verification), and `Q1`, `Q7`,
+`Q9`, `Q10`, `Q14` and `Q15` are untouched — **D03 and D04 do not change any of them.**
 
 ---
 
@@ -509,9 +526,9 @@ truth. `conditional` = ships a reduced deliverable — or nothing — if its gat
 |---|---|---|---|---|---|
 | `AUTHZ-001` | **structural** | **implement in two blocks: 5 (the declaration, answers unchanged) then 6 (the web gate).** Two-level shape is RULING R1. Gate the gate on Q1, Q15, and phase 06's doc ruling (Q13) | **5, 6** | **HIGH** | `MIDDLEWARE` has 14 entries and no account-state gate; `can_login` has exactly one production call site; four of five revocation paths leave the live session authorized. ✔ **The DENY set is already implemented and test-pinned on the bot side** — this is an *extraction*, not a new policy, which lowers the design risk and raises the cost of getting the shape wrong once. ✔ **The report's single-commit recommendation is deliberately split here** (§4.2, edge 5→6) because a pure-refactor commit and a user-visible gate commit are independently reviewable and only one of them can be rolled back |
 | `AUTHZ-002` | **behavioural** | **implement, both halves, one commit** — `submit_ad` compares the actor on the locked row **and** `edit.py` passes `request.user.id` at both literals | **4** | **HIGH** (taxonomy-mandated; **unreachable today**) | The cross-tenant write is confirmed; the recommended guard is a **tautology for its own web caller** and would give false assurance. ⚠ **The highest-consequence sequencing constraint in the phase: phase 10 BLOCK 16 already pre-commits to `user_id=request.user.id`, so a premature BLOCK 16 makes this guard permanently tautological while looking correct** |
-| `AUTHZ-003` | **structural** | **implement the narrow form only — role resolver + `AdminSite` reconciliation + written contract + registry test.** Cite `04-AUT-005` as a hard prerequisite; **must not close without it** | **9** | **HIGH**, band contested (GATE Q9) | Four answers to one question; `media_gate` answers differently from `staff_required` for the same superuser. ✔ **Both candidate fixes are privilege *expansions*** — the correct one grants moderators more, the proposed one grants write to seven deliberately read-only models. **The 17-class `AdminRolePermissionMixin` is a prohibition, not an option** (`VAL-005`) |
-| `AUTHZ-004` | **behavioural** | **implement, gated on Q8 (owner) and Q7 (band).** Blast radius is **4 files / 10 call sites** | **10** | **MEDIUM** (GATE Q7) | A `GET` inserts a `LoginToken` with no CSRF token. ✔ **C-1: one of the two test files the report names does not exist.** Amplification is bounded at two layers (in-app rate limits + nginx `limit_req`), and the token expires in 5 minutes and must still be claimed by a Telegram identity — which is why MEDIUM is right. **`LOGIN_URL` points at this route, so every anonymous `@login_required` redirect lands on it** |
-| `AUTHZ-005` | **behavioural** | **split: 5 (unify the vocabulary with today's answers preserved) then 7 (change the publish DENY set).** Gated on Q4 + Q5 | **5, 7** | MEDIUM | `can_publish_ad` tests three flags and omits `is_declined` **and** `consent_revoked`; the live bot gate is a second, narrower predicate. ✔ **The finding's *type* (SPEC-DEVIATION) is itself gated on phase 06's DECLINE ruling.** ✔ `can_publish_ad` **must not** be deleted as dead code (phase 10 BLOCK 8 binding constraint 1) |
+| `AUTHZ-003` | **structural** | **implement the narrow form only — role resolver + `AdminSite` reconciliation + written contract + registry test.** Cite `04-AUT-005` as a hard prerequisite; **must not close without it**. **`Q3` RESOLVED 2026-10-03 (Product Owner): the moderator contract's content is the moderation queue, criteria, audit log and support desk — a privilege EXPANSION requiring an explicit, reviewed 17-model-matrix pass as a named pre-block step.** `Q3′` and `Q9` remain gated | **9** | **HIGH**, band contested (GATE Q9) | Four answers to one question; `media_gate` answers differently from `staff_required` for the same superuser. ✔ **Both candidate fixes are privilege *expansions*** — the correct one grants moderators more, the proposed one grants write to seven deliberately read-only models. **The ruling took the expansion: a blanket grant is not acceptable and neither is a rubber stamp.** **The 17-class `AdminRolePermissionMixin` is a prohibition, not an option** (`VAL-005`) |
+| `AUTHZ-004` | **behavioural** | **implement. `Q8` RESOLVED 2026-10-03 (Product Owner) — option (b): the `GET` renders the landing page without issuing a token, the `POST` issues it, and the POST-only conversion is unblocked.** Still gated on `Q7` (band only). Blast radius is **4 files / 10 call sites** | **10** | **MEDIUM** (GATE Q7) | A `GET` inserts a `LoginToken` with no CSRF token. ✔ **C-1: one of the two test files the report names does not exist.** Amplification is bounded at two layers (in-app rate limits + nginx `limit_req`), and the token expires in 5 minutes and must still be claimed by a Telegram identity — which is why MEDIUM is right. **`LOGIN_URL` points at this route, so every anonymous `@login_required` redirect lands on it** — and the 2026-10-03 ruling settles exactly how that redirect degrades |
+| `AUTHZ-005` | **behavioural** | **split: 5 (unify the vocabulary with today's answers preserved) then 7 (change the publish DENY set).** **`Q4` and `Q5` both RESOLVED 2026-10-03 (Product Owner): DECLINE is reversible, `PII-105` option (a) — BLOCK 7 no longer waits on phase 06 and starts** | **5, 7** | MEDIUM (unchanged) | `can_publish_ad` tests three flags and omits `is_declined` **and** `consent_revoked`; the live bot gate is a second, narrower predicate. ✔ **The severity is unchanged, but the finding's _type_ (SPEC-DEVIATION) no longer rests on the contested DECLINE sentence — `Q5` is settled, so the finding argues from the product rule rather than from a line two documents contradict.** ⚠ **The reversal makes the missing `is_declined` term the WHOLE control, not a partial one** (D03). ✔ `can_publish_ad` **must not** be deleted as dead code (phase 10 BLOCK 8 binding constraint 1) |
 | `AUTHZ-006` | **mechanical** | **implement — one method plus one regression test. No sweep** | **1** | MEDIUM | A constant `True` that never consults `request`. ✔ **Impact corrected downward: no current exploit**, because `AdminSite.has_permission` is Django's and nothing here overrides it. ✔ **Every** other constant override in the registry returns `False`, so `True` is the only dangerous direction and a blanket sweep would touch 17 classes for one defect |
 | `AUTHZ-007` | **behavioural** | **implement — move the ownership assertion inside the lock, copying the in-file precedent** | **2** | MEDIUM | Authorizes on the unlocked read, then re-reads under lock **without re-checking**. ✔ `ad_archive` / `ad_reactivate` / `ad_delete` already implement the fix — **one function, three precedents.** Externally gated on phase 03 BLOCK 5 and phase 05 BLOCKs 2/8 |
 | `AUTHZ-008` | **behavioural** | **implement — method check first; correct or drop the `WWW-Authenticate` header; update the five test methods in the same commit** | **3** | LOW | ✔ **C-3: five test methods break, two of which pin the ordering by name.** ✔ **The report's `422` claim is refuted and is deleted from the tracker** — the third branch is a `return`, so the view body is never entered on a non-`POST`. Reordering changes only the diagnostic status for two already-denied cases |
@@ -521,11 +538,13 @@ truth. `conditional` = ships a reduced deliverable — or nothing — if its gat
 | `VAL-003` | **mechanical** | **measure (U5) in BLOCK 9 and record the measured numbers in BLOCK 12.** No field set is changed by this phase | **9, 12** | Low | The report's `25` / `29` are stale. **Do not take any count on trust from any document** |
 | `VAL-004` | — | **rolled into the §0.1 citation convention and BLOCK 12's tracker record** | **12** | Low (tracker hygiene) | Three prefixes for one stream, and one burned set (`AUTZ-003` is a **shipped in-source marker**). ✔ Phase 04, 05 and 08 have all filed the same requirement; this plan consolidates it once rather than restating it per phase |
 | `VAL-005` | — | **a prohibition, not a task.** Rejected option, recorded with its evidence | **§6.3, 9** | **High** (blocks implementation as written) | A blanket `AdminRolePermissionMixin` would grant write to seven models that are read-only **by deliberate data-protection policy** — turning an audit trail into a mutable table and a consent record into an editable one. **A strictly larger incident than the one the finding is fixing** |
-| **Q11 / Q12** | **conditional** | **implement only if the gates are answered.** Not in the validated report; routed here by phase 10 | **11** | — | An invalid `reason_category` is concatenated into `ModeratorActionLog.reason`; a `GET` on `reject_ad` / `ban_user` is a 302 while the sibling `approve_ad` is a 405. **Declining the gate is a legitimate outcome and BLOCK 11 then ships nothing** |
-| **Q1 … Q15** | — | **`GATED`** (Q1, Q3, Q3′, Q4, Q5, Q7, Q8, Q9, Q11, Q12, Q15) · **`RULED`** (Q2 → R1, Q10 → R2, Q14 → R3) · **`ROUTED`** (Q6, Q13) | **1–12, §6** | — | Eleven gates, each with options and consequences written into its block. **Three rulings, each with its alternatives recorded. Two routed out. The Implementor is forbidden from choosing an option on any gate** |
+| **Q11 / Q12** | **behavioural** (was `conditional`) | **implement unconditionally — both gates RESOLVED 2026-10-03 (Product Owner).** `Q11`: an invalid `reason_category` re-renders the review page with an error and **preserves the moderator's input**; nothing is coerced to empty. `Q12`: a `GET` returns a **200 confirmation page**, the `POST` performs the action | **11** | MEDIUM | An invalid `reason_category` is concatenated into `ModeratorActionLog.reason`; a `GET` on `reject_ad` / `ban_user` is a 302 while the sibling `approve_ad` is a 405. **There is no longer a "decline" branch: BLOCK 11 ships. The two shipped 302 assertions change in the same commit with the justification recorded, and a new user-visible confirmation page plus error string need non-empty `ru` and `bs`** |
+| **Q1 … Q15** | — | **`RESOLVED` 2026-10-03** (Q3, Q4, Q5, Q8, Q11, Q12) · **`ANSWERED` 2026-10-03** (Q6, was `ROUTED`) · **`GATED`** (Q1, Q3′, Q7, Q9, Q15) · **`RULED`** (Q2 → R1, Q10 → R2, Q14 → R3) · **`ROUTED`** (Q13) | **1–12, §6** | — | Five gates remain, each with options and consequences written into its block. **Three rulings, each with its alternatives recorded. One routed out. Six questions were resolved by the Product Owner on 2026-10-03 and `Q6` was answered. The Implementor is forbidden from choosing an option on any remaining gate** |
 
-**Block classification summary:** `mechanical` = **1** · `behavioural` = **2, 3, 4, 7, 8, 10** ·
-`structural` = **5, 6, 9, 12** · `conditional` = **11**.
+**Block classification summary:** `mechanical` = **1** · `behavioural` = **2, 3, 4, 7, 8, 10, 11** ·
+`structural` = **5, 6, 9, 12** · `conditional` = **none** — **BLOCK 11 was `conditional` on `Q11`/`Q12`
+and became `behavioural` on 2026-10-03, when both gates were answered and the block became
+unconditional.**
 
 ---
 
@@ -1662,16 +1681,16 @@ tests_to_run:
 
 ---
 
-### BLOCK 7 — The publish gate's DENY set, once the DECLINE decision is on the record (`AUTHZ-005b`)
+### BLOCK 7 — The publish gate's DENY set (`AUTHZ-005b`) — **unblocked 2026-10-03**
 
 | | |
 |---|---|
 | **Findings owned** | `AUTHZ-005` (the **policy**; MEDIUM, reclassified SPEC-DEVIATION) |
 | **Class** | **behavioural** — the answers for `is_declined` and `consent_revoked` change, and shipped tests pin the wrong ones |
-| **Depends on** | **BLOCK 6** (hard, §4.2). **Externally, and this is the block's real gate:** **phase 06's `PII-105` DECLINE-reversibility decision (Q4)** and **phase 06's `PII-113` DECLINE-semantics conflict (Q5)** |
+| **Depends on** | **BLOCK 6** (hard, §4.2). ~~**Externally, and this is the block's real gate: phase 06's `PII-105` (Q4) and `PII-113` (Q5)**~~ — **BOTH EXTERNAL GATES ARE RESOLVED. `Q4` and `Q5` were answered by the Product Owner on 2026-10-03, so BLOCK 7 NO LONGER WAITS ON PHASE 06 AND STARTS** |
 | **Blocks** | BLOCK 12 (the prior record's coverage-gap line becomes a live assertion here) |
-| **Priority** | **P1.** Deliberately **not** P0: the two external gates are outside this phase's control, and the report itself places this finding third by sequence, not by risk |
-| **Risk level** | **MEDIUM.** The change is small; the risk is shipping it **before** the DECLINE decision, which would make the publish gate the *only* control standing between a declined seller and a post |
+| **Priority** | **P0 as of 2026-10-03** (was P1). The two external gates are no longer outside this phase's control, and with DECLINE reversible the publish gate is the *only* control — the priority follows the finding's weight, not the report's sequence |
+| **Risk level** | **MEDIUM**, with the risk **now characterised rather than pending**: the DECLINE decision exists, so the publish gate is provably the only control, and the missing `is_declined` term is **the whole control** rather than a partial one |
 | **Blast radius** | `apps/users/services/account_state.py` (the publish purpose's terms) · the bot's `_evaluate_publish_permission` call site · `apps/users/tests/test_account_state.py::TestCanPublishAd` |
 | **Required agents** | **Auditor · Researcher · Planner · Validator** — all four |
 
@@ -1691,12 +1710,22 @@ only because `_evaluate_user_state` denies them **first** — an earlier, unrela
 protection silently disappears. That is the whole finding, and it is why the remedy is a **single
 declaration with a named purpose**, not a wider `if`.
 
-**Sequencing, and it is hard.** If `PII-105` option (a) is taken — DECLINE becomes reversible and
-web login is regained — then the publish gate becomes the **only** thing keeping a declined seller
-from posting, and this block's missing `is_declined` term becomes **the whole control**. **AUTHZ-005
-must be sequenced *after* phase 06's `PII-105` decision, not in parallel with it.** Phase 04 BLOCK 6's
-decline-path `logout()` is gated on the same decision. **Neither phase recorded this dependency; it
-is recorded here so neither is surprised.**
+**The sequencing is now settled — `Q4` and `Q5` were both answered on 2026-10-03, so this
+paragraph records a decision rather than a dependency.** `PII-105` option (a) **is taken**: DECLINE
+is **reversible**. **DECLINE blocks publishing and messaging; the login is regained;
+already-published ads stay live until the seller acts; the seller may restore consent at any
+time.** The consequence is the one this block was written to wait for: **the publish gate becomes
+the ONLY control keeping a declined seller from posting, and the missing `is_declined` term is
+therefore the WHOLE control, not a partial one.** **`Q5` is also answered:** neither
+`spec-index.md:74` nor `technical-specification.md:101` governs — the product rule above does, and
+phase 06 owns the amendment (§6.2).
+
+**This block no longer waits on phase 06, and an Implementor must not reintroduce a wait.** The
+old framing ("`AUTHZ-005` must be sequenced *after* phase 06's `PII-105` decision, not in
+parallel with it") was correct while the decision was open. **It is now satisfied, so BLOCK 7
+runs.** The remaining ordering statement is unchanged and still load-bearing: phase 04 BLOCK 6's
+decline-path `logout()` remains gated on the same decision, and that gate is **phase 04's**, not
+this block's — phase 15 neither satisfies nor satisfies itself out of it.
 
 **The race with a prior record.** `docs/99-agent/test-audit-block-f-findings.md:193` already lists
 *"No test for `can_publish_ad` when `is_declined=True`"* as a test-coverage gap. **Adding that test
@@ -1717,10 +1746,12 @@ the two do not race.
 1. **The publish DENY set becomes `{is_banned, is_deleted, is_declined, consent_revoked}` plus
    `ads_auto_publish == False`** — the same account-state set the interaction gate uses, plus the
    publish-only preference. **Both the bot's evaluator and `can_publish_ad` change together.**
-2. **Both external gates must be answered in writing first.** Q4 (`PII-105` DECLINE reversibility,
-   phase 06) and Q5 (which DECLINE sentence governs, phase 06 `PII-113`). **The Implementor is
-   forbidden from choosing.** If either is unanswered, **this block does not start** and the finding
-   stays open with a recorded reason.
+2. **Both external gates were answered on 2026-10-03 and the answers are on the record — the
+   Implementor chooses nothing and may not re-open them.** `Q4`: DECLINE is reversible,
+   `PII-105` option (a) taken, `BLOCK 7 NO LONGER WAITS ON PHASE 06`. `Q5`: the product rule
+   governs, not either spec line. **The Implementor is forbidden from choosing.** The
+   **consequence must be stated in the commit body**: with DECLINE reversible the publish gate is
+   the only control, so the added `is_declined` term is the whole control.
 3. **`test_declined_user_can_publish` is corrected in this same commit**, and project rule 2 is cited
    by name in the commit body — **the test pins a wrong answer; the answer changes, not the test's
    intent.** The 8 other `TestCanPublishAd` cases keep their current expectations; only the declined
@@ -1747,7 +1778,7 @@ title: "Add is_declined and consent_revoked to the publish DENY set, in the bot 
 priority: high
 depends_on: ["task_15_b06_account_state_gate_middleware"]
 source_reference: ".ai/plans/15-authorization-remediation.md"
-source_section: "BLOCK 7 - The publish gate's DENY set, once the DECLINE decision is on the record"
+source_section: "BLOCK 7 - The publish gate's DENY set (unblocked 2026-10-03)"
 source_blocks: ["BLOCK 7"]
 description: >
   can_publish_ad tests is_banned, is_deleted and ads_auto_publish, and never tests is_declined or
@@ -1764,10 +1795,15 @@ goals:
   - "ads_auto_publish=False, banned and deleted still cannot publish, for the same reasons as before"
   - "the bot's interaction gate is unchanged and its cross-predicate agreement test stays green"
 extra_context: |
-  GATES THAT MUST BE ANSWERED IN WRITING BEFORE IMPLEMENTATION: Q4 (phase 06's PII-105 DECLINE
-  reversibility decision) and Q5 (phase 06's PII-113 DECLINE-semantics conflict). If either is
-  unanswered, THIS BLOCK DOES NOT START and the finding stays open with a recorded reason. The
-  Implementor is forbidden from choosing an option.
+  Q4 AND Q5 ARE RESOLVED - 2026-10-03, Product Owner. Q4: PII-105 option (a) is taken, DECLINE IS
+  REVERSIBLE - it blocks publishing and messaging, the login is regained, already-published ads stay
+  live until the seller acts, and the seller may restore consent at any time. Q5: the PRODUCT RULE
+  GOVERNS, not spec-index.md:74 and not technical-specification.md:101; phase 06 owns the amendment.
+  CONSEQUENCE, WHICH THE COMMIT BODY MUST STATE: with DECLINE reversible the PUBLISH GATE IS THE
+  ONLY CONTROL keeping a declined seller from posting, so the added is_declined term is THE WHOLE
+  CONTROL, not a partial one. THIS BLOCK NO LONGER WAITS ON PHASE 06 AND STARTS. The old "if either
+  is unanswered, this block does not start" rule is superseded - do not reintroduce a wait.
+  The Implementor is forbidden from choosing an option or from re-opening either gate.
   BINDING CONSTRAINTS
   1. The publish DENY set becomes {is_banned, is_deleted, is_declined, consent_revoked} plus
      ads_auto_publish == False. The bot evaluator and can_publish_ad change TOGETHER.
@@ -1882,8 +1918,13 @@ extraction exists to end.
    explicit that it should stay at `WARNING` with a stable code rather than becoming a firehose.
 3. **No `print()`.** `logger = logging.getLogger(__name__)` with lazy `%s` formatting.
 4. **The counter is conditional on U14.** If no Python-level Prometheus client exists, **option (b)
-   is unavailable and the block ships option (a) only**, recording the metrics limb as **open with a
-   named owner (phase 12's Q5)**. **Do not add a metrics client to close a LOW finding.**
+is unavailable and the block ships option (a) only**, recording the metrics limb as **open with a
+named owner (phase 12's `Q5`)**. **Do not add a metrics client to close a LOW finding.** **Updated
+2026-10-03: `Q5` is ANSWERED — phase 12 takes the *minimum viable* deliverable (corrected alert
+selectors, a lint check and the scrape-contract test) and DEFERS the monitoring stack.** That
+decision **consumes this limb's consumer**: with no deployed stack to scrape, the counter is the
+**only outstanding limb of `AUTHZ-009`** and it stays **open with phase 12's reduced deliverable as
+its named owner**. Option (a) still ships; the counter is **not** built.
 5. **`favorite.py` is not given `@login_required`.** Its guest-gate fragment endpoint deliberately
    renders for anonymous users and must keep returning a fragment, never a 302 — the module
    docstring says so, and `test_auth_nav` and the favourite-fragment tests depend on it. BLOCK 8's
@@ -2011,12 +2052,12 @@ tests_to_run:
 
 | | |
 |---|---|
-| **Findings owned** | `AUTHZ-003` (HIGH, band contested — GATE Q9) · discharges `VAL-002` |
+| **Findings owned** | `AUTHZ-003` (HIGH, band contested — GATE Q9) · discharges `VAL-002` · **`Q3` RESOLVED 2026-10-03** |
 | **Class** | **structural** — the block creates a *documented, executable* contract where none existed |
 | **Depends on** | nothing in-plan. **Externally, and this is the block's hardest prerequisite:** **phase 04 BLOCK 1** must have landed, because `04-AUT-005` (with `PII-103` merged in) owns the `UserAdmin` field contract and AUTHZ-003 must cite it as a hard prerequisite |
 | **Blocks** | BLOCK 12 (the decision record's final form) |
-| **Priority** | **P0 — but the most gate-dependent block in the phase.** Three gates (Q3, Q3′, Q9) and one external prerequisite |
-| **Risk level** | **HIGH — and the risk is directional: both candidate fixes are privilege expansions** |
+| **Priority** | **P0 — and the gate burden dropped on 2026-10-03.** `Q3` is answered; **`Q3′` (conditional on `create_admin_user`) and `Q9` (the tracker band) remain, plus the external phase-04 BLOCK 1 prerequisite** |
+| **Risk level** | **HIGH — and the risk is directional: the 2026-10-03 ruling accepted a privilege expansion**, which is why the reviewed 17-model-matrix pass is a named pre-block step and not a formality |
 | **Blast radius** | `apps/ads/views/listings.py::media_gate` (also phase 05 and phase 10's file) · the admin site's permission predicate · **one new decision record** · **one new registry-iterating contract test** |
 | **Required agents** | **Auditor · Researcher · Planner · Validator** — all four |
 
@@ -2054,19 +2095,44 @@ absent. Later assertions in the same test then fail spuriously. **BLOCK 9's cont
 read-only over `admin.site._registry` and never POSTs**, and the U4 probe re-`force_login`s between
 its phases.
 
-**GATE Q3 — what may `is_staff` do?** A plain moderator, today, reaches `Ad`, `AdImage` (read-only),
-`Category`, `City` and `User` (writable), and is refused on the other 12 of 17 changelists. **The
-answer to "may `is_staff` write to the moderation criteria, the audit log and the support desk?" is
-"no — and there is no documented reason."** This is an **owner/product** decision, and it needs an
-explicit review of the 17-model matrix. **The Implementor may not choose.**
+**GATE Q3 — ✅ RESOLVED 2026-10-03 (Product Owner): a moderator (`is_staff`) may write to the
+moderation queue, the moderation criteria, the audit log, and the support desk.**
+
+> **The ruling chose option (a) — `is_staff` is a *full* `ADMIN`, with the per-model write policy
+> declared per class — and it is a privilege EXPANSION.** Three consequences are binding:
+> 1. **An explicit, reviewed pass over the 17-model matrix is a NAMED PRE-BLOCK STEP of this
+>    block, with its own acceptance criterion** (below). **A blanket grant is not acceptable and
+>    neither is a rubber stamp** — the matrix pass is what makes the expansion reviewable rather
+>    than asserted.
+> 2. **`Q3′` remains gated** (conditional on the `create_admin_user` verification). The ruling
+>    does not pick a reconciliation route.
+> 3. **The prohibition on a shared base class stands unchanged.** The expansion is expressed as a
+>    per-class, per-model policy, never as one grant.
+
+The options table below is **retained as the record of what was chosen against** — it is not a
+live choice, and an Implementor may not re-pick (b) or (c).
 
 | Option for the contract's content | Maintains | Project convention | Consequence if wrong |
 |---|---|---|---|
-| (a) `is_staff` is a *full* `ADMIN`, and the per-model write policy is declared per class | Matches the project's documented "is_staff IS the moderator role" position and `staff_required` | ✔ | **A privilege expansion for 12 changelists.** Explicitly reviewed, not a rubber stamp |
-| (b) `is_staff` is a *read-only* moderator and write access is granted per model through `auth.Permission` | Matches today's effective behaviour exactly | ✔ matches 14 of 17 classes' per-model fallback | **The out-of-the-box moderator becomes read-only**, which is arguably a *reduction* — but it is still a behaviour change to 5 changelists and needs the same review |
-| (c) A seeded `Group` defines the contract | Matches Django's model | ✘ contradicts the documented position | **Rejected in the report's own words.** Listed so the choice is on the record |
+| (a) — **CHOSEN, 2026-10-03** | `is_staff` is a *full* `ADMIN`, and the per-model write policy is declared per class | Matches the project's documented "is_staff IS the moderator role" position and `staff_required` | ✔ **A privilege expansion for 12 changellists — accepted by the Product Owner, conditional on the reviewed 17-model-matrix pass.** Explicitly reviewed, not a rubber stamp |
+| (b) — **declined** | `is_staff` is a *read-only* moderator and write access is granted per model through `auth.Permission` | Matches today's effective behaviour exactly | ✔ matches 14 of 17 classes' per-model fallback. Declined: the moderator loses the four write surfaces the ruling named |
+| (c) — **declined** | A seeded `Group` defines the contract | Matches Django's model | ✘ contradicts the documented position | **Declined, in the report's own words.** Listed so the choice is on the record |
 
-**GATE Q3′ — which route reconciles `AdminSite.has_permission` with `User.role`?**
+### Q3 pre-block step (named, with its own acceptance criterion) — the reviewed 17-model matrix pass
+
+| | |
+|---|---|
+| **What it is** | An explicit, item-by-item pass over **all 17 registered models** in `admin.site._registry`, recording for each class what a plain `is_staff` moderator may do (`add` / `view` / `change` / `delete`), and reconciling it against the four surfaces `Q3` names (moderation queue, moderation criteria, audit log, support desk) |
+| **When** | **Before** any permission-predicate edit in this block. It is a review artefact, not a code step |
+| **Why it cannot be a rubber stamp** | The ruling is a **privilege expansion across 12 changelists**. A copy of today's effective matrix "signed off" is not a review — it must show **per-model reasoning**, and it must confirm the seven deliberately read-only classes (`AnalyticsEventAdmin`, `ModeratorActionLogAdmin`, `ConsentRecordAdmin`, `LoginTokenAdmin`, `SupportTicketAdmin`, `SiteConfigAdmin`, `AdImageAdmin`) against the ruling's intent rather than against today's behaviour |
+| **Where the artefact lives** | The block's decision record (§5's record, cited by BLOCK 12) |
+| **Acceptance criterion** | **The commit body cites the reviewed matrix pass by name, names the reviewed artefact, and states the per-class decision for every one of the 17 models — a commit that implements a privilege expansion without that pass is a defect** |
+
+**GATE Q3′ — which route reconciles `AdminSite.has_permission` with `User.role`? — STILL GATED,
+and the 2026-10-03 ruling does not change it.** It **remains conditional on the
+`create_admin_user` verification (R2 / U13)**: if `create_admin_user` sets **both** `is_staff` and
+`is_superuser`, the **provisioning route (ii)** stands; **otherwise the `AdminSite.has_permission`
+override (i) is required**, because option (ii) would have no enforcement point.**
 
 | Option | Shape | Maintains | Future evolution | Project convention | Consequence if wrong |
 |---|---|---|---|---|---|
@@ -2145,11 +2211,19 @@ goals:
   - "a test iterating admin.site._registry asserts the contract by making real permission calls for each identity"
   - "the four report errors that are not errors - the 'not deployable' claim, the 15-of-17 arithmetic, the 422 claim, the field counts - are absent from the commit body"
 extra_context: |
-  GATES THAT MUST BE ANSWERED IN WRITING BEFORE IMPLEMENTATION: Q3 (what may is_staff do - owner and
-  product), Q3' (which route reconciles AdminSite.has_permission with User.role - note this cannot be
-  answered before U13 is verified), and Q9 (the band - coordinator, non-blocking for the code, but the
-  re-band must NOT let the 04-AUT-005 escalation disappear). The Implementor is forbidden from
-  choosing an option.
+  Q3 IS RESOLVED - 2026-10-03, Product Owner. A MODERATOR (is_staff) MAY WRITE TO: the moderation
+  queue, the moderation criteria, the audit log, and the support desk. This is a PRIVILEGE
+  EXPANSION and it requires a NAMED PRE-BLOCK STEP: an explicit, REVIEWED PASS OVER THE 17-MODEL
+  MATRIX, recorded with per-model add/view/change/delete reasoning and reconciled against the four
+  named surfaces. A BLANKET GRANT IS NOT ACCEPTABLE AND NEITHER IS A RUBBER STAMP. A commit that
+  implements the expansion without citing the reviewed matrix pass by name, and without stating the
+  per-class decision for every one of the 17 models, IS A DEFECT.
+  STILL GATED, AND THE Q3 RULING DOES NOT CHANGE EITHER: Q3' (which route reconciles
+  AdminSite.has_permission with User.role - still conditional on U13: if create_admin_user sets both
+  is_staff and is_superuser the provisioning route stands, otherwise the AdminSite.has_permission
+  override is required), and Q9 (the band - coordinator, non-blocking for the code, but the re-band
+  must NOT let the 04-AUT-005 escalation disappear). The Implementor is forbidden from choosing an
+  option on Q3' or Q9, and must not re-open Q3.
   EXTERNAL PREREQUISITE: phase 04 BLOCK 1 must have landed. AUTHZ-003 cites 04-AUT-005 (with PII-103
   merged in) as a hard prerequisite and MUST NOT be closed without it.
   BINDING CONSTRAINTS
@@ -2202,7 +2276,7 @@ files:
         name: AdminSite
     changes:
       - "Reconcile the admin site's permission answer with User.role, per the written gate answer."
-  - path: docs/<GATE Q3 decides the home>
+  - path: docs/<the decision record's home, per the 2026-10-03 Q3 ruling — a decision record, never a mixin>
     targets:
       - type: document
         name: moderator-contract
@@ -2226,6 +2300,9 @@ changes:
     description: >
       Add the decision record and the registry-iterating contract test.
 acceptance_criteria:
+  - "the Q3 pre-block step is done and cited: the commit body names the REVIEWED 17-MODEL MATRIX PASS, names the reviewed artefact, and states the per-class add/view/change/delete decision for EVERY one of the 17 models - an expansion shipped without that pass is a defect"
+  - "the seven deliberately read-only classes are reconciled against the RULING's intent, not against today's behaviour, and the reasoning is recorded"
+  - "the contract implements the 2026-10-03 ruling: a plain is_staff moderator may write to the moderation queue, the moderation criteria, the audit log and the support desk"
   - "media_gate answers identically to staff_required for a superuser who is not staff, asserted through both entry points"
   - "the admin site's permission answer and User.role agree, exactly as the written GATE Q3' answer specifies, and the test names the chosen option"
   - "the decision record states the contract per model, names 04-AUT-005 as a hard prerequisite, and states that AUTHZ-003 is not closed without it"
@@ -2258,12 +2335,12 @@ contradicts a shipped test.
 
 | | |
 |---|---|
-| **Findings owned** | `AUTHZ-004` (MEDIUM, band per GATE Q7) · records `VAL-001`'s amendment request |
+| **Findings owned** | `AUTHZ-004` (MEDIUM, band per GATE Q7) · records `VAL-001`'s amendment request · **`Q8` RESOLVED 2026-10-03** |
 | **Class** | **behavioural** — route and method change on a route every anonymous redirect targets |
 | **Depends on** | nothing in-plan. **Externally:** `apps/users/views/consent.py` and `apps/users/urls.py` are phase 04 BLOCKs 3/4/6's files — one file, sequential passes; phase 04 §5.2 item 2 names the route/method as **phase 15's** to change, having ruled that phase 04 may not |
 | **Blocks** | BLOCK 12 (`VAL-001`'s central request is recorded with its evidence) |
-| **Priority** | **P1.** Two gates, one of which is an **owner/product** decision about deep-link UX |
-| **Risk level** | **MEDIUM** — the amplification is bounded at two layers, but the change is **user-visible** and touches a route whose URL appears in `LOGIN_URL` |
+| **Priority** | **P1.** **`Q8` was answered 2026-10-03, so only `Q7` (the band) remains — and it is non-blocking for the code** |
+| **Risk level** | **MEDIUM** — the amplification is bounded at two layers, but the change is **user-visible** and touches a route whose URL appears in `LOGIN_URL`. **Lowered from "MEDIUM, with an undecided UX" on 2026-10-03**: the deep-link UX is now decided, so the top support ticket risk is bounded by a rendered page rather than a 405 |
 | **Blast radius** | **4 test files / 10 call sites** (C-1) · `apps/users/views/consent.py::login_issue` · `apps/users/urls.py` · `users/login_issue.html` |
 | **Required agents** | **Auditor · Researcher · Planner · Validator** — all four |
 
@@ -2286,25 +2363,38 @@ a state-changing `GET`. **The recommended amendment, recorded for that ruling an
 *"state-changing request (any method) that mutates state without a CSRF token, where the mutation
 affects an authenticated identity or a protected resource."*
 
-**GATE Q8 — the deep-link UX.** `LOGIN_URL = "/login/issue/"`, so this route is also the
-`@login_required` redirect target. A `GET` deep link from a bookmark, a messenger preview or a
-headless client must degrade gracefully once the route is POST-only. **Phase 04's plan names this as
-the reason phase 04 may not add `@require_POST`; phase 15 may, but only with the UX decided.**
+**GATE Q8 — ✅ RESOLVED 2026-10-03 (Product Owner): a `GET` renders a page; the action executes only
+on `POST`.**
+
+> Bookmarks, messenger previews and headless clients **degrade gracefully and cannot act by
+> prefetch**. **This supersedes phase 04's stated reason for not adding `@require_POST`, and the
+> POST-only conversion is unblocked.**
+>
+> **For `/login/issue/` this selects option (b):** the `GET` renders the landing page **without
+> issuing a token**, and the `POST` issues it. Rationale for the mapping, so no implementor
+> re-derives it: the ruling's stated shape is *"a `GET` renders a confirmation page (200), the
+> `POST` performs the action"*, and **(b) is the only option in the table below whose `GET` is a
+> rendered page rather than an error status.**
+>
+> **Option (a) is declined** — its 405 landing is precisely the dead end this ruling forbids.
+> **Option (c) is declined** — it does not fix the finding.
+
+The options table below is **retained as the record of what was chosen against.**
 
 | Option | Shape | User experience | Project convention | Consequence if wrong |
 |---|---|---|---|---|
-| (a) | `@require_POST` + CSRF, with the **landing page rendering a form** that posts to the same URL; a `GET` returns 405 with a translated, actionable page | A bookmarked or messaged deep link shows a button the user presses once | ✔ one route, one template, one new form | The extra hop is real. **The mitigation is that the 405 page is not a dead end** — it must render the form, not an error |
-| (b) | Split: `GET /login/issue/` renders the landing page **without issuing a token**; `POST /login/issue/` issues it | The deep link still lands on a page, and the token is only minted on intent | ✔ cleanest separation; the deep-link UX is **unchanged** | **Two behaviours on one URL**, and `LOGIN_URL` still points at the `GET`. The landing template currently receives the **raw token**, so it must stop — which means the page can no longer render a Telegram deep link on first load without a press |
-| (c) | Keep `GET` and add `@csrf_protect` | Nothing changes for the user | ✔ smallest diff | **A `GET` with a CSRF token still writes, and no deep link carries one.** It does not fix the finding |
+| (b) — **CHOSEN, 2026-10-03** | `GET /login/issue/` renders the landing page **without issuing a token**; `POST /login/issue/` issues it | The deep link still lands on a page, and the token is only minted on intent | ✔ cleanest separation; the deep-link UX is **unchanged** | **Two behaviours on one URL**, and `LOGIN_URL` still points at the `GET`. The landing template currently receives the **raw token**, so it must stop — which means the page can no longer render a Telegram deep link on first load without a press |
+| (a) — **declined** | `@require_POST` + CSRF, with the landing page rendering a form that posts to the same URL; a `GET` returns 405 with a translated, actionable page | A bookmarked or messaged deep link shows a button the user presses once | ✔ one route, one template, one new form | **Declined: the 405 landing is the dead end the ruling forbids** |
+| (c) — **declined** | Keep `GET` and add `@csrf_protect` | Nothing changes for the user | ✔ smallest diff | **Declined: a `GET` with a CSRF token still writes, and no deep link carries one. It does not fix the finding** |
 
-**Options (a) and (b) both fail closed** — no token without a protected `POST`. **The Implementor may
-not choose.**
+**Option (b) fails closed** — no token without a protected `POST`. **The Implementor may not
+choose.**
 
 **Binding constraints**
 
-1. **No token is issued on `GET`, by any route, ever.** If option (b) is chosen, the `GET` renders a
-   landing page with **no `raw_token` in its context**. The `csrf` cookie, the `next` parameter and
-   the `lang` parameter all survive.
+1. **No token is issued on `GET`, by any route, ever.** **Option (b) was chosen on 2026-10-03**,
+   so the `GET` renders a landing page with **no `raw_token` in its context**. The `csrf` cookie, the
+   `next` parameter and the `lang` parameter all survive.
 2. **Both rate limits still apply on the `POST`**, and the `429` behaviour is unchanged. The
    in-app `check_deep_link_render_rate_limit` and `login_rate_limit_check` are not weakened, and
    nginx's `limit_req` is not touched.
@@ -2320,8 +2410,8 @@ not choose.**
 5. **The `apps/core` template test's three assertions must survive** the new form: `{% telegram_deep_link %}`
    present, no cleartext bot username, deep-link button not hidden on load. **If the new POST form
    means the deep link is only reachable after a press, the correct response is to change the
-   template's design under GATE Q8's answer — not to weaken the assertion.** A change there is a
-   **contract change**, so name it in the commit body.
+   template's design under the 2026-10-03 ruling's answer — not to weaken the assertion.** A change
+   there is a **contract change**, so name it in the commit body.
 6. **Every assertion of the form `assert response.url.startswith("/login/issue/")` is about the
    redirect target, not the method, and survives.** Those are in `test_cabinet_sections.py` (4 sites),
    `test_logout.py`, `test_consent.py` and `test_saved_search_create.py::test_requires_login` — they
@@ -2363,12 +2453,18 @@ goals:
   - "the bot's /start login_<token> handshake is unchanged"
   - "all four affected test files and all ten call sites are updated or confirmed green, and every login_required redirect assertion still holds"
 extra_context: |
-  GATES THAT MUST BE ANSWERED IN WRITING BEFORE IMPLEMENTATION: Q8 (the deep-link UX - owner and
-  product) and Q7 (VAL-001's CSRF band - the audit programme, non-blocking for the code, blocking for
-  the tracker). The Implementor is forbidden from choosing an option.
+  Q8 IS RESOLVED - 2026-10-03, Product Owner. A GET ON A STATE-CHANGING ROUTE RENDERS A PAGE; THE
+  ACTION EXECUTES ONLY ON POST. Bookmarks, messenger previews and headless clients degrade
+  gracefully and CANNOT ACT BY PREFETCH. This SUPERSEDES PHASE 04's stated reason for not adding
+  @require_POST, and the POST-ONLY CONVERSION IS UNBLOCKED. For /login/issue/ this selects OPTION
+  (B): the GET renders the landing page WITHOUT issuing a token; the POST issues it. Option (a) is
+  declined - its 405 landing is the dead end the ruling forbids. Option (c) is declined - it does
+  not fix the finding. The Implementor may not choose and must not re-open Q8.
+  STILL GATED: Q7 (VAL-001's CSRF band - the audit programme, non-blocking for the code, blocking
+  for the tracker). The Implementor is forbidden from choosing an option on Q7.
   BINDING CONSTRAINTS
-  1. No token is issued on GET, by any route, ever. If the gate answer renders a landing page on
-     GET, that page carries no raw_token in its context. The csrf cookie, the next parameter and the
+  1. No token is issued on GET, by any route, ever. The GET RENDERS THE LANDING PAGE and that
+     page carries no raw_token in its context. The csrf cookie, the next parameter and the
      lang parameter all survive.
   2. Both rate limits still apply on the POST and the 429 behaviour is unchanged. check_deep_link_render_rate_limit
      and login_rate_limit_check are not weakened, and nginx's limit_req is not touched.
@@ -2403,13 +2499,13 @@ files:
       - type: function
         name: login_issue
     changes:
-      - "Token issuance moves behind a CSRF-protected POST, per the GATE Q8 answer. @never_cache stays."
+      - "Token issuance moves behind a CSRF-protected POST, per the 2026-10-03 Q8 ruling (option (b)). @never_cache stays."
   - path: src/backend/apps/users/urls.py
     targets:
       - type: url_pattern
         name: login_issue
     changes:
-      - "Only if the GATE Q8 answer requires a second pattern. LOGIN_URL is not changed."
+      - "Only if the 2026-10-03 Q8 ruling's answer requires a second pattern. LOGIN_URL is not changed."
   - path: src/backend/templates/users/login_issue.html
     targets:
       - type: template
@@ -2427,7 +2523,7 @@ files:
       - type: method
         name: test_login_issue_renders_header
     changes:
-      - "Follow the GATE Q8 answer; the header assertion is unchanged."
+      - "Follow the 2026-10-03 Q8 ruling; the header assertion is unchanged."
   - path: src/backend/apps/core/tests/test_contact_rate_limit.py
     targets:
       - type: method
@@ -2470,16 +2566,16 @@ tests_to_run:
 
 ---
 
-### BLOCK 11 — The moderation surface phase 10 routed here (`Q11`, `Q12`)
+### BLOCK 11 — The moderation surface phase 10 routed here (`Q11`, `Q12`) — **UNCONDITIONAL as of 2026-10-03**
 
 | | |
 |---|---|
-| **Findings owned** | **No `AUTHZ-` finding.** Two questions **routed by phase 10** to phase 15 |
-| **Class** | **conditional** — ships nothing if its gates are declined or unanswered |
+| **Findings owned** | **No `AUTHZ-` finding.** Two questions **routed by phase 10** to phase 15 — **both now answered** |
+| **Class** | **behavioural** (was `conditional`) — **both gates were RESOLVED on 2026-10-03, so the block is UNCONDITIONAL and ships. There is no decline branch** |
 | **Depends on** | BLOCK 3 (soft — it is the same consistency question, one file over). **Externally:** phase 10's routing; `apps/moderation/views/api_bulk.py` is read-only |
 | **Blocks** | nothing |
-| **Priority** | **P2.** These are live questions, already routed, and not in the validated report — which is exactly why they are easy to lose |
-| **Risk level** | **MEDIUM** — a 302→405 change is **user-visible** and breaks recorded behaviour |
+| **Priority** | **P2.** These were live questions, already routed, and not in the validated report — which is exactly why they are easy to lose |
+| **Risk level** | **MEDIUM** — the response-shape change is **user-visible** and breaks recorded behaviour. **Characterised rather than pending since 2026-10-03**: a `GET` now returns a 200 confirmation page and the two shipped 302 assertions change in the same commit |
 | **Blast radius** | `apps/moderation/views/review.py` (`reject_ad`, `ban_user`) |
 | **Required agents** | **Auditor · Planner · Validator** |
 
@@ -2487,49 +2583,81 @@ tests_to_run:
 to phase 15: **Q2** (what an invalid `reason_category` does in `reject_ad`) and **Q4** (whether a
 `GET` on `reject_ad` / `ban_user` is a 302 or a 405). **Neither is in the validated report**, and
 both are live in the tree. **This block records that phase 15 holds them, and it is the last place
-they can be recorded before they are lost.**
+they can be recorded before they are lost.** **As of 2026-10-03 both are recorded as answered, so
+this block ships its full deliverable.**
 
-**Q12 — the method check.** `reject_ad` and `ban_user` both use an **inline**
+**`Q12` — ✅ RESOLVED 2026-10-03 (Product Owner): a `GET` returns a CONFIRMATION PAGE (200); the
+`POST` performs the action.** `reject_ad` and `ban_user` both use an **inline**
 `if request.method != "POST": return redirect(...)`, which returns **302**. Their sibling
 `approve_ad` already uses `@require_POST` and returns **405**. **Two shipped tests assert the 302.**
 
+> **The ruling: a `GET` on a state-changing moderation route RENDERS A CONFIRMATION PAGE; the
+> action executes only on `POST`.** Bookmarks, messenger previews and headless clients **degrade
+> gracefully and cannot act by prefetch**. **This supersedes phase 04's stated reason for not
+> adding `@require_POST`, and the POST-only conversion is unblocked.**
+>
+> **Consequences:**
+> 1. **Neither a 302 nor a bare 405.** A 405 was the pre-ruling alternative and is declined; the
+>    response is a **200** page the moderator can read and act on deliberately.
+> 2. **The two shipped tests asserting 302 change in the same commit, with the justification
+>    recorded** (project rule 2, cited by name). **The structural lock assertions are never
+>    weakened.**
+> 3. **BLOCK 11 is unconditional.** The old rule — "if either gate is declined or unanswered, this
+>    block ships nothing" — no longer has a branch to take.
+> 4. **A new user-visible confirmation page (and its strings) is required**, so `ru` and `bs`
+>    `msgstr` must both be non-empty and `test_i18n_completeness.py` green.
+
+The options table below is **retained as the record of what was chosen against.**
+
 | Option | Shape | Maintains | Project convention | Consequence if wrong |
 |---|---|---|---|---|
-| (a) | Replace both inline checks with `@require_POST` | All three moderation actions answer 405 for a non-POST | ✔ matches `approve_ad`, `ad_archive`, `ad_reactivate`, `ad_delete` | **A 302 becomes a 405 — user-visible, and it breaks two shipped tests** whose assertions change under project rule 2. A bookmarked or crawled `GET` on a moderation action goes from "quietly redirects" to "405" |
-| (b) | Keep 302 and make `approve_ad` match | 302 everywhere | ✘ the codebase's dominant order is `@require_POST` first, and a 302 on a non-POST action is a **CSRF-adjacent smell**: a browser can be navigated to a mutating URL | **Reversing a sibling that already does the right thing, in a file phase 10 also touches** |
-| (c) | Leave both | Nothing | — | **The inconsistency is permanent and undocumented.** Two shipped tests keep pinning a 302, and the next auditor re-discovers it |
+| **Confirmation page — CHOSEN, 2026-10-03** | Replace both inline checks with a confirmation-page render on `GET`; the action executes only on `POST` | All three moderation actions now require deliberate intent, and a deep link is informative rather than dead | ✔ the POST-only discipline of `approve_ad`, `ad_archive`, `ad_reactivate`, `ad_delete` — extended with a usable landing rather than an error status | **The two shipped 302 assertions change in the same commit under project rule 2.** A new user-visible confirmation page is required, with non-empty `ru` and `bs` |
+| (a) | Replace both inline checks with `@require_POST` (405) | All three moderation actions answer 405 for a non-POST | ✔ matches `approve_ad` and friends | **Declined on 2026-10-03** — a 405 is the dead end the ruling forbids |
+| (b) | Keep 302 and make `approve_ad` match | 302 everywhere | ✘ the codebase's dominant order is `@require_POST` first, and a 302 on a non-POST action is a **CSRF-adjacent smell** | **Declined** — reversing a sibling that already does the right thing, in a file phase 10 also touches |
+| (c) | Leave both | Nothing | — | **Declined** — the inconsistency is permanent and two shipped tests keep pinning a 302 |
 
-**Q11 — the `reason_category` validation.** Today **any** client string is concatenated into
-`ModeratorActionLog.reason`.
+**`Q11` — ✅ RESOLVED 2026-10-03 (Product Owner): an invalid `reason_category` RE-RENDERS the review
+page with an error and PRESERVES the moderator's input.** Today **any** client string is concatenated
+into `ModeratorActionLog.reason`.
+
+> **The ruling, and what it forbids:** **nothing is coerced to empty**, and **no arbitrary client
+> string reaches `ModeratorActionLog.reason`.** The response is a **re-render of the review page
+> carrying the moderator's input**, not a 400 and not a silent drop. Option (a)'s closed `StrEnum`
+> vocabulary is the mechanism; option (b)'s normalise-and-split is **declined** because it overlaps
+> phase 06 BLOCK 16's redaction work.
+>
+> **A new user-visible error string is required**, so `ru` and `bs` `msgstr` must both be non-empty.
 
 | Option | Shape | Maintains | Project convention | Consequence if wrong |
 |---|---|---|---|---|
-| (a) | Validate `reason_category` against a closed vocabulary and reject the request on an unknown value | The audit log stops accepting arbitrary client text | ✔ fixed values via `StrEnum` (project rule 10) | **An existing caller sending a free-text reason starts failing.** The 302-on-GET behaviour and the moderation review flow must be checked for a client that sends a free-text reason |
-| (b) | Validate and **normalise** to a known value, keeping the free text in a separate, redacted field | No caller breaks | ⚠ phase 06 BLOCK 16 owns `reason` **redaction** in `admin_actions.py` — a two-field split touches that | **Overlaps phase 06's redaction work.** Listed so the collision is visible, not to create it |
-| (c) | Leave it | Nothing | ✘ | **An audit record accepts arbitrary client-controlled text**, which is the class of defect phase 06's redaction work exists to close |
+| **(a) + re-render — CHOSEN, 2026-10-03** | Validate `reason_category` against a closed `StrEnum` vocabulary; an unknown value **re-renders the review page with an error and the moderator's input preserved** | The audit log stops accepting arbitrary client text, and the moderator does not lose their work | ✔ fixed values via `StrEnum` (project rule 10) | **A new user-visible error string is required (non-empty `ru` and `bs`).** Any caller sending a free-text reason starts re-rendering instead of acting |
+| (b) — **declined** | Validate and **normalise** to a known value, keeping the free text in a separate, redacted field | No caller breaks | ⚠ phase 06 BLOCK 16 owns `reason` **redaction** in `admin_actions.py` | **Declined** — it overlaps phase 06's redaction work |
+| (c) — **declined** | Leave it | Nothing | ✘ | **Declined** — an audit record would keep accepting arbitrary client-controlled text |
 
 **Binding constraints**
 
-1. **Both gates must be answered in writing, and a decline is a valid answer.** **If either is
-   declined or unanswered, this block ships nothing and that is recorded, not worked around.**
+1. **Both gates were answered on 2026-10-03 and the block SHIPS.** There is no longer a
+   decline branch: `Q12` → confirmation page, `Q11` → re-render with an error and the moderator's
+   input preserved. **A commit that ships nothing is a defect, not a recorded decline.**
 2. **`apps/moderation/views/api_bulk.py` is read-only.** Phases 09 and 10 both forbid touching it.
 3. **`apps/moderation/admin_actions.py` is not edited** — it is five-way contended and phase 10
    BLOCK 12 **moves** it. A `reason_category` change that would touch `ModeratorActionLog.reason`
    construction in that module **overlaps phase 06 BLOCK 16's redaction** and must be escalated
    rather than implemented here.
-4. **A 302→405 change is user-visible and breaks recorded behaviour.** The two shipped 302
-   assertions change in the same commit under project rule 2, cited by name, **or the change does
-   not ship**. No other option is legitimate.
+4. **The two shipped 302 assertions change in the same commit under project rule 2, cited by name,
+   with the 2026-10-03 ruling recorded as the justification.** **The response becomes a 200
+   confirmation page, not a 405.** **No other option is legitimate.**
 5. **No `is_banned` / `is_declined` / `consent_revoked` semantics change**, and nothing touches the
    account-state declaration. This block is about a **method check** and an **input vocabulary**.
-6. **No new user-visible string without `ru` and `bs` translations.** A rejected `reason_category`
-   returning a 400 is a new user-visible response.
+6. **No new user-visible string without `ru` and `bs` translations** — and this block adds two:
+   the confirmation page's strings and the invalid-`reason_category` error. The rejection path
+   **re-renders**, so `test_i18n_completeness.py` must be green.
 
 **Implementor task**
 
 ```yaml
 id: task_15_b11_moderation_surface_questions
-title: "Answer and apply phase 10's two routed moderation-surface questions, or ship nothing (Q11 + Q12, routed by phase 10)"
+title: "Apply phase 10's two routed moderation-surface decisions as ruled on 2026-10-03: a 200 confirmation page on GET, and a reason_category re-render preserving the moderator's input (Q11 + Q12)"
 priority: medium
 depends_on: []
 source_reference: ".ai/plans/15-authorization-remediation.md"
@@ -2537,32 +2665,48 @@ source_section: "BLOCK 11 - The moderation surface phase 10 routed here"
 source_blocks: ["BLOCK 11"]
 description: >
   Phase 10 routed two moderation-surface behaviour decisions to phase 15 and neither appears in the
-  validated report. Q12: reject_ad and ban_user use an inline method check returning 302 while their
-  sibling approve_ad already uses @require_POST and returns 405, and two shipped tests assert the
-  302. Q11: any client string is concatenated into ModeratorActionLog.reason, so an audit record
-  accepts arbitrary client-controlled text. Both gates must be answered in writing; a decline is a
-  valid answer and this block then ships nothing.
+  validated report. Both were answered by the Product Owner on 2026-10-03, so this block is
+  UNCONDITIONAL and ships its full deliverable. Q12: reject_ad and ban_user use an inline method
+  check returning 302 while their sibling approve_ad already uses @require_POST and returns 405, and
+  two shipped tests assert the 302 - a GET now renders a 200 CONFIRMATION PAGE and only a POST
+  performs the action, and those two assertions change in the same commit. Q11: any client string is
+  concatenated into ModeratorActionLog.reason, so an invalid reason_category now RE-RENDERS the
+  review page with an error and preserves the moderator's input, with nothing coerced to empty and
+  no arbitrary client string reaching the audit log.
 goals:
-  - "both gate answers are written down before any code changes"
-  - "if Q12 is approved, all three moderation actions answer 405 for a non-POST and the two shipped 302 assertions change in the same commit under project rule 2"
-  - "if Q11 is approved, reason_category is validated against a closed vocabulary and an unknown value is refused"
-  - "if either gate is declined or unanswered, nothing is shipped and the decision is recorded"
+  - "both gate answers are recorded as ANSWERED (2026-10-03) before any code changes, and the block ships - a no-code commit is a defect"
+  - "a GET on reject_ad and ban_user renders a 200 confirmation page and performs no action; the POST performs it"
+  - "the two shipped 302 assertions change in the same commit under project rule 2, with the ruling recorded as the justification"
+  - "an invalid reason_category re-renders the review page with an error, preserves the moderator's input, and never reaches ModeratorActionLog.reason"
 extra_context: |
-  GATES THAT MUST BE ANSWERED IN WRITING BEFORE IMPLEMENTATION: Q11 and Q12. A decline is a valid
-  answer; if either is declined or unanswered THIS BLOCK SHIPS NOTHING and that is recorded, not
-  worked around. The Implementor is forbidden from choosing an option.
+  Q11 AND Q12 ARE BOTH RESOLVED - 2026-10-03, Product Owner. THIS BLOCK IS UNCONDITIONAL AND
+  SHIPS; there is no decline branch and a no-code commit is a DEFECT.
+  Q12: A GET ON A STATE-CHANGING MODERATION ROUTE RENDERS A CONFIRMATION PAGE (200); THE POST
+  PERFORMS THE ACTION. Bookmarks, messenger previews and headless clients degrade gracefully and
+  CANNOT ACT BY PREFETCH. This supersedes phase 04's stated reason for not adding @require_POST.
+  THE TWO SHIPPED 302 ASSERTIONS CHANGE IN THE SAME COMMIT, WITH THE RULING RECORDED AS THE
+  JUSTIFICATION (project rule 2 cited by name). Option (a)'s bare 405 and options (b)/(c) are all
+  declined. Do not reverse approve_ad.
+  Q11: AN INVALID reason_category RE-RENDERS THE REVIEW PAGE WITH AN ERROR AND PRESERVES THE
+  MODERATOR'S INPUT. NOTHING IS COERCED TO EMPTY AND NO ARBITRARY CLIENT STRING REACHES
+  ModeratorActionLog.reason. The rejection path re-renders - it is not a 400 and not a silent
+  drop. Option (b) (normalise plus a second redacted field) is declined because it overlaps phase
+  06 BLOCK 16's redaction work.
+  The Implementor is forbidden from choosing an option or from re-opening either gate.
   BINDING CONSTRAINTS
-  1. Both gate answers are recorded before any code change.
+  1. Both gate answers are recorded before any code change, and both are recorded as ANSWERED.
   2. apps/moderation/views/api_bulk.py is READ-ONLY. Phases 09 and 10 both forbid touching it.
   3. apps/moderation/admin_actions.py is NOT edited. It is five-way contended and phase 10 BLOCK 12
      MOVES it. Any reason_category change that would touch ModeratorActionLog.reason construction
      there overlaps phase 06 BLOCK 16's redaction - ESCALATE rather than implement.
-  4. A 302-to-405 change is USER-VISIBLE and breaks recorded behaviour. The two shipped 302
-     assertions change in the SAME commit under project rule 2, cited by name, or the change does
-     not ship. No other option is legitimate.
+  4. THE TWO SHIPPED 302 ASSERTIONS CHANGE IN THE SAME COMMIT under project rule 2, cited by name,
+     with the 2026-10-03 ruling as the recorded justification. The response is a 200 CONFIRMATION
+     PAGE, not a 405.
   5. No account-state semantics change. Nothing touches the account-state declaration or the gate.
      This block is about a METHOD CHECK and an INPUT VOCABULARY.
-  6. No new user-visible string without non-empty ru and bs msgstr.
+  6. TWO new user-visible strings (the confirmation page and the invalid-reason_category error)
+     both need non-empty ru and bs msgstr; the rejection path re-renders, so
+     test_i18n_completeness must be green.
   7. Do not reverse approve_ad to 302. The codebase's dominant order is @require_POST first, and a
      302 on a non-POST mutating action is a CSRF-adjacent smell. Option (b) is listed so the choice
      is on the record, not because it is a candidate.
@@ -2575,27 +2719,33 @@ files:
       - type: function
         name: ban_user
     changes:
-      - "Only per the written GATE Q12 answer. Nothing changes if the gate is declined."
+      - "Per the 2026-10-03 Q12 ruling: a GET renders the 200 confirmation page and performs no action; only the POST performs it."
   - path: src/backend/apps/moderation/tests/test_moderation_views.py
     targets:
       - type: class
         name: TestModerationReviewLocking
     changes:
-      - "The two shipped 302 assertions change in the same commit under project rule 2, if and only if Q12 is approved. The structural lock assertions are never weakened."
+      - "The two shipped 302 assertions change in the same commit under project rule 2, with the 2026-10-03 Q12 ruling recorded as the justification. The structural lock assertions are never weakened."
 changes:
   - action: modify_code
     description: >
-      Apply the GATE Q12 and GATE Q11 answers, or change nothing.
+      Apply the 2026-10-03 Q12 ruling: a GET on reject_ad and ban_user renders a 200 confirmation
+      page and performs no action; only the POST performs it.
   - action: modify_code
     description: >
-      Update the two shipped 302 assertions in the same commit, citing project rule 2 by name, if and
-      only if Q12 is approved.
+      Apply the 2026-10-03 Q11 ruling: reason_category is validated against a closed StrEnum
+      vocabulary and an unknown value re-renders the review page with an error, preserving the
+      moderator's input. Nothing is coerced to empty.
+  - action: modify_code
+    description: >
+      Update the two shipped 302 assertions in the same commit, citing project rule 2 by name, with
+      the 2026-10-03 Q12 ruling recorded as the justification.
 acceptance_criteria:
-  - "both gate answers are recorded in the commit body before any code change"
-  - "if Q12 is approved: all three moderation actions answer 405 for a non-POST, and the two shipped 302 assertions changed in the same commit with project rule 2 cited by name"
-  - "if Q12 is declined: review.py is byte-identical and the decision is recorded"
-  - "if Q11 is approved: reason_category is validated against a closed vocabulary and an unknown value is refused with a translated message"
-  - "if Q11 is declined: the free-text behaviour is unchanged and the decision is recorded"
+  - "both gate answers are recorded in the commit body as ANSWERED on 2026-10-03, before any code change"
+  - "Q12: a GET on reject_ad and ban_user renders a 200 confirmation page and performs no action; the POST performs it; the two shipped 302 assertions changed in the same commit with project rule 2 cited by name and the ruling recorded as the justification"
+  - "Q11: reason_category is validated against a closed StrEnum vocabulary; an unknown value re-renders the review page with an error and the moderator's input is preserved; nothing is coerced to empty and no arbitrary client string reaches ModeratorActionLog.reason"
+  - "ru and bs msgstr are non-empty for the confirmation page strings and the invalid-reason_category error; test_i18n_completeness is green"
+  - "the block shipped code - a no-code commit is a defect, not a recorded decline"
   - "apps/moderation/views/api_bulk.py and apps/moderation/admin_actions.py are byte-identical"
   - "TestModerationReviewLocking's structural assertions are green and unmodified"
   - "the fast Docker gate is green"
@@ -2646,7 +2796,8 @@ tests_to_run:
    remains open — it does not re-argue the findings.
 6. **The plan's own status changes only here.** If every block is green, this block's commit is what
    moves the tracker entries from `planned` to `implemented`, naming any finding that shipped reduced
-   (BLOCK 11's decline, BLOCK 8's metrics limb) **as reduced and open, with its named owner.**
+   (**BLOCK 8's metrics limb only** — BLOCK 11 no longer has a decline branch, since both its gates
+   were answered on 2026-10-03) **as reduced and open, with its named owner.**
 
 **Implementor task**
 
@@ -2685,9 +2836,9 @@ extra_context: |
      number is carried over from the validated report.
   5. The record states what was decided, by whom, against which gate, and what remains open. It does
      not re-argue the findings.
-  6. The tracker record names every finding that shipped reduced - BLOCK 11's declined gates, BLOCK
-     8's metrics limb - as reduced AND OPEN, with its named owner. Do not mark a finding closed
-     because a gate was declined.
+6. The tracker record names every finding that shipped reduced - BLOCK 8's metrics limb is the
+      only one left, since BLOCK 11's gates were ANSWERED on 2026-10-03 and it ships - as reduced
+      AND OPEN, with its named owner. Do not mark a finding closed because a gate was declined.
   7. The spec-collision request must name the exact sentence, name BLOCK 6 and the gate, and state
      that the sentence is now false for four account states and not one.
   8. If the agent-facing architecture documentation does not currently describe the middleware stack
@@ -2745,14 +2896,15 @@ trusted?**
 | 4 | `submit_ad`'s actor guard | `AUTHZ-002` | B | **2** | — (R7) | **MED** |
 | 5 | One account-state declaration, two levels | `AUTHZ-001a`, `AUTHZ-005a` | **S** | — | R1 (Q2, ruled) · R8 | **MED–HIGH** |
 | 6 | The per-request web gate | `AUTHZ-001b` | **S** | **5** | **Q15, Q1** + Q13 route | **HIGH** |
-| 7 | The publish DENY set | `AUTHZ-005b` | B | **6** | **Q4, Q5** (both phase 06) | **MED** |
-| 8 | Reason-coded denials | `AUTHZ-009` | B | 6 (soft) | U14 + phase 12 Q5 | LOW–MED |
-| 9 | One role resolver + moderator contract | `AUTHZ-003`, `VAL-002` | **S** | — | **Q3, Q3′, Q9** + phase 04 BLOCK 1 | **HIGH** |
-| 10 | `/login/issue/` requires POST | `AUTHZ-004` | B | — | **Q8** + **Q7** | MED |
-| 11 | Moderation-surface questions | `Q11`, `Q12` | **C** | 3 (soft) | **Q11, Q12** | MED |
+| 7 | The publish DENY set | `AUTHZ-005b` | B | **6** | ~~**Q4, Q5** (both phase 06)~~ → **RESOLVED 2026-10-03; the external wait is over** | **MED** (the missing term is now the whole control) |
+| 8 | Reason-coded denials | `AUTHZ-009` | B | 6 (soft) | U14 + phase 12 `Q5` (**ANSWERED 2026-10-03 — reduced deliverable; the counter is the only outstanding limb**) | LOW–MED |
+| 9 | One role resolver + moderator contract | `AUTHZ-003`, `VAL-002` | **S** | — | **`Q3` RESOLVED 2026-10-03** (privilege expansion + named 17-model-matrix pre-block step) · `Q3′`, `Q9` + phase 04 BLOCK 1 | **HIGH** |
+| 10 | `/login/issue/` requires POST | `AUTHZ-004` | B | — | **`Q8` RESOLVED 2026-10-03** (option (b)) · `Q7` | MED |
+| 11 | Moderation-surface questions | `Q11`, `Q12` | **B** (was **C**) | 3 (soft) | **`Q11`, `Q12` RESOLVED 2026-10-03 — the block is UNCONDITIONAL** | MED |
 | 12 | Documentation parity + tracker | `VAL-001`, `VAL-003`, `VAL-004` | **S** | **all** | — | **LOW** |
 
-`M` = mechanical · `B` = behavioural · `S` = structural · `C` = conditional.
+`M` = mechanical · `B` = behavioural · `S` = structural · `C` = conditional (**no block is `C`
+any longer — BLOCK 11 became unconditional on 2026-10-03**).
 
 ### 4.2 The DAG and why each edge exists
 
@@ -2767,11 +2919,11 @@ trusted?**
   (none) --> [5 account-state declaration] <----(no edge)--+
                   |  \
                   |   \  HARD EDGE
-  (none) --> [9 ADMIN role + moderator contract]  \--> [6 the web gate] --Q15,Q1--> [7 publish DENY set] --Q4,Q5-->
+  (none) --> [9 ADMIN role + moderator contract]  \--> [6 the web gate] --Q15,Q1--> [7 publish DENY set] (no external wait)
                   |                                                            |                              |
   (none) --> [10 login_issue POST-only]                                        +------> [8 denial reason codes]   |
                                                                                  |                              |
-  (none) --> [11 moderation surface] --Q11,Q12-------------------------[everything]--------------------------v
+  (none) --> [11 moderation surface] UNCONDITIONAL---------[everything]--------------------------v
                                                                                                        [12 documentation parity]
 ```
 
@@ -2781,7 +2933,7 @@ trusted?**
 |---|---|---|
 | **2 → 4** | **hard, dependency** | ✔ The two findings are **distinct root causes** and must stay distinct IDs, but they compose. `AUTHZ-002`'s guard becomes meaningful only once the caller passes the *actor*; and BLOCK 4's regression test asserts "a non-owner POST is refused **before** `submit_ad` is reached", which is a statement about BLOCK 2's locked-instance check. Running 4 first means its test is written against a snapshot the view has not yet corrected |
 | **5 → 6** | **hard, dependency** | ✔ The gate consumes the declaration. It cannot be written, reviewed or tested before it exists. **This is the edge that replaces the report's single-commit recommendation, and it does not weaken it** — see below |
-| **6 → 7** | **hard, ordering** | ✔ The publish policy must not move underneath a gate whose own deny behaviour is unpinned. BLOCK 6's acceptance is a per-flag matrix; BLOCK 7 changes a *policy* that the same matrix touches. Changing the bot's publish answer before the web's account-state answer is settled means the first observable symptom of a mistake is a **bot** symptom, which is the harder one to diagnose from a moderator's report |
+| **6 → 7** | **hard, ordering** | ✔ The publish policy must not move underneath a gate whose own deny behaviour is unpinned. BLOCK 6's acceptance is a per-flag matrix; BLOCK 7 changes a *policy* that the same matrix touches. Changing the bot's publish answer before the web's account-state answer is settled means the first observable symptom of a mistake is a **bot** symptom, which is the harder one to diagnose from a moderator's report. **This edge is the ONLY hard ordering BLOCK 7 has** — its two external gates (`Q4`, `Q5`) were both answered on 2026-10-03, so the edge `7 → (phase 06)` that this DAG used to draw is **REMOVED** |
 | **6 → 8** | soft, ordering | ✔ BLOCK 6's gate must be instrumented **on day one** using BLOCK 8's vocabulary, so BLOCK 6 creates the reason enum and BLOCK 8 formalises the shared helper and the ad views. **Soft** — BLOCK 8 is correct in any position after BLOCK 6; it is placed here so the vocabulary is fresh and the ad views have just been edited by BLOCKs 2 and 4 |
 | **everything → 12** | **hard, dependency** | ✔ The same rule phase 12 and phase 13 both applied: **the truth sweep lands after every code change it documents.** `technical-specification.md`'s "no web-side middleware redirects soft-deleted users" must be re-described by whoever **owns** the file — phase 06 — and that request is only accurate once BLOCK 6 has landed and its answer is known. **There is no soft variant of this edge** |
 | **3 → 11** | soft, ordering | ✔ Same consistency question, one file over. BLOCK 3 fixes a decorator's ordering; BLOCK 11 asks whether two sibling views' inline method checks should match `approve_ad`. **Soft** — BLOCK 11 is correct in any position; it is placed here so both moderation-method decisions are taken by one Implementor with one fresh reading of `review.py` |
@@ -2825,9 +2977,14 @@ never separated by another phase's commit; that is handled by §5.3's reservatio
    guard has nothing to fix on the web path — it becomes a permanent tautology that looks correct
    and is protected by a green test. **If phase 10 BLOCK 16 has already landed, BLOCK 4 stops and
    escalates to the coordinator; it does not proceed.**
-4. **BLOCK 7 before Q4 and Q5 are answered.** If `PII-105` option (a) landed, the publish gate is the
-   **only** control keeping a declined seller from posting. Shipping a widened DENY set without the
-   ruling, or shipping it *because* of the ruling without recording the ruling, are both wrong.
+4. **~~BLOCK 7 before Q4 and Q5 are answered.~~ — CLOSED 2026-10-03.** Both gates were answered by
+   the Product Owner: **DECLINE is reversible (`PII-105` option (a))**, and the product rule governs
+   rather than either spec line. **The publish gate is now provably the ONLY control keeping a
+   declined seller from posting**, so the widened DENY set is not merely correct — it is the whole
+   control. **BLOCK 7 STARTS.** The remaining hazard is inverted and is stated in BLOCK 7's
+   constraint 2 and its acceptance criteria: shipping the widened set *without* recording the
+   ruling's consequence in the commit body leaves the reader unable to tell why the gate carries
+   `is_declined`. **The row is retained, not deleted, so the closure is visible.**
 5. **BLOCK 9 without `04-AUT-005` landed.** The finding must cite it as a hard prerequisite and
    **must not be closed without it**. A moderator who can self-provision is the live risk, and it is
    phase 04's to fix.
@@ -2840,7 +2997,7 @@ never separated by another phase's commit; that is handled by §5.3's reservatio
 9. **BLOCK 10 budgeting only the two `test_login_issue_template.py` files** (C-1). One does not
    exist; the real blast radius is **4 files / 10 call sites**. The block will go red.
 10. **Any block writing `is_banned`, `is_declined` or `consent_revoked` into a listing queryset.**
-    That is `SRCH-004` / `SRCH-008`, phase 08's and phase 06's, and Q6's unresolved product question.
+    That is `SRCH-004` / `SRCH-008` — **and `Q6` was ANSWERED on 2026-10-03: a ban hides inventory.**
 11. **Any block restoring `.ai/audit/15-authorization/findings.md`** or editing anything under
     `.ai/audit/`. It is deleted; the validated report is the record.
 12. **Any block allocating an `AdvisoryLockId`.** ✔ Phase 15 allocates **none**. R3's `StrEnum` is
@@ -2880,13 +3037,13 @@ verified in the tree at `ba23277`.
 | **03** | `DB-004` (`statement_timeout` / `lock_timeout`) · `DB-008` (transaction restructuring) · `03-DB-010` (lock behaviour in `admin_actions`) · BLOCK 5 (an `edit.py` pass) · BLOCK 9 (settings) | ✔ **Phase 15 adds no lock and no timeout.** **`03-DB-010` is why `bulk_ban_users` must not be given a lock:** `test_bulk_ban_users_not_locked` asserts `select_for_update` is **not** issued there. Adding locks to close an authorization finding is the signal that the service layer is the wrong place — which is BLOCK 6's whole argument. **Phase 03 BLOCK 5 is an external gate on BLOCK 2** |
 | **04** | `04-AUT-002` session-layer half (**BLOCK 6**: the `logout()` calls) · `04-AUT-005` + `PII-103` (`UserAdmin`'s field contract, **BLOCK 1**) · BLOCKs 2/3/7/8/9 (`consent.py`, `urls.py`, `base.py`) · `login_token.py` | ✔ **The two most important boundaries in this phase.** `04-VAL-001` reads verbatim: *"Phase 04 retains AUT-002 for the session-layer consequences only… Phase 15 owns the per-request gate. **Both phases must not file the same middleware.**"* And `04-AUT-005`: *"Phase 15 audits the permission predicate only and must cite `04-AUT-005` rather than re-file the field set."* **Phase 15 adds no `logout()` call and no middleware to phase 04's BLOCK 6's list.** Phase 04 §5.2 item 2 names the `/login/issue/` route/method as **phase 15's** to change, having ruled phase 04 may not |
 | **05** | `AD-001` (`AdAdmin`'s field set, **BLOCK 6**) · `AD-008` / `05-VAL-003` (dead `ON_MODERATION` and the dead approval path) · BLOCKs 2/8 (`edit.py`, `listings_query.py`) · `account_state.py` **read-only** | ✔ **Phase 15 owns the `AdAdmin` permission predicate; phase 05 owns the field set** — stated three times in phase 05's §5.1/§5.2/§5.3. **`AD-001` is why BLOCK 2's window is real** and is cited, not fixed. **`AD-008` is a publish *state machine*, orthogonal to a publish *gate**** — AUTHZ-005 correctly does not touch it, and so does this plan. **Phase 05 §5.3 marks `account_state.py` read-only; BLOCK 5 is the one phase-15 block that edits it, and the only one authorised to** |
-| **06** | `06-PII-104` (owns `SRCH-004` / `SRCH-008`) · `PII-105` (DECLINE reversibility) · `PII-113` / `04-VAL-005` (the DECLINE sentence conflict) · `PII-103` (merged into phase 04 BLOCK 1) · BLOCK 6 (account-state **semantics**) · BLOCK 10 (`withdraw_consent_action`) · BLOCK 2 (`spec-index.md:74`) · `technical-specification.md` | ✔ **Three of phase 15's gates are phase 06's** (Q4, Q5, and Q13's doc). ✔ Phase 06 §5.2: *"Phase 06 owns the semantics of the account-state predicate; phase 15 owns the framework that enforces it across both processes"* — R1 is the framework, and phase 15 implements **no** phase-06 semantics. ✔ Phase 06 §5.2 also forbids `AccountStateMiddleware` being touched by anyone but phase 15 |
+| **06** | `06-PII-104` (owns `SRCH-004` / `SRCH-008`) · `PII-105` (DECLINE reversibility) · `PII-113` / `04-VAL-005` (the DECLINE sentence conflict) · `PII-103` (merged into phase 04 BLOCK 1) · BLOCK 6 (account-state **semantics**) · BLOCK 10 (`withdraw_consent_action`) · BLOCK 2 (`spec-index.md:74`) · `technical-specification.md` | ✔ **`Q4` and `Q5` were ANSWERED on 2026-10-03 by the Product Owner, so BLOCK 7 no longer waits on phase 06.** ✔ Phase 06 §5.2: *"Phase 06 owns the semantics of the account-state predicate; phase 15 owns the framework that enforces it across both processes"* — R1 is the framework, and phase 15 implements **no** phase-06 semantics. ✔ Phase 06 §5.2 also forbids `AccountStateMiddleware` being touched by anyone but phase 15 |
 | **07** | `MEDIA-*` (nginx `limit_req`, media templates) · BLOCK 10 (`edit.py`) · BLOCK 11 (`admin_actions.py` comments) | ✔ **Complement, not a claim.** Phase 07's `limit_req` on `location /login/` is one of the two bounds that make `AUTHZ-004`'s MEDIUM band right (U12). **Phase 15 plans no media index and no nginx change** |
-| **08** | `SRCH-001` · `SRCH-004` (the `Ad` ad-visibility predicate, its **semantics**) · `SRCH-007` · BLOCK 1 (`ListingsQueryParams`) · BLOCK 9 (a shared client-IP helper) | ✔ **Phase 15 touches no queryset.** Phase 08 owns the ad-visibility predicate's semantics; phase 15 owns the framework and the terms. **`listings_query.py` is read-only for phase 15** — and its `ad__user__is_declined=False` term is the one that must **not** be folded into BLOCK 6's gate. **Q6 is phase 08's and the product owner's** |
+| **08** | `SRCH-001` · `SRCH-004` (the `Ad` ad-visibility predicate, its **semantics**) · `SRCH-007` · BLOCK 1 (`ListingsQueryParams`) · BLOCK 9 (a shared client-IP helper) | ✔ **Phase 15 touches no queryset.** Phase 08 owns the ad-visibility predicate's semantics; phase 15 owns the framework and the terms. **`listings_query.py` is read-only for phase 15** — and its `ad__user__is_declined=False` term is the one that must **not** be folded into BLOCK 6's gate. **`Q6` was ANSWERED on 2026-10-03 (a ban hides inventory) and phase 15 still files and implements nothing about it** |
 | **09** | `MEDIA-005` (refuted in phase 07) · BLOCK 10 (`media_gate`'s duplicated query) · BLOCK 15 (`ci.yml`) · the cache-failure policy | ✔ **Phase 09 BLOCK 10 has not landed**, and `media_gate` is BLOCK 9's file. **Phase 15 must assume it landed or re-measure a phase-09 defect as a phase-15 one — and it files nothing about `media_gate` beyond the one-line staff-branch change.** Phase 09 and phase 10 both forbid phase 15 from touching `api_bulk.py` |
-| **10** | `admin_actions.py` **moved** (BLOCK 12) · BLOCK 7 (`reject_ad` / `ban_user`) · BLOCK 16 (`edit.py`'s `SubmitAdInput` hoist) · routes Q2 and Q4 to phase 15 | ✔ **The phase-10 edge that matters: phase 10 BLOCK 16 must land AFTER BLOCK 4** (§4.4 item 3). ✔ `admin_actions.py` is **record only** for phase 15 — five-way contended *and* moved. ✔ **BLOCK 11 is phase 15's half of phase 10's routing**, and it ships nothing if its gates are declined |
+| **10** | `admin_actions.py` **moved** (BLOCK 12) · BLOCK 7 (`reject_ad` / `ban_user`) · BLOCK 16 (`edit.py`'s `SubmitAdInput` hoist) · routes Q2 and Q4 to phase 15 | ✔ **The phase-10 edge that matters: phase 10 BLOCK 16 must land AFTER BLOCK 4** (§4.4 item 3). ✔ `admin_actions.py` is **record only** for phase 15 — five-way contended *and* moved. ✔ **BLOCK 11 is phase 15's half of phase 10's routing, and since 2026-10-03 it is UNCONDITIONAL — both of its gates are answered and it ships** |
 | **11** | `TEST-010` (the source-inspection census) · BLOCK 2/3 (`ci.yml`, `ci-nightly.yml`, `[tool.pytest.ini_options]`) · `conftest.py` ("nobody") | ✔ **`test_edit_views_locking.py` carries 7 `inspect.getsource` assertions** and `test_admin_actions.py` carries 5 — both in this phase's blast radius. **Phase 15's changes to those files are incidental rewrites required by a decided behaviour change, not coverage work, and phase 11 must not read them as new coverage.** ✔ **Phase 15 adds no pytest dependency, changes no `testpaths`, and adds no fixture to `conftest.py`** |
-| **12** | `OPS-003` (the alert file's selectors, the monitoring stack, Q5's gated decision) · BLOCK 11/12 · runbooks | ✔ **Phase 15's only adjacency is BLOCK 8's counter**: if no Python-level Prometheus client exists, the counter is **not built**, and the metrics limb is recorded as **open with phase 12's Q5 as its named owner.** ✔ Phase 15 edits no runbook, no alert YAML and no `gunicorn.conf.py` |
+| **12** | `OPS-003` (the alert file's selectors, the monitoring stack, Q5's gated decision) · BLOCK 11/12 · runbooks | ✔ **Phase 15's only adjacency is BLOCK 8's counter**: if no Python-level Prometheus client exists, the counter is **not built**, and the metrics limb is recorded as **open with phase 12's Q5 as its named owner.** **`Q5` was ANSWERED on 2026-10-03 — phase 12 takes the *minimum viable* deliverable and defers the monitoring stack — so the counter is the ONLY outstanding limb of `AUTHZ-009`, and it stays open with phase 12's reduced deliverable as its named owner.** ✔ Phase 15 edits no runbook, no alert YAML and no `gunicorn.conf.py` |
 | **13** | `PERF-001` (the load-test gate) · BLOCK 4 (the version-key lifetime) · `cache-strategy.md` | ✔ **No shared file with any phase-15 block.** Phase 13's citation convention is a precedent for this phase's own `AUTHZ-` convention (§0.1) |
 | **14** | Locale files; the language component of a cache key | ✔ **Phase 15 adds user-visible strings in exactly two blocks (6 and 10, and only under specific gate answers).** Both append to the catalogue with non-empty `ru` and `bs`; **neither regenerates it.** Phase 14's locale work is not re-shipped and not reordered |
 
@@ -2901,7 +3058,10 @@ verified in the tree at `ba23277`.
    Phase 04 BLOCK 1 (with `PII-103`), phase 05 BLOCK 6, and phase 04's `login_token.py`.
 4. **Do not touch any queryset in `listings_query.py` or `alert_query.py`, and do not add an
    `ads_auto_publish` term to either.** ✔ A second ad-hoc predicate is what `SRCH-004` exists to
-   replace. **Q6 is unresolved across three phases; phase 15 files nothing about it.**
+   replace. **`Q6` was ANSWERED on 2026-10-03 — a ban hides inventory, across search, category,
+   detail and the media gate — and phase 15 still files and implements nothing about it. The
+   predicate change lands with its owning phase, and it must be argued as a MODERATION decision,
+   never bundled into a commit justified as fixing a consent violation.**
 5. **Do not add a default-manager filter anywhere.** ✔ Phases 06, 08 and 10 each forbid it. It
    would hide withdrawn users from the bot's `_resolve_user`.
 6. **Do not edit `AccountStateMiddleware` from any block other than BLOCK 5.** ✔ Phases 04, 05 and
@@ -2932,7 +3092,7 @@ not negotiate.**
 | **`apps/users/middlewares/` (new package)** | **BLOCK 6, sole owner** | Nobody | Created by BLOCK 6. The directory does not exist today |
 | **`src/telegram_bot/middlewares/permissions.py`** | **BLOCKS 5 and 7** | ✔ Phases 04, 05, 06 all **forbid** touching it; phase 15 is the sole authoriser | **One phase-15 owner.** `_check_user_state`'s single-positional-argument signature is load-bearing and is asserted |
 | **`src/backend/apps/users/services/login_token.py`** | **Record only (BLOCK 10)** | ✔ **Phase 04's** | **Never edited by phase 15.** The `/start login_<token>` handshake is asserted unchanged |
-| **`apps/users/admin.py::UserAdmin`** | **Record only (BLOCK 9)** | ✔ **Three-way:** phase 04 BLOCK 1 owns the **field contract** (with `PII-103` merged in), phase 06 BLOCK 10 owns `withdraw_consent_action`, phase 15 audits the **permission predicate** | **Phase 15 edits nothing in this file** unless GATE Q3's written answer requires it — and the field set stays phase 04's regardless |
+| **`apps/users/admin.py::UserAdmin`** | **Record only (BLOCK 9)** | ✔ **Three-way:** phase 04 BLOCK 1 owns the **field contract** (with `PII-103` merged in), phase 06 BLOCK 10 owns `withdraw_consent_action`, phase 15 audits the **permission predicate** | **Phase 15 edits nothing in this file** unless the 2026-10-03 `Q3` ruling's per-class policy requires it — and the field set stays phase 04's regardless |
 | **`apps/ads/admin.py::AdAdmin`** | **Record only (BLOCKs 2, 9)** | ✔ **Phase 05 BLOCK 6 owns the field set and must not change the permission predicate** | **Phase 15 changes no field and no predicate here.** `AD-001` is cited as the transfer vector |
 | **`apps/ads/views/edit.py`** | **BLOCKS 2 and 4** | ✔ **SIX-WAY:** phase 03 BLOCK 5, phase 05 BLOCKs 2/8/12, phase 07 BLOCK 10, phase 10 BLOCK 16 | **The order is fixed and it is the phase's highest-consequence constraint:** *phase 03 BLOCK 5 → phase 05 BLOCK 2 → phase 05 BLOCK 8 → **BLOCK 2** → **BLOCK 4** → phase 10 BLOCK 16.* **Re-read immediately before each block; stop and report on a concurrent change** |
 | **`apps/ads/services/submission.py`** | **BLOCK 4** | ✔ **EIGHT-WAY:** phase 03 BLOCKS 3/5/6/8, phase 05 BLOCKS 5/12/13, phase 07 BLOCKS 1/3, phase 10 BLOCK 16 | The most contested service in the programme. **BLOCK 4's guard must land before phase 10 BLOCK 16** |
@@ -2960,7 +3120,7 @@ the moment BLOCK 6 or BLOCK 9 lands.
 | # | Plan · block | What becomes stale when phase 15 lands | What the earlier plan must do |
 |---|---|---|---|
 | 1 | **phase 06 · BLOCK 6** (account-state semantics) | R1 has declared the **terms**. BLOCK 7 has changed the **publish policy**. BLOCK 6 has installed the **web gate** | **Build the `User` audience predicate on the declared terms — and on nothing phase 15 implied.** `06-VAL-003` is unblocked by the *shape*, not by any decision phase 15 made. **Q4/Q5's rulings are now on the record and BLOCK 7 is built on them** |
-| 2 | **phase 08 · BLOCK 1** (`SRCH-004`) | The queryset-level **terms** now exist | **Build the `Ad` ad-visibility predicate on them.** ⚠ **Q6 is still unanswered across three phases** — the terms are expressible, the *semantics* are not. **This plan adds nothing to that decision and must not be read as having implied an answer** |
+| 2 | **phase 08 · BLOCK 1** (`SRCH-004`) | The queryset-level **terms** now exist | **Build the `Ad` ad-visibility predicate on them.** ✔ **`Q6` was ANSWERED on 2026-10-03 — a ban hides inventory**, across search, category, detail and the media gate. **This plan adds nothing to that decision and must not be read as having implied an answer.** **The change must be argued as a MODERATION decision and must never be bundled into a commit justified as fixing a consent violation** |
 | 3 | **phase 04 · BLOCK 1** (`04-AUT-005` + `PII-103`) | BLOCK 9's moderator contract is written and now has a test that iterates the registry | **Land the `UserAdmin` field contract.** `AUTHZ-003` cannot close without it, and BLOCK 9's registry test will now *observe* the escalation rather than be blocked by it. ⚠ **The U4 ordering hazard applies to phase 04's probe too** — a POST that omits an unchecked `BooleanField` de-staffs the actor |
 | 4 | **phase 10 · BLOCK 16** | BLOCK 4 has made `user_id` a real actor id | **Do not hoist `SubmitAdInput` into a helper that reintroduces `ad.user_id`.** BLOCK 4's guard is the thing that makes phase 10's hoisting safe, and it must already be landed |
 | 5 | **phase 05 · BLOCK 6** (`AD-001`) | BLOCK 2's window is now closed by an in-lock re-check | **The field contract is still phase 05's**, and BLOCK 2's fix is defence-in-depth until it lands. **Nothing in phase 15 weakens the case for it** |
@@ -2998,10 +3158,10 @@ re-filed finding.
 | **The `AdAdmin` field set** (`user`, `status`, `published_at`, `original_published_at`, `archived_at`, `deleted_at` all editable) | **`AD-001`, phase 05 BLOCK 6.** ✔ It is the reason BLOCK 2's transfer window is real, and citing it is how phase 15 uses it. **Phase 15 changes no admin field set anywhere** |
 | **The `User` audience predicate** (who may see whom) | **`06-PII-104` recommendation item 2, phase 06 BLOCK 6.** Phase 15 makes the terms **expressible** and implements nothing. **The semantics are phase 06's, and must not be inferred from BLOCK 5's declaration** |
 | **The `Ad` ad-visibility predicate** (is this ad public) | **`SRCH-004` / `SRCH-008`, phase 08, already owned by phase 06.** Phase 15 verifies only that non-public objects are not reachable *through an authorization failure* — which is BLOCK 6's DENY set, not a listing filter |
-| **Should a banned seller's ads stay publicly visible? (Q6)** | **A product decision, open across three phases** (08, 06, 15). Phase 08 folded `SRCH-008` into `SRCH-004` deliberately so it is argued as **one** product decision rather than smuggled in as a consent fix. **No amount of work in phase 15 settles it, and phase 15 files nothing about it.** The next step is the one-paragraph trade-off in front of the product owner — not a fourth filing |
+| ~~**Should a banned seller's ads stay publicly visible? (Q6)**~~ — **ANSWERED 2026-10-03** | ~~**A product decision, open across three phases**~~ → **A BAN HIDES INVENTORY. A banned seller's ads are excluded from the public ad-visibility predicate across search, category, detail and the media gate.** Phase 08 folded `SRCH-008` into `SRCH-004` deliberately so it is argued as **one** product decision rather than smuggled in as a consent fix — and that argument must survive into the implementation. **Phase 15 files and implements nothing about it; the predicate change lands with its owning phase.** **Owed to phase 06: the `docs/02-database/db-schema.md:61` amendment** (§6.2) |
 | **Editing `technical-specification.md` and `spec-index.md` (C-4, Q13)** | **Phase 06 holds both** (`PII-113`; `spec-index.md:74` is phase 06 BLOCK 2's sole owner). **A documented divergence is acceptable; a unilateral edit is not.** BLOCK 6 records the request; BLOCK 12 routes it |
 | **The `VAL-001` CSRF band ruling (Q7)** | **The audit programme's, not phase 15's.** It must be ruled once, centrally, and applied to every phase that finds a state-changing `GET`. Phase 15 records the recommended amendment verbatim and applies nothing |
-| **Deciding whether DECLINE is reversible (`PII-105`, Q4) and which DECLINE sentence governs (Q5)** | **Phase 06's.** Phase 15 *depends* on both and gates on them; it does not decide either. **The findings themselves depend on them** — `AUTHZ-005`'s *type* is only well-founded once Q5 is resolved |
+| ~~**Deciding whether DECLINE is reversible (`PII-105`, Q4) and which DECLINE sentence governs (Q5)**~~ — **BOTH ANSWERED 2026-10-03** | ~~**Phase 06's**~~ → **DECLINE IS REVERSIBLE** (`PII-105` option (a): publishing and messaging are blocked, the login is regained, already-published ads stay live until the seller acts, and consent may be restored at any time), and **the product rule governs** — neither `spec-index.md:74` nor `technical-specification.md:101`. **BLOCK 7 no longer waits and starts. Owed to phase 06: correct BOTH spec lines and `06-PII-105` / `06-PII-113` (§6.2).** `AUTHZ-005`'s severity is unchanged, but its **type** no longer rests on the contested DECLINE sentence |
 | **The `AUTHZ-003` re-band (Q9)** | **The coordinator's.** Phase 15 records both bands and the combined-pair band, and does not choose. **The travelling rule is that a re-band must not silently drop the `04-AUT-005` escalation** |
 | **Sweeping the other 16 `ModelAdmin` classes for constant returns** | **Every other constant override in the registry returns `False`, and `False` is always safe. `True` is the only dangerous direction and this is the only instance of it.** A blanket sweep touches 17 classes for one defect and is precisely the overengineering §0.2.2 constraint 3 forbids |
 | **A `ModelAdmin` base class or mixin (any size)** | **Rejected by the validator and upheld here** — `VAL-005`. Seven classes are read-only by deliberate data-protection policy. **A base class answers "how is the role read?"; the contract answers "what may `is_staff` do?"** — two different questions, and answering the second uniformly is what would grant write access to the audit log |
@@ -3019,24 +3179,24 @@ re-filed finding.
 
 | Item | Owner | Note |
 |---|---|---|
-| The `logout()` calls on the four open revocation paths | **Phase 04 · BLOCK 6** | ✔ `04-AUT-002`'s session-layer half. **Phase 15 records the four paths and adds zero `logout()` calls.** The gate makes three of them moot; the fourth (`consent_decline`) is still phase 04's and is still gated on `PII-105` |
+| The `logout()` calls on the four open revocation paths | **Phase 04 · BLOCK 6** | ✔ `04-AUT-002`'s session-layer half. **Phase 15 records the four paths and adds zero `logout()` calls.** The gate makes three of them moot; the fourth (`consent_decline`) is still phase 04's and is still gated on `PII-105` — **though the 2026-10-03 ruling (DECLINE is reversible, so the publish gate is the only control) is now on the record, which is what that gate was waiting for** |
 | `UserAdmin`'s field contract; the moderator self-escalation | **Phase 04 · BLOCK 1** (with `PII-103`) | ✔ **This is the live half of the `AUTHZ-003` pair.** `AUTHZ-003` cites it and does not close without it |
 | `login_issue`'s rate-limit helpers and `login_token.py` | **Phase 04** | **Record only.** BLOCK 10 leaves both intact |
 | `AdAdmin`'s field set | **Phase 05 · BLOCK 6** | ✔ The transfer vector BLOCK 2 defends against |
 | `AD-008` / `05-VAL-003` — the dead `ON_MODERATION` state and the dead approval path | **Phase 05** | ✔ A publish **state machine** is orthogonal to a publish **gate**. AUTHZ-005's reproduction of the phase-05 path was attribution, not duplication, and so is this block's silence |
-| `PII-105` (DECLINE reversibility) and `PII-113` (the DECLINE sentence conflict) | **Phase 06** | ✔ **Two of BLOCK 7's hard gates** |
+| `PII-105` (DECLINE reversibility) and `PII-113` (the DECLINE sentence conflict) | **Phase 06** | ✅ **ANSWERED 2026-10-03 — phase 06's answers are on the record and BLOCK 7 no longer waits.** **PROPAGATION OBLIGATION (phase 06): `06-PII-105` / `06-PII-113` must record the product rule** — DECLINE blocks publishing and messaging, the login is regained, already-published ads stay live until the seller acts, and consent may be restored at any time — **and correct the plan's own open questions on `PII-105` / `PII-113`** |
 | The `User` audience predicate; `06-VAL-003` | **Phase 06 · BLOCK 6** | ✔ **Unblocked by R1's *shape* only.** Phase 15 implements none of its semantics |
-| `technical-specification.md`; `spec-index.md:74` | **Phase 06** | ✔ **BLOCK 12's requests.** This is the plan's most under-recorded item |
+| `technical-specification.md:101`; `spec-index.md:74` | **Phase 06** | 🚧 **PROPAGATION OBLIGATION, raised 2026-10-03.** **Both lines are superseded by the product rule and must be corrected by phase 06, the owning phase.** `spec-index.md:74` says DECLINE *"blocks seller login only"* — that is now **wrong** (the login is regained). `technical-specification.md:101` says DECLINE *"blocks login/actions AND hides the user's PUBLISHED ads"* — that is now **wrong** in two parts (the login is not blocked, and already-published ads **stay live** until the seller acts). **Phase 15 records the request and edits neither file** (see BLOCK 12) |
 | `withdraw_consent_action` | **Phase 06 · BLOCK 10** | **Record only** (one of the four open revocation paths) |
-| `ModeratorActionLog.reason` redaction in `admin_actions.py` | **Phase 06 · BLOCK 16** | ✔ **Overlaps BLOCK 11's Q11 option (b) — escalated, not implemented** |
-| `SRCH-004` / `SRCH-008`; the `Ad` ad-visibility predicate; **Q6** | **Phase 08 / phase 06, and the product owner** | ✔ **Phase 15 files nothing.** The terms are declared; the semantics are not phase 15's |
+| `ModeratorActionLog.reason` redaction in `admin_actions.py` | **Phase 06 · BLOCK 16** | ✔ **Overlaps BLOCK 11's `Q11` option (b) — declined and escalated, not implemented.** BLOCK 11's chosen path validates the vocabulary and re-renders; it never writes arbitrary client text |
+| `SRCH-004` / `SRCH-008`; the `Ad` ad-visibility predicate; **`Q6`** | **Phase 08 / phase 06** | ✅ **`Q6` ANSWERED 2026-10-03 — a ban hides inventory**, across search, category, detail and the media gate. **Phase 15 still files and implements nothing.** 🚧 **PROPAGATION OBLIGATION (phase 06): the `docs/02-database/db-schema.md:61` amendment** must record that a ban hides inventory. **The change must be argued as a MODERATION decision and must NEVER be bundled into a commit justified as fixing a consent violation.** 🚧 **The same ruling covers relisting: a banned seller cannot create or publish a new ad** — which closes plan 16's "a banned seller can still relist" known gap and **withdraws that specific `15-AUTHZ-001` hand-off** |
 | `ListingsQueryParams.feature_slugs`; `SRCH-001`; `SRCH-007` | **Phase 08** | **No shared file with any phase-15 block** |
 | `media_gate`'s duplicated `AdImage` query | **Phase 09 · BLOCK 10** | **Not landed.** Phase 15 changes `media_gate`'s staff branch and nothing else, and files nothing about the duplication |
 | `api_bulk.py` | **Phases 09, 10** | **Read only. Never edited by phase 15** |
-| `admin_actions.py`'s move; `reject_ad` / `ban_user`; **phase 10 Q2 and Q4** | **Phase 10** | ✔ **BLOCK 11 is phase 15's half of the routing and ships nothing if its gates are declined** |
+| `admin_actions.py`'s move; `reject_ad` / `ban_user`; **phase 10 Q2 and Q4** | **Phase 10** | ✔ **BLOCK 11 is phase 15's half of the routing, and since 2026-10-03 it is UNCONDITIONAL — both gates are answered and it ships** |
 | `edit.py`'s `SubmitAdInput` hoist; the `PERF-`-namespace sweep; `ci-nightly.yml` | **Phase 10 / phase 03 / phase 11** | ✔ **Phase 10 BLOCK 16 must land after BLOCK 4** (§4.4 item 3) |
 | The `getsource` test census; the test toolchain | **Phase 11** | ✔ Phase 15's test edits are **incidental rewrites**, not new coverage |
-| The monitoring-stack decision; the alert selectors; the runbooks | **Phase 12** | ✔ **BLOCK 8's counter is conditional on phase 12's Q5** |
+| The monitoring-stack decision; the alert selectors; the runbooks | **Phase 12** | ✔ **`Q5` ANSWERED 2026-10-03 — minimum viable only (corrected selectors, a lint check, the scrape-contract test); the monitoring stack is deferred.** **BLOCK 8's counter is therefore the only outstanding limb of `AUTHZ-009`, and it stays open with phase 12's reduced deliverable as its named owner** |
 | The `ENT-` entrypoint and CI work; the `CFG-` settings guards | **Phases 01, 02** | **No overlap. Phase 15 adds no env key and edits no workflow file** |
 | nginx `limit_req` on `location /login/` | **Phase 07** | **Complement, not a claim.** It is one of the two bounds that make `AUTHZ-004`'s band right |
 
@@ -3142,7 +3302,8 @@ missed in review.
 | **6** | `enums.py` is appended to while another phase is mid-edit, and another phase's enum order is disturbed | Contention | Med | Med | R3's re-read-and-stop rule; constraint 5 | Low |
 | **6** | `technical-specification.md` is edited unilaterally | Contention | Med | **High** | Constraint 7; §6.3 item 15; BLOCK 12's routing | Very low |
 | **6** | The `is_active` premise is shipped silently in either direction, and the control is added in one phase and removed in the next | **Correctness** | Med | **High** | GATE Q1 is a **hard** gate requiring U1 first; the U1 matrix is a required part of the commit body | Low |
-| **7** | The publish DENY set is widened **before** `PII-105` is ruled, and the wrong control is relied on | **Correctness** | Med | **High** | GATE Q4 and GATE Q5 are hard gates; "this block does not start" is in both the description and `extra_context` | Low |
+| **7** | ~~The publish DENY set is widened **before** `PII-105` is ruled, and the wrong control is relied on~~ — **CLOSED 2026-10-03** | **Correctness** | **CLOSED** | — | `Q4` and `Q5` were both answered by the Product Owner; `PII-105` option (a) is taken. The "does not start" rule is withdrawn and BLOCK 7 starts. **Row retained so the closure is visible** | **Closed by decision** |
+| **7** | The widened DENY set ships **without** the ruling's consequence recorded, leaving a reader unable to tell why the gate carries `is_declined` | Behaviour | Med | Med | BLOCK 7's constraint 2, its `extra_context`, and the acceptance criterion requiring the commit body to state that the publish gate is now the **only** control | Low |
 | **7** | A declined seller's ability to **see** their own ads changes along with their ability to post | Behaviour | Low | **High** | Constraint 6; no queryset is touched; the acceptance criteria name the see/post distinction | Very low |
 | **7** | `can_publish_ad` is deleted as dead code, against phase 10's binding constraint | Correctness | Low | **High** | F3; constraint 4; §6.3 item 7; the "still exists and is still exported" acceptance criterion | Very low |
 | **8** | A `prometheus_client` counter is added and **nothing scrapes it** — the finding looks closed and the instrument is dead | **Quality** | **High** if U14 is skipped | Med | Constraint 4 and the acceptance criterion: either a verified scrape path or the limb is recorded as open with phase 12's Q5 named | Low |
@@ -3156,11 +3317,14 @@ missed in review.
 | **9** | `AUTHZ-003` is closed while `04-AUT-005` is still open | **Process** | Med | **High** | The external prerequisite in the block header, constraint 8, the decision record's text, and §8.1 | Low |
 | **10** | The block is budgeted against the report's two test files, one of which does not exist, and the real 4 files / 10 call sites go red | **Process** | **High** | Med | ✔ C-1; F13; constraint 4 names all four files and forbids creating the missing one; all four are in `tests_to_run` | Low |
 | **10** | **`LOGIN_URL` behaviour changes** and the four `test_cabinet_sections.py` redirect assertions, `test_logout.py`, `test_consent.py` and the saved-search test break | Behaviour | Med | Med | Constraint 6; all four modules in `tests_to_run`; the assertion's target-not-method reasoning is stated in the block | Low |
-| **10** | The deep-link landing becomes a dead end for a bookmarked or messaged link, and the top support ticket is a 405 page | Behaviour | Med | **High** | GATE Q8; option (b) is in the alternatives table and its cost is stated; the acceptance criteria require an **actionable** page | Med — inherent to the UX decision |
+| **10** | ~~The deep-link landing becomes a dead end for a bookmarked or messaged link, and the top support ticket is a 405 page~~ — **CLOSED 2026-10-03** | Behaviour | **CLOSED** | — | `Q8` is RESOLVED: a `GET` renders a page and the action executes only on `POST`. **Option (b) was chosen** — the `GET` renders the landing page without issuing a token — and option (a)'s 405 landing is explicitly **declined** because it is precisely the dead end the ruling forbids. Bookmarks, previews and headless clients degrade gracefully and cannot act by prefetch | **Closed by decision** |
 | **10** | The landing template's three deep-link assertions are weakened to make the new form pass | **Correctness** | Med | **High** | Constraint 5: change the template's **design** under the gate answer, never the assertion; name the contract change in the commit body | Low |
 | **10** | `@never_cache` is dropped "while we're here", reintroducing a caching hazard on a page carrying a raw token | **Correctness** | Med | **High** | Constraint 8; the acceptance criterion "still present" | Very low |
-| **11** | A 302→405 change lands without the owner deciding, breaking recorded behaviour | **Behaviour** | Med | **High** | GATE Q12; constraint 4 — the assertions change in the same commit or the change does not ship | Low |
+| **11** | ~~A 302→405 change lands without the owner deciding, breaking recorded behaviour~~ — **CLOSED 2026-10-03** | **Behaviour** | **CLOSED** | — | `Q12` is RESOLVED: the `GET` returns a **200 confirmation page** and the `POST` performs the action. Constraint 4 still requires the two shipped 302 assertions to change in the same commit with project rule 2 cited and the ruling recorded as the justification | **Closed by decision** |
+| **11** | An invalid `reason_category` is **coerced to empty** instead of re-rendering, so a moderator's reason is silently lost | Behaviour | Med | **High** | `Q11` is RESOLVED and the chosen path is explicit: **re-render with an error and preserve the moderator's input; nothing is coerced to empty.** The acceptance criterion names the preservation and the refusal to reach `ModeratorActionLog.reason` | Low |
+| **11** | The confirmation page's strings or the invalid-reason error ship with empty `ru`/`bs`, failing the i18n completeness gate | **i18n** | Low | **High** | Constraint 6; the acceptance criteria require non-empty `ru` and `bs` and a green `test_i18n_completeness.py` | Low |
 | **11** | A `reason_category` change reaches into `admin_actions.py` and collides with phase 06 BLOCK 16's redaction | Contention | Med | Med | Constraint 3; the "byte-identical" acceptance criteria for both files; option (b) is recorded as overlapping | Low |
+| **9** | The privilege expansion is applied without a named per-class decision | Correctness | Med | **High** | The 2026-10-03 ruling plus the Q3 pre-block step's acceptance criterion | Low |
 | **11** | The block is read as an `AUTHZ-` remediation and the finding count inflates | Process | Med | Med | The block header says **"No `AUTHZ-` finding"**; the citation is phase 10 Q2/Q4, not `AUTHZ-0NN` | Very low |
 | **12** | The phase-06 request is too vague to act on and the specification stays wrong | Process | Med | Med | The acceptance criteria require the exact sentence, the block, the gate, and the "four account states, not one" statement | Low |
 | **12** | The tracker marks a finding closed because a gate was **declined** | **Process** | Med | **High** | Constraint 6; the acceptance criteria require "reduced **and open**, with its named owner" | Low |
@@ -3182,8 +3346,10 @@ Phase 15 is complete when **all** of the following hold.
       applied**; `VAL-002` discharged by BLOCK 9's registry iteration; `VAL-003` measured and
       recorded; `VAL-004` consolidated in the citation convention and BLOCK 12; **`VAL-005`
       upheld as a prohibition, with zero mixins in the tree**.
-- [ ] BLOCK 11 and BLOCK 12 shipped, **or** each recorded as declined with its gate answer and its
-      named consequence. **A declined gate is a recorded outcome, never a silent omission.**
+- [ ] **BLOCK 11 and BLOCK 12 shipped.** **BLOCK 11 is UNCONDITIONAL as of 2026-10-03 — both
+      `Q11` and `Q12` are answered, so there is no declined branch.** BLOCK 12 ships or is recorded
+      as declined with its reason. **A declined gate is a recorded outcome, never a silent
+      omission — but BLOCK 11 can no longer be one.**
 - [ ] **Twelve commits**, one per block, explicitly staged. No squashing, no amending.
 - [ ] `git status` shows **no modification under `.ai/audit/`**, and
       `.ai/audit/15-authorization/findings.md` was **not** restored.
@@ -3193,15 +3359,36 @@ Phase 15 is complete when **all** of the following hold.
 
 ### 8.2 Gates — all written, none chosen by an Implementor
 
-- [ ] A **written** answer exists for every one of the eleven `GATED` questions: **Q1, Q3, Q3′,
-      Q4, Q5, Q7, Q8, Q9, Q11, Q12, Q15**. Each names its owner and its date. **An unanswered gate
-      is a stopped block, not a default.**
-- [ ] The three `RULED` decisions are **recorded with their rejected alternatives and consequences**:
+- [ ] A **written** answer exists for every one of the five remaining `GATED` questions: **Q1,
+      Q3′, Q7, Q9, Q15**. Each names its owner and its date. **An unanswered gate is a stopped
+      block, not a default.**
+- [ ] **The 2026-10-03 Product Owner round is recorded and honoured. Seven questions moved off
+      `GATED`, and none may be re-chosen by an Implementor:**
+      - **`Q3`** — moderator write scope: the moderation queue, the moderation criteria, the audit
+        log, the support desk. A privilege **expansion**; the reviewed 17-model-matrix pass is a
+        named pre-block step with its own acceptance criterion.
+      - **`Q4`** — DECLINE is reversible, `PII-105` option (a). **BLOCK 7 no longer waits on phase
+        06 and starts**, and its commit body records that the publish gate is now the only control.
+      - **`Q5`** — the product rule governs, not either spec line.
+      - **`Q8`** — a `GET` renders a page, the action executes only on `POST`; option (b) for
+        `/login/issue/`.
+      - **`Q11`** — an invalid `reason_category` re-renders with an error, input preserved, nothing
+        coerced to empty.
+      - **`Q12`** — a `GET` returns a 200 confirmation page; the `POST` acts. **BLOCK 11 is
+        unconditional**; the two shipped 302 assertions change in the same commit.
+      - **`Q6`** — **ANSWERED**, no longer `ROUTED`: a ban hides inventory. Phase 15 files and
+        implements nothing about it.
+- [ ] **The propagation obligations owed to phase 06 are recorded, not silently discharged:**
+      `docs/01-spec/spec-index.md:74` and `docs/01-spec/technical-specification.md:101` corrected
+      for the DECLINE reversal; `06-PII-105` / `06-PII-113` and phase 06's own open questions
+      updated; `docs/02-database/db-schema.md:61` amended for "a ban hides inventory".
+- [ ] **The three `RULED` decisions are **recorded with their rejected alternatives and consequences**:
       R1 (two-level shape, over instance-level only), R2 (U13 is a verification step, not a
       decision), R3 (one appended `StrEnum` in `enums.py`).
-- [ ] The two `ROUTED` items are **not** implemented and **not** re-filed: **Q6** (the
-      `is_banned` public-visibility product decision) and **Q13** (the `technical-specification.md`
-      edit).
+- [ ] **`Q6` is not implemented and not re-filed by phase 15** — it was **answered**, and the
+      predicate change belongs to its owning phase. **It must be argued as a moderation decision,
+      never bundled into a commit justified as fixing a consent violation.** `Q13` (the
+      `technical-specification.md` edit) remains `ROUTED` and is **not** implemented here.
 - [ ] **`AUTHZ-003` is not closed while `04-AUT-005` is open** — recorded in the decision record and
       in the tracker.
 - [ ] No commit body claims a gate was answered when it was not.

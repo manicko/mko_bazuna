@@ -262,10 +262,13 @@ anchor are **HIGH 3 · MEDIUM 10 · LOW 0**.
 - **`11-TEST-009` is worse than the report's corrected version states.** The report corrected
   itself to "no `timeout-minutes` is configured on any job". Re-read against
   `ci-nightly.yml`: neither workflow bounds any job, and the nightly is unbounded too.
-- **`11-TEST-001`'s severity does not change; its *scope* nearly halves.** Under the
-  "make `ON_MODERATION` durable" branch of AD-008, the 62 defaulted sites become **correct**
-  and the mechanical pass evaporates. Only the default flip and the two doc corrections
-  survive. This is why BLOCK 14 is gated on **both** Q1 and Q2 rather than on Q1 alone.
+- **`11-TEST-001`'s severity does not change; its *scope* nearly halves — and the Product
+  Owner has now confirmed it.** Under the *"make `ON_MODERATION` durable"* branch of `AD-008`,
+  the 62 defaulted sites become **correct** and the mechanical pass evaporates. Only the
+  default flip and the two doc corrections survive. **That branch was chosen: `ON_MODERATION`
+  is a DURABLE status as of 2026-10-03** (§0.7). This is why BLOCK 14 is gated on **both** Q1
+  and Q2 rather than on Q1 alone — and it is why **Q2 no longer holds BLOCK 14's dominant
+  workload.** The **62-site expectation flip is CANCELLED and must not be started.**
 - **`11-TEST-012` executes as S, lower than the report's M** — because the premise is
   refuted: `apps/core/tests/test_support_admin.py` already carries 12 registered-`ModelAdmin`
   introspection tests. The remedy is an **extension**, not a new module.
@@ -283,7 +286,7 @@ outcome for any of them.**
 | ID | Question | Block | Who decides | Status |
 |---|---|---|---|---|
 | **Q1** | **Who edits `src/backend/conftest.py`?** Phase 05 BLOCK 4 claims it for exactly `11-TEST-001`'s change; phases 03 ("must not edit it at all"), 06, 07, 08, 09, 10 say "**Nobody in this plan**"; phase 04 forbids fixture reshaping outright. Options in BLOCK 14 | **14** | **Coordinator** | **GATED — BLOCKER.** Seven plans forbid the file, one claims it, this plan needs it. Nothing in BLOCK 14 starts without this |
-| **Q2** | **Has `AD-008` been decided, and which branch?** If `ON_MODERATION` becomes **durable** (auto-moderation defers to a human), all 62 defaulted sites become correct and the migration evaporates; only the default flip and the docs remain. If the durable state is **removed**, expectation flips land with the production change | **14** | Phase 05 owner + coordinator | **GATED — BLOCKER.** Phase 05's validator explicitly forbade taking the removal branch before `VAL-003` is resolved |
+| **Q2 (BLOCK 14 — `AD-008`)** | **Has `AD-008` been decided, and which branch?** If `ON_MODERATION` becomes **durable** (auto-moderation defers to a human), all 62 defaulted sites become correct as written and the mass expectation flip is **not work**. BLOCK 14 BLOCKS on **Q1 and Q2 together** | **14** | **RESOLVED 2026-10-03 (Product Owner)** — **option (a): `ON_MODERATION` becomes a DURABLE status.** Auto-moderation **defers the ad to a human moderation queue** instead of publishing or rejecting it. The 62 defaulted sites are therefore **correct as written**; the mass expectation flip is **CANCELLED**; BLOCK 14's dominant workload **disappears**. Only the **default flip** and the **documentation** remain. See §0.7 |
 | **Q3** | **Test-side `statement_timeout`: what mechanism and what value?** `DATABASES["default"]["OPTIONS"] = {"options": "-c statement_timeout=N"}` vs a session-scoped `SET statement_timeout` + `RESET`. And must `N` equal DB-004's production value? `SET LOCAL` is a **no-op** outside a transaction block, so it is not an option for the 48 `transaction=True` scopes | **5** | Planner, with phase 03 sizing `DB-004` and `DB-002` landed | **GATED.** Two values drift silently; and `record_event` swallows the resulting `OperationalError` until DB-002 lands |
 | **Q4** | **pytest-timeout shape and value.** A global `timeout` key, or a per-marker value with a larger global backstop? `timeout_method = "signal"` (interrupts the query) or `"thread"` (returns, leaves it running)? And `timeout-minutes` on the `test` and nightly jobs — 20? 30? The only wall-clock gate in the suite is `SEARCH_SLO_MS == 2000` and `test_lookup_cache_swr` sleeps `0.2` deliberately | **3** | Planner, with phase 13's latency surfaces in view | **GATED.** A `timeout_method` choice determines whether a runaway query is *killed* or merely *reported* |
 | **Q5** | **Seed determinism: pin or record?** (a) pin `--randomly-seed` in `addopts` — deterministic, but **destroys shuffle detection**, which is the entire reason `pytest-randomly` is installed; (b) upload `.pytest_cache` as an CI artifact next to `coverage.xml` — keeps shuffling, records the seed; (c) both | **4** | Planner | **GATED.** Option (a) alone removes the plugin's reason for existing and can hide an order-dependence bug that is currently found on every run |
@@ -301,6 +304,51 @@ framing is inapplicable — zero `TestCase` subclasses; the exposure arrives thr
 `pytest.mark.django_db`). **Neither produces a source change.** `11-VAL-002` exists so that
 the `on_commit` exposure is not double-counted between `11-TEST-004` and `11-TEST-014`, and
 so that no downstream block is scoped against the wrong mechanism.
+
+---
+
+### 0.7 Product Owner gate rulings — 2026-10-03
+
+**Authority.** Product Owner decisions, dated `2026-10-03`, recorded here so that no Implementor
+can re-derive a settled question. **One ruling maps to this plan, and it removes work rather
+than adding it.** Because a silent reduction is worse than a silent addition, this section is
+loud on purpose.
+
+| Gate | Ruling (2026-10-03, Product Owner) | Chosen option | Block-level consequence |
+|---|---|---|---|
+| **Q2 (BLOCK 14 — `AD-008`)** | **`ON_MODERATION` becomes a DURABLE status.** Auto-moderation **defers the ad to a human moderation queue** instead of publishing or rejecting it | **(a)** | **BLOCK 14 SHRINKS SUBSTANTIALLY.** (i) The **62-site explicit-`status=` expectation flip is CANCELLED and must not be started** — the defaulted sites are now **correct as written**. (ii) BLOCK 14's "dominant workload" is **gone**; only the **factory-default flip to `PUBLISHED`**, the **two rule-file corrections** (`.kilo/rules/commands.md`, `docs/99-agent/rules.md`) and the **self-verifying regression guard** remain. (iii) The **documentation** half remains in full. (iv) BLOCK 14 is now gated on **Q1 alone**; Q2 is discharged and no longer holds the block. **Changed premise:** §0.4's *"scope nearly halves"* is no longer hypothetical — it is the committed scope |
+
+**The propagated obligation — this is the part that matters most in this plan.**
+
+**PLAN 05 OWNS `AD-008` (BLOCK 6 / `VAL-003`), and it must be updated to match.** The decision
+above was taken in phase 05's territory; phase 05's plan still describes both branches as open.
+Until phase 05 is corrected, its `VAL-003` disposition and BLOCK 6's scope do not reflect the
+decided branch. Recorded as a **named propagation obligation** in §5.4.
+
+**What BLOCK 14 must NOT do, stated so it cannot be done "to be thorough".**
+
+- It must **not** perform the 62-site migration "since the sites are already correct anyway".
+  They are correct **because** of the ruling; touching them would be churn against a decided
+  behaviour and would create a second, disagreeing statement of what `create_test_ad` defaults
+  to.
+- It must **not** add an `ON_MODERATION` branch to `_set_status_timestamp`. That helper sets a
+  timestamp for a status it has just assigned, and a deferred-to-queue ad has not entered the
+  queue yet. Binding constraint 4 is unchanged.
+- It must **not** be treated as the owner of the durable-status production change. `Ad`'s
+  `ON_MODERATION` branch, the moderation queue's existence and `get_pending_queue_size()`
+  becoming non-zero are **phase 05's**. Phase 11 ships the **test-side default flip** and the
+  **regression guard** only.
+
+**Ambiguity note, recorded once, with nothing renumbered.** This plan uses `Q2` for two
+different questions: **`Q2 (BLOCK 14 — `AD-008`)`,** resolved here, and the **BLOCK 2 coverage
+measurement** gate referred to in `11-TEST-002`. New and amended text names the gate in full.
+**No question was renumbered and no gate was merged.**
+
+**Technical gates that are NOT Product Owner decisions and remain exactly as they are.**
+**Q1** (`src/backend/conftest.py` ownership — the **BLOCKER**, untouched by this ruling), and
+**Q3**, **Q4**, **Q5**, **Q6**, **Q7**, **Q8**, **Q9**, **Q10**, **Q11**, **Q12** all keep
+their existing state. No fixture ownership, migration numbering, commit sequencing or coverage
+threshold was changed by the 2026-10-03 ruling.
 
 ---
 
@@ -459,8 +507,8 @@ suite *measures* or *tolerates*. `coverage` = adds or rewrites a test; subject t
 
 | ID | Class | Disposition | Block | Severity | One-line reason |
 |---|---|---|---|---|---|
-| `11-TEST-001` | **reconciliation + coverage** | **implement as two sub-commits — gated on Q1 (ownership) **and** Q2 (AD-008 branch).** (a) explicit `status=` at the **62 defaulted** sites, behaviour-preserving; (b) flip both factory defaults to `PUBLISHED`, correct `.kilo/rules/commands.md` and `docs/99-agent/rules.md`, add a self-verifying regression guard. **The 62-site pass does not start until AD-008 is decided** | **14** | HIGH | The defect is real — the fixture fabricates a state no production writer commits — but the scope is **124 sites in 22 files**, not 111 in 19 (C-1), and under the "make `ON_MODERATION` durable" branch the migration **evaporates**. Seven plans forbid the file and one claims it (C-10) |
-| `11-TEST-002` | **configuration** | **implement — gated on Q2 (measure first).** Both workflows (C-3). Explicit `--cov-config=pyproject.toml --cov=src/backend --cov=src/telegram_bot --cov-branch` is the **preferred** shape over the positional `working-directory: .`, because it is immune to the next `working-directory` change | **2** | HIGH | `[tool.coverage.*]` is read from the CWD only and the pytest step's CWD is `src/backend`, so `branch`, `source`, `omit` and **`fail_under = 80` are all inert**. `ci-nightly.yml` has the identical defect and the report never mentions it. **The edit is one line; the effect is a gate that has never fired beginning to fire** |
+| `11-TEST-001` | **reconciliation + coverage** | **REVISED 2026-10-03 — Q2 (BLOCK 14 — `AD-008`) is RESOLVED as option (a): option (b) is CANCELLED and must not be started.** Sub-commit 2 is therefore reduced to **(b1) the default flip** (both factory defaults → `PUBLISHED`), **the two rule-file corrections**, and **the self-verifying regression guard**. Sub-commit 2 as previously written — the 62-site explicit-`status=` migration — **is cancelled**. Sub-commit 1 (the ownership carve-out) remains **gated on Q1 alone** | **14** | HIGH (↓MEDIUM for the block's work volume) | The defect is real — the fixture fabricates a state no production writer commits — but the scope is **124 sites in 22 files**, not 111 in 19 (C-1), and **under the branch the Product Owner chose on 2026-10-03 the 62-site migration evaporates**: `ON_MODERATION` becomes durable, so the defaulted sites are **correct as written**. Seven plans forbid the file and one claims it (C-10) |
+| `11-TEST-002` | **configuration** | **implement — gated on Q2 (BLOCK 2 — coverage measurement; measure first; this is **not** the `AD-008` Q2).** Both workflows (C-3). Explicit `--cov-config=pyproject.toml --cov=src/backend --cov=src/telegram_bot --cov-branch` is the **preferred** shape over the positional `working-directory: .`, because it is immune to the next `working-directory` change | **2** | HIGH | `[tool.coverage.*]` is read from the CWD only and the pytest step's CWD is `src/backend`, so `branch`, `source`, `omit` and **`fail_under = 80` are all inert**. `ci-nightly.yml` has the identical defect and the report never mentions it. **The edit is one line; the effect is a gate that has never fired beginning to fire** |
 | `11-TEST-003` | **configuration + coverage** | **implement as two sub-blocks.** Step 1 = the test-side bound in `config/settings/test.py` — **gated on Q3 and hard-blocked on phase 03's `DB-002` and `DB-004`**. Step 2 = the hostile-`?features=` test — **gated on Q6** (whose commit it lands in, and which file). Neither the production cap nor the `feature_slugs` bound is re-filed | **5**, **6** | HIGH | The suite cannot host a runaway-query test today: `config/settings/test.py` sets no `OPTIONS` on `DATABASES["default"]`, and a repo-wide search for `statement_timeout\|lock_timeout\|idle_in_transaction_session_timeout` across `src/` and `docker/` returns **0 hits**. The largest `?features=` list anywhere in the suite is **2** |
 | `11-TEST-004` | **coverage** | **implement — the rollback-negative half and the alert-path `transaction=True` half, folded into BLOCK 7.** `test_advisory_lock_release_log.py` is **phase 03 BLOCK 2's** ("it must rewrite the two tests") and is **not** touched here | **7** | HIGH | Two of the four production `on_commit` sites — including the one that sends a real Telegram message — are patched out in their only tests, and no rollback-negative test exists anywhere in `src/`. The failure it would miss is user-visible and irreversible |
 | `11-TEST-005` | **coverage** | **implement the corrected narrow scope only.** Behavioural cross-process assertions for the 2–3 highest-value rows, plus a **predicate-equality** test (the AUT-002 / PII-104 shape). Its proposal 3 — do **not** run the real bot process inside pytest — is **endorsed** and restated as a binding constraint | **12** | MEDIUM | The report's two headline claims are refuted: at least five real cross-tree tests exist, and `test_edit_views_locking.py` already exercises two independent transactions per thread under `transaction=True`. What survives is a bounded, additive ~6-test set following an existing pattern — **not** a new harness |
@@ -476,7 +524,7 @@ suite *measures* or *tolerates*. `coverage` = adds or rewrites a test; subject t
 | `11-VAL-001` | **reconciliation** | **record only.** Correct the phase-report anchor to `6413df5`; re-measure every count that carries remediation weight | **1** | MEDIUM | `0c91666` is unresolvable and **fourteen** further citations have drifted since `9e96b84` — including three of the report's own re-measured numbers (C-8). The report's *narrative* is reliable; its *line citations* are indicative only |
 | `11-VAL-002` | **reconciliation** | **record only.** No source change | **1** | MEDIUM | The scoping premise *"tests using bare `TestCase` are structurally blind to `on_commit`"* is **factually inapplicable**: zero `TestCase` subclasses exist. The exposure is real and arrives through `pytest.mark.django_db`. This item exists so the exposure is not double-counted between `11-TEST-004` and `11-TEST-014`, and so no block is scoped against the wrong mechanism |
 | **`Q1`** | — | **GATED** — coordinator | **14** | — | **BLOCKER.** Seven plans forbid `src/backend/conftest.py`, one claims it, this plan needs it |
-| **`Q2`** | — | **GATED** — phase 05 owner + coordinator | **14** | — | Decides whether the 62-site pass is work or no-op |
+| **`Q2` (BLOCK 14 — `AD-008`)** | — | **RESOLVED 2026-10-03 (Product Owner) — option (a), `ON_MODERATION` becomes DURABLE** | **14** | — | The 62-site pass is **cancelled**; only the default flip and the documentation remain. **PROPAGATION OBLIGATION ON PLAN 05** (BLOCK 6 / `VAL-003`) — see §0.7 and §5.4 |
 | **`Q3`** | — | **GATED** — Planner, with phase 03 | **5** | — | Mechanism and value of the test-side bound; hard-blocked on `DB-002` |
 | **`Q4`** / **`Q5`** | — | **GATED** — Planner | **3**, **4** | — | Timeout shape/value, and pin-vs-record |
 | **`Q6`** | — | **GATED** — Planner + coordinator | **6** | — | Whose commit carries the hostile-`?features=` test |
@@ -1951,12 +1999,12 @@ acceptance_criteria:
 
 | | |
 |---|---|
-| **Findings owned** | `11-TEST-001` (HIGH) |
+| **Findings owned** | `11-TEST-001` (HIGH — severity unchanged; **scope reduced 2026-10-03**) |
 | **Class** | **coverage** — test code only; **no production code is touched** |
-| **Depends on** | BLOCK 1 (which carries Q1 and Q2) |
-| **External gate** | **Q1 — coordinator — BLOCKER** · **Q2 — phase 05 owner + coordinator — BLOCKER** |
-| **Priority** | **P0 — but it cannot start until both blockers are answered** |
-| **Risk level** | **HIGH** |
+| **Depends on** | BLOCK 1 (which carries Q1; Q2 is discharged) |
+| **External gate** | **Q1 — coordinator — BLOCKER** · **Q2 (BLOCK 14 — `AD-008`) — RESOLVED 2026-10-03 (Product Owner), option (a) — no longer a blocker** |
+| **Priority** | **P0 — but it cannot start until Q1 is answered.** The second blocker is gone; the block is now a single commit |
+| **Risk level** | **MEDIUM** (↓HIGH as of 2026-10-03 — the 62-site migration, which was the HIGH-severity half, is **cancelled**) |
 | **Required agents** | **Auditor · Researcher · Planner · Validator — all four** |
 
 **What is confirmed.** `create_test_ad(..., status: AdStatus = AdStatus.ON_MODERATION, ...)`
@@ -1969,8 +2017,15 @@ does the same; `auto_moderate()` has no third exit — every path returns throug
 production cannot produce.**
 
 **The count (C-1): 124 sites in 22 files** — 62 explicit, 62 defaulted. The defaulted count
-is **stable across both anchors**, which is the reassuring part: the mechanical pass is still
-exactly 62 edits. See §0.2.3 for the per-file table.
+is **stable across both anchors**, which was the reassuring part when the mechanical pass looked
+like exactly 62 edits. **Since 2026-10-03 that pass is CANCELLED**: `ON_MODERATION` is a durable
+status, so the 62 defaulted sites are correct as written. See §0.2.3 for the per-file table.
+
+> **⚠ READ THIS BEFORE PLANNING THE WORK.** This block is **no longer the plan's dominant
+> workload**. It was scoped as a 62-site mechanical migration plus a default flip; the Product
+> Owner's 2026-10-03 ruling removes the migration entirely. What remains is one commit that
+> flips two defaults, corrects two documentation files and adds one regression guard.
+> **Do not size, schedule or staff this block as a 124-site change.**
 
 **Correction the Implementor must know (C-9).** Phase 05 BLOCK 4 finding 1 states that
 `src/telegram_bot/tests/conftest.py` **redefines** `create_test_ad` and `create_test_ads_bulk`
@@ -1992,29 +2047,54 @@ This is the most contended file in the repository. Seven plans forbid it; one cl
 | **(b)** | **Carve `11-TEST-001` out as a phase-11 exception**, sequenced **after** `AD-008` is decided | **Gains:** the finding keeps its own owner, its own commit history and its own gate; the 62-site pass is *mechanically* separable from `AD-008`'s production decision. **Costs:** a seventh plan now edits the file, against six that say nobody |
 | **(c)** | **Defer** until phase 05 BLOCK 4 has landed, then act only if the default is still wrong | **Gains:** zero contention. **Costs: if phase 05 BLOCK 4 is de-scoped, nothing happens and the fixture keeps lying** — the finding is never closed and the two documentation files stay wrong |
 
-**Decision required before implementation — Q2: has `AD-008` been decided, and which branch?**
+**Q2 (BLOCK 14 — `AD-008`) RESOLVED 2026-10-03 (Product Owner) — `ON_MODERATION` becomes
+DURABLE**
+
+**The ruling is option (a): auto-moderation DEFERS the ad to a human moderation queue** instead
+of publishing or rejecting it. Options (b) and (c) are **closed**; the Implementor may not
+choose, and **must not start the 62-site pass**.
 
 | Option | Consequence for this block |
 |---|---|
-| **(a)** **`ON_MODERATION` becomes durable** (auto-moderation defers to a human) | **All 62 defaulted sites become correct and need no change. The 62-site pass evaporates.** Only the default flip, the two doc corrections and the regression guard survive. Phase 05's validator was explicit that the "remove the durable state" branch must not be taken before `VAL-003` is resolved |
-| **(b)** **The durable state is removed** | Every site that asserted the fabricated state must be retargeted onto a reachable state, and **each expectation change lands in the same commit as the production change that makes it necessary** (phase 07 VAL-003's rule). This is phase 05's territory, not a mechanical pass |
-| **(c)** **Undecided** | **The 62-site pass does not start.** Doing it first risks ~62 edits of work that option (a) invalidates |
+| **(a) — CHOSEN 2026-10-03** **`ON_MODERATION` becomes durable** (auto-moderation defers to a human) | **All 62 defaulted sites become correct and need no change. The 62-site pass evaporates.** Only the default flip, the two doc corrections and the regression guard survive. Phase 05's validator was explicit that the *"remove the durable state"* branch must not be taken before `VAL-003` is resolved — **that branch was not taken** |
+| ~~**(b)**~~ **The durable state is removed** | **NOT CHOSEN — and now forbidden.** Every site that asserted the fabricated state would have had to be retargeted onto a reachable state, with each expectation change landing in the same commit as the production change that makes it necessary. **This work is cancelled, not deferred.** Do not begin it "because the sites would need changing anyway" |
+| ~~**(c)**~~ **Undecided** | **MOOT.** The question is answered |
 
-**The two-commit, each-green sequence (the report's "must land in one commit" is refuted):**
+**What this removes from the block.** The block previously had a **two-commit** sequence whose
+**first commit was the 62-site mechanical migration**. **That commit is CANCELLED.** What
+remains is **one commit**: flip **both** factory defaults to `AdStatus.PUBLISHED`, correct
+**both** documentation files, and add the **self-verifying regression guard**.
 
-1. Add an explicit `status=` at the **62 defaulted** sites → **green** (behaviour identical;
-   the default is still `ON_MODERATION`).
-2. Flip **both** defaults to `AdStatus.PUBLISHED`, correct the two documents, add the
-   self-verifying guard → **green** (the 62 now pass their explicit value; the 62 explicit
-   sites are unaffected).
+**What survives of the two-commit rationale, and what does not.** The finding that the
+report's *"must land in one commit"* is **over-constrained** remains **true and is retained** —
+but it is now a statement about the *default flip*, not about a sequence. The report's
+*"must land together or the suite is red"* framing was **refuted for the migration half** (a
+migration at 62 sites while the default is still `ON_MODERATION` is green) and is **moot for the
+half that survives**.
 
-Nothing goes red at any point. **The report's "must not be split" is over-constrained**; the
-genuine must-land-together constraint is the *expectation* rule from option (b) above.
+**BLOCK 14 is now gated on Q1 alone.** Q2 is discharged. Q1 — who edits
+`src/backend/conftest.py` — is **unchanged** and remains the hard blocker.
+
+**The surviving sequence (the report's "must land in one commit" is refuted, and the 62-site
+pre-step is CANCELLED):**
+
+1. ~~Add an explicit `status=` at the **62 defaulted** sites → green.~~ **CANCELLED
+   2026-10-03** by the `AD-008` ruling. The sites are correct as written. **This step must not
+   be performed.**
+2. Flip **both** defaults to `AdStatus.PUBLISHED`, correct the two documents, and add the
+   self-verifying guard → **green**.
+
+Nothing goes red at any point. **The report's "must not be split" is over-constrained** — but
+under the ruling it is moot for the cancelled half, and the genuine must-land-together
+constraint that survives is **the two documentation files plus the default flip in one commit**,
+not an expectation-with-production pairing.
 
 **Binding constraints**
 
-1. **This block may not start until Q1 and Q2 are both answered in writing.** Neither is the
-   Implementor's to answer.
+1. **This block may not start until Q1 is answered in writing** — Q1, and only Q1. Q2 (BLOCK 14
+   — `AD-008`) was **answered by the Product Owner on 2026-10-03** and no longer gates
+   anything. Neither Q1 nor Q2 is the Implementor's to answer, and the Implementor may not
+   re-derive either.
 2. **The change to `src/backend/conftest.py` is `only` the `status` default** (and a
    docstring describing it). **No other fixture, no other parameter, no formatting.** The
    file has seven plans' "nobody" statements attached to it and one claimant.
@@ -2038,26 +2118,26 @@ genuine must-land-together constraint is the *expectation* rule from option (b) 
 
 ```yaml
 id: task_11_b14_create_test_ad_contract
-title: "Add explicit status to the defaulted factory call sites, then flip the default and the docs (11-TEST-001)"
+title: "Flip the create_test_ad default, correct both docs and add the regression guard (11-TEST-001)"
 priority: high
 depends_on: [task_11_b01_reconciliation_and_schedule]
 source_reference: ".ai/plans/11-test-coverage-remediation.md"
 source_section: "BLOCK 14 - The create_test_ad contract"
 source_blocks: ["BLOCK 14"]
 description: >
-  create_test_ad and create_test_ads_bulk in src/backend/conftest.py default to
-  AdStatus.ON_MODERATION, a durable state no production writer commits: submit_ad and
-  ad_reactivate transition into it inside the same atomic() block that then calls
-  auto_moderate, which has no third exit. 124 call sites in 22 files depend on that default
-  (62 explicit, 62 defaulted). Add explicit status= at the 62 defaulted sites - behaviour
-  preserving and green - then flip both defaults to PUBLISHED, correct .kilo/rules/commands.md
-  and docs/99-agent/rules.md in the same commit, and add a regression guard asserting the
-  default. Both sub-commits are green. The 62-site pass does not start until AD-008 is
-  decided, and no step starts until conftest.py ownership is ruled.
+  create_test_ad and create_test_ads_bulk in src/backend/conftest.py default to:
+  AdStatus.ON_MODERATION. 124 call sites in 22 files depend on that default (62 explicit, 62
+  defaulted). The Product Owner ruled on 2026-10-03 that ON_MODERATION becomes a DURABLE status
+  - auto-moderation defers the ad to a human moderation queue instead of publishing or rejecting
+  it - so the 62 DEFAULTED sites are correct as written and their expectation migration is
+  CANCELLED. Do NOT add explicit status= at those sites. What remains: flip both defaults to
+  PUBLISHED, correct .kilo/rules/commands.md and docs/99-agent/rules.md in the same commit, and
+  add a regression guard asserting the default. No step starts until conftest.py ownership is
+  ruled (Q1); Q2 is already answered.
 goals:
-  - "make the interesting variable explicit at every call site"
-  - "flip both factory defaults and correct both documentation files in one commit"
-  - "make the documentation self-verifying with one guard test"
+  - "make the default PUBLISHED and make the documentation self-verifying with one guard test"
+  - "correct both documentation files in the same commit as the flip"
+  - "leave the 62 defaulted call sites untouched - the ON_MODERATION ruling makes them correct"
   - "touch no production code, no other fixture and no other parameter"
 files:
   - path: "src/backend/conftest.py"
@@ -2090,19 +2170,21 @@ files:
 changes:
   - action: modify_code
     description: >
-      Sub-commit (a): add an explicit status= at each of the 62 defaulted call sites in the
-      22 files of the re-measured census. Sub-commit (b): flip both factory defaults to
-      AdStatus.PUBLISHED, update the docstring, correct both rule files in the same commit,
-      and add the regression guard. _set_status_timestamp and
+      ONE commit, and only these steps. Flip both factory defaults to AdStatus.PUBLISHED, update
+      the docstring, correct both rule files, and add the regression guard. DO NOT add an
+      explicit status= at the 62 defaulted call sites: sub-commit (a) was CANCELLED on
+      2026-10-03 when the Product Owner ruled that ON_MODERATION becomes a durable status, and
+      those sites are correct as written. _set_status_timestamp and
       src/telegram_bot/tests/conftest.py are read-only.
 acceptance_criteria:
-  - "every call site passes status= explicitly and the defaulted count is zero"
   - "both factory defaults are AdStatus.PUBLISHED and _set_status_timestamp is byte-identical"
+  - "the 62 defaulted call sites are UNCHANGED - no explicit status= was added to any of them, and the commit body states the 2026-10-03 AD-008 ruling that makes them correct"
   - "both documentation files state the shipped default and changed in the flip commit"
   - "the regression guard fails if the default is changed back"
   - "makemigrations --check reports no changes"
   - "src/telegram_bot/tests/conftest.py is unmodified and no production file was touched"
-  - "the commit bodies name the Q1 option, the Q2 branch and the re-measured census"
+  - "the commit bodies name the Q1 option, the resolved Q2 (BLOCK 14 - AD-008) branch dated 2026-10-03, and the re-measured census"
+  - "the commit body does NOT claim the 62-site migration was performed, and no part of it was"
 ```
 
 ---
@@ -2340,7 +2422,7 @@ alternative is two agents editing one file believing the other is not.
 
 | # | Test file | Owning phase | Phase-11 block | Ordering rule |
 |---|---|---|---|---|
-| 1 | **`src/backend/conftest.py`** | **05** BLOCK 4 claims · 03 "must not edit it at all" · 04, 06, 07, 08, 09, 10 "nobody" | **14** | **Q1 GATED — coordinator decides whether 14 or 05 BLOCK 4 owns it.** Then Q2 (AD-008 branch) decides whether 14's 62-site pass is work or a no-op. **Nothing in BLOCK 14 starts before both are written down** |
+| 1 | **`src/backend/conftest.py`** | **05** BLOCK 4 claims · 03 "must not edit it at all" · 04, 06, 07, 08, 09, 10 "nobody" | **14** | **Q1 GATED — coordinator decides whether 14 or 05 BLOCK 4 owns it.** **Q2 (BLOCK 14 — `AD-008`) is RESOLVED 2026-10-03 (Product Owner, option a): the 62-site pass is CANCELLED and BLOCK 14's scope is reduced to the default flip, the two doc corrections and the regression guard. Nothing in BLOCK 14 starts before Q1 is written down** |
 | 2 | `apps/search/tests/test_search_view.py` (10 phase-08 blocks + 1 phase-10 block) | **08** BLOCK 3, then **10** BLOCK 14 | **9** | **`08 BLOCK 3 → 10 BLOCK 14 → 11 BLOCK 9`.** A block that misses its turn must re-read the file *and* both plans immediately before editing, and stop-and-report on uncommitted changes |
 | 3 | `apps/search/tests/test_search_query_count.py`, `test_search_slo.py` | **08** BLOCKs 1/3/11 · **10** BLOCKs 14/15 | **none** | Phase 11 never edits either. They are the tripwires detecting whether BLOCKs 5 and 6 moved a query count or a wall-clock gate. `test_search_slo.py` is CI's separately-named gate |
 | 4 | `apps/core/tests/test_advisory_lock_ids.py` (6 phases) | whichever phase **allocates** `AdvisoryLockId` | **none** | Phase 11 allocates none and edits nothing here. Three files, one commit, coordinator told first — phase 07 BLOCK 8 and phase 06 BLOCK 15 are the live claimants |
@@ -2414,7 +2496,7 @@ order.
 | **15 → 8** | hard, scope | BLOCK 15 decides whether `cabinet/views/hub.py` and `moderation_fixtures.py` get tests or a disposition, and BLOCK 8 adds a second URLconf-level admin/cabinet surface test in the same run. Two blocks writing cabinet-level tests in one review is one block too many |
 | **8 → 11** | hard, mechanism | BLOCK 11's rule is *about* what BLOCK 8's generated-form contract replaces. `test_admin_pii_containment.py`'s four substring assertions are deleted **because** BLOCK 8 covers the admin surface by a stronger mechanism. Reversed, the deletion happens with nothing behind it |
 | **7, 9, 10, 12, 13 → 1** | external, hard | Each is a same-commit-with-production-change rule (phase 07 VAL-003) against a named phase-08/07/04/06/02 block. These are not in-plan edges; the coordinator sequences them (§5) |
-| **14 → 1** | external, hard | Q1 and Q2 are coordinator and phase-05 decisions. **BLOCK 14 is the only block in this plan that cannot start on its own**, and that is correct: seven plans forbid `src/backend/conftest.py` and one claims it |
+| **14 → 1** | external, hard | Q1 is a coordinator decision; **Q2 (BLOCK 14 — `AD-008`) was answered by the Product Owner on 2026-10-03 (option (a), `ON_MODERATION` durable)**, which **cancels** BLOCK 14's 62-site pass. **BLOCK 14 is the only block in this plan that cannot start on its own, and that is still correct** — seven plans forbid `src/backend/conftest.py` and one claims it |
 
 ### 4.4 Where there is deliberately **no** edge, and why
 
@@ -2580,7 +2662,8 @@ and does not touch the file.
 | **Phase 02** | Must not edit `config/settings/base.py`, `production.py`, `dev.py`, `local.py`, `.env*`, or `secret_validation.py`; must not allocate a lock id; must not consolidate the `_run_in_subprocess` helpers | BLOCK 5 touches `config/settings/test.py` **only**. Phase 02 routed the subprocess-helper consolidation to "phase 10 / phase 11"; **phase 11 declines it** (§6) — the consolidation is not a test-coverage finding and phase 02's own BLOCKs own it |
 | **Phase 03** | Must not edit `src/backend/conftest.py`; must not add a production `statement_timeout`/`lock_timeout`; must not take an `AdvisoryLockId`; must not open `test_advisory_lock_release_log.py`; must not start the BLOCK 11-style legacy sweep | BLOCK 5 is the **test-side** bound only and is hard-blocked on `DB-002` — `record_event` swallows the resulting `OperationalError` until then |
 | **Phase 04** | Must not reshape fixtures or redesign conftests; must not add a fixture for BLOCK 12 | Every phase-11 fixture question is resolved **against** adding one: BLOCK 4 uses an artifact upload, BLOCK 5 uses a settings option, BLOCK 12 reuses `sync_to_async` |
-| **Phase 05** | Must not touch `Ad.transition_to`, `ALLOWED_TRANSITIONS`, `search_vector*`, the FTS trigger, or `setup_search_triggers`; must not start the 62-site pass before `AD-008` is decided; must not retarget a producer test | BLOCK 14 is a **mechanical** pass and an expectation-free flip. Under Q2(b) the *retargeting* is phase 05's, and each retargeted expectation lands with the production change |
+| **Phase 05** | Must not touch `Ad.transition_to`, `ALLOWED_TRANSITIONS`, `search_vector*`, the FTS trigger, or `setup_search_triggers`; **must not start the 62-site pass — it is CANCELLED as of 2026-10-03, not merely gated**; must not retarget a producer test | BLOCK 14 is now an **expectation-free default flip** plus documentation plus one guard. Under the **resolved** `AD-008` branch (option (a), 2026-10-03) the *retargeting* limb is **moot**: nothing has to be retargeted, because the defaulted sites were correct all along. **PROPAGATION OBLIGATION ON PLAN 05 — see the block below** |
+| **Phase 05 — PROPAGATION OBLIGATION, 2026-10-03** | Phase 11 must not **assume** phase 05 has implemented the durable status | **PLAN 05 OWNS `AD-008` (its BLOCK 6 / `VAL-003`) and must be updated to match the Product Owner's 2026-10-03 ruling: `ON_MODERATION` becomes a DURABLE status, auto-moderation defers the ad to a human moderation queue.** Phase 05's plan still presents both branches as open; until it is corrected, its `VAL-003` disposition and BLOCK 6's scope do not reflect the decided branch. **Three consequences phase 05 must record:** (i) `get_pending_queue_size()` becomes non-zero, so the "structurally zero" warning that phases 12 and 10 carry forward is **no longer true**; (ii) `auto_moderate()` gains a **third exit** — defer to queue — so phase 05's own analysis of it ("no third exit") is superseded; (iii) the phase-05 validator's prohibition on taking the "remove the durable state" branch before `VAL-003` resolves is **satisfied** — that branch was not taken. **Phase 11 ships none of this.** It ships the test-side default flip and the regression guard only |
 | **Phase 06** | Must not expand a required test rewrite into new coverage; must not add a blanket admin data-subject rule | `VAL-007` is **mandatory** on BLOCK 8. `test_support_admin.py` already asserts on `SupportContactAdmin.telegram_id`, and a blanket rule false-positives on a support *channel* id |
 | **Phase 07** | Must not touch the media pipeline, `MEDIA_ROOT` staging, thumbnail generation or `sweep_orphaned_media`; must not add a reference check to `media/signals.py` | BLOCK 7 adds tests only. `apps/media/tests/test_sweep_orphaned_media.py` is transactional and **stays** transactional — marking it `transaction=True` so the scaffold would pass is a change to another phase's test |
 | **Phase 08** | Must not cap `feature_slugs`, must not add a `max_length` or validator to `ListingsQueryParams`, must not add the `PopularSearch` `UniqueConstraint`, must not change the join loop | BLOCK 6 is the *test*; phase 08 BLOCK 1 is the *cap*. BLOCK 10 asserts a constraint phase 08 BLOCK 5 creates. `test_features_filter.py` stays green unchanged |
@@ -2750,7 +2833,10 @@ restates the implementation** — §1.5's question.
 | **13** | It collides with phase 02's BLOCKs 3/4/5/9 on `test_migrations.py` | Contention | Med | Med | §4.1 row 10; binding constraint 5 — extend the shape, never rewrite phase 02's tests | Low |
 | **13** | The subprocess command is written non-bandit-clean and trips phase 02's `VAL-006` fix when it newly scans the whole repo | Contention | Low | Med | §5.4 phase-09 row: list-form `subprocess.run`, no literal temp path | Very low |
 | **14** | The file is edited and seven plans' "nobody" statements become false in one commit | **Contention** | Med | **High** | **Q1 is a hard blocker.** The commit body names the Q1 option and the ruling | Low |
-| **14** | The 62-site pass is done and `AD-008` is then fixed by making `ON_MODERATION` durable, invalidating it | **Rollout** | Med | Med | **Q2 is a hard blocker.** Under Q2(a) the pass is skipped by design, and that is a *successful* outcome of this block | Low |
+| **14** | ~~The 62-site pass is done and `AD-008` is then fixed by making `ON_MODERATION` durable, invalidating it~~ | — | — | — | **CLOSED 2026-10-03.** The Product Owner chose exactly that branch, so the pass was cancelled rather than invalidated. Replaced by the row below | Closed |
+| **14** | An Implementor performs the 62-site migration "since the sites are correct anyway" | Scope | **Med** | Med | **The cancellation is an acceptance criterion, not a preference.** The sites are correct *because* of the ruling; editing them is churn against a decided behaviour and creates a second statement of the default | Low |
+| **14** | The commit body claims the migration was done, or a reviewer reads the block's old scope and expects it | Review | Med | Med | The block header carries a `⚠` banner; `11-TEST-001`'s §2 row states the reduction; the YAML `changes` description forbids the step by name | Very low |
+| **14** | The block is treated as incomplete because the pass was "skipped" | Review | Low | Low | **Skipping the pass is the *successful* outcome under the resolved branch.** The commit body must say so, citing the 2026-10-03 ruling — otherwise a reviewer reads an absent migration as a dropped requirement | Very low |
 | **14** | Phase 05's "both conftests must change together" is acted on and the bot conftest is edited for nothing | Process | Med | Low | C-9; binding constraint 5; the acceptance criteria require it unmodified | Very low |
 | **14** | `_set_status_timestamp` is changed "to add an `ON_MODERATION` branch", and the block scope creeps | Correctness | Low | Med | Binding constraint 3 names the function as read-only and explains the phantom-`IntegrityError` chase | Very low |
 | **14** | Only one of the two rule files is corrected, leaving the drift half-fixed | Correctness | Med | Med | Binding constraint 4: both in the same commit as the flip; project rule 14 | Low |
@@ -2779,7 +2865,9 @@ Phase 11 is complete when **all** of the following hold.
       **written** answer for each of its open questions, naming the option chosen and the
       consequences accepted. **Silence is not an acceptable outcome for any of them.**
 - [ ] Each of **Q1 … Q12** is answered with a record or explicitly re-routed with a named
-      destination. **Q1 and Q2 are coordinator / phase-05 rulings** (the two blockers);
+      destination. **Q2 (BLOCK 14 — `AD-008`) was answered by the Product Owner on 2026-10-03** —
+      `ON_MODERATION` becomes a **durable status**; the 62-site pass is **CANCELLED** (§0.7).
+      **Q1 remains a coordinator ruling and is now the sole blocker on BLOCK 14.**
       **Q12 is an Auditor finding from the commit log**; **Q3–Q6 and Q8, Q9, Q11 are Planner
       decisions**; **Q7 needs phase 06's `VAL-007`**; **Q7' and Q7'' need the coordinator**;
       **Q10 is a Researcher judgement**; **Q8' is a Planner shape choice**.

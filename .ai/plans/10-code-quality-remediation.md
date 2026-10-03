@@ -111,7 +111,7 @@ mid-edit. **No test suite was run for the audit, for the code context, or for th
 | 2 | An uncaught Pydantic `ValidationError` in `ad_edit` surfaces as **500** (Q3) | 16 | Force `AdEditInput.model_validate` to fail inside the `transaction.atomic()` and assert the response status before the fix |
 | 3 | `POST /save-search/` with `min_price=-1` persists `-1` silently | 4 | One targeted test asserting the row exists with `-1` **before** the fix |
 | 4 | `reject_ad` and `ban_user` return **302** on GET; `approve_ad` returns **405** | 12 | The two shipped assertions already pin it; read them rather than re-deriving |
-| 5 | `test_search_fuzzy.py::TestFuzzyEquivalence` re-derives `cutoff=0.8` in-test (Q6) | 15 | Read the test. If 0.6 is chosen, the test is rewritten under project rule 2 **and the commit body must say which side of the rule it invoked and why** |
+| 5 | `test_search_fuzzy.py::TestFuzzyEquivalence` re-derives `cutoff=0.8` in-test (Q6) | 15 | **RESOLVED 2026-10-03 — the unified cutoff is 0.8, which is the value the test already asserts, so the test is read and left UNCHANGED.** The contingency that required a project-rule-2 rewrite under a 0.6 outcome is **moot**; if the block changes this test, stop and report — rewriting it reverses the Product Owner decision |
 | 6 | `cmd_alerts`'s prompt string is the only place `/alerts` promises a toggle | 10 | Read `alerts.py`'s three router entry points; no test covers the listing or the prompt |
 | 7 | `PLC0415` would fire on **96** sites, and `ruff check src/` is green today | 13 | Run `uv run ruff check src/` before, add the rule with its exclusion list, run again. **A red gate on arrival is a missing exclusion, not a defect to suppress** |
 | 8 | `AdvisoryLockId`'s membership, re-read at that moment | — | **No block allocates one.** If BLOCK 3 must edit the same file, re-read `core/enums.py` first (C-7) |
@@ -212,12 +212,12 @@ acceptable outcome for any of them.**
 | ID | Question | Block | Who decides | Status |
 |---|---|---|---|---|
 | **Q1** | Where does the shared category-fuzzy ladder live, given `apps/search/services/category_fuzzy.py` already owns the cached name list and `categories → search` inverts the graph? (a) ladder in `apps/categories/services/fuzzy.py` with the name list **injected**; (b) ladder in `apps/search/services/` and `ads/views/listings.py` imports from `search` (a new `ads → search` edge); (c) leave both sites alone and only align the cutoff constant | **15** | Planner + Researcher; **check with phase 08**, which owns `category_fuzzy.py`'s neighbourhood (BLOCK 6) | **GATED.** Changes the block's file set, its dependency-direction consequences and its test blast radius |
-| **Q2** | What should an **invalid** `reason_category` do in `reject_ad` — 400, re-render the review page, or coerce to empty? Today **any** client string is concatenated into `ModeratorActionLog.reason` | **7** | Owner / phase 15 (moderation surfaces) | **GATED.** Changes moderator UX; `staff_required` + `transaction.atomic()` make a 400 the least surprising but not obviously right |
+| **Q2** | What should an **invalid** `reason_category` do in `reject_ad` — 400, re-render the review page, or coerce to empty? Today **any** client string is concatenated into `ModeratorActionLog.reason` | **7** | **Product Owner** (routed from phase 15's `Q11`, which owns the moderation surfaces) — answered 2026-10-03 | **RESOLVED 2026-10-03 (Product Owner) — option (b): RE-RENDER the review page with an error and PRESERVE the moderator's input.** The gate row's former clause — *"`staff_required` + `transaction.atomic()` make a 400 the least surprising but not obviously right"* — is **superseded**: the 400 reading is **DECLINED**. **Nothing is coerced to empty**, and **no arbitrary client string reaches `ModeratorActionLog.reason`**. BLOCK 7 ships the re-render **plus a new user-visible error string ⇒ non-empty `ru` and `bs`**. **Still routed to phase 15**, which now owns it under its own `Q11` — the ruling is applied here, the moderation UX is phase 15's |
 | **Q3** | For `CQ-009`, what does `ad_edit` return on a Pydantic `ValidationError`? Today `AdEditInput.model_validate` raises inside `transaction.atomic()` with **no handler** → 500. 400 vs a re-render of `ads/edit.html` with a new i18n string | **16** | Planner (the `ads/edit.html` error slot already exists as the `"error"` context key) | **GATED.** The single riskiest part of `CQ-009`; the report does not mention it |
 | **Q4** | For `CQ-018`'s `review.py` half: is a GET on `reject_ad` / `ban_user` supposed to be a **302** to the admin change page (today) or a **405** (after `@require_POST`)? Two shipped tests assert 302; the sibling `approve_ad` already returns 405 | **7** | Owner / phase 15 | **GATED.** A behaviour decision, not a code decision |
 | **Q5** | Do the three `RESOLVED_*_PREFIX` aliases have any **external** importer? Their source comment claims backward compatibility "with any external callers", and the repo has zero | **8** | Coordinator (one question) | **GATED, narrow.** In-repo half is proven; the external half is not. Project rule 2 says the code is king over the comment, but only after this is asked |
-| **Q6** | Should the unified fuzzy cutoff be **0.6** or **0.8**? `test_search_fuzzy.py::TestFuzzyEquivalence` re-computes 0.8 inside the test over 10 `(locale, query)` pairs | **15** | Owner (product: how forgiving should "did you mean" be?) | **GATED.** If 0.6 wins, the test is rewritten under project rule 2 and the commit body must state which side was invoked and why |
-| **Q7** | Does `suggest_city` (`locations/services/city_suggestions.py`, `_CUTOFF = 0.6`) join the unification, or stay a separate entity's policy? | **15** | Planner | **GATED.** Decides whether BLOCK 15 touches 2, 3 or 4 modules |
+| **Q6** | Should the unified fuzzy cutoff be **0.6** or **0.8**? `test_search_fuzzy.py::TestFuzzyEquivalence` re-computes 0.8 inside the test over 10 `(locale, query)` pairs | **15** | **Product Owner** (how forgiving should "did you mean" be?) — answered 2026-10-03 | **RESOLVED 2026-10-03 (Product Owner) — the unified cutoff is 0.8.** Consequences: **`TestFuzzyEquivalence` stays GREEN AND UNCHANGED** — it already asserts 0.8 in-test, so **project rule 2 is NOT invoked and no test rewrite is permitted**; the **0.6 site** (`ads/views/listings.py::_suggest_category`) **aligns to the shared 0.8 constant**; BLOCK 15's risk row is **downgraded from "tests rewritten under project rule 2" to "tests unchanged"**. See §0.7 |
+| **Q7** | Does `suggest_city` (`locations/services/city_suggestions.py`, `_CUTOFF = 0.6`) join the unification, or stay a separate entity's policy? | **15** | **Planner — UNCHANGED. Q7 is a technical gate, not a Product Owner decision, and the 2026-10-03 ruling did not touch it** | **STILL GATED.** Decides whether BLOCK 15 touches 2, 3 or 4 modules. **But the Q6 ruling sets the bar Q7 must clear:** if `suggest_city` stays separate, its surviving **0.6 must be justified against the 0.8 product decision** in the commit body, as a deliberate entity-specific divergence. That justification is an **acceptance criterion**, so Q7 can no longer be answered by leaving the value in place and saying nothing |
 | **Q8** | Is `build_listings_context()` a **service** (new module) or a **shared helper** beside `ListingsQuery` in `apps/ads/services/listings_query.py`? Phase 08 **BLOCK 1** holds that file | **14** | Planner + phase 08 | **GATED.** A new module versus one more function in another phase's file |
 | **Q9** | For `CQ-006`, do `LanguageLocale.fts_config` / `.fts_vector_field` become `match` arms or `Final` class-level mappings? Either keeps the pairings `test_search_triggers.py` pins | **3** | Planner | **GATED.** Stylistically cheap, but it sets a precedent for every future enum in the repo |
 | **Q10** | For `CQ-005` (and `CQ-018`'s template URL): is the enum exposure a **context processor** in `core/context_processors.py` (next to `price_step`) or a **per-view context key** (next to `dashboard.py`'s `status_labels`)? | **5** (and **7** reuses it) | Planner | **GATED.** A context processor adds a key to *every* template; a per-view key is narrower. Also decides the mechanism for `CQ-003` |
@@ -446,6 +446,44 @@ a **separate Validator task is required** for every `behavioural` block, for eve
 whose acceptance depends on a decision the Implementor was told not to make, and for
 BLOCK 16 (all four agents). Required agents are stated per block in §3.
 
+### 1.7 Product Owner gate rulings — 2026-10-03
+
+**Authority.** Product Owner decisions, dated `2026-10-03`, recorded here so that no Implementor
+can re-derive a settled question. **Three rulings map to this plan.** Two of them **reduce risk**
+(a test no longer needs rewriting) or **remove an option**; one **creates an i18n obligation**
+and one **creates a tracked backlog item**.
+
+| Gate | Ruling (2026-10-03, Product Owner) | Chosen option | Block-level consequence |
+|---|---|---|---|
+| **Q6** — the unified fuzzy cutoff | **The unified fuzzy cutoff is 0.8** | **0.8** | **BLOCK 15 — and the plan's test-rewrite contingency is MOOT.** `test_search_fuzzy.py::TestFuzzyEquivalence` re-derives **0.8 in-test**, so the product decision and the shipped test now agree: the test stays **GREEN AND UNCHANGED**, **project rule 2 is never invoked**, and a rewrite is a *reversal of a Product Owner decision*. The **0.6 site** — `ads/views/listings.py::_suggest_category` — **aligns to the shared 0.8 constant** and loses its local literal. Binding constraint 4 now names the value. **BLOCK 15's risk row is downgraded** from *"tests rewritten under project rule 2"* to *"tests unchanged"* |
+| **Q2** — an invalid `reason_category` | **Re-render the review page with an error and preserve the moderator's input.** Nothing is coerced to empty; no arbitrary client string reaches `ModeratorActionLog.reason` | **(b)** | **BLOCK 7.** The gate row's former clause — *"`staff_required` + `transaction.atomic()` make a 400 the least surprising but not obviously right"* — is **superseded**: the **400 is DECLINED** and the coercion option is declined. Binding constraint 3 is **rewritten in place** to carry the three invariants. **Two new obligations, both with acceptance criteria: a new user-visible error string with non-empty `ru` and `bs` in the same commit, and a preserved-input assertion** — a re-render that silently discards the moderator's typed `comment` would be a worse defect than the one being fixed. Option (d)'s "other" member was **not** chosen, so the vocabulary **stays at 8** and `db-enums.md` is not edited |
+| **`CQ-014`** — the `/alerts` numeric toggle | **Fix the prompt to match implemented behaviour and delete the dead state; the feature is NOT built in this programme** | option (a) only | **BLOCK 10** delivers the prompt correction; **BLOCK 8** delivers the `SavedSearchState` deletion. **No new FSM, no new router entry point, and no new i18n strings are in scope** — the three new strings the report contemplated are **explicitly out of scope**. The un-built toggle is recorded in §6.1 as a **feature request with a named owner** (the bot's seller-facing-flows owner). BLOCK 10's risk row *"the prompt is fixed but the toggle still does nothing"* **SURVIVES** and now cites that owner |
+
+**`Q7` is deliberately untouched.** Whether `suggest_city`'s `_CUTOFF = 0.6` joins the
+unification is a **Planner gate, not a Product Owner decision**, and the 2026-10-03 ruling did
+not touch it. **What the ruling did change is the bar Q7 must clear:** if `suggest_city` stays
+separate, **its surviving 0.6 must be justified against the 0.8 product decision** in the commit
+body, as a deliberate entity-specific divergence rather than an oversight. That justification is
+now an **acceptance criterion**, so Q7 can no longer be answered by leaving the value in place and
+saying nothing.
+
+**Cross-plan propagation obligations created by these rulings.**
+
+- **Phase 15 — `Q11`.** Q2 originated as phase 15's `Q11` and the moderation UX is phase 15's.
+  Phase 15 must record the same answer so it does not re-open the question.
+- **Phase 15 — the moderation UX.** BLOCK 7 applies the re-render because the code lands here;
+  the moderator-facing template and context key are a shared surface with BLOCK 5. Re-read
+  before editing.
+- **Bot seller-facing-flows owner.** The `/alerts` toggle is a declined feature with a named
+  owner (§6.1). BLOCK 11 must run before any future toggle work, because the handlers would land
+  in the file its extraction moves.
+
+**Technical gates that are NOT Product Owner decisions and remain exactly as they are.**
+**Q1**, **Q3**, **Q4**, **Q5**, **Q7**, **Q8**, **Q9**, **Q10**, **Q11**, **Q12**, **Q13** and
+**Q14** all keep their existing state. **Q4 in particular is untouched**, though its premise is
+narrowed by a sibling 2026-10-03 ruling held outside this plan — see the note in BLOCK 7. No
+module placement, commit sequencing or migration numbering was changed by any 2026-10-03 ruling.
+
 ---
 
 ## 2. Scope decisions table (acceptance contract for execution)
@@ -458,7 +496,7 @@ shared contract, breaks a shipped test, or is gated on an open question.
 |---|---|---|---|---|---|
 | `CQ-001` | **behavioural** | **implement — one coordinated change set.** Extract `ad_edit` into `apps/ads/services/edit_ad.py`, and land it in the **same commit** as `CQ-008`, `CQ-009`, and — outside this plan — `AUTHZ-007` and `AUTHZ-002`. Build the hoisted `SubmitAdInput` with `user_id=request.user.id`, **never** `ad.user_id` | **16** | MEDIUM (execution risk **HIGH**) | Largest function in the repository (193 lines, verified) with no demonstrated defect, but it is the single most contended symbol in the plan set: phase 03 BLOCK 5, phase 05 BLOCKs 2/8/12, phase 07 BLOCK 10, and phase 15's two AUTHZ items all point at it. **Three shipped source-inspection tests, one of them a hard `count("select_for_update") == 1`, are the detector** (C-6) |
 | `CQ-002` | **behavioural** | **implement the `alerts` half only.** `telegram_bot/services/alerts.py` for `get_user_saved_searches` / `resolve_unsubscribe` / `resolve_reenable` / `_resolve_owned`; `contact.py` and `support.py` become **module-level imports**, not new modules. **The `login` half is already shipped and is not re-filed** | **11** | MEDIUM | Layering inconsistency with no defect. The report's own merge instruction and target correction were executed by phase 01 `ENT-005`; re-filing them would ship the same code twice at a different severity (C-3). Two source-inspection tests in `test_unsubscribe.py` must be re-pointed |
-| `CQ-003` | **behavioural** | **implement — gated on Q2.** Expose the enum through the Q10 mechanism, delete the eight hardcoded `<option>`s, and validate `reason_category` at the boundary | **7** | MEDIUM | Zero production call sites today; any client string is concatenated into `ModeratorActionLog.reason`. The "unqueryable" half is a **documented design decision** (the enum's own docstring says it is not a DB column), so what survives is the *unvalidated vocabulary* — narrower and sharper than reported. Five existing reject tests post a valid member, so the change is additive for them |
+| `CQ-003` | **behavioural** | **implement — Q2 RESOLVED 2026-10-03: option (b).** Expose the enum through the Q10 mechanism, delete the eight hardcoded `<option>`s, and validate `reason_category` at the boundary **before** the `reason` string is constructed. On an invalid value **re-render the review page with an error and preserve the moderator's typed comment** — **not** a 400, **not** coerced to empty, and **no audit row written**. New user-visible error string ⇒ **non-empty `ru` and `bs`** | **7** | MEDIUM | Zero production call sites today; any client string is concatenated into `ModeratorActionLog.reason`. The "unqueryable" half is a **documented design decision** (the enum's own docstring says it is not a DB column), so what survives is the *unvalidated vocabulary* — narrower and sharper than reported. Five existing reject tests post a valid member, so the change is additive for them. **The owner declined the 400**, which is why the deliverable now carries an i18n obligation |
 | `CQ-004` | **behavioural** | **implement `SavedSearchInput` only — gated on Q12.** Two byte-identical `_int_or_none` closures deleted; `ge=0` price bounds; the `save_search` **view name** and the `request.LANGUAGE_CODE or "bs"` fallback preserved. **`PreferredCityInput` de-scoped** (§6) | **4** | MEDIUM | A mandated Pydantic boundary is genuinely absent and the two closures are byte-identical — but the report's crash is refuted: `min_price=-1` is **silently persisted** (C-12). Fixing it introduces a **new response shape**, which is Q12 |
 | `CQ-005` | **mechanical** | **implement — template-only.** 10 template lines / ~14 literal occurrences across 4 templates, through the existing `price_step` context pattern. **`ads/edit.html` included** (unfiled by the report) | **5** | MEDIUM → executes LOW | **Zero Python sites** (C-1). `AdStatus` is a `StrEnum`, so the substitution is semantically neutral; the one real site is the literal **inside a hardcoded `/admin/` URL** in `analytics/moderation_dashboard.html`, which is why BLOCK 5 carries `CQ-018`'s URL half too |
 | `CQ-006` | **mechanical** | **implement in place — gated on Q9.** `LanguageLocale.X.value` substitution at 10 file-sites, plus the two raw dicts inside `LanguageLocale` itself, plus the false invariant sentence in the module docstring. **No `locales.py`** (§6) | **3** | MEDIUM | Highest closed-literal count per diff line in the report. `LanguageLocale` already exposes `.values()`, `.from_code()`, `.fts_config` and `.fts_vector_field`; a wrapper module is a hop with no consumer. The bot submit path's six `.get("ru"/"bs"/"en")` calls are the largest cluster. `test_search_triggers.py` pins the FTS pairings and must stay green |
@@ -466,19 +504,21 @@ shared contract, breaks a shipped test, or is gated on an open question.
 | `CQ-008` | **behavioural** | **implement — same commit as `CQ-001`.** Split `submit_ad`'s orchestration into the app's own `services/`, keeping the locked fetch inside the transaction | **16** | MEDIUM (execution risk **HIGH**) | 124 lines, six responsibilities, no defect. It cannot be split independently of `CQ-001` because `ad_edit` branches on its return value, and because `SubmitAdInput.user_id` — the field `AUTHZ-002` guards — is declared and never read. **A split that moves the fetch into a helper makes `test_submit_ad_fetches_inside_atomic` raise `ValueError`, not fail cleanly** |
 | `CQ-009` | **behavioural** | **implement — gated on Q3, same commit as `CQ-001`/`CQ-008`.** `title` / `description` required with `min_length=1` | **16** | MEDIUM | A POST omitting `title` persists `""` over a live ad's title. **No test covers the omitted-key case**, so the change is unopposed — but the risk is the *response*: an uncaught `ValidationError` inside `transaction.atomic()` is a **500** today, and the report does not mention it |
 | `CQ-010` | **mechanical** (move) | **implement as two commits.** BLOCK 12: move `admin_actions.py` → `apps/moderation/services/admin_actions.py`, three importers, one commit. BLOCK 13: enable `PLC0415` in `pyproject.toml` **with** a `per-file-ignores` list. **No custom lint script** (§6) | **12**, **13** | LOW | Highest value-per-diff in the report (the move deletes three arbitrary deferred imports as a side effect, and the module's own docstring already calls it a service) and its highest coordination cost: **five phases hold the file**. The count is **96**, not 92; the rule is a `pyproject.toml` edit, not a CI edit; and `PLC0415` on today would fire 96 times (C-4) |
-| `CQ-011` | **behavioural** | **implement — gated on Q1 + Q6 + Q7, all three written down first.** The report's target module is **wrong**; the ladder's home, the cutoff and the scope are decisions, not implementation details | **15** | MEDIUM (consistency, **not** a recall defect) | Two divergent ladders and two divergent cutoffs over **one already-shared** name list. The report's user-visible framing is wrong: on `/search/?category=…` the slug is resolved by the **breadcrumb**, and the ladder is only reached from `?q=` (§0.4). `test_search_fuzzy.py::TestFuzzyEquivalence` re-computes `cutoff=0.8` in-test and turns red on any change (C-2) |
+| `CQ-011` | **behavioural** | **implement — Q6 RESOLVED 2026-10-03 (cutoff 0.8); still gated on Q1 + Q7, both written down first.** The report's target module is **wrong**; the ladder's home, the cutoff and the scope are decisions, not implementation details | **15** | MEDIUM (consistency, **not** a recall defect) | Two divergent ladders and two divergent cutoffs over **one already-shared** name list. The report's user-visible framing is wrong: on `/search/?category=…` the slug is resolved by the **breadcrumb**, and the ladder is only reached from `?q=` (§0.4). `test_search_fuzzy.py::TestFuzzyEquivalence` re-computes `cutoff=0.8` in-test and turns red on any change (C-2) |
 | `CQ-012` | **behavioural** (for the test suite) | **implement as one commit — gated on Q14.** `PriorityScore` + annotated `CategoryLookupResolver` + the 4 `type: ignore[type-arg]` dropped + the 2 bare generics in `cache.py` + the 2 untyped signatures in `context_processors.py`, in the same commit because the suppressions and the annotations are inseparable | **9** | MEDIUM | The four suppressions are the only ones of their kind in production code. **No gate enforces this** (C-4): basedpyright is in `standard` mode, `[tool.mypy]` is not read by it and is not in CI. Largest test blast radius of the "cheap" MEDIUM findings: ~30 assertions in `test_priority.py` plus a `defaults=data` consumer (C-10) |
 | `CQ-013` | **mechanical** | **implement — gated on Q13.** Relocate the four `CONSENT_*` names; update five raw read sites. Values and names byte-identical | **1** | LOW | Cheapest fix-to-risk ratio in the report: ~40 assertions across 5 test files pin the cookie names and values, and a pure relocation changes none of them. A rename would silently break anonymous consent state for every returning visitor |
-| `CQ-014` | **behavioural** | **implement the prompt correction + `SavedSearchState` deletion. The numeric toggle is de-scoped** (§6) and routed to the owner | **10** | MEDIUM → executes LOW | A live user-facing dead end: three router entry points, no numeric handler, and a prompt that promises one. Implementing the toggle is a **new feature** — FSM states, a new router entry point, input parsing, error paths and 3 new i18n strings — wildly out of proportion to a code-quality finding. **No test covers `cmd_alerts`' listing or prompt**, so the correction is unopposed |
+| `CQ-014` | **behavioural** | **RULING 2026-10-03 (Product Owner) — fix the prompt to match implemented behaviour and delete the dead state; the feature is NOT built in this programme.** **BLOCK 10** delivers the `/alerts` prompt correction; **BLOCK 8** delivers the `SavedSearchState` deletion. **No new FSM, no new router entry point, and no new i18n strings are in scope** — the three new strings the report contemplated are **explicitly out of scope** under this ruling. Recorded as a **feature request with a named owner** (§0.7) | **10** (prompt) · **8** (dead state) | MEDIUM → executes LOW | A live user-facing dead end: three router entry points, no numeric handler, and a prompt that promises one. Implementing the toggle is a **new feature** — FSM states, a new router entry point, input parsing, error paths and 3 new i18n strings — wildly out of proportion to a code-quality finding, and **the owner has now declined it for this programme**. **No test covers `cmd_alerts`' listing or prompt**, so the correction is unopposed. The surviving risk — *"the prompt is fixed but the toggle still does nothing"* — is **accepted by decision** and the feature request carries a named owner |
 | `CQ-015` | **behavioural** | **implement — gated on Q8.** One `build_listings_context()` serving both views; 20 shared keys on both, 6 search-only keys stay search-only | **14** | MEDIUM (execution risk MEDIUM) | The 11-field DTO build and the 20-key context are verified duplicates, and `listings.py`'s context is a **strict subset** of `search.py`'s — one template contract expressed twice. Zero intended behaviour change, the largest mechanical diff in the report, and ~10 test files pin the contract from both sides. One-key-per-line reformatting of the context is a **consequence**, not a finding |
 | `CQ-016` | **mechanical** | **implement — deletion only, gated on Q5.** 6 named symbols + the 3 `RESOLVED_*_PREFIX` aliases + the empty `apps/api/` tree + the vestigial `if TYPE_CHECKING: pass` | **8** | LOW | Safest batchable item in the report: every symbol is single-occurrence across the whole repo. The one caveat is Q5 — the aliases carry an explicit "external callers" comment, and project rule 2 says the code is king over the comment **only after** that is asked. `can_publish_ad` is **phase 15's `AUTHZ-005`** and is not touched |
 | `CQ-017` | **mechanical** | **implement sub-claims 1 and 2.** Add `apps/ads/services/__init__.py`; drop `"_get_ad_status"` from `orm.py`'s `__all__`. **Sub-claim 3 (the `AdvisoryLockId` reorder) is de-scoped** (§6) | **2** | LOW | The missing `__init__.py` is the one app in the repo with an implicit namespace `services/`, and **BLOCK 16 adds a module into that package** — so this sub-claim must land before BLOCK 16. The private name in a public export list is a naming contradiction, not dead code: `_get_ad_status` is live |
 | `CQ-018` | **split** | **implement all three parts in three different blocks.** BLOCK 5: the URL half (5 `redirect()`s + the template URL) · BLOCK 6: the 7 behaviour-preserving 405 guards → `@require_POST` · BLOCK 7: the `review.py` half (**302 → 405**, gated on Q4), merged with `CQ-003` because both land on `reject_ad`'s request boundary | **5**, **6**, **7** | LOW (LOW / LOW / **MEDIUM** at execution) | Standardise on the **existing** `@require_POST`; do **not** introduce `require_http_methods` (§6). Everything except `reject_ad` / `ban_user` is behaviour-preserving, which is why those two are reviewed individually rather than batched. The **10th** inline method check is `ad_edit`'s GET **dispatch** branch, not a guard — it belongs to BLOCK 16, not BLOCK 6 (C-5) |
 | `CQ-019` | **mechanical** | **fold into `CQ-007` (BLOCK 2).** `cache.py` docstrings only. **No tree-wide comment census** (§6) | **2** | LOW | 1,526 comment-only lines of 28,574 (5.3 %) is not a defect, and the comments are overwhelmingly non-obvious design rationale. A tree-wide census is a legacy sweep, which **phase 03 BLOCK 11 explicitly reserves to itself**: *"Phases 04–15 must not start BLOCK 11-style legacy sweeps of their own"* |
 | `CQ-002` **login half** | — | **already fixed — not re-filed, not re-shipped** | — | — | Phase 01 `ENT-005` executed the report's own merge instruction and target correction: `_claim_login_token` delegates to `apps.users.services.login_token.claim_token`. **`telegram_bot/services/login.py` must not be created** (C-3) |
-| `Q1` / `Q6` / `Q7` | — | **GATED** — Planner + Researcher, with phase 08 consulted for Q1 | **15** | — | Three of the phase's questions sit on one block. A single unresolved answer stops BLOCK 15 from starting |
+| `Q1` / `Q7` | — | **GATED** — Planner + Researcher, with phase 08 consulted for Q1 | **15** | — | Two of the phase's questions sit on one block. A single unresolved answer stops BLOCK 15 from starting. **Q6 is no longer among them — see the next row** |
+| `Q6` | — | **RESOLVED 2026-10-03 (Product Owner) — the unified cutoff is 0.8** | **15** | — | Was bundled with Q1/Q7 above. Split out because the ruling is made and its consequence is a **reduction** in risk: `TestFuzzyEquivalence` already asserts 0.8 in-test, so it stays **green unchanged** and **project rule 2 is never invoked**. The 0.6 site (`listings.py::_suggest_category`) aligns to the shared constant. **Q7 remains a Planner gate**, but a surviving `suggest_city` 0.6 must now be **justified against this 0.8 decision** in the commit body |
+| `Q2` | — | **RESOLVED 2026-10-03 (Product Owner) — option (b): re-render and preserve the moderator's input** | **7** | — | Routed from phase 15's `Q11`, which owns the moderation surfaces; BLOCK 7 applies the ruling. **The 400 reading is declined**, nothing is coerced to empty, no arbitrary client string reaches `ModeratorActionLog.reason`, and a new user-visible error string requires **non-empty `ru` and `bs`** |
 | `Q8` | — | **GATED** — Planner + phase 08, which holds `listings_query.py` | **14** | — | A new module versus one more function in another phase's file |
-| `Q2` / `Q4` | — | **GATED** — owner / phase 15 (moderation surfaces) | **7** | — | Both change an observable response. Q2 decides what an arbitrary client string gets; Q4 decides whether a GET is a 302 or a 405 |
+| `Q4` | — | **GATED** — owner / phase 15 (moderation surfaces). **⚠ Its premise is narrowed by a sibling 2026-10-03 ruling held outside this plan** (GET renders a 200 confirmation page; the action runs only on POST), which supersedes both of its options. This plan does not re-decide it — see BLOCK 7 constraint 12 | **7** | — | Q4 decides what a GET on `reject_ad` / `ban_user` returns. **Check phase 15's `Q8`/`Q12` before treating 302 or 405 as current options** |
 | `Q3` | — | **GATED** — Planner; the `ads/edit.html` error slot already exists as the `"error"` context key | **16** | — | 500 versus 400 versus a re-render, with a new i18n string in two of the three options |
 | `Q5` | — | **GATED, narrow** — coordinator | **8** | — | One question: does an external consumer import the deprecated aliases? |
 | `Q9` / `Q10` / `Q12` / `Q13` / `Q14` | — | **GATED** — Planner, with an owner input for Q12's response shape | **3**, **5**, **4**, **1**, **9** | — | Style, mechanism, module placement and compatibility questions. Each is cheap, but each sets a precedent, and a precedent set silently by an implementor is a precedent nobody reviewed |
@@ -1314,18 +1354,30 @@ same test class. Two blocks editing one function's request boundary would be a s
 serialisation the DAG would have to defend; one block with two gates is simpler and is the
 shape plan 08 already uses.
 
-**Decision required before implementation — Q2: what happens to an invalid `reason_category`?**
+**Q2 RESOLVED 2026-10-03 (Product Owner) — re-render, preserve the input, coerce nothing**
 
-| Option | What it is | Consequences |
+**The ruling is option (b).** An invalid `reason_category` **re-renders the review page with an
+error and preserves the moderator's input**. **Nothing is coerced to empty**, and **no arbitrary
+client string reaches `ModeratorActionLog.reason`**. The options are retained for traceability;
+the Implementor may **not** re-choose, and **option (a) — the 400 — is DECLINED**.
+
+| Option | What it is | Status |
 |---|---|---|
-| **(a)** | **400** on a value outside the 8 members | **Gains:** the vocabulary becomes a real contract; the audit row can never contain a category that is not one. Matches `set_preferred_city`'s precedent. **Costs:** a moderator with a stale page gets a bare 400; `reject_ad` is inside `staff_required` + `transaction.atomic()`, so nothing is written |
-| **(b)** | Re-render the review page with an error next to the dropdown | **Gains:** the moderator keeps the ad and the text they typed. **Costs:** a new user-visible string (non-empty `ru` **and** `bs`), a new context key, and the review page is also BLOCK 5's and phase 15's surface |
-| **(c)** | Coerce to empty and store the free text only | **Gains:** never blocks a moderator. **Costs:** silently discards the category — the exact failure the finding is filed for, just without the unvalidated string |
-| **(d)** | Validate, and on failure fall back to a named "other" member | **Gains:** never blocks and never stores an arbitrary string. **Costs:** requires **adding a member to `CategoryRejectReason`**, which is a change to the documented 8-value vocabulary in `docs/02-database/db-enums.md` — a data-vocabulary decision, not a code one |
+| ~~**(a)**~~ | **400** on a value outside the 8 members | **DECLINED 2026-10-03.** The gate row's *"least surprising but not obviously right"* clause is superseded: a bare 400 to a moderator holding a stale page loses their work, and the vocabulary is closed by **validation**, not by a rejection status |
+| **(b) — CHOSEN 2026-10-03** | Re-render the review page with an error next to the dropdown, **preserving the text the moderator typed** | **Adopted.** The moderator keeps the ad and their text; the audit row can never contain a category outside the 8 members. **Costs, accepted:** a new user-visible string (**non-empty `ru` and `bs`**), a new context key, and the review page is also BLOCK 5's and **phase 15's** surface |
+| ~~**(c)**~~ | Coerce to empty and store the free text only | **DECLINED.** Silently discarding the category is the exact failure the finding is filed for |
+| ~~**(d)**~~ | Validate, and on failure fall back to a named "other" member | **NOT CHOSEN.** It would require **adding a member to `CategoryRejectReason`**, a change to the documented 8-value vocabulary in `docs/02-database/db-enums.md` — a data-vocabulary decision the owner did not make. **The vocabulary stays at 8**, and the committee must not widen it in this block |
 
-**The Implementor may not choose.** Note that option (d) is the only one that keeps the
-vocabulary closed *and* the moderator unblocked, which is exactly why it must be a decision
-rather than an implementer's preference.
+**Two obligations this ruling creates for BLOCK 7**, both with acceptance criteria below: a
+**new user-visible error string** with non-empty `ru` and `bs` in the same commit, and a
+**preserved-input assertion** — the re-render must carry the moderator's typed `comment` back
+into the form, because a re-render that silently discards it would be a worse defect than the
+one being fixed.
+
+**Routing.** The question originated as phase 15's `Q11` and the moderation UX is **phase 15's**;
+the ruling is applied here because the code change lands in BLOCK 7. **Propagation obligation on
+phase 15**: its `Q11` must be updated to record the same answer, so the moderation-surface owner
+does not re-open it.
 
 **Decision required before implementation — Q4: 302 or 405 for a GET on `reject_ad` and
 `ban_user`?**
@@ -1364,8 +1416,17 @@ into the audit row.
    and `reason_category` alone must still produce a category-only string. The five existing
    `TestRejectAdView` cases post `reason_category="spam_scam"` and must be green unchanged.
 2. **`reason_text` handling is unchanged**, including the no-`reason_text` case.
-3. **The template must not hardcode the vocabulary any more.** The 8 `<option>`s are deleted,
-   not re-listed. A `for` loop over the enum's members, in declaration order, is the point.
+3. **The invalid-value path is the Q2 ruling, and the vocabulary is closed.** *(rewritten in
+   place 2026-10-03 — Product Owner, option (b). This constraint previously said only that the
+   template must not hardcode the vocabulary; it now carries the ruling's three invariants, and
+   no parallel rule is added beside it.)* An invalid `reason_category` **re-renders the review
+   page with an error and preserves the moderator's typed `comment`**; it is **not** a 400, and
+   it is **not** coerced to empty. **No arbitrary client string reaches
+   `ModeratorActionLog.reason`** — validation runs before the `f"{reason_category}"` /
+   `f"{reason_category}: {reason_text}"` construction, and **no audit row is written**. The 8
+   `<option>`s are deleted, not re-listed: a `for` loop over the enum's members, in declaration
+   order, is the point, and the **vocabulary stays at 8 members** — option (d)'s "other" member
+   was **not** chosen, so `db-enums.md` is not edited.
 4. **No migration, no new column, no lookup model.**
 5. **Do not remove the `apps/core/__init__.py` re-export.**
 6. **`approve_ad`, `ban_user` and `reject_ad` are not restructured.**
@@ -1380,6 +1441,17 @@ into the audit row.
     then. This block does not re-edit them, and BLOCK 12's move touches only the import line.
 11. **No template change is permitted** beyond the option list. If a form turns out to submit
     by GET, that is a separate defect: stop and report.
+12. **⚠ A sibling ruling narrows Q4's premise, and this plan does not re-decide it.** *(recorded
+    2026-10-03; appended as 12 so that no existing constraint number shifts)* A Product Owner
+    decision taken **outside this plan** settles that a GET on a state-changing moderation route
+    **renders a confirmation page (200)** and the action executes **only on POST** — which
+    **supersedes both of Q4's options as they stand** (a 302 redirect and a bare 405). **This plan
+    does not choose between them and does not rewrite Q4.** What it records is that Q4's *premise*
+    is affected: the **two shipped tests asserting 302** will need their expectations changed **in
+    the same commit as the shape change, with the justification recorded**, and that change belongs
+    to **phase 15**, which owns the moderation routes. **Propagation obligation on phase 15.** An
+    Implementor must not treat "302" or "405" as still-current options without checking phase 15's
+    `Q8`/`Q12` first.
 
 **Implementor task**
 
@@ -1392,13 +1464,17 @@ source_reference: ".ai/plans/10-code-quality-remediation.md"
 source_section: "BLOCK 7 - Make the reject-reason vocabulary a real boundary"
 source_blocks: ["BLOCK 7"]
 description: >
-  Two decisions land on one function here. Q2: reject_ad reads request.POST.get
-  ("reason_category", ""), does not strip it, does not validate it, and concatenates it
+  Two decisions land on one function here. Q2 is RESOLVED 2026-10-03 by the Product Owner:
+  an invalid reason_category RE-RENDERS the review page with an error and preserves the
+  moderator's typed comment; it is NOT a 400, NOT coerced to empty, and no arbitrary client
+  string reaches ModeratorActionLog.reason. The 8-value vocabulary is closed and no 'other'
+  member is added. reject_ad reads request.POST.get("reason_category", ""), does not
+  strip it, does not validate it, and concatenates it
   into ModeratorActionLog.reason - a TEXT column - so any client string is accepted; expose
-  the enum to review.html via the Q10 mechanism, delete the eight hardcoded options, and
-  validate the value. Q4: reject_ad and ban_user redirect a GET to the admin change page
+  the enum to review.html via the Q10 mechanism and delete the eight hardcoded
+  options. Q4: reject_ad and ban_user redirect a GET to the admin change page
   (302) while their sibling approve_ad already returns 405 via @require_POST; apply the
-  recorded option, and under option (a) update the two GET assertions in this commit. The
+  recorded option, and under option (a) update the two GET assertions in this commit. The]
   stored "<category>: <text>" shape must not change, and no view may be restructured -
   TestModerationReviewLocking source-inspects all three.
 goals:
@@ -1428,18 +1504,26 @@ files:
 changes:
   - action: modify_code
     description: >
-      Validate reason_category against the enum in reject_ad and return the Q2 response on
-      failure. Keep the reason string construction exactly as it is. Under Q4(a) apply
-      @require_POST to reject_ad and ban_user, delete their inline method guards, and update
-      the two GET assertions to expect 405.
+      Validate reason_category against the enum in reject_ad BEFORE the reason string is
+      constructed. Q2 is RESOLVED 2026-10-03 as option (b): on failure RE-RENDER the review page
+      with an error and preserve the moderator's typed comment. Do NOT return a 400, do NOT
+      coerce to empty, and do NOT write a ModeratorActionLog row. Keep the reason string
+      construction exactly as it is. Under Q4(a) apply @require_POST to reject_ad and ban_user,
+      delete their inline method guards, and update the two GET assertions to expect 405.
   - action: modify_code
     description: >
       Render the dropdown options from the enum in declaration order via the Q10 mechanism
-      and delete the eight hardcoded option elements.
+      and delete the eight hardcoded option elements. Add the new invalid-category error string
+      to ru and bs.
 acceptance_criteria:
-  - "a POST with a reason_category outside the enum is refused and NO ModeratorActionLog row is written"
+  - "a POST with a reason_category outside the enum re-renders the review page with an error and NO ModeratorActionLog row is written"
+  - "the re-render PRESERVES the moderator's typed comment - a re-render that discards it would be a worse defect than the one being fixed"
+  - "the invalid value is NOT coerced to empty and does NOT become a 400"
+  - "no arbitrary client string reaches ModeratorActionLog.reason"
   - "all eight enum members still produce a stored reason, and the '<category>: <text>' shape is unchanged"
   - "the review template contains no hardcoded reject-reason option value"
+  - "CategoryRejectReason still has exactly 8 members; no 'other' member was added and db-enums.md was not edited"
+  - "the new error string has non-empty ru and bs msgstr; en may be empty"
   - "a GET to reject_ad or ban_user never moderates or bans the ad, under either Q4 option"
   - "TestModerationReviewLocking is green UNCHANGED for all three views"
   - "TestRejectAdView is green UNCHANGED apart from the two Q4(a) GET assertions"
@@ -1758,22 +1842,27 @@ tests_to_run:
 | **Risk level** | **LOW** — one sentence, plus an i18n catalogue append if the string is reworded |
 | **Required agents** | **Auditor · Planner · Validator** — the Validator confirms `ru` and `bs` |
 
-**Why the toggle is de-scoped.** Implementing it is a **new user-facing feature**: an FSM
-state machine for the list, a new router entry point, numeric input parsing, error paths,
-and **three new i18n strings** with non-empty `ru` **and** `bs` in a catalogue shared with
-six other phases. That is not a MEDIUM code-quality remediation; it is a feature that
-belongs to whoever owns the bot's seller-facing flows. The **defect** is real and narrower
-than the feature: *a shipped prompt promises an interaction the code does not implement*, and
-a seller who follows it falls through to the unhandled-message path.
+**Why the toggle is de-scoped — DECIDED 2026-10-03 (Product Owner), not merely deferred.**
+Implementing it is a **new user-facing feature**: an FSM state machine for the list, a new router
+entry point, numeric input parsing, error paths, and **three new i18n strings** with non-empty
+`ru` **and** `bs` in a catalogue shared with six other phases. That is not a MEDIUM code-quality
+remediation; it is a feature belonging to whoever owns the bot's seller-facing flows. The
+**Product Owner has now ruled the feature OUT of this programme**: the deliverable is the
+**prompt correction plus the dead-state deletion, and nothing else**. **No new FSM, no new router
+entry point, and no new i18n strings are in scope** — the three strings the report contemplated
+are explicitly excluded. The **defect** is real and narrower than the feature: *a shipped prompt
+promises an interaction the code does not implement*, and a seller who follows it falls through
+to the unhandled-message path.
 
 | Option | What ships | Consequence |
 |---|---|---|
-| **(a)** | **Correct the prompt** to describe what `/alerts` actually does (list saved searches with their unsubscribe links, then stop) | The promise is withdrawn, the dead end closes, and the block is one sentence plus an i18n append. **The recommended option** |
-| **(b)** | Implement the numeric toggle | A feature. §6; routed to the owner. Not this plan |
+| **(a) — CHOSEN, ruling 2026-10-03** | **Correct the prompt** to describe what `/alerts` actually does (list saved searches with their unsubscribe links, then stop) | The promise is withdrawn, the dead end closes, and the block is one sentence plus an i18n append for the **reworded existing** string. **The Product Owner adopted this and declined the feature** |
+| ~~**(b)**~~ | Implement the numeric toggle | **DECLINED for this programme (2026-10-03).** §6; recorded as a **feature request with a named owner**. Not this plan |
 
-**The Implementor may not choose (b).** If the owner wants the toggle, this becomes a
-separate, separately-specified piece of work — and BLOCK 11 should still run first, because
-the toggle's handlers would land in the same file the extraction moves.
+**The Implementor may not choose (b)** — it is no longer a choice, it is a **declined option**.
+The un-built toggle is a **feature request**, and the owner of that request is recorded in §0.7
+and §6. **BLOCK 11 should still run before any future toggle work**, because the toggle's
+handlers would land in the same file the extraction moves.
 
 **File surface (semantic units)**
 
@@ -2421,19 +2510,29 @@ gate record)
 | **(b)** | The whole thing in `apps/search/services/`, and `ads/views/listings.py` imports it | **Gains:** one owner, one file, the name list and the ladder stay together; the warm-cache zero-SELECT property is trivially preserved. **Costs:** a **new `ads → search` cross-app edge** on a file phase 05 §5.2 and phase 15 also touch; `apps/ads` imports nothing from `apps.search` today |
 | **(c)** | Align the cutoff constant only; leave the two ladders in place | **Gains:** the smallest change that removes the *divergence* while accepting the structural duplication. **Costs:** the "user types an exact slug and `/` does not resolve it" asymmetry survives; the finding is only half closed. **A real option, not a strawman** |
 
-**Q6 — 0.6 or 0.8?** | **Q7 — does `suggest_city` join?**
+**Q6 RESOLVED 2026-10-03 (Product Owner) — the unified cutoff is 0.8** | **Q7 — does
+`suggest_city` join? — STILL A PLANNER RULING**
 
-`test_search_fuzzy.py::TestFuzzyEquivalence` **re-computes
-`get_close_matches(query, all_names, n=1, cutoff=0.8)` inside the test** and asserts identity
-over 10 `(locale, query)` pairs. Whatever the unified cutoff is, that test changes. If 0.6
-wins, project rule 2 applies: the test is corrected **because the behaviour was decided**,
-and the commit body must say which side of the rule it invoked and why. Under 0.8 the
-equivalence test survives and only `listings.py`'s call site moves.
+**Q6 is answered: 0.8.** `test_search_fuzzy.py::TestFuzzyEquivalence` **stays green and
+unchanged** — it re-computes `cutoff=0.8` in-test, so the product decision and the shipped test
+now agree and **project rule 2 is not invoked at all**. The **0.6 site** —
+`ads/views/listings.py::_suggest_category`, which runs fuzzy against raw slugs at `cutoff=0.6`
+with no exact tier — **aligns to 0.8**. The Implementor may **not** re-choose.
 
-`suggest_city` is a **different entity** with its own `_CUTOFF: Final[float] = 0.6` and its
-own shipped test. Joining it is defensible (one policy for "did you mean") and expanding
-BLOCK 15 to a fourth module; not joining it is defensible (a city is not a category and
-share one policy is a category of its own). **Q7 decides; the plan does not.**
+**What the ruling removes.** The plan's contingency for a 0.6 outcome — *"the test is corrected
+because the behaviour was decided, and the commit body must say which side of rule 2 it invoked
+and why"* — is **moot and must not be exercised**. There is **no test rewrite in this block**, and
+a commit that rewrites `TestFuzzyEquivalence` is reverting a Product Owner decision.
+
+**Q7 is NOT a Product Owner decision and is unchanged.** Whether `suggest_city`
+(`locations/services/city_suggestions.py`, with its own `_CUTOFF: Final[float] = 0.6` and its own
+shipped test) joins the unification stays a **Planner ruling**: joining it expands BLOCK 15 to a
+fourth module; not joining it is defensible on the grounds that a city is not a category and
+"share one policy" is a category of its own. **But the ruling sets the bar Q7 must clear:** if
+`suggest_city` stays separate, **its surviving 0.6 must be justified against this 0.8 product
+decision in the commit body** — stated as a deliberate, entity-specific divergence, not as an
+oversight. That justification is now an **acceptance criterion**, so Q7 can no longer be
+answered by leaving the value in place and saying nothing.
 
 **What this block is not.** It is **not** a recall fix. On `/search/?category=<slug>` the
 category is resolved by the **breadcrumb** path and a typo merely echoes the raw string; the
@@ -2447,7 +2546,7 @@ maintainability defect, which is exactly what its MEDIUM severity supports.
 |---|---|---|
 | `src/backend/apps/search/services/category_fuzzy.py` | `get_active_category_names`, `_fuzzy_names_cache_key`, `FUZZY_NAMES_CACHE_TTL` | **An existing asset — do not duplicate and do not re-implement the name list.** Phase 08 BLOCK 6 region |
 | `src/backend/apps/search/views/search.py` | `_fuzzy_category_match` (3 tiers: slug exact, locale-name exact, fuzzy), `_fuzzy_match_by_name` (`cutoff=0.8`) | **Also BLOCK 14's file** |
-| `src/backend/apps/ads/views/listings.py` | `_suggest_category` (fuzzy against raw slugs, `cutoff=0.6`, **no exact tier**) | **Also BLOCK 14's file** |
+| `src/backend/apps/ads/views/listings.py` | `_suggest_category` (fuzzy against raw slugs, `cutoff=0.6` → **aligns to the shared 0.8 constant** per the Q6 ruling, **no exact tier**) | **Also BLOCK 14's file.** The local `0.6` literal is removed in favour of the shared constant — the point of the block |
 | `src/backend/apps/categories/services/fuzzy.py` **(new, if Q1(a))** | the tier ladder | Name the list parameter; the caller supplies it |
 | `src/backend/apps/locations/services/city_suggestions.py` | `suggest_city`, `_CUTOFF` | **Only if Q7 says join** |
 | `src/backend/apps/search/tests/test_search_fuzzy.py` | `TestFuzzyEquivalence` (10 pairs), `TestFuzzyQueryCount` (2), `TestFuzzyCategoryMatch` (2), `TestFuzzyInvalidation` (2) | `TestFuzzyQueryCount` is the one that forbids re-implementing the name list |
@@ -2464,7 +2563,9 @@ maintainability defect, which is exactly what its MEDIUM severity supports.
    give them to `listings.py` as well under Q1(a) or (b).
 3. **`apps/categories` must not import `apps.search` under Q1(a).** That is the whole reason
    the name list is injected. A grep-level check belongs in the review, not a test.
-4. **The cutoff is a single named constant**, not two literals, whichever value Q6 selects.
+4. **The cutoff is a single named constant, valued 0.8** *(Q6 resolved 2026-10-03)*, not two
+   literals — and **not** a per-call-site literal. `listings.py::_suggest_category`'s 0.6 aligns
+   to the same constant; it does not keep a local literal.
 5. **Under Q1(b)**, the new `ads → search` edge is recorded in the commit body and in §5.3,
    because `apps/ads` imports nothing from `apps/search` today and that is a structural
    change made by a code-quality block.
@@ -2486,13 +2587,15 @@ source_blocks: ["BLOCK 15"]
 description: >
   search.py::_fuzzy_category_match runs a three-tier ladder - slug exact, locale-name exact
   over the cached active-category list, then difflib at cutoff 0.8. listings.py::_suggest_category
-  runs fuzzy against raw slugs at cutoff 0.6 with no exact tier at all, using the same name
+  runs fuzzy against raw slugs at cutoff 0.6 - which ALIGNS TO 0.8 per the Q6 ruling of
+  2026-10-03 - with no exact tier at all, using the same name
   list. The report proposes apps/categories/services/fuzzy.py, which would require a
   categories -> search import; that is rejected. Record the Q1, Q6 and Q7 answers, then ship
   one ladder and one named cutoff, keeping the cold/warm query-count properties. The
-  equivalence test re-derives 0.8 in-test and must be updated in the same commit if 0.6 wins.
+  equivalence test re-derives 0.8 in-test and must be left UNCHANGED - it now matches the
+  decided cutoff, so no project-rule-2 rewrite is invoked.
 goals:
-  - "express the category fuzzy ladder once, with one named cutoff"
+  - "express the category fuzzy ladder once, with one named cutoff valued 0.8"
   - "keep the cached name list as the single source of the candidate names"
   - "give the browse path the exact-match tiers it is missing"
 files:
@@ -2519,21 +2622,24 @@ changes:
     description: >
       Per Q1(a): the tier ladder in apps/categories/services/fuzzy.py with the candidate name
       list injected by the caller. Per Q1(b): the ladder beside get_active_category_names in
-      apps/search/services/. One named cutoff constant per Q6.
+      apps/search/services/. One named cutoff constant, valued 0.8 per the Q6 ruling of 2026-10-03.
   - action: modify_code
     description: >
-      Route both call sites through the shared ladder; update TestFuzzyEquivalence's
-      in-test cutoff if Q6 selected 0.6, stating project rule 2 and the decided behaviour in
-      the commit body.
+      Route both call sites through the shared ladder. Align listings.py::_suggest_category's
+      0.6 to the shared 0.8 constant. DO NOT update TestFuzzyEquivalence's in-test cutoff - Q6
+      resolved as 0.8, the test already asserts 0.8, and it must be green UNCHANGED. No
+      project-rule-2 rewrite is invoked anywhere in this block.
 acceptance_criteria:
-  - "one ladder and one named cutoff serve both / and /search/"
+  - "one ladder and one named cutoff serve both / and /search/, and the cutoff is 0.8"
   - "an exact category slug on / resolves to that category - it does not today"
   - "TestFuzzyQueryCount is green UNCHANGED: one category SELECT cold, zero warm"
   - "TestFuzzyCategoryMatch is green UNCHANGED - both exact tiers survive"
-  - "TestFuzzyEquivalence is green; if it changed, the commit body states the Q6 option and that the test was updated to the decided behaviour"
+  - "TestFuzzyEquivalence is green UNCHANGED - it was NOT rewritten, and the commit body states that project rule 2 was not invoked"
+  - "listings.py::_suggest_category no longer carries a local 0.6 literal; it uses the shared 0.8 constant"
+  - "if Q7 kept suggest_city separate, its surviving 0.6 is justified in the commit body against this 0.8 product decision, as an entity-specific divergence rather than an oversight"
   - "apps/categories imports nothing from apps/search"
   - "an unresolvable slug still yields suggested_category None"
-  - "the commit body records Q1, Q6 and Q7"
+  - "the commit body records Q1, Q6 (with its date 2026-10-03) and Q7"
 tests_to_run:
   - "src/backend/apps/search/tests/test_search_fuzzy.py"
   - "src/backend/apps/ads/tests/test_listings_context.py"
@@ -3115,7 +3221,7 @@ re-filed finding.
 
 | Item | Why |
 |---|---|
-| **`CQ-014`'s numeric `/alerts` toggle** | A **new user-facing feature**, not a code-quality remediation: an FSM for the list, a new router entry point, `str.isdigit()` input parsing, error paths, and **three new i18n strings** with non-empty `ru` and `bs` in a catalogue shared with six other phases. The *defect* is a shipped prompt promising an interaction the code does not implement; the proportionate fix is the prompt (BLOCK 10) plus the dead-state deletion (BLOCK 8). **Routed to the owner** as a feature request |
+| **`CQ-014`'s numeric `/alerts` toggle** | **FEATURE REQUEST — DECLINED for this programme by the Product Owner on 2026-10-03. Named owner: the bot's seller-facing-flows owner (the same owner BLOCK 10's original text identified).** A **new user-facing feature**, not a code-quality remediation: an FSM for the list, a new router entry point, `str.isdigit()` input parsing, error paths, and **three new i18n strings** with non-empty `ru` and `bs` in a catalogue shared with six other phases. The *defect* is a shipped prompt promising an interaction the code does not implement; the proportionate fix is the prompt (BLOCK 10) plus the dead-state deletion (BLOCK 8), and **the owner has ruled that is the whole deliverable**. **Explicitly out of scope under the ruling: the FSM, the router entry point, numeric parsing, and all three new strings.** If the feature is later picked up, BLOCK 11 must already have run — the handlers would land in the same file its extraction moves |
 | **`CQ-004`'s `PreferredCityInput`** | `set_preferred_city` already validates with an explicit existence query, already returns 400 with a documented reason, already has `@require_POST`, and already owns its cookie constants. Wrapping it in a Pydantic model adds a layer with **no defect behind it** — a direct violation of project rules 5 and 7 |
 | **`CQ-007`'s `CacheEntry` class and the five proposed cache modules** | 12 one-line wrappers over `django.core.cache`, whose keys and TTLs are **already** single-sourced as `Final` default arguments. The report's "a key change means 12 edits" impact is false. A class over one-line wrappers is pure indirection |
 | **`CQ-006`'s `apps/core/services/locales.py`** | `LanguageLocale` already exposes `.values()`, `.from_code()`, `.fts_config` and `.fts_vector_field`. A wrapper module is a hop with no consumer. The fix is in-place substitution, and the two raw dicts move **onto the enum itself** (BLOCK 3) |
@@ -3225,7 +3331,8 @@ changes. "Corpus" covers global or cross-cutting edits.
 | **9** | A DTO looks equivalent but drops a key on `model_dump()` and `update_or_create` writes `None` | Correctness | Med | **High** | Test 1 asserts through the **persisted row**, not the intermediate object | Low |
 | **9** | The change is presented as a typecheck-compliance fix | Review | Med | Med | C-4: basedpyright is in `standard` mode, `[tool.mypy]` is not read by it and is not in CI. The commit body must say this is a readability change | Low |
 | **9** | A `# type: ignore` is removed and hides a real typing problem from basedpyright | Correctness | Med | Med | A basedpyright run **is** required — it may flag what mypy's ignore was hiding | Low |
-| **10** | Scope creep into a half-implemented numeric toggle | Scope | Med | Med | Binding constraints 1 and 2; the withdrawal of the promise is the whole fix | Very low |
+| **10** | Scope creep into a half-implemented numeric toggle | Scope | Med | Med | Binding constraints 1 and 2; the withdrawal of the promise is the whole fix. **The feature was DECLINED on 2026-10-03**, so a half-built toggle is a scope violation against a decision, not a judgement call | Very low |
+| **10** | The prompt is fixed but the toggle still does nothing, and the feature request is lost | Product | **High** | Low | **This risk SURVIVES the ruling and is accepted by decision** — the Product Owner declined the feature for this programme. It is now tracked as a **feature request with a named owner** (§0.7, §6), so it is a scheduled backlog item rather than an undocumented gap. The commit body should point at that request | Med — accepted, by decision |
 | **10** | The locale file is regenerated instead of appended, discarding another phase's strings | i18n | Low | **High** | §1.2; append-only, `ru` and `bs` non-empty, `test_i18n_completeness.py` in `tests_to_run` | Very low |
 | **11** | A move splits `transaction.atomic()` from `select_for_update()` | Correctness | Med | **High** | Binding constraint 3; `TestResolveOwnedConcurrency` and the re-pointed ordering assertion are the tripwires | Low |
 | **11** | The two source-inspection tests are deleted rather than re-pointed | Correctness | Med | **High** | Binding constraint 2; §6.3 item 15 | Low |
@@ -3239,7 +3346,9 @@ changes. "Corpus" covers global or cross-cutting edits.
 | **14** | The "context builder" adds a query and quietly breaks the SLO | Performance | Med | Med | `test_search_query_count.py` and `test_search_slo.py` are in `tests_to_run` | Low |
 | **14** | Q8(b) is taken and `listings_query.py` is edited while phase 08 BLOCK 1 holds it | Contention | Med | Med | The Q8 gate names phase 08; §5.1 hot spot 6 fixes the order | Low |
 | **15** | **Q1(b) creates a new `ads → search` cross-app edge from a code-quality block** | Architecture | Med | **High** | Q1 is a three-option gate with the dependency consequence in each; the commit body records the new edge and §5.3 is updated | Med — accepted, by decision |
-| **15** | `TestFuzzyEquivalence` is rewritten to match the code instead of the decision | Correctness | Med | **High** | The case table is derived from Q6; the commit body must state the option and the rule invoked | Low |
+| **15** | ~~`TestFuzzyEquivalence` is rewritten to match the code instead of the decision~~ — **CLOSED 2026-10-03** | — | — | — | **Q6 resolved as 0.8**, the value the test already asserts, so the rewrite contingency is **moot**: the test is **green unchanged** and project rule 2 is **not invoked**. Replaced by the two rows below | Closed |
+| **15** | An Implementor rewrites `TestFuzzyEquivalence` "because the shared cutoff is now a constant" | Correctness | Low | **High** | The test re-derives 0.8 **in-test** and is now a **positive control for the Product Owner decision**. Rewriting it reverts the ruling; binding constraint 4 and an acceptance criterion forbid it | Very low |
+| **15** | `suggest_city`'s 0.6 survives unjustified, so the "one cutoff" claim is false | Review | **Med** | Med | **New obligation created by the Q6 ruling:** a surviving 0.6 must be justified **against the 0.8 product decision** in the commit body, as an entity-specific divergence. Acceptance criterion — Q7 can no longer be answered by silence | Low |
 | **15** | The name list is re-implemented, breaking the cold/warm query-count contract | Performance | Med | **High** | `TestFuzzyQueryCount` is the tripwire; binding constraint 1 | Low |
 | **15** | The finding is argued as a recall fix | Review | Med | Med | §0.4 records that on `/search/?category=` the slug is resolved by the **breadcrumb** and the ladder is reached only from `?q=`. The commit must not claim a recall improvement it cannot evidence | Low |
 | **16** | **The hoisted `SubmitAdInput` passes `ad.user_id` and `AUTHZ-002`'s guard becomes permanently tautological** | Security | Med | **High** | Binding constraint 3, test 3 (the actor is asserted explicitly as `request.user.id`) and the commit-body requirement. **The single highest-consequence defect this plan can introduce** | Low |
@@ -3453,10 +3562,18 @@ Phase 10 is complete when **all** of the following hold.
 - [ ] Q11 (`QLT-###` vs `10-CQ-0NN`) was routed to the coordinator.
 - [ ] Q1 and Q8 were put to phase 08, and the phase-08 view is recorded in BLOCKs 14 and 15
       and in their commit bodies.
-- [ ] Q2 and Q4 were put to the owner / phase 15's moderation surfaces, and the chosen
-      options are named in BLOCK 7's commit body.
-- [ ] Q6 was put to the owner (how forgiving should "did you mean" be?), and the answer is
-      named in BLOCK 15's commit body.
+- [ ] Q2 and Q4 were put to the owner / phase 15's moderation surfaces. **Q2 is ANSWERED —
+      2026-10-03, Product Owner, option (b): re-render, preserve the moderator's input.** Q4's
+      option is named in BLOCK 7's commit body.
+- [ ] **Q2's ruling was communicated to phase 15**, whose own `Q11` covers the same question and
+      must not re-open it (§0.7, §5.4).
+- [ ] **Q6 was put to the owner and ANSWERED — 2026-10-03, Product Owner: the unified fuzzy
+      cutoff is 0.8.** BLOCK 15's commit body names it and states that project rule 2 was **not**
+      invoked, because `TestFuzzyEquivalence` is green unchanged. If Q7 kept `suggest_city`
+      separate, its surviving 0.6 is justified against that decision.
+- [ ] **`CQ-014`'s declined toggle is recorded as a feature request with a named owner** (§6.1,
+      §0.7), so the surviving "prompt fixed, toggle still absent" risk is a tracked backlog item
+      and not an undocumented gap.
 - [ ] The §6.2 routings (phase 15's `AUTHZ-002`/`AUTHZ-007`/`AUTHZ-005`, phase 01's `ENT-004`
       / `ENT-005`, phase 03's `DB-001`, phase 09's `API-009`/`API-010`, phase 07 BLOCK 11's
       legacy sweep) are recorded as **routed**, with evidence that phase 10 did not silently

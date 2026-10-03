@@ -248,14 +248,19 @@ site, not the resolver) and it is retained as defence-in-depth. `VAL-004` is fol
 **No question below is answered by this plan.** Each one either has an explicit pre-block
 step, or is a labelled **decision required before implementation** gate carrying its
 options and their consequences. **The Implementor is forbidden from choosing an option**
-(§1.5, §8.1). **Q1, Q3, Q4, Q5 and Q9 are the ones that block a block from starting.**
+(§1.5, §8.1). **Q3, Q5, Q6, Q9 and Q11 are the ones that block a block from starting.**
+
+**Updated 2026-10-03 (Product Owner decision round).** `Q1`, `Q2` and `Q4` are now recorded
+below with their rulings. **`Q1`'s ruling settles *who signs off* and does NOT close the gate —
+the gate is `OPEN-PENDING-REVIEWER`**, which is a recorded state distinct from both "gated" and
+"closed". `Q2` and `Q4` are closed outright. `Q3`, `Q5`, `Q6`, `Q8` and `Q11` are untouched.
 
 | # | Question | Kind | Owner | Block | Status |
 |---|---|---|---|---|---|
-| **Q1** | **Who signs off the 3 real `bs` translations?** A native Bosnian reviewer (preferably Montenegrin, per the operating region) is required for all three. **No engineer and no translation API may produce them** — the contaminated string needs a linguist, and phase 09's outbound Google-Translate client is explicitly **not** a catalogue tool. *Is a reviewer available, or does `bs` ship with these three as-is and the finding is recorded as accepted?* | **GATE — owner / coordinator** | Owner | **9** | **BLOCKING.** The gate carries a reduced deliverable (detection rule + a named, commented exemption) so the commit never ships a red gate |
-| **Q2** | **`I18N-013`: Option A (document model metadata as exempt) or Option B (wrap ~192 entries in `gettext_lazy` and re-extract)?** | **GATE — owner** | Owner | **12** (Option A doc), **13** (Option B code) | **Option A is the Planner's recommendation** (it is S, it makes the coverage claim accurate, and it matches the existing documented exemption for the `admin/` template subtree) — **but the Implementor may not act on that recommendation.** Option B is M, grows the catalogue by ~192, and requires reviewing admin tests that assert on English field text; per *production code is king* those tests would follow the corrected behaviour |
-| **Q3** | **The `bs` number-grouping decision.** Three options: **(a)** a project-level `FORMATS` override supplying `NUMBER_GROUPING = 3` for `bs` in settings; **(b)** a project-owned formatting helper that bypasses `numberformat.py`'s grouping gate; **(c)** accept ungrouped `bs` prices as a documented limitation. Django's bundled `bs` data cannot be edited — it is a third-party package | **GATE — Planner + Researcher** | Planner | **3** | **BLOCKING.** Option (a) touches the six-way-contended `base.py` and must ship its own settings test; option (b) adds a new project-owned module, which risks a *second* formatting path that can drift from `number_format`; option (c) leaves a visible `ru`/`bs` inconsistency, which **is** the defect the fix was meant to close. **This decision must be made and shipped inside the same change as the argument fix** |
-| **Q4** | **The `TIME_ZONE` value, and whether it is env-overridable.** The operating region is Montenegro/Bosnia, so the intended value is almost certainly `Europe/Podgorica` — **but the exact zone is a product decision** (does the site track one country or several?). If it becomes env-overridable it needs an `ALLOWED_ENV_VARS` entry **and** up to four `.env*.example` lines **in the same commit**, in the most contended settings file in the repository, and the allowlist is gated in both directions | **GATE — owner + Planner** | Owner decides the value; Planner decides the env-overridability | **5** | **BLOCKING.** A hard-coded value is a legitimate outcome and avoids the allowlist collision entirely; that is a real option and is listed as such |
+| **Q1** | **Who signs off the 3 real `bs` translations?** A native Bosnian reviewer (preferably Montenegrin, per the operating region) is required for all three. **No engineer and no translation API may produce them** — the contaminated string needs a linguist, and phase 09's outbound Google-Translate client is explicitly **not** a catalogue tool. *Is a reviewer available, or does `bs` ship with these three as-is and the finding is recorded as accepted?* | **GATE — owner / coordinator** | **Product Owner** | **9** | **✅ RULED 2026-10-03 (Product Owner) — a native, preferably Montenegrin reviewer signs off the three `bs` strings; machine output and translation APIs are NOT acceptable. 🚧 GATE REMAINS `OPEN-PENDING-REVIEWER` — this is NOT closed.** Until a sign-off exists, **BLOCK 9 ships its reduced deliverable** (detection rule + a named commented exemption) exactly as specified below. The gate is recorded as **OPEN-PENDING-REVIEWER**, not closed, so nobody reads it as settled. Re-opening it requires only the reviewer's sign-off; no re-decision |
+| **Q2** | **`I18N-013`: Option A (document model metadata as exempt) or Option B (wrap ~192 entries in `gettext_lazy` and re-extract)?** | **GATE — owner** | **Product Owner** | **12** (Option A doc), **13** (Option B code) | **✅ RESOLVED 2026-10-03 — Product Owner chose Option A: model `verbose_name` / `help_text` is documented as an explicit, named exemption in the i18n coverage rule**, following the existing documented exemption for the `admin/` template subtree. **Option B (wrapping ~192 entries in `gettext_lazy`) is DECLINED.** Consequences: **BLOCK 12 delivers the documentation change and is now the SOLE home of `I18N-013`** · **BLOCK 13 is CANCELLED** · **no catalogue growth** · the admin tests asserting English field text **stay unchanged**. The Implementor may not re-open the option |
+| **Q3** | **The `bs` number-grouping decision.** Three options: **(a)** a project-level `FORMATS` override supplying `NUMBER_GROUPING = 3` for `bs` in settings; **(b)** a project-owned formatting helper that bypasses `numberformat.py`'s grouping gate; **(c)** accept ungrouped `bs` prices as a documented limitation. Django's bundled `bs` data cannot be edited — it is a third-party package | **GATE — Planner + Researcher** | Planner | **3** | **BLOCKING.** Option (a) touches the six-way-contended `base.py` and must ship its own settings test; option (b) adds a new project-owned module, which risks a *second* formatting path that can drift from `number_format`; option (c) leaves a visible `ru`/`bs` inconsistency, which **is** the defect the fix was meant to close. **This decision must be made and shipped inside the same change as the argument fix.** **Untouched by the 2026-10-03 round** |
+| **Q4** | **The `TIME_ZONE` value, and whether it is env-overridable.** The operating region is Montenegro/Bosnia, so the intended value is almost certainly `Europe/Podgorica` — **but the exact zone is a product decision** (does the site track one country or several?). If it becomes env-overridable it needs an `ALLOWED_ENV_VARS` entry **and** up to four `.env*.example` lines **in the same commit**, in the most contended settings file in the repository, and the allowlist is gated in both directions | **GATE — owner + Planner** | **Owner decides the value; Planner decides the env-overridability** | **5** | **✅ RESOLVED 2026-10-03 — Product Owner chose the hard-coded outcome: `TIME_ZONE = "Europe/Podgorica"`, hard-coded and NOT env-overridable.** Consequences: **no `ALLOWED_ENV_VARS` entry and no `.env*.example` lines** — the allowlist collision **disappears entirely**, and **no other phase's allowlist work is triggered**. **The env-overridability branch is CLOSED**: the env-dependent file surface in BLOCK 5 below is marked not-applicable and must not be created. BLOCK 5 starts unblocked |
 | **Q5** | **Is the server write authoritative for `lang_pref`, or is the consent gate real?** The report recommends "server write is authoritative; delete the consent-guarded JS branch". If the consent gate is meant to be real, it must move into `process_response` and **coordinate with phase 06**, which owns consent state. This is a **phase-06 boundary question, not a phase-14 unilateral decision** | **GATE — owner + coordinator, phase 06** | Owner + phase 06 | **6** | **BLOCKING.** Also gates `I18N-011`'s `httponly=True`: that is only safe once the client-side writer is gone. `docs/01-spec/technical-specification.md` is **phase 06's reservation** — the "name `lang_pref` in a cookie list" limb needs their clearance or is deferred |
 | **Q6** | **Does `I18N-001`'s accessor typing propagate to the context processor?** The five accessors and the five `localized_content` filters are all typed `locale: str`; templates call them as `\|get_city_name:LANGUAGE_CODE` where `LANGUAGE_CODE` is a `str` from `apps/core/context_processors.py` → `language(request)`. Tightening the accessors to `LanguageLocale` propagates to the filters, and then to the context processor — which is read by several other phases' templates | **GATE — Planner + Auditor** | Planner | **2** | **NOT blocking, but sized as the phase's only structural item.** Options: (a) the context processor emits `LanguageLocale` and the filters take `LanguageLocale` (widest surface, strongest typing); (b) the accessors keep a `str`-accepting boundary and normalise internally (narrowest surface, weakest guarantee — and arguably a partial re-fix of `I18N-001` at a second site). The Auditor must enumerate every consumer of `context_processors.language` **before** the block starts |
 | **Q7** | **Should the `en` catalogue's 408 empty `msgstr`s stay empty forever?** | **RESOLVED — no change** | Planner | — | Answered: the convention is already correct and is enforced by two tests. **Recorded so a remediation does not "helpfully" fill them.** §6.3 item 4 forbids it |
@@ -479,7 +484,7 @@ source of truth. `conditional` = ships a reduced deliverable if its gate is decl
 | `I18N-001` | **structural** | **implement in two commits — BLOCK 1 (the resolver) then BLOCK 2 (the type boundary).** Route all three locale sources through one normalising resolver; then tighten the five accessors and five filters to `LanguageLocale` | **1**, **2** | **HIGH (P0)** | A cookie whose `to_language()` form is not exactly `ru`/`bs`/`en` — i.e. the overwhelming majority of real BCP-47 tags — makes every DB-backed string fall through `locale → ru → name` to Russian, site-wide. **No mitigation exists**: no `LocaleMiddleware`, no `set_language` view, no `LANGUAGES` clamp in `translation.activate()`. The site never writes such a value itself, so the trigger is an externally-written cookie — which `I18N-011`'s missing `SameSite` enables. Harm is content-legibility, not data exposure |
 | `I18N-002` | **mechanical** | **implement as defence-in-depth inside BLOCK 1** | **1** | LOW | Fully subsumed by `I18N-001`: once normalised there are exactly three possible key segments, so the unbounded cardinality is an artefact of `I18N-001`, not an independent defect. What survives is that the key is built from a raw request attribute that never passed through the enum. The report's own recommendation concedes it |
 | `I18N-003` | **behavioural** | **implement — gated on Q3, and the grouping decision ships in the same change** | **3** | **HIGH (P0)** | `_format_amount` stringifies the `Decimal` and passes a **`str`** to `intcomma`, whose `str` path does `int(value)` → `ValueError` on any fractional amount → a `use_l10n=False` recursion that hard-codes `,` and leaves the `.` decimal mark. Integer amounts survive, which is why round prices hide it. **✔ But the one-argument fix restores the decimal mark for `bs` and not the grouping** (`VAL-004`), so a plan that ships only the argument change introduces a *new* visible `ru`/`bs` inconsistency |
-| `I18N-004` | **behavioural** | **implement — gated on Q4. `.po`-free** | **5** | MEDIUM (↓HIGH) | `TIME_ZONE` is absent from **every** settings module, so Django's `America/Chicago` applies to a Balkan marketplace, and all four user-visible date renderings hardcode `'M d, Y'` / `'M d'` / `'M d, H:i'`. `USE_TZ` is `True` (Django 5 default), so this is **presentation-only — no naive/aware integrity class**. For an ad published between 00:00 and 07:00 local the **calendar day itself** is wrong. **No new msgid: the `Published:` / `Date:` labels already exist in the catalogue** |
+| `I18N-004` | **behavioural** | **implement — `Q4` RESOLVED 2026-10-03. `.po`-free. Hard-coded `TIME_ZONE = "Europe/Podgorica"`, NOT env-overridable** | **5** | MEDIUM (↓HIGH) | `TIME_ZONE` is absent from **every** settings module, so Django's `America/Chicago` applies to a Balkan marketplace, and all four user-visible date renderings hardcode `'M d, Y'` / `'M d'` / `'M d, H:i'`. `USE_TZ` is `True` (Django 5 default), so this is **presentation-only — no naive/aware integrity class**. For an ad published between 00:00 and 07:00 local the **calendar day itself** is wrong. **No `ALLOWED_ENV_VARS` entry and no `.env*.example` lines — the allowlist collision disappears entirely**, and **no other phase's allowlist work is triggered** |
 | `I18N-005` | **structural** | **implement — BLOCK 7, before BLOCK 11** | **7** | MEDIUM | `_parse_po_entries` overwrites its accumulator on every `msgstr`-prefixed line **including `msgstr[N]`**, keeping only the last form, while its docstring claims the first. Both copies of `test_no_empty_msgstr` then ask a question that is only ever about the last form. **Latent**: `ru`/`bs` have 0 plural entries with any empty form today. **BLOCK 11's credible stale-entry gate needs this parser** — hence the strict ordering edge |
 | `I18N-006` | **behavioural** | **implement — gated on Q9 (a pre-block Auditor step)** | **8** | MEDIUM | Both collectors hard-code subdirectories instead of walking `src/telegram_bot` and excluding `tests/`. The unscanned set is `__init__.py`, `lifecycle.py`, `main.py`, `retry.py`, `states.py`, `middlewares/*` (5), `schemas/*` (4) — and `middlewares/language.py`, where the locale is actually activated for every update, is in it. `lifecycle.py` proves the surface is reachable: twelve `BotCommand` literals |
 | `I18N-007` | **mechanical** | **implement with `I18N-006` in one collector pass** | **8** | MEDIUM | `_collect_template_files` iterates `TEMPLATES["DIRS"]` and never consults `APP_DIRS`, which is `True`. **Latent today** — the only roots on disk are `src/backend/templates` (38 files) and an empty `src/templates`. The natural modular-Django refactor silently removes a template from the i18n gate and **nothing detects the loss** |
@@ -488,24 +493,26 @@ source of truth. `conditional` = ships a reduced deliverable if its gate is decl
 | `I18N-010` | **behavioural** | **implement — after BLOCK 3** | **4** | MEDIUM | The chip renders raw `Decimal`s through `{% blocktrans %}`, which applies no filter chain, so `1000.50` appears with an ASCII point, no grouping and no currency code — directly above a correctly formatted card price **in the same response**. The gate cannot catch it: the text *is* wrapped. The remedy is the pattern already used fourteen lines below the defect |
 | `I18N-011` | **mechanical** | **implement inside BLOCK 6 — after `I18N-009`** | **6** | LOW | `lang_pref` is the only cookie the project issues that opts out of all six `SESSION_COOKIE_*` / `CSRF_COOKIE_*` attributes the project sets elsewhere. Confidentiality impact is nil (a three-value code); the integrity impact is that the absent `SameSite` makes it a candidate for cross-site overwrite — which, per `I18N-001`, is sufficient to change a visitor's rendered language. `httponly=True` is only safe once the client writer is gone |
 | `I18N-012` | **mechanical (doc only)** | **implement the docstring correction inside BLOCK 6. Do NOT touch the header** | **6** | LOW | The finding was reclassified to `DOC-UPDATE` **because the code is already correct**: `CsrfViewMiddleware` adds `Vary: Cookie` on any response whose template calls `get_token()`, and every page does, so a `Vary`-honouring cache already keys on the cookie. The auditor's probe measured the wrong stack. What remains is that the **docstring is factually wrong** and the property is **incidental** — `ads/partials/ad_list.html` and `categories/partials/mega_submenu.html` render no CSRF token |
-| `I18N-013` | **conditional** | **GATED on Q2 — an owner decision, not a code defect.** Option A's documentation lands in BLOCK 12; Option B's code lands in BLOCK 13 | **12**, **13** | LOW | ✔ 20 `verbose_name` + **172** `help_text` (C-3), 0 `gettext_lazy`, 0 gettext imports in any `models.py`. **Staff-only** — no buyer or seller sees it. Option A is S and makes the coverage claim accurate; Option B is M, grows the catalogue by ~192, and admin tests asserting English field text must follow the corrected behaviour. **Until an owner chooses, the current state is a documentation gap, not a violation of any written rule** |
+| `I18N-013` | **mechanical (documentation only)** | **✅ RESOLVED 2026-10-03 — Option A. Model `verbose_name` / `help_text` is documented as an explicit, named exemption in the i18n coverage rule.** **BLOCK 12 is now the SOLE home of `I18N-013`** · **BLOCK 13 is CANCELLED** · **no catalogue growth** · the admin tests asserting English field text **stay unchanged** | **12** only (**13 CANCELLED**) | LOW | ✔ 20 `verbose_name` + **172** `help_text` (C-3), 0 `gettext_lazy`, 0 gettext imports in any `models.py`. **Staff-only** — no buyer or seller sees it. Option A is S and makes the coverage claim accurate; Option B (wrapping ~192 entries) is M, would grow the catalogue by ~192, and would require reviewing admin tests that assert English field text. **The Product Owner chose Option A and DECLINED Option B on 2026-10-03** |
 | `I18N-014` | **mechanical + behavioural** | **implement in two commits — BLOCK 10 (the `--no-obsolete` flags and the one-shot prune) then BLOCK 11 (the durable reverse gate). BLOCK 10 must land after BLOCK 7** | **10**, **11** | LOW | Six msgids are present as **active** entries in all three catalogues and absent from extraction. Runtime impact is nil; the cost is that translators spend time on strings that never render and a reviewer grepping a `.po` can be misled into believing a code path is translated. **Method constraint: the sixth is a wrapped multi-line `msgid` — a line-anchored regex misses it, and a literal-substring source scan over-reports (47 false positives in the Auditor's cross-check). The gate must parse both sides.** ✔ **Strengthened by N-2**: six `#~` entries already exist in `ru`/`bs` and zero in `en`, and nothing gates it |
 | `I18N-015` | **behavioural** | **implement inside BLOCK 1 — one shared resolver** | **1** | LOW | `_parse_accept_language` takes `split(",")[0]` and returns the fallback immediately, so `de-DE,ru;q=0.8,bs;q=0.6` resolves to `bs`, skipping the `ru` the user ranked above Bosnian. The spec is **silent on q-values**, so this is a spec gap as much as a code gap — BLOCK 12 states the rule either way |
 | `VAL-001` | — | **NOT ACTIONED — stale, already fixed at the anchor** | — | CRITICAL (as filed) | ✔ C-1. `RUN_TRANSLATION_BACKFILL` is in `ALLOWED_ENV_VARS` and a reverse-direction whole-tree gate exists. Actioning it would produce a false reopening of `CFG-008` |
 | `VAL-002` | — | **NOT ACTIONED — still stale; procedural closure only** | §6.2 | MEDIUM | ✔ The function contains no `isalpha()`; it strips only control characters and truncates to 100 chars, so Cyrillic, Serbian Latin diacritics and digits all pass through. The phase-08 premise no longer holds. The residual is closing the phase-08 deferral and correcting the phase-08 advisory — **phase 08's surface, not a code change here** |
 | `VAL-003` | **advisory → constraint** | **implement as a binding constraint on BLOCK 1's and BLOCK 2's test shape** | **1**, **2** | LOW | ✔ `base.py` is `ru`, `test.py` is `en`. Django's `_add_fallback` makes the gettext chrome for an unsupported locale **Russian in production and English under test for the identical request**, while the DB accessors behave identically in both. **A chrome assertion passes in CI and production is still wrong** |
 | `VAL-004` | **advisory → gate** | **folded into `I18N-003` as `Q3`, shipped in the same change** | **3** | LOW | ✔ Django's `bs/formats.py` leaves `NUMBER_GROUPING` commented out and `numberformat.py` gates on `grouping != 0`, so grouping is **structurally unreachable for `bs` even under `force_grouping=True`**. No project-level `FORMATS` override exists. Django's bundled locale data is a third-party package and cannot be edited |
-| **N-1** (new) | **mechanical + conditional** | **implement the detection rule unconditionally; the string correction is gated on Q1** | **9** | MEDIUM | ✔ One `bs` `msgstr` ends `"Za kreiranje oglasа користи /post."` — a Croatian/Bosnian frame with the **Russian verb** `користи` and a **Cyrillic "а"** inside `oglasa`. It is the only Cyrillic-bearing line in the `bs` catalogue and it renders to every Bosnian user. **No gate catches it**, and the reason is written into the gate itself: `test_no_cyrillic_msgids`'s docstring says *"`msgstr` values for ru/bs are naturally Cyrillic and exempt"* |
+| **N-1** (new) | **mechanical + conditional** | **implement the detection rule unconditionally; the string correction stays gated on Q1, which is `OPEN-PENDING-REVIEWER`** | **9** | MEDIUM | ✔ One `bs` `msgstr` ends `"Za kreiranje oglasа користи /post."` — a Croatian/Bosnian frame with the **Russian verb** `користи` and a **Cyrillic "а"** inside `oglasa`. It is the only Cyrillic-bearing line in the `bs` catalogue and it renders to every Bosnian user. **No gate catches it**, and the reason is written into the gate itself: `test_no_cyrillic_msgids`'s docstring says *"`msgstr` values for ru/bs are naturally Cyrillic and exempt"* |
 | **N-2** (new) | **mechanical** | **implement the prune in BLOCK 10 and the assertion in BLOCK 11** | **10**, **11** | LOW | ✔ Obsolete entries are **6 (`ru`) / 6 (`bs`) / 0 (`en`)**. `test_pot_creation_date_sync` compares only the `POT-Creation-Date` header, so the asymmetry is ungated and the three catalogues disagree about their own history |
 | **N-3** (new) | **mechanical** | **implement in BLOCK 12 — gated on Q11** | **12** | LOW | ✔ `i18n-spec.md` has **3 dead link targets referenced 5 times**: `../99-agent/i18n-translation-pipeline-gap-analysis.md` (×3), `../99-agent/i18n-definition-of-done-research.md` (×1), `../96-researches/i18n-translation-egress.md` (×1). **The whole `docs/96-researches/` directory does not exist** |
 | **N-4** (new) | **mechanical** | **implement in BLOCK 12, and as a standing rule in §1.4** | **12** | LOW | ✔ `i18n-spec.md` carries stale line citations, and **every line anchor in the validated report has drifted**. No task in this plan uses a line number as a target |
-| **Q1** / **Q2** | — | **GATED** — owner decisions | **9**, **12**, **13** | — | **Q1 is the blocking human decision**: real `bs` translations are a linguist deliverable, never an engineering one. **✔ Q1 and Q2 are independent** — the code context's claim that Q2's Option A removes two of the three strings is not supported by the tree (C-5): `Moderator #%(mid)s` is in an **already-exempt template** and `I18N-013` is about a different surface |
-| **Q3** / **Q4** / **Q5** | — | **GATED** — each blocking its block, with options and consequences written down | **3**, **5**, **6** | — | Three structural gates. **Q5 is a phase-06 boundary** and also gates `I18N-011`'s `httponly=True` |
+| **Q1** / **Q2** | — | **`Q1` RULED 2026-10-03, gate `OPEN-PENDING-REVIEWER` · `Q2` RESOLVED 2026-10-03 (Option A)** | **9**, **12** | — | **Q1 is the outstanding human deliverable**: the Product Owner ruled on 2026-10-03 that a native (preferably Montenegrin) reviewer signs off the three `bs` strings and that machine output and translation APIs are not acceptable — but **no sign-off exists yet, so the gate is `OPEN-PENDING-REVIEWER`, not closed**, and BLOCK 9 ships its reduced deliverable. **Q2 is closed**: Option A, BLOCK 12 sole home, **BLOCK 13 CANCELLED**. **✔ Q1 and Q2 remain independent** — the code context's claim that Q2's Option A removes two of the three strings is not supported by the tree (C-5): `Moderator #%(mid)s` is in an **already-exempt template** and `I18N-013` is about a different surface. Q1's ruling does not release it |
+| **Q3** / **Q4** / **Q5** | — | **`Q3` GATED · `Q4` RESOLVED 2026-10-03 · `Q5` GATED (phase-06 boundary)** | **3**, **5**, **6** | — | **Q4 is closed**: hard-coded `Europe/Podgorica`, not env-overridable, no allowlist work. **Q3 and Q5 are untouched by the 2026-10-03 round and remain open.** **Q5 is a phase-06 boundary** and also gates `I18N-011`'s `httponly=True` |
 | **Q6** / **Q8** / **Q9** / **Q11** | — | **PRE-BLOCK STEP** (Q6, Q9) / **PLANNER RULING** (Q8) / **GATED** (Q11) | **2**, **8**, **12** | — | Q6: the Auditor enumerates every consumer of `context_processors.language` before BLOCK 2. Q9: the Auditor runs the widened collector before BLOCK 8. Q8: resolved — the obsolete assertion belongs in `I18N-014`, not as a separate item |
 | **Q7** / **Q10** | — | **RESOLVED (no change)** / **ROUTED** | — | — | Q7: the `en` empty-`msgstr` convention is already correct and is recorded so nothing "helpfully" fills it. Q10: the backfill target-language matrix is unowned and belongs to phase 09 |
 
-**Block classification summary:** `mechanical` = **8, 10, 12** · `behavioural` = **3, 4, 5, 6, 8** ·
-`structural` = **1, 7** · `conditional` = **9, 13**.
+**Block classification summary:** `mechanical` = **8, 10, 12, 13** · `behavioural` = **3, 4, 5, 6, 8**
+· `structural` = **1, 7** · `conditional` = **9** (reduced deliverable, pending `Q1`'s reviewer
+sign-off). **BLOCK 13 is CANCELLED as of 2026-10-03** (`Q2` → Option A) and its rows appear below
+only so the cancellation is on the record — **no implementor runs it and no commit exists for it.**
 
 ---
 
@@ -1274,23 +1281,28 @@ acceptance_criteria:
 | **Depends on** | nothing in-plan |
 | **Blocks** | BLOCK 12 |
 | **Priority** | **P1** |
-| **Risk level** | **HIGH** — the only change in the phase that is not backward-compatible, and it writes the six-way-contended settings file |
+| **Risk level** | **MEDIUM** (lowered from HIGH on 2026-10-03). The change is still the only one in the phase that is not backward-compatible and it still writes the six-way-contended settings file — **but the allowlist half of that risk is gone, because the value is hard-coded** |
 | **Blast radius** | Ad-card freshness timestamps, the ad detail page, search history, and the seller dashboard's metric dates |
-| **Required agents** | **Auditor · Researcher · Planner · Validator — all four**, because the value is a product decision, the settings file is contended in both allowlist directions, and every rendered timestamp moves |
+| **Required agents** | **Auditor · Researcher · Planner · Validator — all four**, because every rendered timestamp moves and the settings file is contended |
 
-**`Q4` — DECISION REQUIRED BEFORE IMPLEMENTATION.** Two sub-answers, both needed:
+**`Q4` — ✅ RESOLVED 2026-10-03 (Product Owner). Both sub-answers are given; the block is
+unblocked and the Implementor chooses nothing.**
 
-1. **The `TIME_ZONE` value.** The operating region is Montenegro/Bosnia, so the intended value
-   is almost certainly `Europe/Podgorica` — **but the exact zone is a product decision.** Does
-   the site track one country or several? `Europe/Belgrade` and `Europe/Sarajevo` are the same
-   offset today and will diverge if a jurisdiction changes. **The Implementor does not pick
-   the zone.**
-2. **Whether it is env-overridable.** A hard-coded value is a legitimate outcome and it
-   **avoids the `ALLOWED_ENV_VARS` collision entirely** — the allowlist is read in both
-   directions by `config/settings/tests/test_env_allowlist.py`, so an env-overridable value
-   needs an allowlist entry **and** up to four `.env*.example` lines **in the same commit**,
-   in the file six other phases claim. An env-overridable value must be recorded in the commit
-   body with that cost stated.
+> **1. The value: `TIME_ZONE = "Europe/Podgorica"`, hard-coded.**
+> **2. Env-overridability: NO. The value is hard-coded and NOT env-overridable.**
+>
+> **Consequences, stated so no implementor re-opens them:**
+> - **There is NO `ALLOWED_ENV_VARS` entry and NO `.env*.example` lines.** The allowlist collision
+>   **disappears entirely** — the two rows in the file-surface table below are marked
+>   *not applicable — do not create*.
+> - **No other phase's allowlist work is triggered.** The reverse AST scanner and
+>   `test_example_keys_in_allowlist` in both directions have nothing new to check.
+> - **The env-overridability branch is CLOSED.** The earlier framing — "a hard-coded value is a
+>   legitimate outcome and avoids the allowlist collision entirely; that is a real option" — has
+>   been *chosen*, not merely listed. Do not create the env surface "for operator convenience".
+> - `Europe/Belgrade` and `Europe/Sarajevo` are **declined**: they share today's offset and would
+>   diverge if a jurisdiction changes, and the operating region is Montenegro.
+> - The commit body records the ruling's date and that the zone was **ruled, not defaulted**.
 
 **The defect.** `TIME_ZONE` is **absent from every module in the settings package**, so
 Django's `America/Chicago` default (UTC−5/−6) applies. Separately, all four user-visible date
@@ -1303,9 +1315,9 @@ day itself is wrong**, and a day-old ad can read as published today.
 
 | File | Element | Change |
 |---|---|---|
-| `src/backend/config/settings/base.py` | the i18n / locale block, beside `LANGUAGE_CODE` | Add `TIME_ZONE` using the file's **own existing `env()` idiom**. **Re-read immediately before editing; stop and report a concurrent change** |
-| `src/backend/config/settings/base.py` | `ALLOWED_ENV_VARS` | **Only under Q4 part 2.** Same commit as the setting and the `.env` templates |
-| `.env.dev.example`, `.env.test.example`, `.env.prod.example`, and the fourth template | `TIME_ZONE=` | **Only under Q4 part 2.** Same commit, or `test_example_keys_in_allowlist` goes red in both directions |
+| `src/backend/config/settings/base.py` | the i18n / locale block, beside `LANGUAGE_CODE` | Add `TIME_ZONE = "Europe/Podgorica"` as a **hard-coded literal** — **NOT read through `env()`**, per the 2026-10-03 ruling. **Re-read immediately before editing; stop and report a concurrent change** |
+| `src/backend/config/settings/base.py` | `ALLOWED_ENV_VARS` | 🚫 **NOT APPLICABLE — do not create.** `Q4` ruled the value non-env-overridable, so there is no entry. The allowlist collision disappears entirely |
+| `.env.dev.example`, `.env.test.example`, `.env.prod.example`, and the fourth template | `TIME_ZONE=` | 🚫 **NOT APPLICABLE — do not create.** No env line is added, so `test_example_keys_in_allowlist` has nothing new to check in either direction. **No other phase's allowlist work is triggered** |
 | `src/backend/templates/ads/detail.html` | the `{% trans "Published:" %}` display pattern | `'M d, Y'` → the locale `DATE_FORMAT`. **✔ The adjacent `<time datetime="{{ …\|date:'Y-m-d' }}">` attribute is correct ISO 8601 and must not change** |
 | `src/backend/templates/ads/partials/ad_list.html` | the ad-card date display | `'M d'` → the locale `SHORT_DATE_FORMAT`. **Same file as BLOCK 4 — the two ISO attributes must not change** |
 | `src/backend/templates/cabinet/search_history.html` | the search-history timestamp | `'M d, H:i'` → the locale `DATETIME_FORMAT` |
@@ -1330,9 +1342,11 @@ day itself is wrong**, and a day-old ad can read as published today.
    timestamp moves. That is the fix. Record the before/after for one known instant in the
    commit body.
 5. **`base.py` is six-way contended.** Re-read immediately before editing. Stage the specific
-   files, never a directory.
-6. **The `env()` idiom is the file's own**, not a new pattern. Read how `LANGUAGE_CODE`'s
-   neighbours read their environment and follow that shape exactly.
+   files, never a directory. **The contention is now only additive**: one literal line.
+6. **The setting is a literal — do not use the file's `env()` idiom here.** That was the shape
+   under the env-overridable branch, which `Q4` **closed** on 2026-10-03. The file's `env()`
+   idiom is correct everywhere else in `base.py` and is unchanged; it is simply **not** the idiom
+   for this one setting.
 7. **Do not touch `apps/core/utils/sanitize.py`, the bot's time handling, or any analytics
    query.** The change is display-timezone only; stored values are already aware and stay
    unchanged.
@@ -1359,18 +1373,15 @@ description: >
   exist in the whole template tree; two are correct ISO 8601 datetime attributes that must not
   change, and four are the defective display patterns.
 goals:
-  - "settings.TIME_ZONE is the Q4 value and every rendered timestamp reflects it"
+  - "settings.TIME_ZONE is the ruled value Europe/Podgorica, hard-coded, and every rendered timestamp reflects it"
   - "the four display patterns use Django locale format names and the two ISO attributes are byte-identical"
   - "no msgid changes, so the catalogue diff is empty"
 extra_context: |
-  Q4 GATE - two answers are needed before the block starts, both written down. (1) The
-  TIME_ZONE value: this is a product decision, and Europe/Podgorica, Europe/Belgrade and
-  Europe/Sarajevo are the realistic candidates - they share an offset today and diverge if a
-  jurisdiction changes. The Implementor does not pick. (2) Whether the value is
-  env-overridable. A hard-coded value is a legitimate outcome and avoids the ALLOWED_ENV_VARS
-  collision entirely; an env-overridable value needs an ALLOWED_ENV_VARS entry AND up to four
-  .env*.example lines in the same commit, because test_env_allowlist.py reads both
-  directions.
+  Q4 IS RESOLVED - 2026-10-03, Product Owner. BOTH sub-answers are given. (1) The value is
+  Europe/Podgorica. (2) It is HARDCODED and NOT ENV-OVERRIDABLE.
+  THEREFORE: NO ALLOWED_ENV_VARS entry and NO .env*.example lines. The allowlist collision
+  disappears entirely and NO OTHER PHASE'S ALLOWLIST WORK IS TRIGGERED. The env-overridability
+  branch is CLOSED - do not create the env surface for operator convenience.
   BINDING CONSTRAINTS (verbatim, from section 3 BLOCK 5)
   1. The |date: inventory is complete and re-verified: six occurrences in the whole template
      tree. The two <time datetime="{{ ...|date:'Y-m-d' }}"> attributes in ads/detail.html and
@@ -1388,8 +1399,10 @@ extra_context: |
   5. config/settings/base.py is six-way contended (phases 02, 04, 06, 07, 08, 12). Re-read
      immediately before editing; stop and report a concurrent change; stage specific files, not
      a directory.
-  6. Follow the file's OWN env() idiom, reading the shape used by the settings around
-     LANGUAGE_CODE. Do not introduce a new pattern.
+  6. TIME_ZONE IS A HARDCODED LITERAL - do NOT use the file's env() idiom for this one setting.
+     That idiom is correct everywhere else in base.py and is unchanged; the env-overridable
+     branch of Q4 was CLOSED on 2026-10-03, so this setting simply is not read from the
+     environment.
   7. Do not touch apps/core/utils/sanitize.py, the bot's time handling, or any analytics
      query. Stored values are already aware and do not change.
   8. The two datetime attributes are the machine-readable contract - a screen reader, a
@@ -1425,38 +1438,29 @@ files:
   - path: src/backend/config/settings/tests/test_settings_defaults.py
     targets: []
     changes: []  # add a TIME_ZONE assertion; re-read first, a concurrent edit was landing
-  - path: .env.dev.example
-    targets: []
-    changes: []  # ONLY under Q4 part 2; same commit as ALLOWED_ENV_VARS
-  - path: .env.test.example
-    targets: []
-    changes: []  # ONLY under Q4 part 2
-  - path: .env.prod.example
-    targets: []
-    changes: []  # ONLY under Q4 part 2
 changes:
   - action: add_code
     description: >
-      Add TIME_ZONE next to LANGUAGE_CODE using the file's existing env() idiom, set to the
-      Q4 value. Add the ALLOWED_ENV_VARS entry and the .env*.example lines only if Q4 part 2
-      says env-overridable, all in this same commit.
+      Add TIME_ZONE = "Europe/Podgorica" next to LANGUAGE_CODE as a hard-coded literal, NOT read
+      through env(). No ALLOWED_ENV_VARS entry and no .env*.example lines - Q4 ruled the value
+      non-env-overridable on 2026-10-03.
   - action: change_code
     description: >
       Replace the four defective display date patterns with the corresponding Django locale
       format names, leaving the two <time datetime="...|date:'Y-m-d'"> attributes untouched.
   - action: add_test
     description: >
-      Assert settings.TIME_ZONE equals the chosen value, that a known UTC instant renders to
+      Assert settings.TIME_ZONE equals "Europe/Podgorica", that a known UTC instant renders to
       the expected local time under each of ru/bs/en, and that the two ISO datetime
       attributes are byte-identical to their current values.
 acceptance_criteria:
-  - "settings.TIME_ZONE is the Q4 value and a known UTC instant renders to the expected local wall time"
+  - "settings.TIME_ZONE is the literal Europe/Podgorica, is NOT read from the environment, and a known UTC instant renders to the expected local wall time"
+  - "ALLOWED_ENV_VARS is byte-unchanged and no .env*.example file gained a TIME_ZONE line; test_env_allowlist.py is green in both directions with nothing new to check"
   - "the four display patterns use locale format names; no per-locale pattern string is written in a template"
   - "the two <time datetime=\"...|date:'Y-m-d'\"> attributes are byte-identical to their pre-block state"
   - "git diff -- src/backend/locale is empty; this block adds no msgid"
-  - "under Q4 part 2, ALLOWED_ENV_VARS and every .env*.example were updated in the same commit and test_env_allowlist.py passes in both directions"
   - "uv run djlint src/backend/templates/ reports no new finding"
-  - "the commit body names the Q4 answers, the chosen zone, the reason, and a before/after rendering of one known instant"
+  - "the commit body names the Q4 ruling (Product Owner, 2026-10-03), the chosen zone, that it was ruled and not defaulted, and a before/after rendering of one known instant"
 ```
 
 ---
@@ -2001,7 +2005,8 @@ acceptance_criteria:
 | | |
 |---|---|
 | **Findings owned** | **N-1** (new, MEDIUM) — the detection rule and, conditionally, the three `bs` strings |
-| **Class** | **conditional** — ships a reduced deliverable if `Q1` / `Q2` are declined |
+| **Class** | **conditional** — ships the **reduced deliverable** (detection rule + named commented exemption) while `Q1` is `OPEN-PENDING-REVIEWER` |
+| **Status** | 🚧 **`Q1` gate = `OPEN-PENDING-REVIEWER` as of 2026-10-03 — NOT closed.** The *who* is ruled (a native, preferably Montenegrin reviewer; machine output and translation APIs are not acceptable); the *sign-off* does not yet exist. **BLOCK 9 is runnable now and ships its reduced deliverable.** It is not blocked and it is not settled |
 | **Depends on** | **BLOCK 7** (the parser) and **BLOCK 8** (the exemption set this block's gate reuses) |
 | **Blocks** | BLOCK 11, BLOCK 12 |
 | **Priority** | **P1** |
@@ -2009,9 +2014,9 @@ acceptance_criteria:
 | **Blast radius** | One `.po` file (`bs`) and one gate |
 | **Required agents** | **Auditor · Planner · Validator** — all three of the engineering agents. **No translation is written by anyone; `Q1` is an owner/linguist decision** |
 
-**`Q1` — DECISION REQUIRED BEFORE IMPLEMENTATION. A human deliverable, never an engineering
-one.** Three strings need a native Bosnian reviewer (preferably Montenegrin, per the
-operating region):
+**`Q1` — RULED 2026-10-03 (Product Owner): a native, preferably Montenegrin reviewer signs off the
+three `bs` strings; machine output and translation APIs are NOT acceptable. The gate is therefore
+recorded as `OPEN-PENDING-REVIEWER`, not closed.** Three strings need that reviewer:
 
 | # | String | Where | Verdict required |
 |---|---|---|---|
@@ -2022,25 +2027,30 @@ operating region):
 **✔ This plan does not write any of them, and the Implementor is forbidden from writing,
 guessing, machine-translating or "approximating" any of them.** Phase 09's outbound
 Google-Translate client is explicitly **not** a catalogue tool, and project rule 1 makes every
-`msgid` English — the replacement `msgstr` is a `bs` value that only a speaker can produce.
+`msgid` English — the replacement `msgstr` is a `bs` value that only a speaker can produce. **The
+2026-10-03 ruling reinforces this: machine output and translation APIs are not acceptable, so
+"there is no reviewer yet" is the *only* reason the strings ship as-is — it is not a licence to
+produce them another way.**
 
-**`Q2` does not gate this block.** ✔ The code context claims Option A for `I18N-013` would
-remove two of the three strings from scope. **The tree does not support that**: `I18N-013` is
-about *model metadata* (`verbose_name` / `help_text`), a different surface from a *template*
-that is already in the gate's `exclude_subpaths` tuple (C-5). **Q1 and Q2 are independent.**
+**`Q2` does not gate this block, and its 2026-10-03 answer does not change that.** ✔ The code
+context claims Option A for `I18N-013` would remove two of the three strings from scope. **The
+tree does not support that**: `I18N-013` is about *model metadata* (`verbose_name` /
+`help_text`), a different surface from a *template* that is already in the gate's
+`exclude_subpaths` tuple (C-5). **Q1 and Q2 are independent**, and the fact that `Q2` resolved to
+Option A on 2026-10-03 — while `Q1` remains `OPEN-PENDING-REVIEWER` — is the proof.
 
 **The detection rule is engineering and ships unconditionally.** The gate's own docstring
 declares the blind spot in writing: `test_no_cyrillic_msgids` says *"`msgstr` values for ru/bs
 are naturally Cyrillic and exempt"* and inspects `msgid` only. That reasoning is right for
 `ru` and **wrong for `bs`**, where Cyrillic is contamination by construction.
 
-**Block outcomes**
+**Block outcomes — the `Q1` gate is `OPEN-PENDING-REVIEWER`, so the second row is the current one**
 
 | `Q1` outcome | What ships |
 |---|---|
+| 🚧 **Current state — no reviewer sign-off yet (2026-10-03)** | **The detection rule plus a named, commented exemption for all three**, and the commit body says the gate is **`OPEN-PENDING-REVIEWER`**, not closed. `I18N-014`'s prune is unaffected. **When the sign-off arrives, a follow-up commit supplies the three values and removes the exemptions; the gate closes then** |
 | **A linguist supplies all three** | The detection rule **and** the three corrected `msgstr` values, in one commit. The gate goes green having been red in the tree, and its failure is demonstrated in the same session |
 | **A linguist supplies some** | The detection rule, the corrected ones, and a **named, commented exemption** for each string knowingly shipped as-is — with the commit body stating plainly that the finding is **not closed** for those |
-| **No reviewer is available** | The detection rule **plus a named, commented exemption for all three**, and the commit body says so. `I18N-014`'s prune is unaffected |
 | **Gate red on arrival with no exemption recorded** | **This commit must not be made.** Re-apply the previous `bs` content and re-plan. The gate is never committed red |
 
 **File surface (semantic units)**
@@ -2100,16 +2110,19 @@ goals:
   - "the three bs values are either corrected by a native reviewer or recorded as named, reasoned exemptions"
   - "ru's legitimate Cyrillic msgstrs stay correct and the gate stays green for them"
 extra_context: |
-  Q1 GATE - the blocking human decision. A native Bosnian reviewer (preferably Montenegrin)
-  supplies the three values, or they are exempted with a written reason. THIS PLAN DOES NOT
-  WRITE THEM AND THE IMPLEMENTOR IS FORBIDDEN FROM WRITING, GUESSING, MACHINE-TRANSLATING OR
-  APPROXIMATING THEM. Phase 09's outbound Google-Translate client is explicitly NOT a
-  catalogue tool. Project rule 1 makes every msgid English; the replacement is a bs value only
-  a speaker can produce.
-  Q2 DOES NOT GATE THIS BLOCK. The code context claims Option A for 14-I18N-013 would remove
-  two of the three strings from scope; the tree does not support that. I18N-013 is about MODEL
-  METADATA, a different surface from a template that is already in the gate's exclude_subpaths
-  tuple. Q1 and Q2 are independent.
+  Q1 IS RULED but the GATE IS OPEN-PENDING-REVIEWER - 2026-10-03, Product Owner. Who signs off is
+  decided: a native Bosnian reviewer, preferably Montenegrin. Machine output and translation APIs
+  are NOT acceptable. NO SIGN-OFF EXISTS YET, so THIS BLOCK SHIPS ITS REDUCED DELIVERABLE NOW:
+  the detection rule plus a named, commented exemption for all three strings, with the commit body
+  recording the gate as OPEN-PENDING-REVIEWER rather than closed. THIS PLAN DOES NOT WRITE THEM
+  AND THE IMPLEMENTOR IS FORBIDDEN FROM WRITING, GUESSING, MACHINE-TRANSLATING OR APPROXIMATING
+  THEM. Phase 09's outbound Google-Translate client is explicitly NOT a catalogue tool. Project
+  rule 1 makes every msgid English; the replacement is a bs value only a speaker can produce.
+  Q2 DOES NOT GATE THIS BLOCK, and its 2026-10-03 answer (Option A) does not change that. The code
+  context claims Option A for 14-I18N-013 would remove two of the three strings from scope; the
+  tree does not support it. I18N-013 is about MODEL METADATA, a different surface from a template
+  that is already in the gate's exclude_subpaths tuple. Q1 and Q2 are independent - and Q2
+  resolving while Q1 stayed open is the proof.
   BINDING CONSTRAINTS (verbatim, from section 3 BLOCK 9)
   1. The msgid NEVER changes. These are msgstr-only corrections; changing a msgid re-extracts
      the key and orphans the entry.
@@ -2176,6 +2189,7 @@ acceptance_criteria:
   - "a Cyrillic code point in a ru msgstr passes, and that pass was demonstrated too"
   - "the existing msgid-only Cyrillic rule is byte-identical to its pre-block state"
   - "every changed value came from the Q1 reviewer, or is a named exemption with a reason and an owner - no value was invented, guessed or machine-translated"
+  - "the commit body records the Q1 gate as OPEN-PENDING-REVIEWER dated 2026-10-03, NOT as closed, and names the required reviewer (native Bosnian, preferably Montenegrin)"
   - "no msgid changed, and Start was left alone for BLOCK 10 to prune"
   - "the six legitimate copy-through entries and the two shared-form plural entries are untouched"
   - "ru and en catalogues are byte-identical to their pre-block state"
@@ -2496,16 +2510,18 @@ acceptance_criteria:
 
 | | |
 |---|---|
-| **Findings owned** | `I18N-001`, `I18N-002`, `I18N-004`, `I18N-012`, `I18N-015` (documentation limbs), **N-3** (new), **N-4** (new), `I18N-013` **Option A only** |
+| **Findings owned** | `I18N-001`, `I18N-002`, `I18N-004`, `I18N-012`, `I18N-015` (documentation limbs), **N-3** (new), **N-4** (new), `I18N-013` — **now the SOLE home of `I18N-013`** (Option A, ruled 2026-10-03) |
 | **Class** | **mechanical** — no behaviour change at all |
 | **Depends on** | **BLOCKS 1, 5, 6, 9** (the document describes the behaviour those blocks establish, and writing it earlier would institutionalise a claim the code does not yet make) |
-| **Blocks** | BLOCK 13 |
+| **Blocks** | **nothing** — was "BLOCK 13", which is **CANCELLED** as of 2026-10-03 |
 | **Priority** | **P2**, and deliberately **last among the code blocks** |
 | **Risk level** | **LOW** for behaviour, **MEDIUM** for contention — phase 12 holds a conditional claim on `docs/99-agent/rules.md` |
 | **Blast radius** | The phase's authoritative document, plus the agent-rules file four other phases read |
 | **Required agents** | **Auditor · Planner · Validator** — the Validator's job here is to check every claim against the tree, not to read for prose quality |
 
-**Gated on `Q11` (the dead links) and, for the Option A limb, on `Q2`.**
+**Gated on `Q11` (the dead links). The Option A limb is UNCONDITIONAL: `Q2` was resolved on
+2026-10-03 (Option A), so the model-metadata exemption is written here as a matter of course and
+this block is the only place `I18N-013` is delivered.**
 
 **The doc claims this block must correct or make true**
 
@@ -2518,7 +2534,7 @@ acceptance_criteria:
 | The middleware docstring's cache contract | Already corrected in BLOCK 6; the spec should point at it rather than restate it | 6 |
 | **3 dead link targets, referenced 5×** | `../99-agent/i18n-translation-pipeline-gap-analysis.md` (×3), `../99-agent/i18n-definition-of-done-research.md` (×1), `../96-researches/i18n-translation-egress.md` (×1). **The whole `docs/96-researches/` directory does not exist** | **N-3** |
 | **Stale line citations** | The settings block is cited as `L55`-`L62`; `Ad.get_title`/`get_description` are cited as one span `L464-487` but are two distinct methods. **Every line anchor in the validated report has drifted too** | **N-4** |
-| Whether model metadata is exempt from the i18n DoD | **Unstated** — that is `I18N-013`. Option A names the exemption | 12/13 |
+| Whether model metadata is exempt from the i18n DoD | **Unstated** — that is `I18N-013`. **Option A named the exemption, and the Product Owner chose Option A on 2026-10-03** — this block writes it, and it is the only place it is written | **12** (BLOCK 13 is CANCELLED) |
 
 **`Q11` — the three dead links.** Options: (a) **delete the three references** and fold their
 content into `i18n-spec.md` (the honest, cheapest option — the sources were research notes
@@ -2549,10 +2565,13 @@ recommendation.**
 3. **The `Makefile` and `.kilo/rules/commands.md` extraction forms are already correct**
    (BLOCK 10 changed them) — do not "correct" them again, and do not restate them in the spec
    as runnable commands on a platform where they do not run.
-4. **Under `Q2` Option A, the exemption must name model metadata explicitly** and sit
+4. **The model-metadata exemption MUST be written in this block.** ✔ `Q2` was resolved on
+   2026-10-03 — Option A — so the exemption names model metadata explicitly and sits
    alongside the three existing exclusions (`admin/`, `analytics/moderation_dashboard.html`,
-   `components/feature_tag.html`). **Under Option B, this limb is not written here** — BLOCK
-   13 does the code, and the spec is updated in BLOCK 13's commit.
+   `components/feature_tag.html`). **Option B was declined and BLOCK 13 is CANCELLED**, so there
+   is no Option-B limb to skip and no second place `I18N-013` may be documented. **No catalogue
+   entry is added here** — Option A costs nothing at runtime, and the admin tests asserting
+   English field text **stay unchanged** because no `gettext_lazy` wrapping happened.
 5. **`docs/01-spec/technical-specification.md` is phase 06's.** Do not touch it. If the
    `lang_pref` cookie needs naming there, that is BLOCK 6's deferred limb (§5.3).
 6. **`docs/01-spec/spec-index.md` is phase 06's sole file.** Do not touch it.
@@ -2660,24 +2679,46 @@ acceptance_criteria:
 
 ---
 
-### BLOCK 13 — `I18N-013` Option B: translate the model metadata (`14-I18N-013`)
+### BLOCK 13 — `I18N-013` Option B: translate the model metadata (`14-I18N-013`) — ❌ **CANCELLED 2026-10-03**
+
+> ## 🚫 THIS BLOCK IS CANCELLED. IT DOES NOT RUN. THERE IS NO COMMIT, NO TASK AND NO FILE.
+>
+> **`Q2` was resolved on 2026-10-03 by the Product Owner: Option A.** Model `verbose_name` /
+> `help_text` is documented as an **explicit, named exemption** in the i18n coverage rule,
+> following the existing documented exemption for the `admin/` template subtree. **Option B —
+> wrapping ~192 entries in `gettext_lazy` — is DECLINED.**
+>
+> **Consequences, recorded so nothing is silently dropped:**
+> 1. **`I18N-013` is delivered by BLOCK 12's documentation and nowhere else.** BLOCK 12 is now
+>    the **sole home** of this finding.
+> 2. **This block is cancelled — not deferred, not de-scoped, not "later".**
+> 3. **No catalogue growth.** The ~192 `ru`/`bs` entries below are **not** added; the three
+>    `django.po` files gain nothing from this block.
+> 4. **The admin tests asserting English field text stay UNCHANGED.** Project rule 2 is not
+>    invoked anywhere here, because no production behaviour changed.
+> 5. **No `models.py` file is edited.** No `gettext_lazy` import is added anywhere.
+>
+> Everything below is retained **as the record of what was declined and why** — the costed
+> option table is what makes the cancellation reviewable. **An Implementor must not re-open
+> Option B, must not "finish it later", and must not create the `task_14_b13_model_metadata_i18n`
+> task.** The only legitimate follow-up is a **new Product Owner decision**, recorded as such.
 
 | | |
 |---|---|
-| **Findings owned** | `I18N-013` (LOW, **Option B only**) |
-| **Class** | **conditional** — **ships nothing at all if `Q2` resolves to Option A** |
-| **Depends on** | **BLOCK 12** (its Option A limb decides whether this block exists) |
+| **Status** | ❌ **CANCELLED 2026-10-03** — `Q2` → Option A. Not deferred. |
+| **Findings owned** | `I18N-013` — **delivered by BLOCK 12**, not here |
+| **Class** | **cancelled** (was `conditional` — "ships nothing at all if `Q2` resolves to Option A") |
+| **Depends on** | BLOCK 12 (its Option A limb) — the dependency that **cancelled** this block |
 | **Blocks** | nothing |
-| **Priority** | **P2** — the largest single change in the phase by volume, and the lowest by user impact |
-| **Risk level** | **HIGH** — ~192 new catalogue entries, admin-visible label changes, and existing admin tests that assert English field text |
-| **Blast radius** | Every `ModelAdmin` in the project: `ads`, `analytics`, `categories`, `core`, `locations`, `lookups`, `moderation`, `users` — **eight `admin.py` modules** |
-| **Required agents** | **Auditor · Researcher · Planner · Validator — all four**, because the volume, the `.po` growth and the test fallout are the largest in the phase |
+| **Required agents** | **none** — no agent is dispatched |
 
-**This block does not run unless `Q2` is answered Option B.** Under Option A the block is
-**cancelled**, BLOCK 12's documentation limb closes the finding, and the phase is complete
-without it. **That is the recommended outcome and the Implementor may not assume it.**
+**The outcome this block always described, now realised.** Under Option A the block is
+cancelled, BLOCK 12's documentation limb closes the finding, and the phase is complete without it.
+**That is no longer "the recommended outcome the Implementor may not assume" — it is the
+decision.**
 
-**What Option B costs, measured**
+**What Option B would have cost, measured — retained as the record of the declined option. None of
+it is paid.**
 
 | Metric | Count (✔ re-verified at `d42f778`, C-3) |
 |---|---|
@@ -2691,10 +2732,12 @@ without it. **That is the recommended outcome and the Implementor may not assume
 | `verbose_name` distribution | `core` 8, `categories` 5, `lookups` 2, `moderation` 2, `users` 2, `locations` 1 |
 | `admin.py` modules affected | **8** |
 
-**Binding constraints**
+**Constraints that applied to Option B only, retained as the record of the declined option. None
+of them binds anyone now that the block is cancelled — in particular constraint 4 (project rule 2,
+admin tests follow corrected behaviour) is NOT invoked, because no production behaviour changed.**
 
-1. **`Q2` must be answered Option B in writing.** Otherwise this block is cancelled, not
-   deferred-and-partially-done.
+1. **Option B had to be chosen in writing.** It was not; it was declined. **This block is
+   cancelled, not deferred-and-partially-done.**
 2. **Every new msgid is English.** Project rule 1. `verbose_name` and `help_text` are
    developer documentation today; making them msgids means every one becomes a translator
    obligation. **That is the cost of Option B and it should be restated in the commit body.**
@@ -2716,24 +2759,29 @@ without it. **That is the recommended outcome and the Implementor may not assume
 8. **No `ModelAdmin` layout, list_display, or searchfield change.** This block changes the
    *text*, not the admin's structure.
 
-**Implementor task**
+**Implementor task — ❌ NOT ISSUED. Retained only to show what was declined; do not create this task.**
 
 ```yaml
-id: task_14_b13_model_metadata_i18n
-title: "Wrap model verbose_name and help_text in gettext_lazy and extract (~192 entries) (14-I18N-013, Option B)"
-priority: low
-depends_on: [task_14_b12_i18n_spec]
+cancelled: true
+cancelled_on: "2026-10-03"
+cancelled_by: "Product Owner"
+cancellation_basis: "Q2 resolved to Option A; Option B declined. I18N-013 is delivered by BLOCK 12."
+id: task_14_b13_model_metadata_i18n   # NOT CREATED - recorded so the ID is visibly retired
+title: "CANCELLED - Wrap model verbose_name and help_text in gettext_lazy (~192 entries) (14-I18N-013, Option B)"
+priority: none
+depends_on: []
 source_reference: ".ai/plans/14-i18n-remediation.md"
-source_section: "BLOCK 13 - I18N-013 Option B"
+source_section: "BLOCK 13 - I18N-013 Option B (CANCELLED)"
 source_blocks: ["BLOCK 13"]
 description: >
-  All 20 verbose_name/verbose_name_plural and 172 help_text assignments across 11 models.py
-  files are plain English literals with zero gettext_lazy and zero gettext imports anywhere in
-  any models.py, and ModelAdmin renders verbose_name through capfirst() untranslated while
-  Django's own admin chrome is localised. The impact is staff-only. This block exists only if
-  the owner chose Option B; under Option A it is cancelled and the finding is closed by
-  BLOCK 12's documentation.
+  CANCELLED 2026-10-03 by the Product Owner. Q2 resolved to Option A: model verbose_name and
+  help_text are documented as an explicit, named exemption in the i18n coverage rule, following
+  the existing documented exemption for the admin/ template subtree. Option B - wrapping ~192
+  entries in gettext_lazy - is DECLINED. This task is NOT created, NOT dispatched, and NOT
+  partially executed. No models.py file is edited, no catalogue entry is added, and the admin
+  tests asserting English field text stay unchanged.
 goals:
+  - "none - the block is cancelled"
   - "every verbose_name, verbose_name_plural and help_text is a gettext_lazy msgid"
   - "the catalogue grows by ~192 entries with non-empty ru and bs msgstr"
   - "existing admin tests that assert English field text are updated to the localised output"
@@ -2815,14 +2863,7 @@ changes:
       Review the existing admin tests that assert English field text and update them to the
       localised output. Weakening or skipping them is not acceptable.
 acceptance_criteria:
-  - "20 verbose_name/verbose_name_plural and 172 help_text assignments are gettext_lazy msgids across the 11 models.py files"
-  - "no gettext() call exists in any models.py; only gettext_lazy"
-  - "every new catalogue entry has a non-empty ru msgstr AND a non-empty bs msgstr, supplied by the Q1 reviewer"
-  - "no bs value was machine-translated, invented or left in English"
-  - "the admin tests that asserted English field text now assert the localised output, and none was skipped or weakened"
-  - "git diff -- src/backend/locale shows only the ~192 new entries plus the re-extraction churn; no existing msgstr was lost"
-  - "no ModelAdmin list_display, searchfield or layout was changed"
-  - "the commit body states the Q2 answer, the Q1 reviewer, and the translator-obligation cost of ~192 new strings"
+  - "N/A - the block is CANCELLED. The verifiable consequence is that: no models.py changed, no catalogue entry added, no admin test changed, and BLOCK 12's documentation limb names the model-metadata exemption"
 ```
 
 ---
@@ -2842,15 +2883,15 @@ depends on a decision that has not been made.
 | 2 | Accessor and filter typing | Immediately after 1 — the report is explicit that the typing is sequenced **after** the normalisation so the value has already passed through the enum |
 | 3 | Price formatting + the `bs` grouping decision | Independent of 1 and 2, so it ships early. **Its own gate (`Q3`) is the first technical decision in the phase** |
 | 4 | The price chip | Strictly after 3 — the chip must use the corrected helper, or BLOCK 3's fix leaves a second unformatted price on the same page |
-| 5 | `TIME_ZONE` and the date patterns | Independent. Placed before 6 so the six-way-contended `base.py` write happens while the queue of other blocks is still short |
+| 5 | `TIME_ZONE` and the date patterns | Independent. Placed before 6 so the six-way-contended `base.py` write happens while the queue of other blocks is still short. **`Q4` resolved 2026-10-03 — hard-coded `Europe/Podgorica`, not env-overridable** |
 | 6 | `lang_pref` writer, flags, cache contract | After 1 (the write path depends on the resolver). Gated on `Q5`, a **phase-06 boundary** |
 | 7 | Plural-aware `.po` parser | Before every block that parses a catalogue |
 | 8 | Collector widening + `hreflang` | Before 9, which reads the exemption set 8 defines. Gated on the `Q9` pre-block step |
-| 9 | `msgstr` script gate + the three `bs` strings | After 7 (the parser) and 8 (the exemption set). Gated on `Q1` |
+| 9 | `msgstr` script gate + the three `bs` strings | After 7 (the parser) and 8 (the exemption set). **Reduced deliverable while `Q1` is `OPEN-PENDING-REVIEWER`** (ruled 2026-10-03, sign-off not yet in) |
 | 10 | `--no-obsolete` + the one-shot prune | After 7 (it must parse before it deletes). **Placed after 9 so the three real `bs` strings are judged before the prune removes the fourth** |
 | 11 | Reverse stale-entry gate + obsolete-symmetry | **Strictly after 10** — the tree must be clean before the gate that asserts it is clean is added |
-| 12 | `i18n-spec.md` | After 1, 5, 6 and 9. The spec describes behaviour; writing it earlier institutionalises a claim the code does not make |
-| 13 | `I18N-013` Option B | After 12, which carries Option A. **Cancelled outright if `Q2` is Option A** |
+| 12 | `i18n-spec.md` | After 1, 5, 6 and 9. The spec describes behaviour; writing it earlier institutionalises a claim the code does not make. **Sole home of `I18N-013` (Option A, ruled 2026-10-03)** |
+| 13 | `I18N-013` Option B | ❌ **CANCELLED 2026-10-03** — `Q2` resolved to Option A. No task, no commit, no file |
 
 ### 4.2 The DAG and why each edge exists
 
@@ -2918,7 +2959,7 @@ depends on a decision that has not been made.
                     │  lifecycle.py   │  be   │
                     ▼  command msgids)│ clean │
               ┌───────────┐           │ first │
-              │  BLOCK 9  │  Q1       │       │
+              │  BLOCK 9  │ Q1 OPEN-  │       │
               └─────┬─────┘           │       │
                     │  9→10            │       │
                     │  the three real  │       │
@@ -2934,9 +2975,9 @@ depends on a decision that has not been made.
               └─────────────┬─────────────┘
                             │ 12→13
                             ▼
-              ┌───────────────────────────┐
-              │  BLOCK 13  I18N-013 Opt B │  cancelled if Q2 = A
-              └───────────────────────────┘
+┌───────────────────────────┐
+               │  BLOCK 13  I18N-013 Opt B │  CANCELLED 2026-10-03 (Q2 = A)
+               └───────────────────────────┘
 ```
 
 **Every edge, and what it would cost to remove**
@@ -2955,7 +2996,7 @@ depends on a decision that has not been made.
 | **9 → 10** | The three real `bs` strings must be judged before the prune removes the fourth (`Start`) | A linguist is asked to review a string that BLOCK 10 then deletes, wasting the review |
 | **10 → 11** | **The strictest edge in the plan.** The tree must be clean before the assertion that it is clean is added | BLOCK 11 is red on arrival, and the implementor's response is to widen the assertion — which is how a gate becomes theatre |
 | **9 → 12** | The spec's exemptions must reflect the script gate's final scope | The spec claims a coverage the gate does not have |
-| **12 → 13** | BLOCK 12 carries Option A's documentation; BLOCK 13 carries Option B's code | Both owner options are partially implemented, and the reader cannot tell which was chosen |
+| **12 → 13** | ~~BLOCK 12 carries Option A's documentation; BLOCK 13 carries Option B's code~~ — **both owner options partially implemented, and the reader cannot tell which was chosen** | **EDGE REMOVED 2026-10-03: `Q2` resolved to Option A and BLOCK 13 is CANCELLED.** There is no second option left to half-implement, so the hazard the edge existed to prevent can no longer occur. BLOCK 12 is now the sole home of `I18N-013` |
 
 ### 4.3 Where there is deliberately **no** edge, and why
 
@@ -3076,7 +3117,7 @@ phase is in the way, the rule is written down here and repeated in the block's c
 | From | What | If it does not arrive |
 |---|---|---|
 | **Phase 06** | A `Q5` answer on whether the server write or the consent gate is authoritative, and clearance (or not) for the `technical-specification.md` limb | **BLOCK 6 does not start.** The `secure`/`samesite` halves could ship independently, but the block as written is one commit and `httponly` is unsafe without the answer |
-| **Owner** | `Q1` (a linguist for three `bs` strings), `Q2` (`I18N-013` A or B), `Q3` (the `bs` grouping), `Q4` (the `TIME_ZONE` value and its env-overridability) | BLOCKS 9, 12, 13, 3 and 5 respectively are gated. **Each has a documented reduced deliverable except BLOCKS 3, 4, 5 and 13, which are all-or-nothing** |
+| **Owner** | `Q1` (a linguist for three `bs` strings), `Q2` (`I18N-013` A or B), `Q3` (the `bs` grouping), `Q4` (the `TIME_ZONE` value and its env-overridability) | **Updated 2026-10-03: `Q2` is RESOLVED (Option A — BLOCK 12 sole home, BLOCK 13 cancelled) and `Q4` is RESOLVED (hard-coded `Europe/Podgorica`, not env-overridable — BLOCK 5 unblocked). `Q1` is RULED but its gate is `OPEN-PENDING-REVIEWER`; `Q3` remains open. BLOCKS 3 and 6 stay gated** |
 | **Phase 08** | The `sanitize_query_for_log` deferral closed and the advisory text corrected | §6.2. Phase 14's own conclusion is already recorded; this is phase 08's paperwork |
 | **Phase 09 / the coordinator** | An owner for the `backfill_translations` target-language matrix | §6.2, Q10. **Phase 14 does not block on it** and does not audit it |
 
@@ -3111,8 +3152,8 @@ phase is in the way, the rule is written down here and repeated in the block's c
 | `VAL-002` — close phase-08's `sanitize_query_for_log` deferral and correct the phase-08 advisory text | **Phase 08** | The premise is stale; the residual is paperwork. Phase 14's conclusion is already recorded |
 | The `backfill_translations` **target-language matrix** (Q10) | **Unowned — coordinator to assign; phase 09 owns the mechanism** | `backfill_translations` produces the `Ad.title_bs` / `Ad.title_en` values `Ad.get_title` reads. A wrong target degrades `bs` ad content to Russian through the **same `locale → ru` chain**, with no gate coverage. **Phase 14 does not block on it and does not audit it** |
 | Naming `lang_pref` in a formal cookie inventory | **Phase 06** holds `technical-specification.md` | BLOCK 6's deferred limb (§5.3) |
-| Translating ~192 model-metadata entries (`I18N-013` Option B) | **Conditional** — BLOCK 13, and only if `Q2` is Option B | Under Option A the finding closes in BLOCK 12's documentation |
-| The three real `bs` strings | **A human/linguist**, via `Q1` | Never this plan. Never a machine |
+| Translating ~192 model-metadata entries (`I18N-013` Option B) | ❌ **CANCELLED 2026-10-03** — `Q2` resolved to Option A | The finding closes in BLOCK 12's documentation. Option B is declined, **not deferred**; re-opening it requires a new Product Owner decision |
+| The three real `bs` strings | **A human/linguist**, via `Q1` — gate `OPEN-PENDING-REVIEWER` | Never this plan. Never a machine, never a translation API (ruled 2026-10-03) |
 
 ### 6.3 Explicitly forbidden while implementing
 
@@ -3172,13 +3213,13 @@ loss.
 | **2** | The typing change leaves `basedpyright` errors and is committed anyway | Quality | Med | Med | Constraint 7 and the acceptance criterion; `uv run basedpyright` is in §8.2 | Low |
 | **3** | **The one-argument fix lands without the `Q3` grouping decision, and `bs` reads `1234,56` beside `ru`'s `1 234,56`** | **Correctness** | **High** | **High** | ✔ §0.2.2 item 2; `Q3` is a blocking gate; BLOCK 4 inherits the limitation and must restate it; §4.4 lists this as an unsafe order | Med — accepted, by decision |
 | **3** | The test is corrected to assert only "a separator is present", reproducing the defect it documents | Quality | Med | **High** | Constraint 2; the acceptance criteria require exact output, a fractional case, a round case and a **≥7-digit** case | Low |
-| **3** | Option (a) edits `base.py` without its `ALLOWED_ENV_VARS` / `.env` companion, and the allowlist gate goes red | Correctness | Med | Med | Constraint 4; the `Q4` part-2 rule in BLOCK 5 states the same coupling; §5.3 records it | Low |
+| **3** | Option (a) edits `base.py` without its `ALLOWED_ENV_VARS` / `.env` companion, and the allowlist gate goes red | Correctness | Med | Med | Constraint 4; §5.3 records the coupling. **Note: BLOCK 5's identical coupling is GONE — `Q4` ruled `TIME_ZONE` non-env-overridable on 2026-10-03, so BLOCK 5 creates no allowlist work** | Low |
 | **3** | Django's bundled `bs` locale data is edited in `.venv` to fix grouping | Correctness | Med | **High** | Constraint 5; the acceptance criteria require `.venv` to be byte-identical to its shipped state | Very low |
 | **4** | The chip is updated on one route only, and the listings and search views of the same page disagree | Correctness | Med | Med | Constraint 3; both files are in the file surface; the acceptance criteria require byte-identical chips | Low |
 | **4** | The `blocktrans` → `trans` change alters the extracted msgid and the gate goes red in CI | Behaviour | **High** | Med | Constraint 5 names the `#, python-format` entry and requires a non-empty `ru`/`bs` `msgstr` in the same commit; the commit body must report the msgid delta | Low |
 | **4** | The chip's date filter is changed "while you are in there", and an ISO attribute or a `TIME_ZONE` regression is introduced | Behaviour | Low | Med | Constraint 6 keeps BLOCK 5's change in a separate commit so a date regression stays attributable | Very low |
-| **5** | `TIME_ZONE` is set to the wrong zone | **Correctness** | Med | **High** | `Q4` is a blocking gate and the Implementor does not pick; the commit body records the choice and the reason; the test asserts a known UTC instant | Med — accepted, by decision |
-| **5** | Env-overridable `TIME_ZONE` is added to the allowlist without all four `.env*.example` lines | Correctness | **High** | Med | `Q4` part 2; the allowlist is gated in **both** directions; the acceptance criteria name the gate | Low |
+| **5** | ~~`TIME_ZONE` is set to the wrong zone~~ — **CLOSED 2026-10-03** | Correctness | **CLOSED** | — | `Q4` is RESOLVED: the zone is **`Europe/Podgorica`**, ruled by the Product Owner on 2026-10-03, and the Implementor does not pick. The commit body records that it was **ruled, not defaulted**, and the test asserts a known UTC instant | **Closed by decision** |
+| **5** | ~~Env-overridable `TIME_ZONE` is added to the allowlist without all four `.env*.example` lines~~ — **CLOSED 2026-10-03** | Correctness | **CLOSED** | — | The env-overridability branch is **closed**: the value is hard-coded, there is **no `ALLOWED_ENV_VARS` entry and no `.env*.example` line**, and the allowlist collision disappears entirely. **The residual risk is inverted and much smaller: an implementor "helpfully" adding the env surface.** BLOCK 5's acceptance criteria name `ALLOWED_ENV_VARS` as byte-unchanged and the file-surface rows are marked *not applicable — do not create* | **Closed by decision** |
 | **5** | The two ISO `datetime` attributes are swept into the locale-format change | **Compatibility** | Med | **High** | Constraint 1, restated as an acceptance criterion requiring byte-identity; the report flags this in the finding itself | Low |
 | **5** | `base.py` has changed underneath and the block clobbers a concurrent phase | Contention | **High** | Med | Constraint 5; re-read; stop and report | Med — accepted |
 | **6** | `httponly=True` lands while a client-side writer still needs the cookie, and the language switcher breaks in production | **Correctness** | Med | **High** | Constraint 2 restricts `httponly` to `Q5` option (a); the acceptance criteria require an end-to-end switcher check under option (a) | Low |
@@ -3190,7 +3231,7 @@ loss.
 | **8** | The widened bot collector is red on arrival and the implementor adds blanket `skip`s | Quality | **High** | **High** | `Q9` is a **pre-block Auditor step** whose answer is reported, not suppressed; constraint 2 makes the exemption a named set with a reason; constraint 8 requires every new assertion to be seen red **and** green | Low |
 | **8** | The collector rewrite uses a hard-coded module list and silently loses the nine-module `handlers/ad_create` package | **Correctness** | Med | Med | Constraint 1; the acceptance criteria require that package to be reached | Low |
 | **8** | A hard-coded template count is baked into the new guard, encoding the report's stale "43" | Quality | **High** | Med | ✔ C-2; constraint 5; the acceptance criteria forbid any hard-coded count | Very low |
-| **9** | **A machine translation fills the three `bs` strings, or the implementator "approximates" the corrupted sentence** | **Linguistics** | Med | **High** | §6.3 item 1; `Q1`'s consequences; the acceptance criteria require the value to come from the reviewer or be a named exemption with a reason and an owner; a reviewer reads any `bs` diff | Low |
+| **9** | **A machine translation fills the three `bs` strings, or the implementator "approximates" the corrupted sentence** | **Linguistics** | Med | **High** | §6.3 item 1; `Q1`'s consequences, reinforced by the 2026-10-03 ruling that machine output and translation APIs are not acceptable; the acceptance criteria require the value to come from the reviewer or be a named exemption with a reason and an owner; a reviewer reads any `bs` diff. **The gate is `OPEN-PENDING-REVIEWER`, so today's correct state is three named exemptions — not three invented strings** | Low |
 | **9** | The new Cyrillic rule is written as a blanket "no Cyrillic in `msgstr`" and immediately fails on `ru` | Correctness | **High** | Med | Constraint 3; a dedicated unit test proves the `ru`-exempt / `bs`-contaminated distinction, and the acceptance criteria require that pass to be demonstrated | Low |
 | **9** | `Start` is translated as well as pruned, and BLOCK 10 then deletes the translation | Process | Med | Low | Constraint 5 names it and points at BLOCK 10 | Very low |
 | **9** | The gate is committed red | Process | Med | Med | Constraint 10 — the commit must not be made; the reduced deliverable (a named exemption) exists precisely so this never ships | Low |
@@ -3205,7 +3246,7 @@ loss.
 | **12** | The three dead links are re-pointed at live documents that do not contain the referenced content | Documentation | Med | Med | `Q11`'s consequences; the acceptance criteria require no link to point at a non-existent file **and** that no missing document was invented | Low |
 | **12** | `docs/99-agent/rules.md` is edited on a stale read and clobbers phase 12's conditional change | Contention | Med | Med | Constraint 6; §5.3 records the overlap; stop and report | Low |
 | **12** | Stale line citations are re-introduced while rewriting the sections | Quality | Med | Med | Constraint 2; the acceptance criteria forbid a line-number citation in any corrected section | Low |
-| **13** | Option B is implemented without a `Q1` reviewer and ~192 `bs` values are machine-translated or left in English | **Linguistics** | Med | **High** | Constraint 5 — the correct outcome is to return to the owner and re-ask `Q2`, **not** to ship English `bs` values | Low |
+| **13** | ~~Option B is implemented without a `Q1` reviewer and ~192 `bs` values are machine-translated or left in English~~ — **NOT APPLICABLE: the block is CANCELLED 2026-10-03** | ~~Linguistics~~ | **CLOSED by cancellation** | — | `Q2` resolved to Option A; the block does not run. Retained so a reader who reaches this row sees the cancellation rather than an open hazard. **The only live version of this risk is BLOCK 9's three strings, row 9** | **Closed** |
 | **13** | The catalogue grows by ~192 entries against six appending phases and a concurrent phase's strings are lost | **Data** | Med | **High** | Constraint 6 (§1.6 in full); the acceptance criteria require the diff to show only the new entries plus re-extraction churn | Med — accepted |
 | **13** | Admin tests asserting English field text are weakened or skipped rather than updated | Quality | Med | Med | Constraint 4 — production code is king; the acceptance criteria explicitly reject skipping and weakening | Low |
 | **13** | The implementor "corrects" the catalogue to the report's stale 18 + 169 count | Process | Med | Low | Constraint 7 names the tree's 20 + 172 and says why | Very low |
@@ -3226,21 +3267,30 @@ Phase 14 is complete when **all** of the following hold.
       decision in BLOCK 3), **2 `VAL-` items not actioned with a stated reason** (`VAL-001`
       stale/already fixed, `VAL-002` still stale), **4 new findings implemented** (`N-1`,
       `N-2`, `N-3`, `N-4`), **0 rejected**, **0 dropped without a destination**.
-- [ ] Every gated block (**3, 5, 6, 9, 12, 13**) has a **written** answer for each of its open
+- [ ] Every gated block (**3, 6, 9, 12**) has a **written** answer for each of its open
       questions, naming the option chosen and the consequences accepted. **Silence is not an
-      acceptable outcome for any of them.**
+      acceptable outcome for any of them.** **BLOCK 5 is no longer gated — `Q4` was resolved on
+      2026-10-03 — and BLOCK 13 is CANCELLED.**
 - [ ] Each of **Q1 … Q11** is either answered with a record, or explicitly re-routed with a
-      named destination. **Q1, Q2, Q3, Q4, Q5, Q11** are owner or cross-phase decisions;
+      named destination. **`Q2` and `Q4` are RESOLVED (Product Owner, 2026-10-03)**; **`Q1` is
+      ruled but its gate is `OPEN-PENDING-REVIEWER` and is recorded as such**;
+      **Q3, Q5, Q11** are owner or cross-phase decisions still open;
       **Q3, Q6, Q8, Q11** are Planner/Researcher rulings; **Q9** is an Auditor pre-block step;
       **Q7** is answered (no change); **Q10** is routed to phase 09 / the coordinator.
 - [ ] **`VAL-001` was not actioned and `CFG-008` was not re-opened.**
 - [ ] **The three `bs` strings were either supplied by the named reviewer or recorded as
       named, commented exemptions** — and for every exempted string, the commit body states
-      the finding is **not closed** for it.
-- [ ] `I18N-013` closed on exactly one option: Option A in BLOCK 12's documentation, or
-      Option B in BLOCK 13. **Not both, and not half of each.**
+      the finding is **not closed** for it. **While `Q1` is `OPEN-PENDING-REVIEWER`, the
+      exemptions are the expected state; a follow-up commit supplies the values and removes them
+      when the sign-off arrives.**
+- [ ] **`I18N-013` closed on exactly one option — Option A, in BLOCK 12's documentation (2026-10-03).**
+      **BLOCK 13 was CANCELLED: no `models.py` changed, no catalogue entry was added, and the
+      admin tests asserting English field text are unchanged. Not both options, and not half of
+      each.**
 - [ ] The `I18N-013` Option A/B decision was recorded as **independent of `Q1`** (C-5), not as
-      a gate on it.
+      a gate on it — and the fact that `Q2` resolved while `Q1` stayed open is the proof.
+- [ ] **`settings.TIME_ZONE` is the hard-coded literal `Europe/Podgorica`; `ALLOWED_ENV_VARS` is
+      byte-unchanged and no `.env*.example` gained a `TIME_ZONE` line.**
 - [ ] Every de-scoping in §6 has a named destination or a stated rationale.
 - [ ] **No `bs` sentence was written by an engineer, guessed, or machine-translated.**
 
@@ -3281,8 +3331,10 @@ Phase 14 is complete when **all** of the following hold.
       three locales; a **≥7-digit** amount renders grouped in every locale the `Q3` option
       covers; a round integer amount renders identically to before. The test asserts exact
       output, not the presence of a separator. ✔
-- [ ] **`I18N-004`** — `settings.TIME_ZONE` is the `Q4` value; a known UTC instant renders to
-      the expected local wall time under each of `ru`/`bs`/`en`; **the two
+- [ ] **`I18N-004`** — `settings.TIME_ZONE` is the hard-coded literal `"Europe/Podgorica"`
+      (not env-overridable); a known UTC instant renders to the expected local wall time under
+      each of `ru`/`bs`/`en`; **`ALLOWED_ENV_VARS` is byte-unchanged and no `.env*.example` gained
+      a `TIME_ZONE` line**; **the two
       `<time datetime="…|date:'Y-m-d'">` attributes are byte-identical to their pre-block
       state.** ✔
 - [ ] **`I18N-005`** — a synthetic plural entry with a blank `msgstr[0]` is reported as a
@@ -3308,11 +3360,11 @@ Phase 14 is complete when **all** of the following hold.
 - [ ] **`I18N-012`** — **the `Vary` header is byte-identical to its pre-block state**, and the
       docstring names `Vary: Cookie` via `CsrfViewMiddleware` and states that the coverage is
       **incidental**. ✔
-- [ ] **`I18N-013`** — closed on exactly one option. Under Option A, model metadata is named
-      as an explicit exemption beside the three template exclusions. Under Option B, all 20
-      `verbose_name`/`verbose_name_plural` and 172 `help_text` assignments are
-      `gettext_lazy` msgids with non-empty `ru` **and** `bs` values, and the admin tests
-      follow the corrected behaviour. ✔
+- [ ] **`I18N-013`** — closed on **Option A**, ruled by the Product Owner on 2026-10-03. Model
+      metadata is named as an explicit exemption beside the three template exclusions, in
+      **`docs/01-spec/i18n-spec.md` and `docs/99-agent/rules.md`**. **BLOCK 13 did not run:** no
+      `models.py` changed, no `gettext_lazy` was added, no catalogue entry was added, and the
+      admin tests that assert English field text are **unchanged**. ✔
 - [ ] **`I18N-014`** — BLOCK 10's prune is done and BLOCK 11's gate is in place; a synthetic
       orphan **including a wrapped multi-line msgid** fails the gate, and a synthetic `#~`
       block in **each** of `ru`, `bs` and `en` fails the obsolete-symmetry assertion. ✔
@@ -3338,17 +3390,21 @@ Phase 14 is complete when **all** of the following hold.
    `ru`/`bs` `msgstr`s, 0 `msgctxt` and 2 plural entries with 0 blank forms. The real `bs`
    debt was **three strings**, and two of them sit on staff surfaces. The volume in this
    phase is locale resolution, formatting, gate coverage and documentation honesty.
-2. **No uncertainty was resolved by the Planner.** Six blocks carry a labelled gate, two
-   carry an Auditor pre-block step, and one question was answered as "no change". Real `bs`
+2. **No technical uncertainty was resolved by the Planner.** Six blocks carried a labelled gate,
+   two carry an Auditor pre-block step, and one question was answered as "no change". Real `bs`
    translations were gated as a human deliverable and **not written**. The `bs` grouping
-   decision, the `TIME_ZONE` value, the consent question, the `I18N-013` option and the dead
-   links were all **surfaced with their options and consequences**, not chosen.
+   decision, the consent question and the dead links were all **surfaced with their options and
+   consequences**, not chosen. **On 2026-10-03 the Product Owner — not the Planner — resolved two
+   of them: the `TIME_ZONE` value (hard-coded `Europe/Podgorica`, not env-overridable) and the
+   `I18N-013` option (A; BLOCK 13 cancelled). The `bs`-reviewer gate was ruled in its `who`, and
+   is recorded as `OPEN-PENDING-REVIEWER` because no sign-off exists.**
 3. **The four process hazards were handled as first-class work, not as caveats**: the
    `VAL-003` false-green test, the `I18N-003` half-fix, the six-phase `.po` append race with
    the `--no-obsolete` deletion hazard, and the six-way `base.py` contention each have a
    binding constraint in the block that owns them, a row in §7, and a checkbox above.
 
-**End of plan.** Thirteen blocks, six labelled decision gates, two Auditor pre-block steps,
-and three real `bs` strings routed to a human reviewer rather than written by this plan.
+**End of plan.** Thirteen blocks, of which **BLOCK 13 is CANCELLED** (2026-10-03) — so twelve
+run; four labelled decision gates remain open, `Q1` is `OPEN-PENDING-REVIEWER`, and three real
+`bs` strings are routed to a human reviewer rather than written by this plan.
 
 

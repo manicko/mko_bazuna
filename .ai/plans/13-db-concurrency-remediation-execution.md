@@ -2277,24 +2277,48 @@ acceptance_criteria:
 
 **Roster decision — CONFIRMED unchanged; all five.** Re-verified at `ba23277`: `D-15`
 confirms the 13-command lock-structure test exactly as the source plan describes, so BLOCK 7's
-amendment surface is precisely bounded. Q11 remains structurally unresolvable as written and
-needs a real survey. Validator is mandatory because resolving Q11 wrongly loses mutual
-exclusion **silently**.
+amendment surface is precisely bounded. Q11 is now **CLOSED** (see *Decisions* below) — the
+Researcher resolved it and the Planner folded in the refutation, the two plan corrections, the
+guard-test replacement and the two open items. Validator remains mandatory because resolving Q11
+wrongly loses mutual exclusion **silently**.
 
-**Decision gate — Q11 (must be closed before implementation).** The tension is exact:
-`pg_advisory_xact_lock` releases with the **enclosing** transaction, so an outer `atomic()`
-spanning the loop makes the per-batch commits not real commits, and a real per-batch commit
-releases the lock. The option table (A session-scoped lock held once; B dedicated-connection
-transaction-scoped lock; C keep one transaction and only add a timeout — **does not fix
-DB-008**; D defer the block) is in the source plan §3.7.1. **This execution plan does not
-choose.** The Researcher must resolve Q11 before any batching code is written.
+**Decisions — CLOSED by Researcher + Planner. Do not re-open; do not substitute an alternative.**
 
-**The two invariants that must survive any relaxation.**
+The tension is exact: `pg_advisory_xact_lock` releases with the **enclosing** transaction, so an
+outer `atomic()` spanning the loop makes the per-batch commits not real commits, and a real
+per-batch commit releases the lock. Option table in source plan §3.7.1. All gates closed:
+
+| Gate | CLOSED decision |
+|---|---|
+| **Q11** — lock held once across per-batch commits | **Option A — `advisory_lock(id, session=True)` → `pg_advisory_lock`**, with the existing `finally: pg_advisory_unlock` releasing it. **No enclosing `transaction.atomic()` in `handle`** — one would turn each per-batch `atomic()` into a savepoint and silently restore DB-008. **Zero change to `advisory_lock.py`**: the session branch already exists. Rejected: B (dedicated pinned connection — more machinery, same exclusion), per-batch re-acquisition (changes what the lock *means* — one batch, not one sweep), C (does not fix the finding), D. |
+| **Q7** — `archive_sweep` batch key | **keyset on `(published_at, pk)`** — **no migration** (existing `IX_ads_archive_sweep`). |
+| **Q7** — `recompute_normalized_prices` batch key | **keyset on `pk`** — **no migration** (existing `ads_pkey`). One statement per batch; the `values_list("pk").iterator()` enumeration **and** the second `filter(pk__in=batch_ids)` re-read both disappear. |
+| **Q7** — re-derivation | **Forced, not preferred.** `.iterator()` uses `chunked_cursor()` (no `DISABLE_SERVER_SIDE_CURSORS` in `config/settings/**`), i.e. a server-side cursor PostgreSQL closes at `COMMIT`. A per-batch-commit design physically cannot keep today's one-pass cursor open. |
+| **Q7** — batch size | **hardcoded module constant `_BATCH_SIZE = 500`.** No CLI argument, no env var. |
+| **Q8** — `archive_sweep` observability | per-batch **INFO** with batch index + cursor + `hold_ms`; on failure `logger.exception` + **re-raise**; closing INFO moved **after** the lock; **no `skipped` counter** (`selected - archived` is structurally always `0` — the `ValueError` branch is unreachable while we hold `FOR UPDATE`). |
+| **Q8** — `recompute_normalized_prices` | **fail-the-command** (BLOCK 5's `apps/moderation/management/commands/admin_actions.py` precedent). No marker, no per-batch isolation. The command is operator-triggered only (in neither `HOURLY_COMMANDS` nor `DAILY_COMMANDS`), so a zero exit on partial work would be the worst outcome. The two existing per-row handlers (`ValueError`, `ExchangeRateNotFoundError`) stay exactly as they are. |
+| **Q7** — dead work | move `queryset.count()` **inside `if dry_run:`**, on a queryset **without** `select_for_update()` so a dry run provably takes no row locks. |
+
+**The two invariants survive unchanged — both are still binding.**
 
 1. The advisory lock is taken **once** and held across **every** batch. Moving the commit
    inside the loop while the lock is released per batch is **strictly worse** than today.
 2. The queryset is **re-derived at the start of each batch**, not iterated from a single
    long-lived cursor, so batch *N+1* cannot act on rows batch *N* already changed.
+
+**The plan's `order_by("pk")` invariant is superseded, not violated.** It is *preserved and
+supplemented* for `recompute_normalized_prices` (whose `.order_by("pk")` did not exist — `Ad.Meta`
+declares no `ordering`, and `_recompute` applied none, so the guarantee the invariant was
+protecting was never there), and `archive_sweep` moves to ascending `(published_at, pk)` because
+that is the only order PostgreSQL can serve as an `Index Cond`. Both commands gain an explicit
+ordering where none was guaranteed, which is the intent of the invariant.
+
+**Cost is measured and is NOT a regression.** `archive_sweep` **+2.4 %** (17.12 s → 17.53 s at
+31 500 stale rows); the cost is dominated by 31 500 single-row `UPDATE`s at 542 µs, not by the
+read loop (read+lock: 36 ms one-pass → 442 ms keyset). `recompute_normalized_prices` is **−68 %**
+(3.1× faster: 118 batches, 307 ms → 99 ms). Worst measured per-batch transaction hold: **445 ms**
+against BLOCK 5's 10 000 ms `lock_timeout` — a **22× margin** (~11× after the per-row Redis
+`INCR` `post_save` performs).
 
 **Agent briefs (paste-ready).**
 
@@ -2404,13 +2428,30 @@ files:
     targets: [{ type: function, name: test_all_sweep_commands_lock_inside_transaction }]
     semantic_anchors: {}   # amend ONLY if Q11 changes session for these two commands
   - path: src/backend/apps/core/tests/test_sweep_archive.py
-    targets: [{ type: function, name: test_archive_sweep_handle_uses_select_for_update_and_atomic }]
-    semantic_anchors: {}   # RE-POINT at the helper if select_for_update leaves handle
+    targets: [{ type: function, name: test_archive_sweep_handle_uses_select_for_update_and_atomic }]  # DELETE (token test) -> runtime spy
+    semantic_anchors: {}   # replaced by a QuerySet.select_for_update runtime spy (see addendum 4)
   - path: src/backend/apps/currencies/tests/test_recompute_command.py
-    targets: [{ type: function, name: test_process_batch_uses_select_for_update }]
-    semantic_anchors: {}   # RE-POINT only if _process_batch moves
-  # NOT touched: apps/core/utils/scheduler.py's command lists; Ad.transition_to;
-  #             IX_ads_archive_sweep.
+    targets:
+      - { type: function, name: test_process_batch_uses_select_for_update }  # DELETE (token test) -> runtime spy
+      - { type: class, name: TestRecomputeNormalizedPrices }
+      - { type: class, name: TestRecomputeRowLockConcurrency }               # byte-identical, do NOT touch
+  - path: docs/02-database/db-retention.md
+    targets: [{ type: section, name: Configuration }]
+    semantic_anchors:
+      insert_after:
+        type: paragraph
+        value: "LOCK_TIMEOUT_SECONDS` (default 10) bounds every lock wait"
+  - path: docs/ops/docker-deployment.md
+    targets: [{ type: section, name: lock timeout runbook }]
+    semantic_anchors:
+      replace_in_body:
+        old: "holds its `select_for_update()` for the whole sweep until per-batch commit lands"
+  # NOT touched: apps/core/utils/scheduler.py's command lists; AdvisoryLockId;
+  #             Ad.transition_to; Ad.Meta.indexes; apps/core/utils/advisory_lock.py;
+  #             apps/media/management/commands/sweep_orphaned_media.py (BLOCK 6/8);
+  #             src/backend/conftest.py. DO NOT add repair_bot_username to
+  #             SWEEP_COMMANDS/_LOCK_TARGET_MODULES — it would change the
+  #             count-coupled assertion in BLOCK 7's own backstop.
 
 changes:
   - action: edit_code
@@ -2441,12 +2482,18 @@ acceptance_criteria:
     of whether session=True or session=False
   - the queryset is re-derived per batch; a row that becomes ineligible between batches is not
     acted on by a later batch
-  - archive_sweep's .order_by("pk") is preserved and recompute_normalized_prices GAINS an
-    explicit ascending-pk ordering
-  - test_sweep_lock_structure.py's `session is False` assertion is either unchanged or amended
-    for EXACTLY the two named commands; the other 11 entries are byte-identical
+  - the cutoff is FROZEN once before the loop; the archive_sweep cursor is the TUPLE
+    (published_at, pk) with ORDER BY published_at ASC, pk ASC
+  - the LIMIT lives on the SAME queryset that is select_for_update()'d, and that queryset is
+    evaluated inside the per-batch atomic(); no queryset is locked unbounded
+  - NO enclosing transaction.atomic() remains in archive_sweep.Command.handle or
+    recompute_normalized_prices.Command.handle / ._recompute
+  - test_sweep_lock_structure.py's BOTH assertions (session is False AND in_atomic is True) are
+    amended for EXACTLY the two named commands; the other 12 entries are byte-identical
   - HOURLY_COMMANDS and DAILY_COMMANDS are unmodified; test_scheduler.py passes unchanged
-  - AdvisoryLockId gained no new member
+  - AdvisoryLockId gained no new member; no migration was created (apps/0009_* stays free)
+  - the two docs/ files carry the batching + PgBouncer-prerequisite + partial-success text,
+    including the removal of BLOCK 5's now-false "until per-batch commit lands" forward reference
   - the commit message states what all-or-nothing relaxation costs (a mid-sweep failure leaves
     earlier batches applied and the sweep re-runs on the next tick; re-running is safe because
     the predicates are time-based and re-derived, transition_to is idempotent per row, and
@@ -2455,14 +2502,108 @@ acceptance_criteria:
   - the Docker gate below is green
 ```
 
+**Planner addendum (post-Researcher). Corrections and resolutions that supersede the task body
+above.**
+
+**1. The Researcher's refutation of the Auditor's "pk keyset is quadratic" claim. The Researcher
+is right; the plan's `order_by("pk")` recommendation is withdrawn for `archive_sweep`.** The
+claim did **not** reproduce as a stable property: the `pk` keyset produced **three different
+plans across runs** for the same query shape (correlated `Index Cond: (id > 0)`; interleaved
+`Index Cond: (id > 32000)`; and an emptied-tail `Index Scan using ads_pkey` with `Rows Removed
+by Filter: 65000` at 28 ms / 63 798 buffers for a query returning **zero** rows) plus the
+Auditor's `Bitmap Heap Scan + Sort (Sort Key: id)` with the `pk` window as a **post-scan Filter**.
+That `Sort`/`Bitmap` shape *is* real — in it every batch re-reads and re-sorts the whole stale
+set (63 × 31 500 ≈ 2 M visits) — it is simply not the plan PostgreSQL 18 picks on every
+distribution. **The disqualifier is that the per-batch plan is pinned by nothing.** `published_at`
+*is* pinned, because only `IX_ads_archive_sweep` can serve `ORDER BY published_at, pk` on that
+predicate; the `Incremental Sort` it causes is a tiebreaker sort on `, pk` alone (one tiny group,
+`Index Searches: 1`), and its tail query is **8× cheaper** (7.9 ms / 31 482 buffers vs 28 ms /
+63 798). **That plan stability — not the read-loop constant — is why `published_at` wins.**
+OFFSET/LIMIT is also rejected: every committed batch removes rows, so later offsets skip live
+rows — strictly worse under exactly the concurrency the fix targets. A new index is rejected: the
+only useful one is a partial index whose predicate contains the moving cutoff, and phase 05
+contends for `ads/` (the `0008_*` collision with BLOCK 6 already happened). **BLOCK 7 ships no
+migration; `ads/0009_*` stays free.**
+
+**2. Plan correction — `test_sweep_lock_structure.py` needs `in_atomic is True` exempted too.**
+With `session=True` and **no** enclosing `atomic()`, the spy's
+`transaction.get_connection().in_atomic_block` records `False` for those two entries. Amending
+only `session` leaves the test red. The amendment is a **per-command exemption keyed to the two
+named entries** (`archive_sweep`, index 0 of `SWEEP_COMMANDS`; `recompute_normalized_prices`, index
+12), asserted positively for them (`session is True`, `in_atomic is False`) and unchanged for the
+other **12 of 14** transaction-scoped lock-takers, which stay byte-identical. The module docstring's
+blanket "every command acquires `pg_advisory_xact_lock` inside `transaction.atomic()`" claim and
+the `SWEEP_COMMANDS` comment must be corrected to say so explicitly.
+
+**3. Plan correction — `docs/ops/docker-deployment.md` is in the file surface and must be
+REWRITTEN, not amended.** BLOCK 5 left a forward-reference — *"holds its `select_for_update()` for
+the whole sweep **until per-batch commit lands**"* — that becomes **false on landing**. It is
+replaced by the runbook text in the task's documentation deliverable, which also carries the new
+partial-success semantics and the PgBouncer prerequisite.
+
+**4. Guard tests: the `inspect.getsource` token approach is DELETED and replaced.** Both token
+tests asserted **two** tokens, so a **vestigial** `with transaction.atomic():` left in `handle`
+(now only a savepoint) would keep them **green** while silently defeating the entire fix — token
+presence is the wrong oracle. `test_archive_sweep_handle_uses_select_for_update_and_atomic` and
+`test_recompute_command.py::test_process_batch_uses_select_for_update` are replaced by a
+**`QuerySet.select_for_update` runtime spy** (`patch.object(QuerySet, "select_for_update", …)`,
+the pattern already in `apps/core/tests/test_db_lock_timeout_boundary.py::TestBulkLockTimeout`),
+which asserts a real call rather than a substring. The second token test must be **deleted, not
+re-pointed** — it resolves `Command._process_batch` by attribute, and that symbol is renamed. One
+new **behavioural** test is the regression control: `django_db(transaction=True)`, monkeypatched
+small `_BATCH_SIZE`, `Ad.transition_to` raising in batch 2, asserting batch 1's rows are
+**`ARCHIVED`** and the exception **propagates**. It is **RED pre-fix**, which is what makes it a
+control. `TestArchiveSweepRowLockConcurrency` and `TestRecomputeRowLockConcurrency` stay
+**byte-identical** — neither invokes either command, so they cannot detect this block in either
+direction; they remain the DB-010/DB-001 property guards and must not be credited as controls.
+
+**5. Two items the plan left open — RESOLVED by Planner (see the Implementor task for the full
+reasoning).** (a) **`cutoff` is frozen ONCE, before the loop and before `advisory_lock` is
+entered.** A per-batch cutoff lets a row cross *into* the eligible set behind the cursor, where
+the keyset never revisits it — a silent skip for the whole run. The monotonic-shrinkage proof only
+holds under a frozen cutoff, and the dry-run `count()` must describe the same population the real
+sweep would archive. (b) **The `archive_sweep` cursor is the TUPLE `(published_at, pk)`, not
+`published_at` alone.** `published_at` is not unique, so a single-column `published_at__gt` window
+skips every remaining tie at a batch boundary — silent, unbounded staleness. `ORDER BY
+published_at ASC, pk ASC` is additionally required for `LIMIT` determinism among ties.
+
+**6. Accepted risks — recorded, NOT engineered away.** `session=True` is **not PgBouncer
+transaction-mode safe** (hard prerequisite, with a future trigger). Lock ordering is advisory
+discipline, not a guarantee — PostgreSQL does not promise acquisition order for `LIMIT … FOR
+UPDATE`. A cross-command cycle between lock 1 and lock 12 in two key orders is possible: blast
+radius **one batch**, `40P01` at `deadlock_timeout` (1 s) beats the 10 s bound, and it is
+**strictly better than today** (which would roll back the whole sweep). A row entering eligibility
+behind the cursor is **deferred one cycle** (measured). Uncaught `bulk_update` and every
+non-expected exception **lose one batch, loudly**. **Per-row Redis `INCR` inside the row-locking
+transaction** (`post_save` → `bump_search_version`, ~0.2–1 ms/row on top of 445 ms) is
+**forbidden to fix** here — `Ad.transition_to` and `post_save` are out of scope. **Partial-success
+semantic change:** a non-zero `archive_sweep` exit now means **batches 1..N-1 committed**; the
+runbook text is in the task's documentation deliverable.
+
+**7. Confirmed out of scope — state explicitly, do not "helpfully" fix.** `repair_bot_username`
+(the 14th transaction-scoped lock-taker, `AdvisoryLockId.REPAIR_BOT_USERNAME == 13`, missing from
+`SWEEP_COMMANDS` and `_LOCK_TARGET_MODULES`): **do not add it** — it would change the
+count-coupled assertion in the very test BLOCK 7 relies on as its backstop. `filesystem.py::
+move_staging_to_permanent`'s dangling-`AdImage` defect is BLOCK 8 / phase 07's and a shipped
+green test currently **asserts** it (`test_filesystem.py::TestMoveStagingToPermanent::
+test_updates_key_even_if_file_missing`) — reported, not fixed. `sweep_orphaned_media.py` —
+BLOCK 6 left `_STAGING_TTL_SECONDS = 2*60*60` unchanged; **BLOCK 7 may not touch that file at
+all.** `scheduler.py`'s command lists, `AdvisoryLockId`, `Ad.transition_to`, `Ad.Meta.indexes`,
+`advisory_lock.py`, `src/backend/conftest.py`, `.ai/audit/**`, `.ai/plans/**` — untouched.
+Pre-existing, record do not fix: `recompute_normalized_prices` never bumps the search content
+version (`bulk_update` fires no `post_save`, so `price_normalized_eur ∈ _SEARCH_RELEVANT_FIELDS`
+is not reindexed), and `PriceNormalizer._rate_cache` is process-local and does not memoise misses.
+
 **Tests required.**
 
-- *Must keep passing unchanged:* all of `test_sweep_archive.py` **except** the re-pointed
-  structural case; all of `test_sweep_delete.py`; the 11 non-affected entries in
-  `test_sweep_lock_structure.py`; `apps/core/tests/test_scheduler.py`.
-- *Must be added:* the four tests named in `changes.add_test`, the first of which is **red
-  against the pre-fix code**.
-- *Must be changed:* the two structural tests **only if** Q11 forces a re-point.
+- *Must keep passing unchanged:* all of `test_sweep_archive.py` **except** the two replaced
+  structural cases; all of `test_sweep_delete.py`; the **12** unaffected entries in
+  `test_sweep_lock_structure.py`; `TestArchiveSweepRowLockConcurrency`;
+  `TestRecomputeRowLockConcurrency`; `TestArchiveSweepPositivePath`; `apps/core/tests/test_scheduler.py`.
+- *Must be added:* the behavioural `test_batches_commit_independently` (**red pre-fix**), its
+  `recompute` mirror, and the two `QuerySet.select_for_update` runtime-spy replacements.
+- *Must be changed:* `test_sweep_lock_structure.py::TestSweepLockOrdering` (two-entry exemption
+  + docstrings) **only**.
 
 **Exact gate command (Docker only).**
 
@@ -2553,34 +2694,91 @@ to phase 03 and nothing in the tree pre-empts it.
 > result; and confirmation that the class docstring of `TestSubmitAdStagingMove` now states the
 > corrected contract, not the defect.
 
-**Implementor task.**
+**Implementor task.** *(rewritten by the Planner after Q7/Q8 were closed — this supersedes the
+draft task body in the source plan; see the Planner addendum below for the four staleness
+corrections it carries.)*
 
 ```yaml
 id: task_03_b08_media_promotion_window
-title: Close the window where a promoted file is visible to the orphan sweep before its AdImage row commits
+title: "Promote staged media in transaction.on_commit so no file is visible to the orphan sweep before its AdImage row commits"
 priority: medium
 depends_on: [task_03_b06_idle_timeout]
 source_reference: .ai/plans/03-db-concurrency-remediation.md
-source_section: "BLOCK 8 — Media promotion must not become visible before its row commits (DB-005)"
+source_section: "BLOCK 8 — Media promotion must not become visible before its AdImage row commits (03-DB-005)"
+source_blocks:
+  - "BLOCK 8 — Media promotion must not become visible before its AdImage row commits (`03-DB-005`)"
 extra_context: |
-  Q7 AND Q8 ARE DECISION GATES, closed by Researcher + Planner inside this block. Record the
-  chosen option in the commit message. Do not begin implementation before they are written down.
-  D-8: test_sweep_orphaned_media.py has TWO classes —
-  TestSweepOrphanedMedia::test_orphaned_file_is_deleted (NOT test_orphan_file_deleted),
-  ::test_referenced_file_is_kept (NOT test_ad_referenced_file_survives),
-  ::test_seed_subdir_excluded (NOT test_seed_dir_is_excluded) — and
-  TestSweepLockScope::test_delete_photo_called_within_lock_scope, a class the source plan omits.
-  D-18: the bot error surface is ad_create/submit.py::process_preview; preview.py::show_preview
-  is a non-router render helper. submit_ad promotes at step 2, before step 3's atomic().
-  move_staging_to_permanent's docstring MANDATES the defect in prose and is a deliverable.
-  AdImage.save() computes SHA-256 from MEDIA_ROOT / self.image — a staging-keyed row hashes
-  DIFFERENTLY pre- and post-promotion. Check this explicitly before writing Option A.
-  Do NOT merge AD-003 (phase 05): no refcounting, no removal of copy_ad's storage-key reuse,
-  no change to delete_adimage_files_on_delete.
-  Do NOT lock the submit hot path — it would serialise every seller submission against an
-  os.walk.
-  A migration is required only if the DB schema changes; then it is media/0002_* — check the
-  directory immediately before generating.
+  Q7 AND Q8 ARE CLOSED. They are NOT open questions, MUST NOT be re-litigated, and no
+  alternative may be substituted for either.
+
+  Q7 = OPTION A-PRIME (a variant the source plan does not list): reuse `staging/` ITSELF as the
+  sweep-excluded holding area and promote in `transaction.on_commit`. NO NEW DIRECTORY.
+    - Files stay in `MEDIA_ROOT/staging/` for their whole uncommitted life.
+    - The `AdImage` row is written with the PERMANENT key (prefix already stripped).
+    - The `os.replace` runs from an `on_commit` callback registered INSIDE the atomic block.
+    - The plan's Option A prices itself at four costs that are ALREADY PAID:
+      `STAGING_SUBDIR`/`STAGING_PREFIX` exist, `_walk_media_files` already skips `staging/`,
+      and `_reclaim_stale_staging` already reclaims it on BLOCK 6's mtime heartbeat. The
+      `6 -> 8` hard edge is satisfied LITERALLY — BLOCK 8 inherits BLOCK 6's predicate,
+      constant and heartbeat instead of re-deriving a policy against them.
+    - On rollback the file stays in `staging/` and dies to the existing TTL — the same fate
+      as an abandoned upload, already modelled and tested.
+    - It closes interleaving A BY CONSTRUCTION: the file is never where `_walk_media_files`
+      looks until its row commits. No lock, no re-check, no timing assumption. It is the only
+      candidate that removes the premise of the race rather than bounding it.
+    - It mirrors the shipped convention: the `AdImage pre_delete` signal ALREADY defers FS
+      deletion via `transaction.on_commit`, so this adds no new machinery.
+  CONSEQUENCES OF A-PRIME THAT SUPERSEDE THE SOURCE PLAN:
+    - NO new subdirectory constant, NO new `_walk_media_files` exclusion, NO new reclamation
+      policy. The plan's option-A risk row ("a sweep-excluded subdirectory that nothing
+      reclaims") CANNOT FIRE, and its "mandatory reclamation test" resolves to the EXISTING
+      `TestSweepOrphanedMedia::test_stale_staging_file_reclaimed`.
+    - `STAGING_SUBDIR`, `STAGING_PREFIX` and `KEY_FORMAT_REGEX` are UNCHANGED. The row stores
+      a permanent key, which already matches `KEY_FORMAT_REGEX`. Change none of them.
+    - `docs/ops/docker-deployment.md` is UNCHANGED and the "these two commands" session-lock
+      wording in `docs/02-database/db-retention.md` STAYS AS-IS.
+
+  INTERLEAVING B IS FIXED INDEPENDENTLY OF Q7, BY THE `setattr` PLACEMENT — never by inheriting
+  a fix from BLOCK 6. B is still reachable after BLOCK 6: only
+  `telegram_bot/handlers/ad_create/photos.py::process_photos` and
+  `telegram_bot/handlers/ad_create/submit.py::process_preview` call `touch_staging_photos`;
+  `category.py`, `city.py`, `price.py` and `text.py` touch only the row. A dialog spending more
+  than 2 h across those steps still loses its files. The contract:
+      REWRITE A KEY IFF THE FILE WAS ACTUALLY MOVED.
+      A MISSING STAGING FILE RAISES FileNotFoundError NAMING THE KEY. NO KEY IS REWRITTEN.
+  RAISE, not skip. `delete_photo` already classifies `FileNotFoundError` as terminal ("the
+  file is already gone and retrying would not help"), and raising is the only option that
+  preserves the information needed for a RECOVERABLE seller message. Skip-silently IS the
+  defect. `submit_ad` catches it BEFORE opening the transaction and returns
+  `(False, [_("One of your photos is no longer available. Please upload it again.")])` —
+  strictly better than today's `(True, [])`, which publishes an ad with a broken image.
+
+  Q8 = NEITHER batching NOR session=True. `sweep_orphaned_media` keeps ONE read-only snapshot,
+  ONE delete loop, ONE `transaction.atomic()` with `session=False`. The premise that forced
+  `session=True` was Option B's per-candidate commit releasing the lock early; under A-prime
+  there are no per-candidate transactions, so the premise is GONE. Therefore
+  `sweep_orphaned_media` is NOT added to `_SESSION_SCOPED_BATCHERS`,
+  `test_sweep_lock_structure.py` is UNTOUCHED, and the "these two commands" wording in
+  `docs/02-database/db-retention.md` and `docs/ops/docker-deployment.md` STAYS AS-IS and
+  remains accurate. ONE discipline, not blended.
+
+  DEAD CODE: delete the unreachable `if not dry_run:` guard in
+  `sweep_orphaned_media.Command.handle` (the `dry_run` branch has already returned). KEEP the
+  early return — dropping it would make `--dry-run` reclaim staging files and break
+  `test_dry_run_is_nondestructive`.
+
+  D-8: `test_sweep_orphaned_media.py` has TWO classes —
+  `TestSweepOrphanedMedia::test_orphaned_file_is_deleted` (NOT test_orphan_file_deleted),
+  `::test_referenced_file_is_kept` (NOT test_ad_referenced_file_survives),
+  `::test_seed_subdir_excluded` (NOT test_seed_dir_is_excluded) — and
+  `TestSweepLockScope::test_delete_photo_called_within_lock_scope`, a class the source plan omits.
+  D-18: the bot error surface is `handlers/ad_create/submit.py::process_preview`;
+  `preview.py::show_preview` is a non-router render helper.
+  Do NOT merge AD-003 (phase 05): no refcounting, no removal of `copy_ad`'s storage-key reuse,
+  no change to `delete_adimage_files_on_delete`, and no special-casing of the dedup-hit file
+  that stays in `staging/` for the TTL to reclaim.
+  NO MIGRATION. `media/0001_initial.py` is the only migration in that directory and nothing
+  schema-level changes.
 
 description: >
   submit_ad promotes staged files to permanent MEDIA_ROOT BEFORE opening its
@@ -2588,394 +2786,1345 @@ description: >
   AdvisoryLockId.SWEEP_ORPHANED_MEDIA. A concurrent sweep_orphaned_media takes a point-in-time
   snapshot of referenced keys and unlinks on_disk-minus-referenced across the whole os.walk
   with no re-check, so a promoted file whose row is not yet committed is classified as an
-  orphan and deleted. Apply the chosen design so no file is ever visible to the sweep before the
-  row that owns it is committed.
+  orphan and deleted. Apply Option A-prime so the file is invisible to _walk_media_files until
+  its row commits, and fix the unconditional key rewrite that lets a reaped staged file be
+  published as a dangling AdImage reference.
 
 goals:
-  - eliminate the promote-before-row-commit window
-  - do not introduce unbounded growth (files left behind must be reclaimed within a bounded time)
-  - keep AdImage content dedup (SHA-256) stable across any promotion move
-  - keep the TX-then-FS convention for every deletion
-  - leave AD-003 (phase 05) untouched
+  - eliminate the promote-before-row-commit window by construction, not by narrowing it
+  - close interleaving B: no AdImage row may ever reference a file that is not on disk
+  - convert a photo-less publication into a RECOVERABLE seller message
+  - keep AdImage content dedup (SHA-256) working under deferred promotion
+  - do not introduce unbounded growth: files left behind stay in staging/ and die to the TTL
+  - keep the TX-then-FS convention for every deletion, including the new promotion move
+  - leave AD-003 (phase 05) untouched and add no migration
 
 files:
+  - path: src/backend/apps/media/services/filesystem.py
+    scope: |
+      DELETE `move_staging_to_permanent` and REPLACE it with two single-responsibility
+      functions (rule 4):
+        * `plan_staging_promotion(photos) -> list[str]` — PURE. For every key field
+          (`storage_key`, `thumbnail_small`, `thumbnail_medium`, `thumbnail_large`) that carries
+          `STAGING_PREFIX`: existence-check the file under `MEDIA_ROOT`; RAISE
+          `FileNotFoundError` NAMING THE KEY if absent; otherwise rewrite the field to its
+          permanent form (prefix stripped) in place. Returns the deduplicated list of
+          permanent keys to move. Fields without the staging prefix are untouched (seed data,
+          web-edit fixtures). It performs NO filesystem mutation — no move, no write, no mkdir.
+        * `promote_media_files(keys) -> None` — the filesystem move: `os.replace` from
+          `MEDIA_ROOT/staging/<key>` to `MEDIA_ROOT/<key>`, with the existing EXDEV ->
+          `shutil.move` fallback and a non-EXDEV re-raise. It carries a PER-KEY
+          `try`/`except` that LOGS AND CONTINUES: it runs post-commit, so one failure must not
+          abort the rest and must never propagate into the caller (mirror the shipped
+          convention in `apps/media/signals.py`). A post-commit raise would be a lie — the row
+          is already committed. It needs NO containment assertion (unlike `delete_photo`,
+          which takes operator-supplied keys): its keys are generated internally and were just
+          prefix-stripped.
+    targets:
+      - { type: function, name: move_staging_to_permanent }   # DELETE
+      - { type: function, name: plan_staging_promotion }       # ADD
+      - { type: function, name: promote_media_files }          # ADD
+      - { type: function, name: delete_photo }                 # REFERENCE ONLY
+      - { type: module,   name: filesystem }                   # module docstring
+      - { type: constant, name: STAGING_SUBDIR }               # UNCHANGED
+      - { type: constant, name: STAGING_PREFIX }               # UNCHANGED
+      - { type: constant, name: KEY_FORMAT_REGEX }             # UNCHANGED
+    semantic_anchors: {}
+  - path: src/backend/apps/media/services/__init__.py
+    scope: |
+      Remove the `move_staging_to_permanent` entry from the import list and from `__all__`;
+      add `plan_staging_promotion` and `promote_media_files` to both, keeping the existing
+      alphabetical order of `__all__`.
+    targets:
+      - { type: constant, name: __all__ }
+    semantic_anchors: {}
+  - path: src/backend/apps/ads/services/images.py
+    scope: |
+      `AdImageService.create_or_skip` gains ONE optional keyword `sha256: str | None = None`,
+      and the body becomes:
+          digest = sha256 if sha256 is not None else cls._compute_sha256(image)
+      with `AdImage.objects.create(..., sha256=digest, ...)` otherwise unchanged. Document the
+      parameter in the docstring, including WHY it exists (under deferred promotion the bytes
+      are not at the row's key).
+    targets:
+      - { type: method, name: AdImageService.create_or_skip }
+      - { type: method, name: AdImageService._compute_sha256 }   # REFERENCE ONLY
+    semantic_anchors: {}
   - path: src/backend/apps/ads/services/submission.py
-    targets: [{ type: function, name: submit_ad }]
+    scope: |
+      `submit_ad`, in this order:
+        1. PRE-FLIGHT — for each photo whose `storage_key` carries `STAGING_PREFIX`, assert the
+           file resolves under `MEDIA_ROOT`. Missing -> return
+           `(False, [_("One of your photos is no longer available. Please upload it again.")])`
+           BEFORE any I/O and before the transaction. This is what makes the thumbnail loop's
+           bare `except Exception` structural: by construction "file missing" can no longer be
+           what that broad catch swallows, so it covers GENERATION failures only and
+           `test_thumbnails_null_on_generation_failure` stays green unchanged. ~4 lines.
+        2. THUMBNAIL LOOP — unchanged position (still before the transaction). Leave the broad
+           `except` clause alone; do NOT narrow it (that is a separate, unrequested change).
+        3. CAPTURE the staging storage keys into a local list (needed in step 6 for hashing).
+        4. `plan_staging_promotion(input.photos)` — still OUTSIDE the atomic block, which is
+           now correct for a DIFFERENT reason: it is pure key rewriting plus validation, with
+           no filesystem mutation. The existing comment that says the promotion must happen
+           BEFORE the transaction is FALSE under A-prime and must be corrected (see the
+           documentation deliverable).
+        5. `with transaction.atomic():` — otherwise UNCHANGED, including the
+           `Ad.DoesNotExist` early return, the `create_or_skip` loop and the `auto_moderate`
+           delegation. ONE placement constraint: register `transaction.on_commit` INSIDE the
+           atomic, AFTER the `create_or_skip` loop and AFTER the `Ad.DoesNotExist` return, so a
+           missing ad schedules no promotion. Its position relative to the `auto_moderate`
+           delegation is free.
+        6. Hash the CAPTURED STAGING keys with
+           `FileHashService.calculate_sha256(<staging path>)` and pass the digest to
+           `create_or_skip(..., sha256=...)`. Under deferred promotion
+           `_compute_sha256(permanent_key)` finds nothing, returns `""`, and the existing
+           `if digest:` guard SILENTLY DISABLES content dedup for every submission. This
+           override is MANDATORY, not optional.
+        7. `transaction.on_commit(<callable that calls promote_media_files(permanent_keys)>)`.
+           Bind the key list into the callback's closure explicitly (default argument or
+           `functools.partial`) so no late-binding trap is possible.
+      NO advisory lock is added to `submit_ad`; `AdvisoryLockId` is untouched.
+      `auto_moderate` is imported FUNCTION-LOCALLY in this module, so the only valid patch
+      target for any test that hooks it is `apps.moderation.services.auto_moderation.auto_moderate`
+      (patching `submission.auto_moderate` will not intercept it).
+    targets:
+      - { type: function, name: submit_ad }
     semantic_anchors:
       replace_in_body:
-        old: "move_staging_to_permanent(input.photos)"   # step 2 — currently BEFORE the atomic
-  - path: src/backend/apps/media/services/filesystem.py
-    targets:
-      - { type: function, name: move_staging_to_permanent }
-      - { type: function, name: delete_photo }
-      - { type: module,   name: filesystem }
-    semantic_anchors: {}
+        old: 'move_staging_to_permanent(input.photos)'
+        new: 'plan_staging_promotion(input.photos)'
+      insert_after:
+        type: comment
+        value: "Promote staging files to permanent storage BEFORE the transaction"   # the comment that must be corrected, not kept
   - path: src/backend/apps/media/management/commands/sweep_orphaned_media.py
+    scope: |
+      TWO changes only, both non-functional:
+        * DELETE the unreachable `if not dry_run:` guard around the `_reclaim_stale_staging`
+          call in `Command.handle`. KEEP the call and KEEP the early `return` in the `dry_run`
+          branch — that return is load-bearing (`test_dry_run_is_nondestructive`).
+        * Docstring updates ONLY: the module docstring, the `_walk_media_files` docstring and
+          the `_reclaim_stale_staging` docstring must record the EXTENDED meaning of
+          `staging/` — it now holds in-flight uploads AND files awaiting post-commit promotion,
+          and a file may briefly belong to a committed `AdImage` row, which the 2 h mtime TTL
+          is what bounds. This is the "directory contract" phases 07/13 extend: a
+          DOCUMENTATION change, not a structural one.
+      NO new exclusion in `_walk_media_files` (`staging/` is already skipped) and NO new
+      reclamation policy in `_reclaim_stale_staging`.
     targets:
       - { type: function,  name: _walk_media_files }
-      - { type: function,  name: _collect_referenced_keys }
+      - { type: function,  name: _collect_referenced_keys }   # REFERENCE ONLY
       - { type: function,  name: _reclaim_stale_staging }
-      - { type: function,  name: Command.handle }
-      - { type: constant,  name: _SEED_SUBDIR }
-      - { type: constant,  name: _STAGING_TTL_SECONDS }
+      - { type: method,    name: Command.handle }
+      - { type: constant,  name: _STAGING_TTL_SECONDS }       # UNCHANGED (BLOCK 6 owns it)
+      - { type: constant,  name: _SEED_SUBDIR }               # UNCHANGED
     semantic_anchors: {}
-  - path: src/backend/apps/media/models.py                   # AdImage.save() — REFERENCE ONLY
-    targets: [{ type: class, name: AdImage }]
-    semantic_anchors: {}
-  - path: src/backend/apps/media/signals.py                 # REFERENCE ONLY unless design changes
-    targets: [{ type: function, name: delete_adimage_files_on_delete }]
+  - path: src/backend/apps/media/tests/test_filesystem.py
+    scope: |
+      Split `TestMoveStagingToPermanent` into `TestPlanStagingPromotion` and
+      `TestPromoteMediaFiles` and carry the existing cases across:
+        * -> `TestPlanStagingPromotion`: `test_strips_staging_prefix_from_all_fields`,
+          `test_leaves_non_staging_keys_untouched`, `test_multiple_photos_processed`, and the
+          INVERTED missing-file case.
+        * -> `TestPromoteMediaFiles` VERBATIM: `test_exdev_falls_back_to_shutil_move` and
+          `test_non_exdev_oserror_reraises` (the latter already asserts the OPPOSITE contract
+          and is the reason the missing-file case is the lone violation, not the rule).
+      Add a case for `promote_media_files`' per-key log-and-continue: one key whose `os.replace`
+      raises non-EXDEV must not abort the remaining keys and must not propagate.
+    targets:
+      - { type: class, name: TestMoveStagingToPermanent }        # SPLIT
+      - { type: class, name: TestPlanStagingPromotion }          # ADD
+      - { type: class, name: TestPromoteMediaFiles }             # ADD
     semantic_anchors: {}
   - path: src/telegram_bot/tests/test_save_photo_integration.py
-    targets: [{ type: class, name: TestSubmitAdStagingMove }]
+    scope: >
+      The concurrency regression test and the interleaving-B end-to-end test live here, next
+      to the class they extend. The class is `pytestmark = [django_db(transaction=True),
+      integration, concurrent]`, so `transaction.on_commit` DOES fire inside `submit_ad`.
+    targets:
+      - { type: class, name: TestSubmitAdStagingMove }
+    semantic_anchors: {}
+  - path: src/backend/apps/ads/tests/test_submission.py
+    scope: >
+      Home of the interleaving-B end-to-end test if it is written against `submit_ad` outside
+      the `transaction=True` bot class. Locate the existing `submit_ad` cases by symbol; if
+      the class's `django_db` mode prevents observing the pre-flight return, give the new test
+      its own `transaction=True` class rather than converting an existing one.
+    targets: []
+    semantic_anchors: {}
+  - path: src/backend/apps/ads/tests/test_ad_image_service.py
+    scope: >
+      The unit home for the `sha256=` override. NOTE: the source plan names
+      `test_ad_image_dedup.py` — THAT FILE DOES NOT EXIST. The real class is
+      `TestAdImageServiceCreateOrSkip`. The END-TO-END dedup control belongs in the bot test
+      module instead (it must exercise `submit_ad`, not `create_or_skip` in isolation).
+    targets:
+      - { type: class, name: TestAdImageServiceCreateOrSkip }
     semantic_anchors: {}
   - path: src/backend/apps/media/tests/test_sweep_orphaned_media.py
-    targets: [{ type: class, name: TestSweepOrphanedMedia }, { type: class, name: TestSweepLockScope }]
+    scope: |
+      UNCHANGED. `test_stale_staging_file_reclaimed` IS the reclamation control under A-prime:
+      a `staging/` file inside the TTL survives the sweep, which is exactly the property the
+      post-commit gap relies on. Do not add a second reclamation test and do not edit any
+      existing case.
+    targets:
+      - { type: class, name: TestSweepOrphanedMedia }
+      - { type: class, name: TestSweepLockScope }
     semantic_anchors: {}
-  # NOT touched: copy_service.py's storage-key reuse (AD-003, phase 05);
-  #             delete_draft's storage_keys (that path genuinely uses them);
-  #             sweep_drafts.py (BLOCK 1 and BLOCK 6 own it).
+  - path: src/backend/apps/core/tests/test_sweep_lock_structure.py
+    scope: |
+      UNTOUCHED. Q8 decided neither batching nor `session=True`, so the `session is False`
+      entry for `sweep_orphaned_media` remains correct and this file gains no amendment.
+    targets: []
+    semantic_anchors: {}
+  - path: src/telegram_bot/services/ad_data/media.py
+    scope: |
+      CORRECT A MIS-ATTRIBUTION IN THE `touch_staging_photos` DOCSTRING. It states that the
+      `move_staging_to_permanent` silent-skip defect "is phase 07's". That becomes wrong the
+      moment this block lands and re-derives the wrong owner for a future reader. Correct it
+      in THIS commit. Docstring only — no behavioural change to `touch_staging_photos`, whose
+      fail-soft `FileNotFoundError -> continue` is correct for its own purpose (there is
+      nothing left to protect).
+    targets:
+      - { type: function, name: touch_staging_photos }
+    semantic_anchors: {}
+  - path: docs/02-database/db-retention.md
+    scope: |
+      EXTEND the existing `staging/` paragraph (the one that names
+      `sweep_orphaned_media._STAGING_TTL_SECONDS`, mtime, and `touch_staging_photos`) to record
+      that `staging/` also holds files awaiting post-commit promotion and that the TTL is what
+      bounds the gap between a committed `AdImage` row and its promoted file. DO NOT touch the
+      "these two commands" session-lock wording in this file.
+    targets: []
+    semantic_anchors: {}
+  # NOT touched: src/backend/apps/core/tests/test_sweep_lock_structure.py;
+  #             src/backend/apps/core/enums.py (AdvisoryLockId);
+  #             src/backend/apps/core/utils/advisory_lock.py;
+  #             src/backend/apps/media/models.py (AdImage) and apps/media/signals.py
+  #             (delete_adimage_files_on_delete) — REFERENCE ONLY;
+  #             apps/ads/services/copy_service.py storage-key reuse (AD-003, phase 05);
+  #             delete_draft's storage_keys; sweep_drafts.py (BLOCK 1 and BLOCK 6 own it);
+  #             src/backend/apps/core/utils/scheduler.py;
+  #             src/backend/apps/media/migrations/** (no migration);
+  #             docs/ops/docker-deployment.md (Q8 leaves its wording accurate);
+  #             src/backend/conftest.py; .ai/audit/**; .ai/plans/**.
 
 changes:
   - action: add_code
     description: >
-      Apply the Q7 decision. Option A: a new sweep-excluded subdirectory constant in
-      filesystem.py, promoted to permanent storage in a transaction.on_commit callback after the
-      owning AdImage row commits, plus a matching exclusion in _walk_media_files and a
-      reclamation rule (possibly reusing _reclaim_stale_staging). Option B: a re-check inside a
-      short transaction immediately before each unlink, kept INSIDE the
-      AdvisoryLockId.SWEEP_ORPHANED_MEDIA lock scope so test_delete_photo_called_within_lock_scope
-      keeps holding.
+      Apply Q7 = Option A-prime. Replace `move_staging_to_permanent` with the pure
+      `plan_staging_promotion` and the post-commit `promote_media_files`; give
+      `create_or_skip` the `sha256` override; restructure `submit_ad` into pre-flight ->
+      thumbnail loop -> capture staging keys -> pure key rewrite -> unchanged atomic block ->
+      `on_commit` promotion. NO new directory, NO new sweep exclusion, NO new reclamation
+      policy, NO advisory lock on the submit path.
+  - action: edit_code
+    description: >
+      Delete the unreachable `if not dry_run:` guard in `Command.handle` and keep the early
+      return. Remove the `move_staging_to_permanent` re-export from
+      `apps/media/services/__init__.py` (import list and `__all__`) and export the two
+      replacements in its place.
   - action: rewrite_docstring
     description: >
-      Correct move_staging_to_permanent's "the caller must run this before any
-      transaction.atomic()" contract and TestSubmitAdStagingMove's class docstring. Both
-      currently document the DEFECT as intended behaviour. Per project rule 2 the TESTS bend;
-      the docstrings are corrected, not preserved.
+      Four shipped claims become FALSE with this change and are corrected IN THE SAME COMMIT —
+      see the `documentation_deliverable` block below. Per project rule 2 the TESTS bend; the
+      docstrings are corrected, not preserved. The docstring is part of the deliverable: a
+      reader who inherits "promote before TX => orphans on rollback" as documented intent
+      reverts the fix.
   - action: rewrite_test
     description: >
-      Rewrite BOTH cases of TestSubmitAdStagingMove to the chosen design: after a rolled-back
-      submit no file exists in permanent storage; after a successful submit the file is permanent
-      AND an AdImage row exists AND a concurrent sweep running between the row commit and the
-      promotion move cannot unlink it.
+      INVERT, do not delete, the two tests that assert the defect:
+      `TestSubmitAdStagingMove::test_submit_ad_rollback_leaves_permanent_orphans` (renamed to
+      `test_submit_ad_rollback_leaves_files_in_staging`) and
+      `TestMoveStagingToPermanent::test_updates_key_even_if_file_missing` (renamed to match its
+      new meaning). `TestSubmitAdStagingMove::test_submit_ad_moves_staging_to_permanent` needs
+      its DOCSTRING corrected and NO assertion rewrite.
+  - action: add_test
+    description: >
+      Four new tests, specified in full in `tests_to_add` below: the concurrency regression
+      test (RED pre-fix), the interleaving-B end-to-end test, the SHA-256 dedup control, and
+      the per-key log-and-continue case for `promote_media_files`.
+
+implementation_sequence:
+  - step: 1
+    name: Write the four tests FIRST, and prove two of them RED against the untouched tree
+    detail: >
+      Do this BEFORE any production edit. Four tests:
+      (a) `test_files_are_not_promoted_before_the_row_commits` in `TestSubmitAdStagingMove` —
+          patch `apps.moderation.services.auto_moderation.auto_moderate` (the symbol is
+          imported FUNCTION-LOCALLY inside `submit_ad`, so patching `submission.auto_moderate`
+          will not intercept it) with a side effect that inspects the filesystem FROM INSIDE
+          the transaction. At that instant the staging original MUST still exist and the
+          permanent `photo.jpg` MUST NOT. It must be RED pre-fix: today the promotion happens
+          before the atomic block, so `photo.jpg` already exists and the assertion fails.
+          This is the direct guard for 03-DB-005 and the block's one mandatory control.
+      (b) `test_missing_staged_file_reports_a_recoverable_error` — drive interleaving B end to
+          end: stage a photo, delete the staged file, call `submit_ad`, assert it returns
+          `(False, [...])` carrying the new recoverable message, that NO `AdImage` row was
+          created, and that no key was rewritten.
+      (c) INVERT `TestMoveStagingToPermanent::test_updates_key_even_if_file_missing` (renamed)
+          to assert that `FileNotFoundError` is raised AND that the storage key is STILL
+          `"staging/missing.jpg"`. It must be RED pre-fix, because today no exception is
+          raised and the key is rewritten to `"missing.jpg"`. Do NOT delete it.
+      (d) SHA-256 dedup survives deferred promotion — assert that after a `submit_ad` the
+          stored `AdImage.sha256` equals the digest of the STAGED bytes and is non-empty, and
+          that a second submission of identical bytes still resolves to the SAME row. This is
+          the control for accepted risk 2: it must FAIL if the `sha256=` override is removed
+          from the `submit_ad` call site. Demonstrate that by temporarily deleting the
+          override, showing RED, and restoring it.
+      Then RUN the suite and RECORD, in the commit message, that (a) and (c) are RED against
+      the pre-fix code and that (b) and (d) fail for their own (pre-fix) reasons. A control
+      that is never seen red proves nothing.
+  - step: 2
+    name: Rewrite apps/media/services/filesystem.py and its re-export
+    detail: >
+      Delete `move_staging_to_permanent`; add `plan_staging_promotion` (pure) and
+      `promote_media_files` (log-and-continue per key). Update the module docstring. Leave
+      `STAGING_SUBDIR`, `STAGING_PREFIX`, `KEY_FORMAT_REGEX` and `delete_photo` alone. Update
+      `apps/media/services/__init__.py` (import list and `__all__`).
+  - step: 3
+    name: Give AdImageService.create_or_skip the sha256 override
+    detail: >
+      One optional keyword `sha256: str | None = None`; body becomes
+      `digest = sha256 if sha256 is not None else cls._compute_sha256(image)`. Document why it
+      exists. No other signature, query or return-path change.
+  - step: 4
+    name: Restructure submit_ad
+    detail: >
+      In order: pre-flight existence check, thumbnail loop (unchanged), capture staging keys,
+      `plan_staging_promotion` (still outside the atomic, now because it is PURE), the
+      unchanged atomic block with the `on_commit` registration placed after the
+      `create_or_skip` loop and after the `Ad.DoesNotExist` return, and the digest passed as
+      `create_or_skip(..., sha256=...)`. Add the `FileNotFoundError` catch that returns the
+      recoverable message BEFORE the transaction is opened. No advisory lock.
+  - step: 5
+    name: Apply the four documentation corrections with the code
+    detail: >
+      The corrected `submit_ad` comment, the `filesystem.py` module docstring (which inherits
+      the "the caller must run this before any transaction.atomic()" claim that is now false),
+      the `sweep_orphaned_media` docstrings, the `touch_staging_photos` mis-attribution, and
+      the `TestSubmitAdStagingMove` class docstring. See `documentation_deliverable`.
+  - step: 6
+    name: "sweep_orphaned_media — delete the dead guard, docstrings only otherwise"
+    detail: >
+      Remove the unreachable `if not dry_run:` guard; keep the early return; update the module,
+      `_walk_media_files` and `_reclaim_stale_staging` docstrings for the extended `staging/`
+      meaning. `_STAGING_TTL_SECONDS` is BLOCK 6's and stays as it is.
+  - step: 7
+    name: i18n — append the new msgid
+    detail: >
+      One new user-visible string, `"One of your photos is no longer available. Please upload
+      it again."` Add it to the `ru` and `bs` catalogs with NON-EMPTY `msgstr`; `en` MAY stay
+      empty (the msgid is English). APPEND ONLY — these files are shared with phase 14 and
+      another phase may be editing them. `test_i18n_completeness.py` gates this; the catalogs
+      are recompiled automatically at container start, so no manual `compilemessages`.
+  - step: 8
+    name: Update db-retention.md, then run the gates
+    detail: >
+      Extend the `staging/` paragraph only. Then run lint, typecheck and the exact Docker gate
+      commands in `acceptance_criteria` below. Do NOT run `test-recreate` — no migration was
+      generated.
+  - step: 9
+    name: Commit with explicit staging
+    detail: >
+      Stage the EXPLICIT paths listed above. Never `git add -A`, `git add .`, or `git commit -a`
+      — the tree is dirty by design and other phases commit concurrently. Watch for CRLF
+      damage: this phase already had an Implementor corrupt a file with `Set-Content`. Do not
+      run `git reset`, `checkout`, `stash`, or `clean`.
+
+architectural_constraints:
+  - "`apps.*` code must NEVER import `telegram_bot.*`. The dependency runs one way only."
+  - >
+    The `transaction.on_commit` callback is registered INSIDE the `with transaction.atomic():`
+    block and AFTER both the `create_or_skip` loop AND the `Ad.DoesNotExist` early return, so a
+    missing ad schedules no promotion. Its position relative to the `auto_moderate` delegation
+    is free.
+  - >
+    `promote_media_files` runs POST-COMMIT and therefore MUST log and continue rather than
+    raise: a per-key `try`/`except` around the move, never a bare propagate. The row is already
+    committed, so an exception crossing back into the caller would be a lie.
+  - "`plan_staging_promotion` is PURE and must perform NO filesystem mutation — no move, no write, no mkdir."
+  - >
+    `plan_staging_promotion` RAISES `FileNotFoundError` naming the key when a staged file is
+    absent, and rewrites NO key in that case. `submit_ad` is the single place that converts that
+    into a recoverable seller message.
+  - "NO advisory lock is added to `submit_ad`. `AdvisoryLockId` is untouched — phase 03 allocates no new member."
+  - "`test_sweep_lock_structure.py` is UNTOUCHED; `sweep_orphaned_media` is NOT added to `_SESSION_SCOPED_BATCHERS`."
+  - >
+    NO migration. `apps/media/migrations/` keeps only `0001_initial.py`. Nothing schema-level
+    changes; the row already stores a permanent key.
+  - >
+    Locale files are APPENDED only, never re-sorted or rewritten wholesale (they are shared
+    with phase 14). `ru` and `bs` `msgstr` MUST be non-empty; `en` MAY be empty.
+  - "`logger` is never `print()` (rule 12). All code, comments, docstrings, log messages and docs are in clear English (rule 1)."
+  - >
+    Every `with transaction.atomic():` this block touches KEEPS the project's established
+    pyright suppression comment on that line. Do not drop it, and do not add a second one.
+  - "No new dependency. No refcounting and no `AD-003` content — `copy_service.py`'s storage-key reuse and `delete_adimage_files_on_delete` are unchanged."
+  - >
+    No test may assert on a source line, on a log string's exact wording, or on a variable's
+    absence. Behavioural and runtime-spy oracles only. (The one logging test permitted asserts
+    that an ERROR/WARNING record EXISTS and that a later key still moved — not the message.)
+  - "Constants stay `StrEnum`/module constants. No plain-string or dict constant tables (rule 10)."
+
+must_keep_passing_unchanged:
+  - "`src/backend/apps/core/tests/test_sweep_lock_structure.py` — the WHOLE FILE, byte-identical."
+  - "`src/backend/apps/media/tests/test_sweep_orphaned_media.py` — the WHOLE FILE, including `TestSweepOrphanedMedia::test_orphaned_file_is_deleted`, `::test_referenced_file_is_kept`, `::test_seed_subdir_excluded`, `::test_staging_file_survives_sweep`, `::test_stale_staging_file_reclaimed`, `::test_fresh_staging_file_preserved`, `::test_dry_run_is_nondestructive`, `::test_delete_photo_routing`, and `TestSweepLockScope::test_delete_photo_called_within_lock_scope` (D-8 names)."
+  - "`src/backend/apps/ads/tests/test_ad_image_service.py::TestAdImageServiceCreateOrSkip` — all four existing cases."
+  - "`src/telegram_bot/tests/test_save_photo_integration.py::TestSubmitAdStagingMove::test_submit_ad_moves_staging_to_permanent` — every assertion, unchanged; docstring only."
+  - "`src/backend/apps/ads/tests/test_submission.py::…::test_thumbnails_null_on_generation_failure` — the pre-flight check is what keeps it green; do not narrow the thumbnail loop's `except`."
+  - "`TestSavePhotoThumbnailsIntegration` and `src/backend/apps/media/tests/test_thumbnail_integration.py` — its `create_or_skip` call site writes the bytes AT the row key, so it needs no `sha256=` override and must be unchanged."
+  - "`src/backend/apps/media/tests/test_filesystem.py::TestMoveStagingToPermanent::test_non_exdev_oserror_reraises` — carried into `TestPromoteMediaFiles` VERBATIM, assertions included."
+  - "`src/backend/apps/media/tests/test_filesystem.py::TestDeletePhoto` and every other `filesystem.py` case."
+  - "`docs/ops/docker-deployment.md` — unchanged; its \"these two commands\" wording stays accurate under Q8."
+
+tests_to_add:
+  - name: test_files_are_not_promoted_before_the_row_commits
+    file: src/telegram_bot/tests/test_save_photo_integration.py
+    target_class: TestSubmitAdStagingMove
+    purpose: "Direct guard for 03-DB-005. RED pre-fix."
+    must_be_red_before_any_production_edit: true
+    notes: >
+      Patch `apps.moderation.services.auto_moderation.auto_moderate` with a side effect that
+      asserts, from inside the still-open transaction, that the staging original still exists
+      and that the permanent `photo.jpg` does not. Force the interleaving with this hook — never
+      with sleeps.
+  - name: test_missing_staged_file_reports_a_recoverable_error
+    file: src/backend/apps/ads/tests/test_submission.py
+    purpose: >
+      Interleaving B end to end through `submit_ad`. Assert `(False, [...])` carrying the new
+      recoverable message, NO `AdImage` row, and no rewritten key.
+  - name: "test_raises_and_leaves_key_untouched_when_file_missing (INVERTED from test_updates_key_even_if_file_missing)"
+    file: src/backend/apps/media/tests/test_filesystem.py
+    target_class: TestPlanStagingPromotion
+    purpose: "Assert `FileNotFoundError` is raised AND the key is still `\"staging/missing.jpg\"`. RED pre-fix."
+    must_be_red_before_any_production_edit: true
+  - name: test_dedup_survives_deferred_promotion
+    file: src/telegram_bot/tests/test_save_photo_integration.py
+    purpose: >
+      The control for accepted risk 2. The stored `AdImage.sha256` equals the digest of the
+      STAGED bytes and is non-empty, and a second submission of identical bytes resolves to the
+      SAME row. Must FAIL if the `sha256=` override is removed from the `submit_ad` call site —
+      demonstrate that by temporarily deleting the override, showing RED, and restoring it.
+  - name: test_one_failed_key_does_not_abort_the_remaining_promotions
+    file: src/backend/apps/media/tests/test_filesystem.py
+    target_class: TestPromoteMediaFiles
+    purpose: >
+      One key whose `os.replace` raises a non-EXDEV `OSError` is logged and skipped; the
+      remaining keys still move; nothing propagates to the caller.
+
+documentation_deliverable:
+  - >
+    `submit_ad`'s comment that reads "Promote staging files to permanent storage BEFORE the
+    transaction" is FALSE under A-prime and must be replaced. It must now say that key
+    rewriting happens before the transaction because `plan_staging_promotion` is pure, and
+    that the file move happens AFTER the row commits.
+  - >
+    `filesystem.py`'s module docstring, which currently carries `move_staging_to_permanent`'s
+    claim that "the caller is responsible for running this before any `transaction.atomic()`
+    block so that a DB rollback leaves the permanent files as unreferenced orphans". The
+    function is deleted; the new module docstring must state the A-prime contract: promotion
+    happens AFTER the owning row commits via `transaction.on_commit`; a missing staged file is
+    an ERROR, not a skip; a rollback leaves the file in `staging/` for TTL reclamation.
+  - >
+    `sweep_orphaned_media.py`: the module docstring, the `_walk_media_files` docstring and the
+    `_reclaim_stale_staging` docstring must record the EXTENDED `staging/` lifecycle — in-flight
+    uploads AND files awaiting post-commit promotion — and note that a file may briefly belong
+    to a committed `AdImage` row, which the 2 h mtime TTL bounds.
+  - >
+    `telegram_bot/services/ad_data/media.py::touch_staging_photos`: its docstring mis-attributes
+    the silent-skip defect to "phase 07". That becomes wrong the moment this block lands.
+    Correct the attribution in THIS commit.
+  - "`TestSubmitAdStagingMove`'s class docstring must state the corrected contract, not the defect."
+  - "`docs/02-database/db-retention.md`: extend the `staging/` paragraph for the post-commit promotion gap. Do NOT touch the \"these two commands\" session-lock wording."
+  - "i18n: the new msgid, appended to `ru` and `bs` (non-empty) and `en` (may stay empty)."
+
+commit_message:
+  - "Conventional Commit, scope `media`, referencing the finding — e.g. `fix(media): promote staged uploads in on_commit (03-DB-005)`. Match the style of the surrounding commits."
+  - "State the two closed decisions: Q7 = Option A-prime (reuse `staging/` as the sweep-excluded holding area, promote in `transaction.on_commit`, NO new directory, NO new sweep exclusion, NO new reclamation policy) and Q8 = neither batching nor `session=True` (the sweep keeps one transaction-scoped lock across the whole walk; `test_sweep_lock_structure.py` untouched)."
+  - "State the key-rewrite contract change: a key is rewritten IFF the file was actually moved; a missing staged file RAISES and `submit_ad` returns a recoverable seller message instead of publishing a photo-less ad."
+  - "State the dedup obligation: `create_or_skip` gained an explicit `sha256=` and every call site whose bytes are not at the row key must pass it, or content dedup silently no-ops."
+  - "Record that the two defect-asserting tests were INVERTED (not deleted) and that the concurrency regression test was demonstrated RED against the pre-fix code."
+  - "Name the accepted risks carried forward (see `accepted_risks`), especially the crash-between-COMMIT-and-move window and the dependency on `sha256=` at every call site."
+
+accepted_risks:
+  - >
+    (1) CRASH BETWEEN COMMIT AND THE `on_commit` MOVE leaves a committed row whose file is still
+    in `staging/`; the TTL reclaims it, making the row permanently dangling. It requires a
+    process kill in a sub-millisecond window — strictly narrower than today's guarantee, which
+    is every submission for the length of a multi-minute walk. NO mitigation is proposed;
+    deleting the row post-commit would be worse. Record it; do not engineer around it.
+  - >
+    (2) DEDUP NOW DEPENDS ON EVERY CALL SITE PASSING `sha256=` when the bytes are not at the row
+    key. Miss one and it silently no-ops (`""` -> the existing `if digest:` guard). Owner: the
+    mandatory `test_dedup_survives_deferred_promotion` control.
+  - >
+    (3) THE SWEEP KEEPS ONE TRANSACTION AND ONE LOCK ACROSS THE WHOLE WALK. Unchanged from
+    today and DELIBERATELY unchanged; mixing lock disciplines is rejected under Q8. Record it.
+  - >
+    (4) PROMOTED FILES INHERIT THE STAGING MTIME (`os.replace` preserves it). Harmless today; a
+    trap for any future mtime-keyed retention policy. Record it in the code where a reader would
+    look.
+  - >
+    (5) INTERLEAVING B's TRIGGER IS NARROWED, NOT ELIMINATED, BY BLOCK 6. Only `photos.py` and
+    `submit.py` call `touch_staging_photos`; `category.py`, `city.py`, `price.py` and `text.py`
+    touch only the row, so a seller who uploads and then spends more than 2 h across those
+    steps still has files reaped. Owner: BLOCK 6's Q5 coverage gap, or phase 07. BLOCK 8 owns
+    only the consequence it fixes: the outcome is now a recoverable message instead of a
+    silent photo-less publication. Do NOT widen `touch_staging_photos`'s call sites here.
+  - "(6) The `media.py` mis-attribution comment is corrected here, in this commit."
+  - >
+    (7) `_SESSION_SCOPED_BATCHERS` STAYS AN EXCEPTION LIST. Replacing it with a positive
+    per-entry `(session, in_atomic)` table is a NAMED FOLLOW-UP FOR THE COORDINATOR and is
+    explicitly NOT BLOCK 8 WORK: BLOCK 7 authored that set at this HEAD, and editing it would
+    collide on a shared artefact for zero correctness gain. Record it in the commit message;
+    do not open the file.
 
 acceptance_criteria:
-  - a sweep overlapping a submit_ad never deletes a file whose AdImage row commits
-  - files orphaned by a rolled-back submit are reclaimed within a bounded time
-  - AdImage.save() produces the same content hash before and after any promotion move
-  - the concurrency regression test is RED against the pre-fix code
-  - every delete_photo call still happens inside the SWEEP_ORPHANED_MEDIA lock scope
-  - test_sweep_orphaned_media.py's seed, staging, reclaim, dry-run and routing cases pass
-    unchanged, using their ACTUAL names (D-8)
-  - copy_service.py's storage-key reuse and delete_adimage_files_on_delete are unchanged (AD-003)
-  - uv run ruff check src/ exits 0 and uv run basedpyright src/ reports 0 errors
-  - `.\Makefile.ps1 test-recreate` was run if a migration was generated, then the Docker gate is green
+  - "`test_files_are_not_promoted_before_the_row_commits` was demonstrated RED against the pre-fix code and is GREEN after, and the RED evidence is recorded in the commit message."
+  - "The inverted missing-file test was demonstrated RED before the production edit and is GREEN after; it asserts BOTH that `FileNotFoundError` is raised and that the key is still `\"staging/missing.jpg\"`."
+  - "No `AdImage` row can ever be committed for a file that is not on disk: `submit_ad` returns `(False, [<new recoverable message>])` before opening the transaction, creating no row and rewriting no key."
+  - "`plan_staging_promotion` is pure — it rewrites key fields in place and performs no filesystem mutation; `promote_media_files` performs every move."
+  - "`promote_media_files` never propagates: one failing key is logged and skipped, the rest still move (covered by `test_one_failed_key_does_not_abort_the_remaining_promotions`)."
+  - "The `on_commit` callback is registered inside the atomic block and after both the `create_or_skip` loop and the `Ad.DoesNotExist` return."
+  - "The `AdImage` row is written with the PERMANENT key, and content dedup still works: `test_dedup_survives_deferred_promotion` is GREEN, and is RED if the `sha256=` override is removed from the `submit_ad` call site."
+  - "A rolled-back `submit_ad` leaves NO file in permanent storage: permanent `photo.jpg` does not exist, the staging original and its thumbnails still exist, `AdImage` count is 0, and the ad stays DRAFT."
+  - "A committed `submit_ad` leaves the file permanent and every thumbnail key permanent — `test_submit_ad_moves_staging_to_permanent` needed no assertion rewrite and still passes."
+  - "`test_dry_run_is_nondestructive` is GREEN (the early `return` was kept) and the unreachable `if not dry_run:` guard is gone from `Command.handle`."
+  - "A file left in `staging/` by a rollback is reclaimed by the existing TTL — `TestSweepOrphanedMedia::test_stale_staging_file_reclaimed` is GREEN and unmodified. No new reclamation policy was written."
+  - "`test_sweep_lock_structure.py` is byte-identical; `sweep_orphaned_media` was NOT added to `_SESSION_SCOPED_BATCHERS`; `docs/ops/docker-deployment.md` and the \"these two commands\" wording in `docs/02-database/db-retention.md` are unchanged."
+  - "Every `delete_photo` call still happens inside the `SWEEP_ORPHANED_MEDIA` lock scope — `TestSweepLockScope::test_delete_photo_called_within_lock_scope` is GREEN."
+  - "No migration was created; `apps/media/migrations/` still contains only `0001_initial.py`."
+  - "All six documentation corrections above are present in the SAME commit as the code that falsified them."
+  - "The new msgid is present in the `ru` and `bs` catalogs with non-empty `msgstr` (appended only, not re-sorted) and `test_i18n_completeness.py` is GREEN."
+  - "`AdvisoryLockId` gained no new member; no `apps.*` module imports `telegram_bot.*`; `copy_service.py`'s storage-key reuse and `delete_adimage_files_on_delete` are unchanged (AD-003 untouched)."
+  - "`uv run ruff check src/` exits 0 and `uv run basedpyright src/` reports 0 errors."
+  - >
+    THE DOCKER GATE (tests run ONLY through Docker — local `uv run pytest` fails, there is no DB
+    on `localhost:5432`):
+
+        $dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'
+        docker ps --filter "name=mko-bazuna-test-db-"
+        # if the DB container is absent:
+        $dc up -d db
+
+        # RED/GREEN step 1 evidence (pre-fix) and the post-fix gate:
+        $dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS="src/backend/apps/media/tests/test_filesystem.py src/backend/apps/media/tests/test_sweep_orphaned_media.py src/backend/apps/core/tests/test_sweep_lock_structure.py src/telegram_bot/tests/test_save_photo_integration.py src/backend/apps/ads/tests/test_submission.py src/backend/apps/ads/tests/test_ad_image_service.py" test
+
+        .\Makefile.ps1 test
+
+    Do NOT run `.\Makefile.ps1 test-recreate` — no migration was generated. The full suite
+    expects EXACTLY ONE failure, the known pre-existing
+    `test_search_slo.py::…::test_search_at_seed_volume_meets_slo`, which also fails on the
+    anchor commit. Any other failure is BLOCK 8's.
+  - >
+    ENVIRONMENT NOTES the Implementor must honour: `PYTEST_OPTS` is UNQUOTED in
+    `docker/entrypoint-test.sh`, so each token word-splits on spaces — bare file paths and
+    single-token flags work, quoted multi-token values do NOT; setting `PYTEST_OPTS` also
+    REPLACES the defaults, so the targeted run loses `--reuse-db` and xdist parallelism. NEVER
+    use `--override-ini=addopts=` — it strips `--import-mode=importlib`. `docker compose run` can
+    abort with `dependency failed to start: … is unhealthy` BEFORE pytest runs: wait ~45 s and
+    retry. Known pre-existing teardown-flush flakiness: `ExchangeRateNotFoundError`,
+    `test_bulk_delete_skips_hard_deleted_row` seeing leftover `Ad` rows, and
+    `test_mko_bazuna is being accessed by other users`. `head` and `tail` do not work in
+    PowerShell and `rg` is unavailable. The tree is dirty BY DESIGN and other phases commit
+    concurrently: never `git reset`, `git checkout`, `git stash`, `git clean`, `git add -A`,
+    `git add .` or `git commit -a`; stage EXPLICIT paths and watch for CRLF damage.
 ```
 
-**Tests required.**
+**Planner addendum (post-Researcher). Resolutions that supersede the source plan's BLOCK 8
+body. The Implementor task above is the authoritative specification.**
 
-- *Must be changed (rewritten — this is the block's core obligation):*
-  `src/telegram_bot/tests/test_save_photo_integration.py::TestSubmitAdStagingMove` —
-  `test_submit_ad_rollback_leaves_permanent_orphans` currently asserts permanent files **exist**
-  after a rollback, staging files do **not**, and `AdImage.objects.filter(ad=ad).count() == 0`,
-  with the class docstring calling the ordering *intended*; its rewrite must state **why** the
-  old expectation encoded the defect. `test_submit_ad_moves_staging_to_permanent` must be
-  re-derived.
-- *Must be added:* the **concurrency regression test** — force the interleaving with a
-  hook/barrier, **never with sleeps**; **red against the pre-fix code**. Option A also requires
-  the **reclamation test** (without it Option A trades data loss for unbounded growth) and the
-  **dedup-key test**.
-- *Must keep passing unchanged:*
+**1. Q7 = Option A′, and it is not the plan's Option A.** The Researcher closed Q7 for a variant
+the plan does not list: **reuse `staging/` itself** as the sweep-excluded holding area and
+promote in `transaction.on_commit`. **No new directory.** The plan's Option A prices itself at
+four costs that are **already paid**: `STAGING_SUBDIR`/`STAGING_PREFIX` exist, `_walk_media_files`
+already skips `staging/`, and `_reclaim_stale_staging` already reclaims it on BLOCK 6's mtime
+heartbeat. The `6 → 8` hard edge is therefore satisfied **literally** — BLOCK 8 inherits BLOCK 6's
+predicate, constant and heartbeat rather than re-deriving a policy against them. The plan's
+option-A risk row ("a sweep-excluded subdirectory that nothing reclaims") **cannot fire**, and its
+"mandatory reclamation test" resolves to the **existing** `test_stale_staging_file_reclaimed`.
+The rollback story also inverts cleanly: a rolled-back submit leaves the file **in `staging/`**
+where the existing TTL reclaims it — the same fate as an abandoned upload, already modelled and
+tested. **Option C** (locking the submit path on `SWEEP_ORPHANED_MEDIA`) was confronted head-on
+and **rejected**: `lock_timeout` is 10 s and the sweep's hold is unbounded and volume-dependent;
+the web `ad_edit` caller has no `OperationalError` boundary and would return a raw 500. It trades
+guaranteed silent photo-loss for an availability incident on the hottest write path, and it does
+not fix B anyway.
+
+**2. The plan's "reclamation test", "dedup-key test" and "no new subdirectory constant" tasks are
+CANCELLED**, per §1. `test_stale_staging_file_reclaimed` is the reclamation control. The
+**dedup-key test survives and is mandatory** — see §3.
+
+**3. Interleaving B is fixed independently of Q7, by the `setattr` placement, and must NOT be
+inherited from BLOCK 6.** B is still reachable after BLOCK 6 (HIGH confidence): only
+`handlers/ad_create/photos.py` and `.../submit.py` call `touch_staging_photos`;
+`category.py`, `city.py`, `price.py` and `text.py` touch only the row, so a dialog spending more
+than 2 h across those steps still loses its files. The contract: **rewrite a key iff the file was
+actually moved; a missing staging file raises `FileNotFoundError` naming the key; no key is
+rewritten.** **Raise, not skip** — `delete_photo` already classifies `FileNotFoundError` as
+terminal, and raising is the only option that preserves the information needed for a
+*recoverable* seller message. Skip-silently **is** the defect. `submit_ad` catches it before
+opening the transaction and returns a recoverable message — strictly better than today's
+`(True, [])`, which publishes an ad with a broken image. The Researcher's §2.3 also makes the
+thumbnail loop's bare `except Exception` **structural** rather than narrower: the pre-flight
+existence check runs **before** the loop, so "file missing" cannot be what that broad catch
+swallows and `test_thumbnails_null_on_generation_failure` stays green unchanged.
+
+**4. Q8 = neither batching nor `session=True`.** The premise that forced `session=True` was
+Option B's per-candidate commit releasing the lock early; **under A′ there are no per-candidate
+transactions, so the premise is gone.** `sweep_orphaned_media` keeps one read-only snapshot, one
+delete loop, one `transaction.atomic()` with `session=False`. It is **not** added to
+`_SESSION_SCOPED_BATCHERS`, `test_sweep_lock_structure.py` is **untouched**, and the "these two
+commands" wording in `docs/02-database/db-retention.md` and `docs/ops/docker-deployment.md`
+**stays as-is**. One discipline, not blended.
+
+**5. The plan is partly stale — four corrections, carried into the task above.**
+(a) `test_submit_ad_moves_staging_to_permanent` needs **no assertion rewrite**; the class is
+`pytestmark = [django_db(transaction=True), …]`, so `on_commit` **fires** before `submit_ad`
+returns and every file-side assertion stays true. Docstring only. (b)
+`test_submit_ad_rollback_leaves_permanent_orphans` **asserts the defect** — **invert, do not
+delete**. (c) `test_updates_key_even_if_file_missing` **also asserts the defect** — invert, do not
+delete; deleting it leaves the unconditional `setattr` completely unguarded, and its sibling
+`test_non_exdev_oserror_reraises` already asserts the *opposite* contract, so it is the lone
+violation of "rewrite the key iff the file was actually moved". (d) The plan names
+`src/backend/apps/ads/tests/test_ad_image_dedup.py` — **that file does not exist**; the real
+home is `apps/ads/tests/test_ad_image_service.py::TestAdImageServiceCreateOrSkip`. Locate by
+symbol.
+
+**6. The `sha256=` override is MANDATORY, not a nice-to-have.** Under deferred promotion
+`AdImageService._compute_sha256(permanent_key)` finds nothing and returns `""`, and the existing
+`if digest:` guard then **silently disables content dedup for every submission**. This is the
+concrete form the plan's `AdImage.save()` SHA-256 risk row takes, and
+`test_dedup_survives_deferred_promotion` is its control. **No refcounting, no `AD-003`.** On a
+dedup **hit** the staged file stays in `staging/` and the TTL reclaims it — correct, and no worse
+than today, where the promoted file becomes a permanent orphan. Do not special-case it.
+
+**7. Dead code: delete the unreachable `if not dry_run:` guard; KEEP the early return.** Dropping
+the return would make `--dry-run` reclaim staging files and break `test_dry_run_is_nondestructive`.
+
+**8. Accepted risks — recorded, NOT engineered away.** (1) A crash between COMMIT and the
+`on_commit` move leaves a committed row whose file is still in `staging/`; the TTL reclaims it and
+the dangling row becomes permanent. It needs a process kill in a sub-millisecond window —
+**strictly narrower than today's guarantee**, which is every submission for the length of a
+multi-minute walk. No mitigation; deleting the row post-commit would be worse. (2) Dedup now
+depends on every call site passing `sha256=` when the bytes are not at the row key — miss one and
+it silently no-ops. Owner: the mandatory dedup control. (3) The sweep keeps one transaction and
+one lock across the whole walk — unchanged and **deliberately** so. (4) Promoted files inherit the
+staging mtime (`os.replace` preserves it) — harmless today, a trap for any future mtime-keyed
+retention policy; record it where a reader would look. (5) B's **trigger** is narrowed, not
+eliminated, by BLOCK 6 — owner is BLOCK 6's Q5 coverage gap or phase 07; BLOCK 8 owns only the
+consequence it fixes (recoverable message instead of silent photo-less publication). (6) The
+`media.py` mis-attribution is corrected **in this commit**. (7) `_SESSION_SCOPED_BATCHERS` stays
+an exception list — replacing it with a positive per-entry `(session, in_atomic)` table is a
+**named follow-up for the coordinator, explicitly not BLOCK 8 work** (BLOCK 7 authored that set
+at this HEAD; editing it collides on a shared artefact for zero correctness gain).
+
+**9. One thing left deliberately undecided by the Planner: where the interleaving-B end-to-end
+test lives** — `apps/ads/tests/test_submission.py` versus a new class in the bot's
+`transaction=True` module. It is behaviourally identical either way, and both files are already
+in the file surface and in the gate. The Implementor picks the one whose existing
+`django_db` mode lets it observe the pre-flight return without converting an unrelated class, and
+records the choice in the commit message.
+
+**Tests required (corrected).**
+
+- *Must be added (all four are specified in full in the task's `tests_to_add`):* the concurrency
+  regression test `test_files_are_not_promoted_before_the_row_commits` — force the interleaving
+  with a hook, **never with sleeps**, and it must be **RED against the pre-fix code**;
+  `test_missing_staged_file_reports_a_recoverable_error`; the dedup control
+  `test_dedup_survives_deferred_promotion`; and
+  `test_one_failed_key_does_not_abort_the_remaining_promotions`. The plan's separate
+  **reclamation test is cancelled** (§1, §2).
+- *Must be changed — INVERTED, not deleted:* `TestSubmitAdStagingMove::
+  test_submit_ad_rollback_leaves_permanent_orphans` (renamed to
+  `test_submit_ad_rollback_leaves_files_in_staging`) and `TestMoveStagingToPermanent::
+  test_updates_key_even_if_file_missing`. Both rewrites must state **why the old expectation
+  encoded the defect**. The plan's instruction to "rewrite BOTH cases of
+  `TestSubmitAdStagingMove`" is **over-stated** — see §5(a).
+- *Must keep passing unchanged (exact list in the task's `must_keep_passing_unchanged`):*
   `TestSweepOrphanedMedia::test_seed_subdir_excluded`, `::test_referenced_file_is_kept`,
   `::test_orphaned_file_is_deleted`, `::test_staging_file_survives_sweep`,
   `::test_stale_staging_file_reclaimed`, `::test_fresh_staging_file_preserved`,
-  `::test_dry_run_is_nondestructive`, `::test_delete_photo_routing`;
-  `TestSavePhotoThumbnailsIntegration` (untouched by this finding);
-  `src/backend/apps/ads/tests/test_ad_image_dedup.py`.
+  `::test_dry_run_is_nondestructive`, `::test_delete_photo_routing` (actual names, D-8);
+  `TestSweepLockScope::test_delete_photo_called_within_lock_scope`; the whole of
+  `test_sweep_lock_structure.py`; `TestAdImageServiceCreateOrSkip`; `TestSubmitAdStagingMove::
+  test_submit_ad_moves_staging_to_permanent`; `TestSavePhotoThumbnailsIntegration`;
+  `test_thumbnail_integration.py`; and `…::test_thumbnails_null_on_generation_failure`.
 
-**Exact gate command (Docker only).**
+**Exact gate command (Docker only).** No migration is generated, so `test-recreate` is
+**deliberately absent**; the authoritative command list is inside `acceptance_criteria` above.
 
 ```powershell
-# run only if a migration was generated:
-.\Makefile.ps1 test-recreate
-$dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS="src/telegram_bot/tests/test_save_photo_integration.py src/backend/apps/media/tests/ src/backend/apps/ads/tests/test_submission.py src/backend/apps/ads/tests/test_ad_image_dedup.py" test
+$dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'
+$dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS="src/backend/apps/media/tests/test_filesystem.py src/backend/apps/media/tests/test_sweep_orphaned_media.py src/backend/apps/core/tests/test_sweep_lock_structure.py src/telegram_bot/tests/test_save_photo_integration.py src/backend/apps/ads/tests/test_submission.py src/backend/apps/ads/tests/test_ad_image_service.py" test
 .\Makefile.ps1 test
 ```
 
 **Risk / rollback.**
 
-- *Risk (highest):* rewriting `TestSubmitAdStagingMove` and **not** updating the class docstring,
-  so the next reader inherits "promote before TX ⇒ orphans on rollback" as documented intent
-  and reverts the fix. **The docstring is part of the deliverable.**
-- *Risk (Option A):* the new sweep-excluded subdirectory becomes a **second** `staging/` and
-  nothing reclaims it. The reclamation test is the control.
-- *Risk (Option A):* `AdImage.save()`'s SHA-256 changes across the promotion move, silently
-  breaking content dedup.
-- *Risk:* taking `SWEEP_ORPHANED_MEDIA` on the submit hot path — a new availability incident.
-- *Risk:* BLOCK 6 also edits `sweep_orphaned_media.py`. Re-read `_STAGING_TTL_SECONDS`.
-- *Rollback:* code and test changes are reversible. **A deployed Option A leaves files in a
-  subdirectory that a rolled-back code version would treat as orphans — the rollback plan must
-  include a one-off reclamation of that directory.**
+- *Risk (highest):* inverting the two defect-asserting tests but **not** updating the
+  `TestSubmitAdStagingMove` class docstring and the `filesystem.py` module docstring, so the next
+  reader inherits "promote before TX ⇒ orphans on rollback" as documented intent and reverts the
+  fix. **All six documentation corrections are part of the deliverable.**
+- *Risk:* shipping the `sha256=` override on `create_or_skip` but **not** passing it from the
+  `submit_ad` call site — dedup then silently no-ops for every submission, and no existing test
+  sees it. The dedup control is the only guard.
+- *Risk:* a crash between COMMIT and the `on_commit` move (§8.1). Accepted; do not engineer.
+- *Risk:* `promote_media_files` raising out of its `on_commit` callback, which would surface a
+  post-commit failure to the caller as though it were pre-commit. It must log and continue.
+- *Risk:* BLOCK 6 also edits `sweep_orphaned_media.py`. Re-read `_STAGING_TTL_SECONDS` and
+  `_reclaim_stale_staging` immediately before editing; BLOCK 8 changes **no** constant there.
+- *Risk:* dropping the `dry_run` early return along with the dead guard, which breaks
+  `test_dry_run_is_nondestructive` and silently makes `--dry-run` destructive.
+- *Risk (lower than under the plan's Option A):* the plan's "a deployed Option A leaves files in
+  a subdirectory that a rolled-back code version would treat as orphans" rollback hazard **does
+  not apply** — A′ introduces no new directory, so a rolled-back code version finds only
+  `staging/` files, which it already TTL-reclaims.
+- *Rollback:* code and test changes are reversible with no schema change and no data migration.
+  A rolled-back tree resumes today's promote-before-`atomic()` behaviour — safe, with the
+  original defect, and with any committed-but-unpromoted file reclaimed from `staging/` by the
+  existing TTL.
 
 ---
 
-### BLOCK 9 — Serialise and de-duplicate immediate-alert delivery (`03-DB-007`)
+### BLOCK 9 — Saved-search alert **delivery-state contract** (`03-DB-007`)
 
 | | |
 |---|---|
 | **Findings owned** | `03-DB-007` |
-| **`depends_on`** | **BLOCK 5** (hard) and **BLOCK 7** (ordering) |
-| **Priority** | P3 — **latent** |
-| **Roster** | **Implementor, Auditor, Researcher, Planner, Validator** → *all five* |
+| **`depends_on`** | **BLOCK 6**, **BLOCK 8** |
+| **Priority** | P3 — latent behind `IMMEDIATE_ALERTS_ENABLED` (default `False`) |
+| **`Q9` / `Q10`** | **CLOSED** — decision record `.ai/tmp/block9-context-r.md`; the re-publish call is coordinator-approved |
+| **Roster** | **Implementor, Auditor, Researcher, Planner, Validator** |
 
-**Roster decision — CONFIRMED unchanged; all five.** Re-verified at `ba23277`: `D-5` confirms
-the gate file, **N-2** strengthens the "latent" claim (all four templates set the flag `false`;
-base default `False`), and `D-2` invalidates the hash the source plan's `extra_context` cites.
-`delivered_by_immediate_alerts` does **not** exist anywhere in `src/`; `SavedSearchNotification`
-carries only `uq_saved_search_ad`. Validator is mandatory: the block lands **behind a disabled
-feature flag**, so nothing in production exercises it.
-
-**Ordering decision (carried forward).** BLOCK 7 before BLOCK 9 — same shared advisory-lock and
-lock-structure-test neighbourhood, and BLOCK 7 is the more structural of the two, which keeps
-BLOCK 9's diff concentrated in `apps/search`.
-
-**Decision gates — Q9 and Q10 (must be closed before implementation).** Q9 options in the source
-plan §3.9.1 (A: shared advisory lock alone — **provably insufficient** for the stated defect;
-B: service-level `delivered_by_immediate_alerts` on `SavedSearchNotification` with a
-`NOT EXISTS` filter in `find_matching_saved_searches`; C: command-level "skip any existing
-notification row", which misses the immediate path). Q10 specifies the column's contract.
-**This execution plan does not choose.** The Researcher must answer explicitly: *does the shared
-advisory lock close the reported double-send, and if not, what does?*
-
-**The finding's framing correction, carried into every brief.** `deliver_immediate_alerts`
-records the `SavedSearchNotification` rows **before** dispatch. If the send then fails, the row is
-already committed, so the daily `send_alerts` run **skips** that (search, ad) pair — a
-**silent alert loss**, which is the opposite of a duplicate and arguably worse. The source
-report frames the finding only as a double-send. **A block that ships only Option A must record
-in its commit message that the concurrency path is unproven and that B remains required.**
-
-**Agent briefs (paste-ready).**
-
-> **Auditor.** *Goal:* re-verify the activation precondition after BLOCK 5/6/7/8 have changed
-> transaction boundaries in the same neighbourhood, and establish the rollout state. *Hard
-> constraints:* change no code; never target a line number; **`src/backend/apps/ads/signals.py`
-> does not exist.** *Files + symbols:*
-> `src/backend/apps/moderation/signals.py::deliver_immediate_alerts_on_publish` (guarded by
-> `getattr(settings, "IMMEDIATE_ALERTS_ENABLED", False)`);
-> `config/settings/base.py::IMMEDIATE_ALERTS_ENABLED`;
-> `src/backend/apps/search/services/immediate_alerts.py::deliver_immediate_alerts`, `_executor`,
-> `_run_send`, `_SEND_CONCURRENCY`, `_BACKOFF_BASE`, `UNSUB_CALLBACK_PREFIX`;
-> `src/backend/apps/search/services/alert_query.py::find_matching_saved_searches`,
-> `::record_notifications`, `::find_matching_ads`;
-> `src/backend/apps/search/models.py::SavedSearchNotification`;
-> `src/backend/apps/search/management/commands/send_alerts.py::Command.handle`;
-> `src/backend/apps/ads/services/submission.py::submit_ad` → `ad.transition_to`.
-> *Must return:* (a) whether the "immediate path can double-send" precondition is **still** true
-> after BLOCK 5/6/7/8; (b) confirmation that `IMMEDIATE_ALERTS_ENABLED` is `False` by default and
-> `false` in **all four** `.env.*.example` templates (**N-2** — the source plan's "appears in no
-> template" is wrong), and the real gate test is
-> `moderation/tests/test_approve_ad_side_effects.py` via `override_settings`; (c) confirmation
-> that `record_notifications` returns `len(ads)` ("not necessarily created") and that
-> `find_matching_saved_searches` has **no** `NOT EXISTS` filter while `find_matching_ads` **does**;
-> (d) the shape of `send_alerts.Command.handle`'s docstring, which already nominates *"a
-> delivery-state column on `SavedSearchNotification` (phase 03 DB-007's schema)"*.
-
-> **Researcher.** *Goal:* close **Q9**. *Hard constraints:* **adding the lock alone is
-> provably insufficient** — it does not address the missing `NOT EXISTS` filter or the
-> meaningless return value; the `on_commit` call site is unique, so the concurrency trigger the
-> report describes is a **hypothesis, not a demonstrated fact**. *Files + symbols:* the same set
-> as the Auditor brief. *Must return:* the chosen option with why; an explicit answer to *"does
-> the shared advisory lock close the reported double-send, and if not, what does?"*; and whether
-> Option C is viable as a complement.
-
-> **Planner.** *Goal:* close **Q10** — the delivery-state column's contract — before coding.
-> *Hard constraints:* a **fixed value** must be an enum member or named constant, never a bare
-> boolean literal scattered across call sites (project rule 10); only
-> `deliver_immediate_alerts` writes it, never `send_alerts`; it is written **inside the same
-> transaction that creates the notification row and BEFORE dispatch** (writing it after the send
-> leaves a crash window where the duplicate is already out and the flag is lost); backfill is
-> **`NULL` with no backfill** — a `NOT NULL DEFAULT false` backfill would **re-notify every
-> previously immediate-sent pair**, a mass duplicate send on first enable; the column must be
-> **nullable**; `uq_saved_search_ad` is a true no-op backstop for concurrent creates of the same
-> pair and does **nothing** for the "immediate sent ⇒ daily skips" filter, which needs its own
-> column; the daily path's phase-01 idempotency is **untouched**. *Files + symbols:* `models.py::
-> SavedSearchNotification`; a **new** `search/migrations/0003_*` (check the directory immediately
-> before generating). *Must return:* the column name/type/nullability, the writer, the ordering
-> relative to dispatch, the backfill rule, and the migration shape.
-
-> **Validator.** *Goal:* confirm the delivery contract before the flag is ever enabled. *Hard
-> constraints:* change no code; tests must exercise the code path **directly**, not by flipping
-> `IMMEDIATE_ALERTS_ENABLED` globally. *Must return:* evidence that a failed `_run_send`
-> followed by a `send_alerts` run **still delivers** (red before the fix); that an
-> already-delivered pair is **not** delivered twice; that pre-existing rows are `NULL` and are
-> not filtered; and that the feature still does nothing with the flag off. *Also:* confirm phase
-> 01's `send_alerts` idempotency behaviour was **not** reverted (re-anchor by **symbol**:
-> `apps.core.utils.scheduler.SchedulerDailyMarker`, `send_alerts._DIGEST_AD_LIMIT` — **not** by
-> the hash `fbbb6cf`, which is the scheduler daily-marker commit and never touched
-> `send_alerts.py`; see **D-2**).
+**The stale draft in this section is WITHDRAWN.** Two of its instructions were unsafe and are
+replaced here: the shared **advisory lock** (rejected outright, not merely "insufficient") and
+**"nullable with NO backfill"** (that rule ships a mass re-notification on the live, ungated
+08:00 UTC digest one day after deploy — see **F-1** below). The Researcher's decision record
+`.ai/tmp/block9-context-r.md` is the source of truth for this block; the earlier paste-ready
+agent briefs are superseded by it and are deliberately not restated. `delivered_by_immediate_alerts`
+never existed in `src/`. Validator stays mandatory: the block lands behind a disabled flag, and
+`moderation/tests/test_approve_ad_side_effects.py` is the real gate pin.
 
 **Implementor task.**
 
 ```yaml
-id: task_03_b09_immediate_alert_serialisation
-title: Serialise immediate-alert delivery and de-duplicate it against the daily digest
+id: task_03_b09_alert_delivery_state_contract
+title: Saved-search alert delivery-state contract (delivered_at marker written by both paths)
 priority: medium
-depends_on: [task_03_b05_lock_timeout, task_03_b07_per_batch_commit]
+depends_on: [BLOCK 6, BLOCK 8]
 source_reference: .ai/plans/03-db-concurrency-remediation.md
-source_section: "BLOCK 9 — Serialise and de-duplicate immediate-alert delivery (DB-007)"
+source_section: "BLOCK 9 — Serialise and de-duplicate immediate-alert delivery (03-DB-007); Q9/Q10 as closed in .ai/tmp/block9-context-r.md (§2–§9, implementation shape §6)"
+
 extra_context: |
-  Q9 AND Q10 ARE DECISION GATES, closed by Researcher + Planner inside this block.
+  Q9 AND Q10 ARE CLOSED. Do not re-open, do not re-derive. Source of record:
+  .ai/tmp/block9-context-r.md (Researcher, read-only, HEAD 35441e0). The previous draft's
+  advisory-lock option and its "nullable with NO backfill" rule are BOTH WITHDRAWN — see F-1/F-2.
+
+  ANCHOR CORRECTIONS CARRIED FORWARD
   D-5: src/backend/apps/ads/signals.py DOES NOT EXIST. The gate is
   src/backend/apps/moderation/signals.py::deliver_immediate_alerts_on_publish.
-  N-2: IMMEDIATE_ALERTS_ENABLED IS present in all four .env.*.example templates (value false)
-  and in ALLOWED_ENV_VARS. Do NOT add a template entry for it and do NOT claim it is
-  undocumented. The "latent" conclusion still holds and is stronger.
+  N-2: IMMEDIATE_ALERTS_ENABLED is present in all four .env.*.example templates (false) and in
+  ALLOWED_ENV_VARS. Do NOT add a template entry and do NOT claim it is undocumented.
   D-2: DO NOT cite the hash fbbb6cf — it is the scheduler daily-marker commit and never touched
   send_alerts.py. Re-anchor the "do not revert" artefacts by SYMBOL:
   apps.core.utils.scheduler.SchedulerDailyMarker, apps.core.services.scheduler_daily_state,
   send_alerts._DIGEST_AD_LIMIT, send_alerts.Command.handle's loss-window docstring.
-  THE FINDING'S REAL HALF IS SILENT ALERT LOSS: deliver_immediate_alerts records the
-  SavedSearchNotification rows BEFORE dispatch, so a failed send permanently suppresses that pair
-  in the daily run. Adding the advisory lock alone is PROVABLY INSUFFICIENT — it addresses
-  neither find_matching_saved_searches' missing NOT EXISTS filter nor record_notifications'
-  meaningless return value.
-  Shipping Option A alone is permitted ONLY if the commit message records that the concurrency
-  path is unproven and that Option B remains required.
-  Q10: the column must be NULLABLE with NO backfill. NOT NULL DEFAULT false would re-notify
-  every previously immediate-sent pair on first enable — a mass duplicate send. The flag must be
-  written inside the same transaction that creates the row and BEFORE _executor.submit.
-  Tests must exercise the path directly, not by flipping IMMEDIATE_ALERTS_ENABLED globally.
-  Phase 03 allocates NO new AdvisoryLockId (D-1: id 13 is REPAIR_BOT_USERNAME).
+  The flag gate: base setting IMMEDIATE_ALERTS_ENABLED (default False), never enable it in this
+  block and never change a .env template. Phase 03 allocates NO new AdvisoryLockId.
+
+  THE CLOSED DECISIONS
+  1. KEY = (saved_search_id, ad_id) — UNCHANGED, still materialised as uq_saved_search_ad — PLUS a
+     new NULLABLE delivered_at. Both FKs are immutable and written once, so the pair is stable
+     across edit/archive/re-publish. The row becomes a RECORD of an alert attempt; delivered_at is
+     the RECEIPT. The bare key's real question — "was this pair DELIVERED?" — is what is answered.
+     uq_saved_search_ad stays a row-level backstop; it arbitrates rows, never messages.
+  2. BOTH matchers exclude on delivered_at__isnull=False. find_matching_ads adds it to the
+     existing ~Exists subquery; find_matching_saved_searches gains a correlated ~Exists on the
+     candidate queryset (explicit ~Exists/OuterRef, never exclude() — multi-valued-relation trap).
+     A row with delivered_at IS NULL, or no row at all, stays ELIGIBLE on both paths: that is the
+     self-healing retry that replaces today's terminal loss.
+  3. RE-PUBLISH IS NOT A NEW ALERT (coordinator-approved). One alert per (saved_search_id, ad_id)
+     for the life of the listing, including across re-publish. ad_reactivate is a content-neutral
+     status flip (verified in source), so a second alert is a duplicate message about an
+     identical listing. original_published_at is NOT used in the key. This is also what US-B11
+     already promises. The counter-case — a seller EDITS a live ad, it is re-moderated and
+re-published — is DEFERRED to a named follow-up; if wanted, the epoch is a content-revision
+      column, NOT Ad.published_at (published_at is reset by ad_reactivate too, so it would
+      re-alert the content-neutral case). **The follow-up's named owner is the coordinator /
+      Product Owner, recorded as follow-up item (a) in BLOCK 9's acceptance criteria. It was NOT
+      reached by the 2026-10-03 Product Owner decision round and remains deferred.**
+  4. The marker is written AFTER a successful send. Asymmetry that decides it: loss ≫ duplicate.
+     Kill between send_message returning 200 and the UPDATE committing ⇒ ONE bounded,
+     self-healing duplicate, visible as a 0-row UPDATE. Writing BEFORE dispatch ⇒ TERMINAL LOSS
+     (any dead-letter, exhausted retry, exception or kill marks the pair delivered forever) and it
+     has no un-claim hook, because _send_payloads returns None and swallows per-payload outcomes —
+     which is phase 09 API-013's surface, not this block's.
+  5. NO atomic(), NO advisory_lock in mark_delivered. One conditional statement in autocommit is
+     already atomic, and send_message is not transactional, so a transaction would only wrap a
+     network call. This also eliminates BLOCK 5's lock_timeout/55P03 exposure inside on_commit.
+  6. The mark is ONE conditional statement, no bulk_update, no loop, no queryset abstraction:
+       UPDATE saved_search_notifications SET delivered_at = %(sent_at)s
+        WHERE saved_search_id = %(ss)s AND ad_id = %(ad)s AND delivered_at IS NULL
+       RETURNING id
+     True ⇒ this call recorded the delivery. False ⇒ a concurrent call already marked it: log at
+     WARNING with the (saved_search_id, ad_id) pair. Idempotent — a second call is a no-op.
+
+  F-1 — THE MIGRATION BACKFILLS delivered_at = sent_at, AND IT MUST.
+  The withdrawn draft said "nullable, NO backfill", justified by "NOT NULL DEFAULT false would
+  re-notify everyone on first enable". The conclusion was right, the RULE was wrong. With a
+  no-backfill column every pre-existing row has delivered_at = NULL; the moment the filter change
+  lands, find_matching_ads stops excluding those rows; send_alerts is in DAILY_COMMANDS and fires
+  08:00 UTC UNGATED (apps.core.utils.scheduler), so the next run re-notifies EVERY previously
+  notified (search, ad) pair to EVERY subscribed buyer — a mass duplicate send one day after
+  deploy, with no flag to turn it off. The correct rule is "the backfill must be
+  BEHAVIOUR-PRESERVING", not "no backfill". Therefore:
+    SavedSearchNotification.objects.filter(delivered_at__isnull=True)
+        .update(delivered_at=F("sent_at"))
+  sent_at is auto_now_add, so F("sent_at") is a set-based UPDATE — no row loop, safe at any table
+  size. Pre-existing D-1/D-2 rows therefore stay suppressed, exactly as today; repairing them is
+  an ops decision OUTSIDE this block. The migration's REVERSE IS A NO-OP with a comment: a
+  reverse that NULLs the column would re-arm the mass re-notification, so it must not.
+
+  F-2 — TWO shipped tests encode the defect, not one.
+  (1) test_records_notification_idempotently monkeypatches _run_send with a no-op and asserts only
+  row count == 1. It asserts ROW-level idempotency under a name that claims MESSAGE-level
+  idempotency: the second call still SUBMITS the payload, because its own comment ("re-running
+  must not double-send") asserts a property the code does not have. Invert it (recorder +
+  assert ONE submission), KEEP the row-count assertion, record the rationale in its docstring.
+  (2) TestFindMatchingAds::test_excludes_already_notified_ads creates a BARE row (no delivered_at)
+  and asserts it is EXCLUDED. Under the correct contract a bare row means "recorded, NOT
+  delivered" and must stay collectable. It encodes the defect and must be rewritten: set
+  delivered_at, rename to test_excludes_delivered_ads, and add the
+  test_includes_recorded_but_undelivered_ads sibling. Per project rule 2 the TEST changes, not
+  production code. The audit's list names only (1).
+  ALSO: TestImmediateAlertsGate::test_gate_off_does_not_deliver_on_publish is a NO-OP — it never
+  calls deliver_immediate_alerts, never uses override_settings, and asserts only a count == 0.
+  Leave it byte-identical, do not count it as gate coverage, ADD a real override_settings-based
+  gate test beside it, and report E2c as still open with the real pin named.
 
 description: >
-  deliver_immediate_alerts takes no advisory lock, opens no transaction, and calls
-  record_notifications(saved_search, [ad]) BEFORE _executor.submit(_run_send, payloads). If the
-  send fails, the SavedSearchNotification row is already committed, so the daily send_alerts run
-  SKIPS that (search, ad) pair — a silent alert loss. Separately, a re-published ad re-runs the
-  matcher with no exclusion filter, because find_matching_saved_searches has no NOT EXISTS
-  clause. Apply the chosen option so a failed immediate send is retried by the daily path and
-  an already-delivered pair is not delivered twice.
+  Today a SavedSearchNotification row IS the delivery receipt, so deliver_immediate_alerts
+  records before dispatch (a user with no chat_id gets a row and no message, forever), a failed
+  send is permanently suppressed by the daily digest, and a re-publish re-alerts because
+  find_matching_saved_searches has no exclusion at all. Add a nullable delivered_at receipt to
+  the existing (saved_search_id, ad_id) key, make BOTH matchers filter on delivered state, and
+  have BOTH paths write the receipt after a successful send — the two halves in one atomic
+  change.
 
 goals:
-  - a failed immediate send must not permanently suppress the daily digest for that pair
-  - an already-delivered pair must not be delivered twice
-  - keep the daily path's phase-01 idempotency untouched (re-anchored by symbol)
-  - keep the IMMEDIATE_ALERTS_ENABLED gate and the bounded executor unchanged
-  - keep recipient-selection semantics unchanged (PII-104, phase 06)
+  - a recorded-but-undelivered pair is retried by the next run of the other path (self-healing)
+  - a delivered pair is never delivered again, by either path, including across a re-publish
+  - a user with no chat_id is never recorded, so the pair stays collectable
+  - behaviour-preserving on deploy: pre-existing rows remain suppressed
+  - the IMMEDIATE_ALERTS_ENABLED gate, the bounded executor and phase-01 daily idempotency are
+    untouched (re-anchored by symbol)
 
 files:
-  - path: src/backend/apps/moderation/signals.py          # NOT apps/ads/signals.py (D-5)
-    targets: [{ type: function, name: deliver_immediate_alerts_on_publish }]
-    semantic_anchors: {}                                   # reference only
+  - path: src/backend/apps/search/services/notification_delivery.py      # NEW MODULE
+    targets:
+      - { type: class,    name: DeliveryOutcome }   # StrEnum: DELIVERED / SKIPPED_ALREADY_DELIVERED
+      - { type: function, name: mark_delivered }
+    semantic_anchors: {}
+  - path: src/backend/apps/search/models.py
+    targets: [{ type: class, name: SavedSearchNotification }]
+    semantic_anchors: {}                                # Meta (uq_saved_search_ad,
+                                                       # idx_saved_search_notif_sid) UNCHANGED
+  - path: src/backend/apps/search/services/alert_query.py
+    targets:
+      - { type: function, name: find_matching_ads }
+      - { type: function, name: find_matching_saved_searches }
+      - { type: function, name: record_notifications }
+      - { type: module,   name: alert_query }
+    semantic_anchors: {}
   - path: src/backend/apps/search/services/immediate_alerts.py
     targets:
       - { type: function, name: deliver_immediate_alerts }
+      - { type: method,   name: _send_payloads }        # nested _send
       - { type: module,   name: immediate_alerts }
-    semantic_anchors: {}
-  - path: src/backend/apps/search/services/alert_query.py
-    targets:
-      - { type: function, name: find_matching_saved_searches }
-      - { type: function, name: record_notifications }
-    semantic_anchors: {}
-  - path: src/backend/apps/search/models.py               # Option B only
-    targets: [{ type: class, name: SavedSearchNotification }]
-    semantic_anchors: {}
-  - path: src/backend/apps/search/migrations/0003_alter_savedsearchnotification.py  # Option B only
-    targets: [{ type: module, name: migration }]
-    semantic_anchors: {}                                   # CHECK THE DIRECTORY FIRST
+    semantic_anchors: {}                                # _run_send / _send_payloads FROZEN
   - path: src/backend/apps/search/management/commands/send_alerts.py
-    targets: [{ type: class, name: Command }]
+    targets:
+      - { type: function, name: _collect_alerts }
+      - { type: function, name: _send_user_digests }
+      - { type: class,    name: Command }               # handle(): lock/transaction shape UNCHANGED
+    semantic_anchors: {}
+  - path: src/backend/apps/search/migrations/0003_*.py   # AddField delivered_at, null/blank, no default
+    targets: [{ type: module, name: migration }]
+    semantic_anchors: {}                                # RE-LIST THE DIRECTORY BEFORE GENERATING;
+                                                       # take the generated slug, never guess
+  - path: src/backend/apps/search/migrations/0004_*.py   # RunPython backfill delivered_at = sent_at
+    targets: [{ type: module, name: migration }]        # reverse = NO-OP + comment
     semantic_anchors: {}
   - path: src/backend/apps/search/tests/test_alert_query.py
     targets:
       - { type: class, name: TestRecordNotifications }
       - { type: class, name: TestDeliverImmediateAlerts }
-      - { type: class, name: TestImmediateAlertsGate }
       - { type: class, name: TestFindMatchingSavedSearches }
       - { type: class, name: TestFindMatchingAds }
       - { type: class, name: TestSendAlertsCommand }
+      - { type: class, name: TestImmediateAlertsGate }   # byte-identical; a real gate test is ADDED
     semantic_anchors: {}
-  # NOT touched: _build_payload, build_alert_message, the bot's unsubscribe handler, or the
-  # daily run marker / idempotency work owned by an earlier cycle.
+  - path: src/backend/apps/search/tests/test_send_alerts_daily.py
+    targets: [{ type: class, name: TestPerUserDigestCap }]   # the structure reference for D-1/D-2
+    semantic_anchors: {}
+  - path: src/backend/apps/search/tests/test_alert_delivery.py   # NEW — confirm the name against
+    targets: []                                            # the tests directory before creating
+    semantic_anchors: {}                                   # (backfill + mark_delivered unit tests)
+  # NOT touched: moderation/signals.py (gate only — reference), ads/services/submission.py,
+  # _build_payload's contract, build_alert_message(_keyboard), the bot's unsubscribe handler,
+  # core/utils/advisory_lock.py, core/enums.py, config/settings/base.py, and the phase-01 daily
+  # marker / idempotency work.
+  # DOCS OWNED (4): docs/02-database/db-schema.md, docs/02-database/db-indexes.md,
+  #   docs/04-user-stories/buyer-stories.md (US-B11), docs/01-spec/architecture-structure.md.
+  # docs/01-spec/technical-specification.md — decision O gets NO EDIT (recorded, unchanged: it
+  #   stays true, and PII-113 / phase 15 both file against that file).
+  # docs/02-database/db-retention.md — OUT OF SCOPE: it has no alert-delivery region and is
+  #   already three-way edited by BLOCKs 6/7/8.
 
 changes:
   - action: add_code
+    target: src/backend/apps/search/services/notification_delivery.py
     description: >
-      Apply the Q9 decision (advisory lock via AdvisoryLockId.ALERT_DELIVERY_TASK (9), a
-      delivered-state column, a NOT EXISTS filter on find_matching_saved_searches, a
-      command-level skip, or a combination).
+      New single-responsibility module holding the delivery contract; imports neither
+      immediate_alerts nor send_alerts (no cycle). Define DeliveryOutcome(StrEnum) with
+      DELIVERED / SKIPPED_ALREADY_DELIVERED — log-record vocabulary ONLY, not a DB column (the
+      state is binary-by-nullness; rule 10 is satisfied by the one named function, not by a
+      constant nothing branches on). Define
+      mark_delivered(saved_search_id: int, ad_id: int, *, sent_at: datetime) -> bool issuing the
+      single conditional UPDATE … WHERE saved_search_id AND ad_id AND delivered_at IS NULL
+      RETURNING id, in autocommit, with NO transaction.atomic() and NO advisory_lock. True ⇒ this
+      call recorded the delivery; False ⇒ log at WARNING with the (saved_search_id, ad_id) pair
+      (the duplicate DETECTOR, see accepted_risks). Idempotent. No bulk_update, no loop.
+  - action: edit_code
+    target: src/backend/apps/search/models.py — SavedSearchNotification
+    description: >
+      Add delivered_at = DateTimeField(null=True, blank=True, help_text=…). The help_text is
+      load-bearing documentation, not a comment: it must state that the value is written AFTER a
+      successful send, that NULL means "recorded but not delivered" and therefore stays eligible
+      for both paths, and that one alert per (saved_search_id, ad_id) for the life of the listing
+      — including across a re-publish — is a recorded product decision. Rewrite the model
+      docstring: "Tracks sent notifications to prevent duplicate alerts" is false; the row is an
+      attempt record and delivered_at is the receipt. Correct sent_at's help_text to "when the
+      notification record was created" (help_text is not in the DB, so no migration). Meta is
+      untouched.
   - action: add_migration
+    target: src/backend/apps/search/migrations/0003_* (AddField)
     description: >
-      Option B only: add a NULLABLE delivery-state column with NO backfill, written inside the
-      same transaction that creates the notification row and BEFORE _executor.submit. NEVER
-      NOT NULL DEFAULT false — that re-notifies every previously immediate-sent pair. Any fixed
-      value must be an enum member or named constant (project rule 10), not a bare boolean
-      literal. CHECK THE search/migrations DIRECTORY IMMEDIATELY BEFORE GENERATING (0003_* is
-      correct as of ba23277).
-  - action: edit_docstring
+      Run makemigrations and take the generated slug and number; RE-LIST the migrations directory
+      immediately before generating (0003/0004 are a prediction, not a promise). AddField only:
+      delivered_at, null=True, blank=True, no default.
+  - action: add_migration
+    target: src/backend/apps/search/migrations/0004_* (RunPython backfill)
     description: >
-      Correct the immediate_alerts module docstring's claim that "ignore_conflicts" alone means
-      the daily command never double-sends, and correct record_notifications' return of
-      len(ads) if the chosen option changes its contract. Note explicitly that a failed send
-      currently causes silent loss, not a duplicate.
+      RunPython(forward, migrations.RunPython.noop) with
+      SavedSearchNotification.objects.filter(delivered_at__isnull=True).update(delivered_at=F("sent_at"))
+      — set-based, no row loop. The REVERSE IS A NO-OP carrying an explicit comment that a
+      reverse which NULLs delivered_at would re-arm the mass re-notification. Two migrations, not
+      one, mirroring the existing data-migration precedent in search/0002_*.
+  - action: edit_code
+    target: src/backend/apps/search/services/alert_query.py
+    description: >
+      find_matching_ads: add delivered_at__isnull=False to the EXISTING ~Exists subquery and
+      nothing else — which ads match a search is untouched. find_matching_saved_searches: add a
+      correlated ~Exists(SavedSearchNotification.objects.filter(saved_search_id=OuterRef("pk"),
+      ad_id=ad.pk, delivered_at__isnull=False)) to the CANDIDATE QUERYSET — not a per-candidate
+      Exists (it would multiply the existing N+1) and not exclude() (join-multiplication trap).
+      The is_active / city / price / category / FTS recipient predicate is NOT touched, and the
+      chat_id check stays a DELIVERY PRECONDITION, not an audience filter (PII-104, phase 06) —
+      say so in the docstrings so phase 06 cannot misread it. record_notifications: CONTRACT
+      UNCHANGED — same bulk_create(ignore_conflicts=True), same count = len(ads); only the
+      docstring is corrected to say the count is not a delivery signal and that the dedup decision
+      lives in the matchers' delivered_at predicate plus notification_delivery.mark_delivered.
+      Correct the module docstring's "record notifications to prevent duplicate alerts".
+  - action: edit_code
+    target: src/backend/apps/search/services/immediate_alerts.py
+    description: >
+      deliver_immediate_alerts, NEW ORDER: filter and build payloads FIRST, drop the Nones, then
+      record only for the (saved_search, ad) pairs that actually produced a payload, then
+      _executor.submit. (Today the record loop runs before _build_payload, so a user with no
+      chat_id is recorded and then skipped — D-1.) Each payload dict gains a NON-SERIALISED
+      side-channel tuple (saved_search_id, ad_id) used only for the post-send mark. In
+      _send_payloads._send add exactly ONE call to mark_delivered after the successful
+      await bot.send_message(...), INSIDE the try and before the except clauses. No signature
+      change, no return-value change, no except change. Rewrite the module docstring: "Delivery is
+      idempotent via uq_saved_search_ad + ignore_conflicts, so the daily send_alerts command never
+      double-sends" is false.
+  - action: edit_code
+    target: src/backend/apps/search/management/commands/send_alerts.py
+    description: >
+      _collect_alerts additionally returns, per user, the SavedSearchNotification rows it already
+      built, grouped by user_id. _send_user_digests marks each of that user's rows delivered
+      INLINE, immediately after bot.send_message returns without raising; a user with no chat_id
+      is skipped BEFORE the send, so its rows are correctly left unmarked (the daily path's own
+      D-1 is fixed for free). Command.handle's LOCK/TRANSACTION SHAPE IS UNCHANGED — the mark
+      happens after both scopes have closed, exactly where the send already is, which is what
+      keeps test_sweep_lock_structure.py byte-identical. REPLACE the docstring sentence that
+      nominates "a delivery-state column on SavedSearchNotification (phase 03 DB-007's schema)" as
+      the future fix: after this block the column exists, and a shipped TODO is a lie in
+      production code. Not touched: DAILY_COMMANDS membership, the run-level daily marker,
+      _DIGEST_AD_LIMIT, _BACKOFF_BASE, _format_digest, the CommandError exit-code policy, the
+      dry-run branch.
   - action: rewrite_test
     description: >
-      Rewrite TestDeliverImmediateAlerts::test_records_notification_idempotently ONLY if the
-      chosen option inverts it, with a recorded rationale in its docstring. Note that it
-      currently monkeypatches _run_send so the executor is bypassed and dispatch ordering is NOT
-      actually tested.
+      F-2(1): invert test_records_notification_idempotently (recorder for _run_send, assert ONE
+      submission, KEEP count() == 1, record the rationale). F-2(2): invert
+      test_excludes_already_notified_ads → test_excludes_delivered_ads and add
+      test_includes_recorded_but_undelivered_ads. Never delete these tests; invert and keep the
+      still-valid assertions.
+  - action: add_test
+    description: >
+      The supplementary suite below, plus one genuine override_settings(IMMEDIATE_ALERTS_ENABLED)
+      gate test in test_alert_query.py (True ⇒ _run_send is reached; False ⇒ it is not) — an
+      ADDITION beside the no-op gate test, not a strengthening of it.
+  - action: edit_docs
+    description: >
+      The four owned docs. technical-specification.md decision O gets NO EDIT. db-retention.md is
+      out of scope.
+
+implementation_sequence:
+  - step: 1
+    action: >
+      WRITE THE RED TESTS FIRST, and run them; capture the failing output. No production code
+      before this: the inverted test_records_notification_idempotently, the inverted
+      test_excludes_delivered_ads + its new collectable sibling, then
+      test_no_chat_id_records_nothing_and_stays_collectable, test_failed_send_leaves_pair_undelivered_and_collectable,
+      test_republish_submits_nothing_on_second_call, test_cross_path_dedup. Show them RED in the
+      task report. Red is the whole point — today the suite cannot see the defect.
+  - step: 2
+    action: >
+      Re-derive anchors by SYMBOL, not by line: re-list search/migrations/ immediately before
+      generating; re-read immediate_alerts.py immediately before editing it, in case phase 09
+      API-013 has landed in the interim.
+  - step: 3
+    action: >
+      models.py field + help_text, then generate 0003_* (AddField) and 0004_* (backfill) with
+      makemigrations/takemigrations, taking the generated slugs. Pin the behaviour-preservation
+      with test_backfill_marks_preexisting_rows_delivered before touching the matchers.
+  - step: 4
+    action: >
+      notification_delivery.py, then BOTH matchers, then BOTH writers (immediate_alerts.py and
+      send_alerts.py). The filter change and the daily write change LAND IN ONE COMMIT — see
+      architectural_constraints.
+  - step: 5
+    action: >
+      Green the reds; add test_daily_digest_marks_delivered_after_send (the infinite-loop guard),
+      the mark_delivered unit tests and the real gate test. Then ruff + basedpyright.
+  - step: 6
+    action: >
+      The four docs, then the Docker gate in acceptance_criteria (sequential, foreground).
+
+architectural_constraints:
+  - >
+    THE FILTER CHANGE AND THE DAILY WRITE CHANGE ARE ONE ATOMIC CHANGE. Changing only the filter
+    produces an INFINITE daily re-notification loop: the daily path collects a pair whose row
+    has delivered_at IS NULL, bulk_create(ignore_conflicts=True) silently no-ops the insert, the
+    digest renders, and the next day collects it again — forever, to the same user. This is the
+    single largest implementation hazard in the block. One commit, one rollback unit.
+  - >
+    mark_delivered contains NO transaction.atomic() and NO advisory_lock. A single conditional
+    statement in autocommit is already atomic; send_message is not transactional. No new
+    AdvisoryLockId is allocated, and no lock is taken on either path.
+  - >
+    TWO migrations, not one; the second one's REVERSE IS A NO-OP and must stay one.
+  - >
+    record_notifications' CONTRACT is unchanged (bulk_create(ignore_conflicts=True), returns
+    len(ads)) — only its docstring changes. record_notifications still WRITES rows; it does not
+    mark them delivered.
+  - >
+    Command.handle's lock/transaction shape is UNCHANGED. The daily mark happens after both
+    scopes close. Do NOT move the send inside the transaction, split the collect/persist
+    transaction, add a session lock, add a 14th sweep entry, or reorder _LOCK_TARGET_MODULES.
+  - >
+    core/tests/test_sweep_lock_structure.py stays BYTE-IDENTICAL. send_alerts remains SWEEP
+    entry 12 of 13, still in_atomic is True / session is False, and still absent from
+    _SESSION_SCOPED_BATCHERS.
+  - >
+    TestImmediateAlertsGate::test_gate_off_does_not_deliver_on_publish stays BYTE-IDENTICAL, is
+    NOT counted as gate coverage, and is NOT strengthened. The real gate pin is
+    moderation/tests/test_approve_ad_side_effects.py and it must stay green.
+  - >
+    _run_send / _send_payloads signatures, the AiogramError-only narrowing, the
+    future/callback surface, _MAX_DELIVERY_THREADS, _SEND_CONCURRENCY, _BACKOFF_BASE,
+    UNSUB_CALLBACK_PREFIX, build_alert_message and build_alert_message_keyboard are FROZEN.
+    TestRunSendExceptionNarrowing::test_non_aiogram_error_propagates is a phase 09 API-013 pin.
+    BLOCK 9's contract lives in the NEW module; immediate_alerts.py receives a one-line insertion
+    only. No backpressure, no shutdown hook, no new pool.
+  - >
+    NO new index — and the decision is recorded, because an undocumented no-change is an
+    omission. For find_matching_ads the unique index (saved_search_id, ad_id) is an EXACT PREFIX
+    match for the two indexed columns and delivered_at is a cheap heap-level residual. For
+    find_matching_saved_searches the correlated Exists drives off saved_searches.id and probes
+    the same index prefix, leaving the outer query's cost unchanged. Meta is untouched.
+  - >
+    NO new user-visible strings: no gettext, no template, no translatable message. The field's
+    help_text and the docstrings are not user-facing.
+  - >
+    logger = logging.getLogger(__name__), NEVER print(). Comments, docstrings, log records and
+    migration comments in English. Any existing basedpyright suppression stays in place — do not
+    delete suppressions to make the typechecker happy and do not add blanket ignores.
+  - >
+    No new dependency, no new feature flag, no change to IMMEDIATE_ALERTS_ENABLED's default or
+    to any .env.*.example template.
+  - >
+    No test may assert on a source line number, on an exact log string, or on the ABSENCE of a
+    name (e.g. "assert 'atomic' not in source"). Assert observable behaviour: rows, timestamps,
+    submitted payloads, digests, return values.
+  - >
+    Scope fences: SavedSearch.last_notified_at's false help_text is recorded drift, not fixed here.
+    The 'edited live ad should re-alert' product question is a named follow-up. send_alerts'
+    pre-existing pre-send-record crash window is fixed as a SIDE EFFECT of the daily mark, not as
+    a separate change. moderation/signals.py is a reference, not an edit.
+
+tests_to_add:
+  - { name: test_no_chat_id_records_nothing_and_stays_collectable,
+      class: TestDeliverImmediateAlerts, file: test_alert_query.py,
+      pins: "D-1. No SavedSearchNotification row for a user with no chat_id, and find_matching_ads still returns the ad.",
+      red_today: true }
+  - { name: test_failed_send_leaves_pair_undelivered_and_collectable,
+      class: TestDeliverImmediateAlerts, file: test_alert_query.py,
+      pins: "D-2. _run_send raises ⇒ a row exists, delivered_at IS NULL, find_matching_ads still returns the ad.",
+      red_today: true }
+  - { name: test_republish_submits_nothing_on_second_call,
+      class: TestDeliverImmediateAlerts, file: test_alert_query.py,
+      pins: "D-3. A second deliver_immediate_alerts on the same ad.id submits no payload.",
+      red_today: true }
+  - { name: test_cross_path_dedup,
+      class: TestSendAlertsCommand, file: test_alert_query.py,
+      pins: >
+        Replaces the source plan's acceptance criterion the audit proved FALSE. A pair delivered by
+        the immediate path is not re-delivered by send_alerts; a pair delivered only by send_alerts
+        is still excluded by the immediate matcher. Assert on delivery, not on the return value.
+      red_today: true }
+  - { name: test_includes_recorded_but_undelivered_ads,
+      class: TestFindMatchingAds, file: test_alert_query.py,
+      pins: "The twin of the inverted test: a row with delivered_at = NULL is COLLECTABLE.",
+      red_today: true }
+  - { name: test_excludes_delivered_ads,
+      class: TestFindMatchingAds, file: test_alert_query.py,
+      pins: "The INVERSION of test_excludes_already_notified_ads — set delivered_at on the fixture row.",
+      red_today: true }
+  - { name: test_backfill_marks_preexisting_rows_delivered,
+      class: new, file: test_alert_delivery.py,
+      pins: >
+        F-1 behaviour-preservation. A row created before the backfill migration has
+        delivered_at == sent_at and REMAINS EXCLUDED by find_matching_ads. This is the test that
+        stops a mass re-notification from reaching production.
+      red_today: n/a }
+  - { name: test_daily_digest_marks_delivered_after_send,
+      class: TestPerUserDigestCap (or a sibling), file: test_send_alerts_daily.py,
+      pins: >
+        THE INFINITE-LOOP GUARD for the one-atomic-change rule. After a successful digest send that
+        user's rows have delivered_at IS NOT NULL; after a FAILED send they do not.
+      red_today: n/a }
+  - { name: test_mark_delivered_is_idempotent_and_conditional,
+      class: new, file: test_alert_delivery.py,
+      pins: >
+        A second call for the same pair is a no-op returning False; a WARNING log record names the
+        (saved_search_id, ad_id) pair. Assert the returned bool and the row's timestamps — not the
+        log text.
+      red_today: n/a }
+  - { name: test_immediate_alerts_flag_gate_reaches_sender_only_when_enabled,
+      class: new (beside TestImmediateAlertsGate), file: test_alert_query.py,
+      pins: >
+        The real gate coverage the no-op test cannot give. With override_settings
+        (IMMEDIATE_ALERTS_ENABLED=True) _run_send is reached; with False it is not.
+      red_today: n/a }
+  - note: >
+      Shape reference for the D-1/D-2 regressions:
+      test_send_alerts_daily.py::TestPerUserDigestCap::test_per_user_cap_is_applied_at_collection_time
+      — the existing strongest pin of the "record ⊆ deliver" invariant. Copy its structure.
+      Exercise the code path directly; do not flip IMMEDIATE_ALERTS_ENABLED globally.
+
+must_keep_passing_unchanged:
+  - test_alert_query.py::TestRecordNotifications::test_ignore_conflicts_skips_duplicates
+  - test_alert_query.py::TestImmediateAlertsGate::test_gate_off_does_not_deliver_on_publish  # byte-identical
+  - src/backend/apps/core/tests/test_sweep_lock_structure.py                                  # byte-identical
+  - src/backend/apps/moderation/tests/test_approve_ad_side_effects.py
+  - src/backend/apps/search/tests/test_send_alerts.py::TestHandleSafety::test_handle_swallows_aiogram_error
+  - test_alert_query.py::TestRunSendExceptionNarrowing::test_non_aiogram_error_propagates
+  - src/telegram_bot/tests/test_alerts*.py
+  - >
+      The phase-01 send_alerts idempotency tests, re-anchored by SYMBOL (D-2), not by a commit
+      hash: apps.core.utils.scheduler.SchedulerDailyMarker, apps.core.services.scheduler_daily_state,
+      send_alerts._DIGEST_AD_LIMIT, send_alerts.Command.handle's loss-window docstring.
+  - src/backend/apps/ads/tests/ (unaffected neighbours, run for regression)
+
+documentation_deliverable:
+  - path: docs/02-database/db-schema.md
+    region: "### SavedSearchNotification"
+    owed: >
+      Add delivered_at (TIMESTAMP, NULL, no default). Replace the header sentence "Tracks
+      notification delivery…" with the real contract: the row is an ATTEMPT RECORD, delivered_at
+      is the RECEIPT, NULL stays eligible. State that it is written AFTER a successful send, that
+      it is backfilled from sent_at, and that one alert per (saved_search_id, ad_id) for the life
+      of the listing — including across a re-publish — is a product decision, made visible.
+  - path: docs/02-database/db-indexes.md
+    region: "## Indexes — saved_search_notifications"
+    owed: >
+      Keep uq_saved_search_ad as-is and RECORD the "no new index" decision with its reason for
+      BOTH predicates (exact prefix match + cheap heap residual; correlated Exists drives off
+      saved_searches.id). A documented no-change is a decision; an undocumented one is an omission.
+  - path: docs/04-user-stories/buyer-stories.md
+    region: "### US-B11"
+    owed: >
+      Careful, minimal touch. The mechanism sentence cites uq_saved_search_ad as THE dedup
+      mechanism — wrong today and wrong after the fix (it is the row-level backstop). Cite the
+      delivery-state contract instead of the constraint name. The DEDUP PROMISE ITSELF DOES NOT
+      CHANGE and must not be reworded. Do not touch the story, the unsubscribe surface or the
+      flag sentence.
+  - path: docs/01-spec/architecture-structure.md
+    region: "the cron note"
+    owed: >
+      The only place in the docs that states the dedup invariant, and it states it for the DAILY
+      path only. Extend it: the daily NOT EXISTS now filters on DELIVERED state (so a failed
+      digest is retried on the next run rather than suppressed), and the immediate path is
+      separately gated by IMMEDIATE_ALERTS_ENABLED and deduped by the same contract. COORDINATE
+      WITH BLOCK 11 — both file against this file; BLOCK 9's claim is the cron note only.
+  - path: docs/01-spec/technical-specification.md
+    region: "decision O"
+    owed: "NO EDIT. 'Deduplicated per search-ad pair' is MORE true after the fix, not less. Record the decision; change nothing (PII-113 and phase 15 both file against this file)."
+  - path: docs/02-database/db-retention.md
+    region: "—"
+    owed: "OUT OF SCOPE. No alert-delivery region exists in it and it is already three-way edited by BLOCKs 6/7/8."
+  - not_touched: >
+      docs/99-agent/architecture.md, spec-index.md, search-patterns.md, docker-deployment.md
+      (IMMEDIATE_ALERTS_ENABLED row), config/settings/base.py, apps/core/enums.py,
+      core/utils/advisory_lock.py.
+
+accepted_risks:
+  - >
+      1. The CONCURRENT duplicate is DETECTED, not PREVENTED. Two concurrent ticks both send; the
+      loser's UPDATE … WHERE delivered_at IS NULL returns 0 rows and mark_delivered logs a WARNING
+      with the (saved_search_id, ad_id) pair. This is the honest limit of any database-only answer
+      without a Telegram-side idempotency key. Accepted because the concurrent trigger is
+      UNDEMONSTRATED, the on_commit call site is unique per publish, and the feature is behind an
+      OFF flag. ESCALATION TRIGGER: if mark_delivered ever returns False in production logs, that
+      is evidence the concurrent case is real, and the fix is the claimed_at/lease shape — a
+      separate block with search/0005_*.
+  - >
+      2. Crash-window duplicate between send_message returning 200 and the UPDATE committing — one
+      extra message per affected pair, self-correcting, visible as a 0-row UPDATE. Accepted: the
+      alternative's failure mode is a permanent loss.
+  - >
+      3. Pre-existing D-1/D-2 rows stay suppressed. The backfill preserves today's behaviour
+      exactly, which is the point — but already-lost alerts are not recovered. OPS FOLLOW-UP, not
+      this block: a pre-existing row whose user had no chat_id at record time is unrecoverable
+      from the database.
+  - >
+      4. The re-publish product decision (§2.3) is encoded WITHOUT a filed finding. Accepted only
+      because the coordinator approved it, and made visible in the field help_text, the model
+      docstring and db-schema.md so it reads as a decision, not an accident.
+  - >
+      5. A seller who EDITS a live ad and is re-moderated back to PUBLISHED does not re-alert —
+      a real, unquantified product loss. Deferred to a named follow-up whose recommended epoch is
+      a content-revision column, NOT Ad.published_at. NAMED OWNER: the coordinator / Product Owner.
+      The 2026-10-03 decision round did not reach this question and it is still deferred.
+  - >
+      6. lock_timeout/PgBouncer exposure (BLOCK 5's) is MOOT — no lock is taken, so no 55P03 can
+      be raised inside an on_commit callback. ELIMINATED by the design, not accepted.
+  - >
+      7. Process attribution of deliver_immediate_alerts remains unverified (reachable from the
+      bot's submit/auto-moderate and the web's approve/reactivate). IMMATERIAL to this design,
+      which holds in any process because the state is in the database.
+  - >
+      8. The sent_at semantics lie is corrected in help_text and docstrings only, not in the
+      column's value — existing rows' sent_at still means "recorded". A full semantic correction
+      would need the backfill plus a column rename and is not warranted.
+  - >
+      9. UNVERIFIED BY EXECUTION on the anchor: the decision record used zero Docker invocations
+      and zero test runs, so every claim in it is a SOURCE-READING claim at HEAD 35441e0, not a
+      demonstrated behaviour. The red tests in implementation_sequence step 1 are what convert
+      them into evidence.
+
+commit_message_requirements:
+  - >
+      Name the finding: "03-DB-007 saved-search alert delivery-state contract" and state in the
+      body that the row is an attempt record and delivered_at is the receipt.
+  - >
+      Record the BACKFILL explicitly — "backfill delivered_at = sent_at (behaviour-preserving);
+      reverse is a no-op" — so a future reader does not "clean it up" into a NULLing reverse and
+      re-arm a mass re-notification.
+  - >
+      Record the PRODUCT DECISION: one alert per (saved_search_id, ad_id) for the life of the
+      listing, including across a re-publish; the edited-ad re-alert is a deferred follow-up.
+  - >
+      Record the LIMITS: the concurrent duplicate is DETECTED, not prevented; the escalation
+      signal is mark_delivered returning False in production logs; a kill in the crash window
+      yields one bounded duplicate.
+  - >
+      Record the ONE-ATOMIC-CHANGE constraint: the filter change and the daily write change are a
+      single unit; reverting half of it creates an infinite daily re-notification loop.
+  - >
+      Record that IMMEDIATE_ALERTS_ENABLED remains OFF and unset in every template, and that
+      the two shipped tests were INVERTED, not deleted, with the defect each one encoded.
+  - >
+      List the two migrations by their GENERATED names; English only; no print(), no secrets.
 
 acceptance_criteria:
-  - a failed _run_send followed by a send_alerts run STILL delivers the pair; the test was
-    demonstrated RED against the pre-fix code
-  - a pair already delivered by the immediate path is not re-delivered by send_alerts
-  - a pair delivered only by send_alerts is still excluded by the immediate matcher
-  - pre-existing notification rows are NULL and are NOT filtered out (Option B backfill test)
-  - the feature still does nothing when IMMEDIATE_ALERTS_ENABLED is False
-  - test_alert_query.py::TestRecordNotifications::test_ignore_conflicts_skips_duplicates passes
-    unchanged
-  - recipient-selection logic is unchanged beyond the delivery-state filter (PII-104, phase 06)
-  - _executor, the Bot lifecycle and asyncio.run-per-batch behaviour are UNCHANGED
-  - AdvisoryLockId gained no new member
-  - uv run ruff check src/ exits 0 and uv run basedpyright src/ reports 0 errors
-  - `.\Makefile.ps1 test-recreate` was run if search/0003_* was generated, then the Docker gate
-    below is green
+  - >
+      RED-FIRST EVIDENCE: implementation_sequence step 1's failures were captured and shown before
+      any production code changed.
+  - >
+      `uv run ruff check src/` exits 0 and `uv run basedpyright src/` reports 0 errors; no
+      suppression deleted, no blanket ignore added.
+  - >
+      MIGRATION HYGIENE: `makemigrations --check --dry-run` reports no pending changes, AND a
+      real forward AND backward `migrate` is exercised on a NAMED SCRATCH DATABASE
+      (e.g. mko_bazuna_block9_migration_check): forward to 0004 with a pre-existing row, then
+      reverse 0004 and observe that delivered_at is UNCHANGED (the no-op reverse, proved), then
+      forward again, then back to 0002. NEVER run migrate against test_mko_bazuna and NEVER drop
+      or recreate the named Docker volume: pytest's DisableMigrations means no test gate replays
+      the migrations, so a hand-run migrate there is neither verified nor reversible and would
+      corrupt the shared volume for the rest of the phase.
+  - >
+      SEARCH GATE (Docker only, run SEQUENTIALLY and in the FOREGROUND — never in the background,
+      never two suites at once):
+      $dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS=src/backend/apps/search/tests/ test
+  - >
+      ADJACENT GATES, each as its own sequential run:
+      $dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS=src/backend/apps/moderation/tests/test_approve_ad_side_effects.py test
+      $dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS=src/telegram_bot/tests/test_alerts.py test
+  - >
+      Fresh schema first, because two migrations were added:
+      .\Makefile.ps1 test-recreate
+  - >
+      Then the full gate: .\Makefile.ps1 test
+      $dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS="src/backend/apps/search/tests/ src/backend/apps/ads/tests/ src/backend/apps/moderation/tests/test_approve_ad_side_effects.py src/telegram_bot/tests/test_alerts.py" test
+  - >
+      NOTE on the Docker harness: PYTEST_OPTS is UNQUOTED in docker/entrypoint-test.sh and
+      word-splits on spaces — quoted multi-token values do not work, and setting PYTEST_OPTS
+      REPLACES the default --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4
+      --dist loadgroup. Never use --override-ini=addopts= (it strips
+      --import-mode=importlib). Do not delete or recreate the test DB volume.
+  - >
+      THE FULL SUITE IS EXPECTED TO SHOW EXACTLY ONE FAILURE — the pre-existing
+      search/tests/test_search_slo.py::…::test_search_at_seed_volume_meets_slo, which fails on the
+      anchor. Any other failure, or a count other than one, is BLOCK 9's and must be fixed or
+      explained. Do not attribute the SLO failure to this block, and do not "fix" it.
+  - >
+      Behavioural: a failed send is retried by the other path; a delivered pair is never delivered
+      again by either path, including across a re-publish; a user with no chat_id is never
+      recorded; pre-existing rows stay excluded (behaviour-preserving deploy).
+  - >
+      Structural: core/tests/test_sweep_lock_structure.py and
+      TestImmediateAlertsGate::test_gate_off_does_not_deliver_on_publish are BYTE-IDENTICAL (prove
+      it with a diff), no new AdvisoryLockId, Meta unchanged, no new index, no new user-visible
+      string, technical-specification.md decision O and db-retention.md untouched.
+  - >
+      Follow-up findings filed, not fixed: (a) "an edited live ad should re-alert" product
+      question, with the content-revision-column epoch recommendation — OWNER: coordinator /
+      Product Owner, still deferred after the 2026-10-03 decision round; (b)
+      SavedSearch.last_notified_at's false help_text drift; (c) audit E2c — the no-op gate test —
+      named with its real replacement.
 ```
 
-**Tests required.**
-
-- *Must keep passing unchanged:*
-  `test_alert_query.py::TestRecordNotifications::test_ignore_conflicts_skips_duplicates`;
-  `::TestImmediateAlertsGate::test_gate_off_does_not_deliver_on_publish`; the phase-01
-  `send_alerts` idempotency tests (re-anchored by symbol, **D-2**);
-  `src/backend/apps/moderation/tests/test_approve_ad_side_effects.py`;
-  `src/telegram_bot/tests/test_alerts*.py`.
-- *Must be added:* the **lost-alert regression test** — **red against the pre-fix code**;
-  the **duplicate-suppression test** and its converse; the **backfill test** (Option B); a test
-  that the immediate path still behaves correctly with the flag off.
-- *Must be changed:* `test_records_notification_idempotently` **only if** the chosen option
-  inverts it, with a recorded rationale.
-
-**Exact gate command (Docker only).**
-
-```powershell
-# run only if search/0003_* was generated:
-.\Makefile.ps1 test-recreate
-$dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS="src/backend/apps/search/tests/ src/backend/apps/ads/tests/ src/backend/apps/moderation/tests/test_approve_ad_side_effects.py src/telegram_bot/tests/test_alerts.py" test
-.\Makefile.ps1 test
-```
-
-**Risk / rollback.**
-
-- *Risk:* shipping Option A alone and recording the feature as fixed. The block summary must
-  state that the concurrency path is unproven and that B remains required.
-- *Risk (Option B):* writing the flag **after** the send — a crash then duplicates the message.
-- *Risk (Option B):* a `NOT NULL DEFAULT false` backfill re-notifies every previously
-  immediate-sent pair on first enable.
-- *Risk:* reverting an earlier cycle's `send_alerts` idempotency work by an over-broad
-  "simplification".
-- *Rollback:* the column-removal migration is reversible. **Rolling back after the flag is
-  enabled means every pair already marked `True` becomes eligible again — the rollback plan must
-  disable `IMMEDIATE_ALERTS_ENABLED` first.**
+**Replace the stale draft above.** The advisory lock and the "no backfill" rule are gone; the
+`delivered_at` delivery-state contract and the behaviour-preserving `delivered_at = sent_at`
+backfill are in their place. **F-1 is the headline hazard in this block:** shipping the filter
+change without that backfill mass re-notifies every previously notified pair to every subscribed
+buyer on the next live 08:00 UTC `DAILY_COMMANDS` run, one day after deploy, with no flag to turn
+it off.
 
 ---
 
@@ -2994,25 +4143,44 @@ $dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS="src/backend/apps/sea
 - **Auditor — yes.** The finding's central correction is that `copy_ad` has exactly **one**
   production site and there is **no** web route; the report's other source was a **test helper**.
   That must be re-verified at `ba23277`, together with the `Ad.status` default BLOCK 10 depends on.
-- **Researcher — NO, and this is a deliberate correction of instinct, not an oversight.** Q12 is a
+- **Researcher — NO, and this is a deliberate correction of instinct, not an oversight.** Q12 was a
   **product** decision, not a technical survey; the tree points at an in-repo model
   (`create_draft_ad`'s delete-then-recreate); and project rule 5 says prefer the simple obvious
   solution over abstractions. Adding a Researcher here would be ceremony with no question to
-  answer. **If the coordinator challenges this, the answer is that there is no external
-  best-practice question — only a product preference with a fixed default.**
+  answer. **If the coordinator challenges this, the answer is that there was never an external
+  best-practice question — only a product preference.** *(Settled twice over: the coordinator first
+  closed Q12 as **Option A applied as a default**, and the **Product Owner then ruled Option A as a
+  decision on 2026-10-03** — see the decision gate. Either way there was never an external question
+  to survey, so the "no Researcher" rationale above is unchanged.)*
 - **Planner — yes.** The product rule must be specified for **both** creators at once, the
   error-handling boundary defined, and the i18n string set designed.
 - **Validator — yes.** Seller-visible behaviour changes and a new user-facing message ships; the
   "unified rule" is only credible if both call sites are shown to obey it.
 
-**Decision gate — Q12.** Option table in the source plan §3.10.1. **The default is fixed:**
+**Decision gate — Q12 — ✅ RESOLVED 2026-10-03 by the Product Owner: Option A, taken as a
+DECISION.**
 
-> **Default if unanswerable: Option A — "a new draft replaces the current one."** It matches
-> the shipped `create_draft_ad` policy, needs **no** new i18n string, and requires no behaviour
-> change on the busiest bot path. If the coordinator/product is not consulted, **default to A and
-> record in the commit message that the choice was made by default, not by decision.**
-> **Option C is FORBIDDEN.** It improves the message without addressing the missing policy, which
-> is the finding's actual ask.
+> **The 2026-10-03 ruling supersedes this block's earlier "applied as a DEFAULT, not as a product
+> decision" framing. The option is unchanged; the *character* of the answer is not.** A commit
+> implementing it **must now record that the rule was chosen by the Product Owner on 2026-10-03** —
+> the previous instruction ("must record that the choice was made by default, not by decision") is
+> **withdrawn**, because it is no longer true. Recorded so no implementor satisfies the letter of
+> the old rule and contradicts the new one.
+>
+> Option table in the source plan §3.10.1. **`copy_ad` deletes the seller's existing `DRAFT`
+> inside its already-open `transaction.atomic()` before creating the copy** — exactly the shape
+> BLOCK 4 shipped for `create_draft_ad` (`ad_data/orm.py::create_draft_ad`). The partial unique
+> index `uq_ads_single_draft_per_user` stays as the **backstop**; a concurrent race is absorbed by
+> the same savepoint-and-retry, never by a new mechanism.
+> **Option B (catch `IntegrityError`, new translated string) is REJECTED** — it diverges from the
+> already-shipped `/post` behaviour, so the two creators would disagree, and it puts a behaviour
+> change on the hottest bot path. **Option C remains FORBIDDEN.**
+>
+> Independently of the option, `cmd_copy`'s `_("Failed to copy ad: {error}").format(error=e)`
+> goes away: raw psycopg text (constraint name, `DETAIL Key (...)`, `CONTEXT INSERT INTO ads`)
+> must never reach a seller's chat. That change needs **one** new msgid appended to **all three**
+> `.po` files (`ru`/`bs` non-empty, `en` may be empty) —
+> `test_extraction_completeness` fails if a msgid is missing from any locale.
 
 **Agent briefs (paste-ready).**
 
@@ -3046,47 +4214,48 @@ $dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS="src/backend/apps/sea
 
 ```yaml
 id: task_03_b10_single_draft_policy
-title: Apply one single-draft policy in both draft creators and stop leaking raw driver errors
+title: Mirror BLOCK 4's single-draft savepoint in copy_ad and stop leaking raw driver errors
 priority: low
 depends_on: [task_03_b04_create_draft_savepoint]
 source_reference: .ai/plans/03-db-concurrency-remediation.md
 source_section: "BLOCK 10 — One single-draft policy, applied in both creators (DB-009)"
 extra_context: |
-  Q12 IS A PRODUCT DECISION GATE.
-  DEFAULT IF UNANSWERABLE: Option A — "a new draft replaces the current one." It matches the
-  shipped create_draft_ad policy and needs no new i18n. If defaulted, the commit message MUST
-  record that the choice was made by default, not by decision.
-  OPTION C IS FORBIDDEN — it improves the message without addressing the missing policy, which
-  is the finding's actual ask.
-  Whichever option is chosen, cmd_copy's broad `except Exception` formatter must stop
-  interpolating raw psycopg IntegrityError text (constraint name, `DETAIL Key (...)`,
-  `CONTEXT  INSERT INTO ads`) into a Telegram message.
-  Adding an explicit `status=AdStatus.DRAFT` in copy_ad is COSMETIC — do not bundle it as if it
-  were the fix.
-  Locale files are a SHARED artefact with phase 14 — APPEND, never run a wholesale makemessages.
-  Do NOT touch cmd_post's existing draft replacement (BLOCK 4) and do NOT touch copy_ad's
-  storage-key reuse (AD-003, phase 05).
+  Q12 IS RESOLVED — 2026-10-03, Product Owner. Option A, TAKEN AS A DECISION (not as a default).
+  A commit implementing it MUST record that the single-draft rule was ruled by the Product Owner on
+  2026-10-03. The older "this was a default, not a decision" wording is WITHDRAWN.
+  `copy_ad` deletes the seller's existing DRAFT inside its already-open `transaction.atomic()`
+  before creating the copy, mirroring BLOCK 4's `create_draft_ad` EXACTLY: the create is wrapped
+  in a NESTED `transaction.atomic()` savepoint with the `try` OUTSIDE it, and an
+  `except IntegrityError:` branch cleans up and retries once.
+  OPTION B IS REJECTED (diverges from the shipped `/post` behaviour); OPTION C IS FORBIDDEN.
+  INDEPENDENT OF THE OPTION: `cmd_copy`'s broad `except Exception` must stop interpolating raw
+  psycopg text (constraint name, `DETAIL Key (...)`, `CONTEXT  INSERT INTO ads`) into Telegram.
+  Locale files are a SHARED artefact with phase 14 — APPEND the one new msgid to ru, bs AND en
+  (test_extraction_completeness requires all three; ru/bs msgstr non-empty), never regenerate.
+  Do NOT touch `create_draft_ad`/`ad_data/orm.py` (BLOCK 4, already shipped), the `Ad` model, the
+  partial index, `AdvisoryLockId`/`advisory_lock.py`, or copy_ad's storage-key reuse
+  (AD-003, phase 05). No new dependency, no migration, no new deployment surface.
 
 description: >
   copy_ad never sets status, never handles uq_ads_single_draft_per_user, and never touches an
-  existing DRAFT. When a seller already has one, the partial unique index fires and cmd_copy's
-  broad `except Exception` interpolates the raw psycopg IntegrityError text into a Telegram
-  message. Apply the chosen single-draft policy in copy_ad, keep it identical to the one
-  create_draft_ad already implements, and stop surfacing raw exception text.
+  existing DRAFT, so a seller who already has one trips the partial unique index; the raw psycopg
+  text then propagates out of cmd_copy into a Telegram message. Apply BLOCK 4's shipped
+  delete-then-recreate policy inside copy_ad's existing transaction, keep filesystem deletions
+  after commit via the AdImage pre_delete signal, and stop surfacing raw exception text.
 
 goals:
-  - apply ONE single-draft policy across create_draft_ad and copy_ad
+  - apply ONE single-draft policy across create_draft_ad and copy_ad (BLOCK 4's exact shape)
+  - keep the partial unique index as the backstop, not the primary mechanism
   - stop interpolating raw database exception text into user-facing messages
-  - keep filesystem deletions after commit, not inside the transaction
-  - keep the partial unique index as the backstop, not as the primary mechanism
+  - make the rationale survive review, so nobody "simplifies" the savepoint away
 
 files:
   - path: src/backend/apps/ads/services/copy_service.py
     targets: [{ type: function, name: copy_ad }]
     semantic_anchors:
       insert_after:
-        type: assignment
-        value: "new_ad = Ad("
+        type: raise_statement
+        value: 'raise PermissionError("Cannot copy another user\'s ad")'
   - path: src/telegram_bot/handlers/ad_copy.py
     targets: [{ type: function, name: cmd_copy }]
     semantic_anchors:
@@ -3097,73 +4266,102 @@ files:
     targets: [{ type: module, name: test_copy_ad }]
     semantic_anchors: {}
   - path: src/telegram_bot/tests/test_ad_copy.py
-    targets: [{ type: function, name: test_copy_unexpected_error }]
-    semantic_anchors: {}   # the `assert "failed" in called_text.lower()` must keep passing; do not edit
-  - path: src/backend/locale/ru/LC_MESSAGES/django.po   # Option B only — APPEND
+    targets: [{ type: module, name: test_ad_copy }]
+    semantic_anchors: {}   # the `assert "failed" in called_text.lower()` must keep passing unchanged
+  - path: src/backend/locale/ru/LC_MESSAGES/django.po   # APPEND the one new msgid
     targets: [{ type: module, name: django_po }]
     semantic_anchors: {}
-  - path: src/backend/locale/bs/LC_MESSAGES/django.po   # Option B only — APPEND
+  - path: src/backend/locale/bs/LC_MESSAGES/django.po
     targets: [{ type: module, name: django_po }]
     semantic_anchors: {}
+  - path: src/backend/locale/en/LC_MESSAGES/django.po
+    targets: [{ type: module, name: django_po }]
+    semantic_anchors: {}   # en msgstr may stay empty
 
 changes:
   - action: add_code
     description: >
-      Option A: delete the seller's existing DRAFT before creating the copy, inside the same
-      transaction, exactly mirroring create_draft_ad's documented delete+recreate pattern, with
-      the AdImage file deletions deferred to transaction.on_commit().
-      Option B: let the constraint fire and map IntegrityError to a new translated domain error
-      with a seller-facing message.
+      In copy_ad, after the ownership check and before constructing the copy, delete the seller's
+      existing DRAFT inside the EXISTING atomic() — mirroring create_draft_ad's delete + recreate.
+      Wrap the Ad construction/save in a NESTED transaction.atomic() savepoint with the `try`
+      OUTSIDE it, and on IntegrityError delete the seller's DRAFT and retry once. The delete and
+      the create must live in the SAME transaction so a failed create leaves the seller as they
+      were. Do not hand-roll a manual storage-key sweep — the AdImage pre_delete signal
+      (apps.media.signals::delete_adimage_files_on_delete) already defers file deletion to
+      transaction.on_commit(), which is why copy_ad's own atomic() must remain the outermost one.
   - action: edit_error_handler
     description: >
       Replace the raw-interpolating `except Exception` branch in cmd_copy with one that logs via
-      logger.exception and answers a translated, non-interpolating message.
+      the existing logger.exception and answers a translated, non-interpolating message.
+  - action: add_locale_entry
+    description: >
+      Append msgid "Failed to copy ad." to ru, bs and en django.po with non-empty ru/bs msgstr.
+      Append only; never run makemessages/regenerate, and never delete the now-obsolete
+      "Failed to copy ad: {error}" entry (it is a shared artefact with phase 14).
   - action: edit_docstring
     description: >
-      Correct copy_ad's docstring (its Raises: section lists only Ad.DoesNotExist and
-      PermissionError) and test_copy_ad.py's module docstring, which currently states the
-      single-draft precondition as a fact the code does not enforce.
+      copy_ad's docstring must document the delete-then-recreate policy AND the savepoint
+      rationale, the way create_draft_ad's does — a reviewer finding that rationale absent treats
+      it as a defect. test_copy_ad.py's module docstring currently asserts the unenforced
+      precondition "the seller cannot have an existing DRAFT when copy_ad runs"; correct it.
 
 acceptance_criteria:
-  - a seller with an existing DRAFT running /copy ends with exactly one DRAFT (Option A), or
-    keeps the old one and receives the translated message (Option B)
-  - the failure message contains NO raw driver text (no "Key (", no "DETAIL", no "CONTEXT",
-    no "INSERT INTO")
+  - a seller with an existing DRAFT running /copy ends with EXACTLY ONE DRAFT, and it is the copy
+  - a seller with no existing DRAFT is unaffected (no regression)
+  - the copy is DRAFT and its fields match the source
+  - the failure message contains NO raw driver text (no constraint name, no "Key (", no "DETAIL",
+    no "CONTEXT", no "INSERT INTO") and still contains the word "failed"
   - a replaced draft's media files are removed after commit, not inside the transaction
-  - test_ad_copy.py's `assert "failed" in called_text.lower()` passes unchanged
-  - test_copy_ad.py::TestCopyAd::test_copy_ad_happy_path's DRAFT-status assertion passes unchanged
-  - src/backend/apps/ads/tests/test_ad_constraints.py passes unchanged
-  - copy_ad's storage-key reuse and cmd_post's draft replacement are unchanged
-  - Option B only: non-empty msgstr for ru AND bs; locale files appended, never regenerated
+  - a failed create leaves the seller's original DRAFT intact (same transaction)
+  - the 5 existing test_copy_ad.py tests and the 6 existing test_ad_copy.py tests pass unchanged
+  - BLOCK 4's test_create_draft_ad.py (incl. TestCreateDraftAdCrashRecovery), BLOCK 6's
+    test_ad_create_heartbeat_coverage.py + test_ad_create_heartbeat.py, test_sweep_lock_structure.py,
+    test_ad_constraints.py and test_i18n_completeness.py pass unchanged
+  - copy_ad's storage-key reuse and create_draft_ad's shipped shape are unchanged
+  - no migration, no new dependency, no `apps.*` -> `telegram_bot.*` import
+  - the commit body records the single-draft rule as a Product Owner DECISION dated 2026-10-03, and
+    does not describe it as a default
   - uv run ruff check src/ exits 0 and uv run basedpyright src/ reports 0 errors
   - the Docker gate below is green
 ```
 
 **Tests required.**
 
-- *Must keep passing unchanged:* all of `src/backend/apps/ads/tests/test_copy_ad.py`'s
-  field-copying assertions (including `test_copy_ad_happy_path`);
-  `src/telegram_bot/tests/test_ad_copy.py` including the `"failed"` assertion;
-  `src/backend/apps/ads/tests/test_ad_constraints.py`.
-- *Must be added:* the **unified-policy test** (assert the **chosen** option's outcome, in both
-  `create_draft_ad` and `copy_ad`); the **no-raw-driver-text** test; and, under Option A, the
-  **after-commit media deletion** test mirroring `TestCreateDraftAdCrashRecovery`.
-- *Must be changed:* none.
+- *Must keep passing unchanged:* all 5 of `src/backend/apps/ads/tests/test_copy_ad.py`; all 6 of
+  `src/telegram_bot/tests/test_ad_copy.py` (including the `"failed"` assertion); BLOCK 4's
+  `src/telegram_bot/tests/test_create_draft_ad.py`; BLOCK 6's
+  `src/telegram_bot/tests/test_ad_create_heartbeat_coverage.py` + `test_ad_create_heartbeat.py`;
+  `src/backend/apps/core/tests/test_sweep_lock_structure.py`; `test_ad_constraints.py`;
+  `test_i18n_completeness.py`.
+- *Must be added:* the **pre-existing-DRAFT copy test**, written FIRST and shown RED against the
+  unfixed tree (today it raises `IntegrityError`), asserting the invariant **"a draft is
+  returned"** plus exactly one DRAFT for that seller — **never** "the seller's draft survived"
+  (false) and **never** a specific exception class; the **no-pre-existing-draft** copy test; and
+  the **raw-driver-text-never-reaches-Telegram** test.
+- *Must be changed:* none of the existing tests. Only the two module/function docstrings.
 
-**Exact gate command (Docker only).**
+**Exact gate command (Docker only — run SEQUENTIALLY, never two suites at once).**
 
 ```powershell
-$dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS="src/backend/apps/ads/tests/test_copy_ad.py src/backend/apps/ads/tests/test_ad_constraints.py src/telegram_bot/tests/test_ad_copy.py src/telegram_bot/tests/test_create_draft_ad.py" test
+$dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'
+$dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS="src/backend/apps/ads/tests/test_copy_ad.py src/telegram_bot/tests/test_ad_copy.py src/telegram_bot/tests/test_create_draft_ad.py" test
+$dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS="src/telegram_bot/tests/test_ad_create_heartbeat_coverage.py src/telegram_bot/tests/test_ad_create_heartbeat.py src/backend/apps/core/tests/test_sweep_lock_structure.py src/backend/apps/ads/tests/test_i18n_completeness.py" test
 .\Makefile.ps1 test
 ```
 
 **Risk / rollback.**
 
-- *Risk:* Option A deleting the seller's in-progress draft **before** the copy commits, so a
-  later failure loses both. Delete and create in one transaction; file deletions after commit.
-- *Risk:* changing the error surface in a way that breaks `test_ad_copy.py`'s `"failed"` assertion.
-- *Risk:* Option C shipped by default — explicitly forbidden above.
-- *Rollback:* two small functions plus an i18n string. Fully reversible; no schema.
+- *Risk:* deleting the seller's in-progress draft before the copy commits loses both on a later
+  failure. **Mitigated by construction:** one transaction, so a failed create rolls the delete
+  back and the seller is exactly as they were.
+- *Risk (accepted, not a defect):* `/copy` mid-dialog deletes the draft the FSM still points at,
+  so the next step hits `process_preview`'s existing, already-translated "Your draft expired and
+  was deleted. Please start again with /post." Confirm that string exists and is reachable, and
+  record the consequence — do **not** "fix" it here.
+- *Risk:* the savepoint being "simplified" away by a later reader. Countered by the docstring.
+- *Risk:* changing the error surface breaking the `"failed"` assertion. Countered by a required
+  test.
+- *Rollback:* two functions, two docstrings and one msgid. Fully reversible; no schema.
 
 ---
 
@@ -3173,45 +4371,93 @@ $dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS="src/backend/apps/ads
 |---|---|
 | **Findings owned** | `03-VAL-001` (the source-comment half) |
 | **`depends_on`** | *(none)* — executes last; re-reads every file it touches |
-| **Priority** | P2 — **gated on a coordinator decision** |
-| **Roster** | **Implementor, Auditor, Researcher, Planner, Validator** → *all five* |
+| **Priority** | P2 — **gate CLOSED**, executes unconditionally |
+| **Roster** | **Auditor, Planner, Implementor, Validator** → *four* (Researcher dropped) |
+| **Gate** | **CLOSED** — Option C chosen by the coordinator; no open gate remains |
 
-**Roster decision — CONFIRMED unchanged; all five.** Re-verified at `ba23277`: the inventory is
-**68 citations across 27 files** (**D-7**), of which **8 are production** and 19 are tests.
-`D-6` removes `ad_data/orm.py` from the production list entirely (it has zero citations) and
-adds three test files. The Auditor's job (re-derive the set, establish each legacy ID's cycle
-from the audit history) is real and is an **archival investigation, not a grep**. The
-Researcher's conventions question and the Planner's cross-phase convention-setting are both
-still justified. **Scope is what changed — see N-5, not the roster.**
+**Roster decision — REDUCED to four; the Researcher is dropped.** The Researcher's role was
+**archaeological ambiguity resolution** ("establish which cycle each legacy ID belongs to").
+Option C **descriptive replacement never asks for that attribution** — a description needs no
+cycle number — so the entire premise of the role is dead. Keeping it would mean paying for work
+whose output is deliberately discarded. The other four roles all survive intact: the Auditor
+still re-derives the inventory (and did, decisively), the Planner still sets the cross-phase
+convention, Implementor and Validator unchanged.
 
-**Scope shrink (N-5) — this is the correction to the source plan's scope.** BLOCK 11's
-**default scope is the 8 production files**:
+**Decision gate Q14 (second half) — CLOSED: Option C, descriptive replacement.** Coordinator
+ruling, recorded here so no later reader treats it as open:
 
-1. `src/backend/apps/core/utils/advisory_lock.py` (3 citations) — *two of the three this-cycle
-   citations are handled inside BLOCK 2; the legacy `DB-001`/`DB-007` text is BLOCK 11's.*
-2. `src/backend/apps/moderation/admin_actions.py` (4)
-3. `src/backend/apps/moderation/services/moderation_log.py` (4)
-4. `src/backend/apps/ads/services/submission.py` (1)
-5. `src/backend/apps/ads/views/edit.py` (1)
-6. `src/backend/apps/ads/models.py` (1)
-7. `src/backend/apps/core/management/commands/archive_sweep.py` (1)
-8. `src/backend/apps/search/management/commands/send_alerts.py` (1) — **the third this-cycle
-   citation; non-negotiable under any option.**
+1. Every unresolvable bare citation becomes a **short, self-contained description of the
+   invariant the comment defends**, so the comment is useful **without** an id lookup.
+2. Where the citation is unambiguously a finding **this cycle** fixed, use the phase-scoped
+   **`03-DB-00N`** form instead.
+3. **Test files are out of scope** — phase 11 territory (unchanged from §5.2).
 
-The **19 test files are an explicitly optional second pass**, owned by phase 11 (test coverage).
-**Reason:** the source plan's own §5.2 assigns test-file concerns to phase 11 and forbids phase 03
-from expanding them; note 3 of the block already ranks production above test; and rewriting
-comments in files that **twelve other phases are writing against in parallel** is the block's
-largest process risk. If the coordinator wants the full sweep, the second pass runs as a
-**separate commit** within the same block.
+**Corrected corpus — 6 production files / 18 citations, not 8 / 68.** Re-derived by the Auditor
+at `64a9de6` with the mechanical gate `(?<!03-)\bDB-[0-9]{3}\b` over `src/**` excluding `tests/`
+and `migrations/`:
 
-**Decision gate — Q14, second half (coordinator).** Option table in the source plan §3.11.1
-(A prefix-only — rejected; B prefix sweep — risky where the audit history is missing; C
-descriptive replacement — the plan's recommendation). **Default if unanswerable: the block is
-DE-SCOPED and the de-scope is recorded** (§3.1). Under **any** option, the **three production
-citations this cycle already polluted are non-negotiable** — `advisory_lock.py`'s `DB-004` and
-`DB-010` (handled by BLOCK 2) and `send_alerts.py`'s `DB-007`. On a de-scope, `send_alerts.py`
-is handed to the coordinator.
+| # | Production file | Bare `DB-0\d\d` | In this cycle's commit series? |
+|---|---|---|---|
+| 1 | `src/backend/apps/ads/services/submission.py` | 1 | yes (`35441e0`, `ead3bc9`, `ba1b059`, `64a9de6`) |
+| 2 | `src/backend/apps/ads/views/edit.py` | 2 | yes (`42d0edd`, `bb034e9`) |
+| 3 | `src/backend/apps/ads/models.py` | 1 | yes (`2697796`) |
+| 4 | `src/backend/apps/core/utils/advisory_lock.py` | 3 | yes (`7c7a27e`, BLOCK 2) |
+| 5 | `src/backend/apps/moderation/admin_actions.py` | 7 | yes (`42d0edd`) |
+| 6 | `src/backend/apps/moderation/services/moderation_log.py` | 4 | **NO — untouched legacy**, last touched `83c7f70` (phase 05) |
+| | **Total** | **18** | 5 of 6 in-series |
+
+**Why the source plan's corpus was wrong in both directions.** The plan's "8 production files"
+included `archive_sweep.py`, `send_alerts.py` and `ad_data/orm.py` — all three are **already
+clean** at HEAD (every `DB-*` citation there is `03-DB-00N`-scoped: BLOCK 2 normalised
+`advisory_lock.py`'s `DB-010`, BLOCK 9 `7245f48` normalised all three `send_alerts.py`
+citations to `03-DB-007`, and `orm.py` never had a citation, per `D-6`). Conversely the plan's
+"68 citations across 26 files" is **not reproducible at HEAD**: repo-wide the same gate returns
+**68 matches across 25 files**, of which **18 are production** and **50 are test files**. The
+`26`-file figure is not re-derivable and is treated as **superseded, not corrected**.
+
+**Classification (Auditor-verified; all 18 comments are FACTUALLY CORRECT today).**
+
+| Class | Count | Disposition |
+|---|---|---|
+| **(a)** this cycle's own `DB-004`, written bare by `42d0edd` (plus `advisory_lock.py`'s already words-qualified `phase 03 DB-004`, which needs only the hyphen) | **5** | → **`03-DB-004`** |
+| **(b)** pre-phase-03 origins (`214a988`, `1d7aa1c`, `324d50b`, `ef319ad`, `AUT-003..010`) | **13** | → **descriptive text** |
+| **(c)** already unambiguous | **0** | — |
+
+**Class (b) cycle numbers are NOT inferred.** `.ai/audit/**` records are deleted from the working
+tree (19 tracked deletions), and the pre-`03-DB-*` origin commits carry **bare `DB-00N` in their
+own subjects** — so `git blame` yields the commit but not the cycle. A confident-but-wrong
+attribution is worse than today's honest ambiguity, so the descriptions stand alone instead.
+
+**Class-(c) premise DISPROVED — no finding id in this repo carries a phase prefix.** The brief's
+hypothesis that `PII-002`, `CF-003`, `ENT-006` were already phase-qualified is **false**. A
+census of every non-`DB-` finding-id citation in production source found **no** bare `PII-`,
+`CF-`/`CFG-`, `ENT-`, `AUT-`, `ME-`/`MED-`, `SRH-`, `CAB-`, `FT-`, `AL-`, `EXT-`, `FQ-`, `AD-`,
+`VAL-`, `OPS-`, `I18N-`, `PERF-`, `AUTHZ-`, `QLT-`-cited id that is phase-prefixed. Two
+words-qualified exceptions exist, neither in that list: `alert_query.py`'s `(PII-104, phase 06)`
+and `login_token.py`'s `` ``AUT-007`` (phase 04, VAL-002) ``.
+
+**Scope ruling — the gate STAYS at `DB-0\d\d`, production files only.** The wider
+unqualified-citation census is **~110 citations across ~61 production files**, because the
+class-(c) disproof above generalises: *every* legacy finding id in this repo is bare.
+Sweeping ~61 files would be **scope creep across other phases' active work** with real drift
+risk — it collides head-on with phase 07 BLOCK 8 (`ME-003`) and phase 06, both already scoped.
+**The gate is not widened.** The remaining **~92** non-`DB-0\d\d` unqualified citations are
+**routed out to the final report**; the test-file `DB-0\d\d` citations (**50**, out of scope
+under §5.2) are routed to **phase 11**. This routing is recorded **in the commit message** as
+well as here, so the next reader cannot assume the sweep was complete.
+
+**Convention documentation — three plans, one convention, no source of truth (now closed).**
+The `NN-<PREFIX>-00N` rule lived **only** in phase 03's plan: not in `AGENTS.md`, not in
+`.kilo/rules/project.md` or `commands.md`, not in any `docs/99-agent/` file — while phase 06
+(`06-PII-1xx`) and phase 07 (`07-MEDIA-0NN`) each restated it locally. BLOCK 11 therefore ships
+**one** documentation addition: a short *"Finding-id citations"* subsection in
+`docs/99-agent/rules.md`, a **living** convention doc (`id: rules`). The four dated artefacts in
+`docs/99-agent/` (`test-audit-*.md`, no frontmatter) hold historical citations, are point-in-time
+reports of a finished audit, and are **out of scope and must not be edited**; the four living
+docs carry no finding-id citation, so nothing stale needs reconciling there.
+
+**Not established, deliberately:** the origin of the plan's `26`-file figure; the cycle number
+for any class-(b) citation. Neither is needed under Option C.
 
 **Already decided and not up for renegotiation:** this plan and every phase from 04 onwards keys
 its tracker on **`NN-<PREFIX>-00N`**; the precedent is shipped
@@ -3219,139 +4465,377 @@ its tracker on **`NN-<PREFIX>-00N`**; the precedent is shipped
 BLOCK 1–10 uses `03-DB-00N`; BLOCK 11 does **not** touch a file it has no other business
 touching.
 
-**Agent briefs (paste-ready).**
+**Agent briefs (paste-ready).** All four remaining roles; **no Researcher** — its premise died
+with Option C.
 
-> **Auditor.** *Goal:* re-derive the ambiguous-citation set at `ba23277` and establish which
-> cycle each legacy ID belongs to. *Hard constraints:* change no code; **never infer a cycle
-> number** — `git blame` / the audit history is the only evidence, and if it cannot be
-> established the descriptive form is the correct fallback because it needs no attribution;
-> `src/telegram_bot/services/ad_data/orm.py` has **zero** citations and is **not** a target
-> (**D-6**). *Must return:* the exact inventory — 68 matches / **27** files, **8 production**
-> / **19 test** (**D-7**) — plus, for each production file, the cycle attribution with its
-> evidence, or an explicit "cannot be established".
-
-> **Researcher.** *Goal:* answer Q14's conventions question — what is the maintainable way to
-> cross-reference an ephemeral, per-cycle identifier in code comments so the reference is
-> unambiguous, durable, and does not require archaeology to resolve. *Hard constraints:* a
-> description cannot become ambiguous when a new cycle reuses an id; the repository already
-> contains one shipped precedent (`03-DB-002` in `src/telegram_bot/tests/test_unsubscribe.py`).
-> *Must return:* the recommended citation form, its durability argument, and how it interacts
-> with the `NN-<PREFIX>-00N` convention phases 04–15 are adopting in parallel.
+> **Auditor.** *Goal:* re-derive the ambiguous-citation set at `64a9de6` with the mechanical gate
+> `(?<!03-)\bDB-[0-9]{3}\b`, and separate what is *resolvable* from what is not.
+> *Hard constraints:* change no code; **never infer a cycle number** — the audit records are
+> deleted and the pre-`03-DB-*` commits carry bare ids in their own subjects, so attribution is
+> unresolvable by construction. *Must return:* the exact inventory (6 production files / 18
+> citations), the class-(a)/(b) split with origin commits as evidence, an explicit
+> "cannot be established" for every class-(b) id, and a factual-correctness check of all 18
+> comments against current code. **Returned:** `.ai/tmp/block11-context-a.md` — 6/18 confirmed,
+> 5/13/0 split, all 18 factually correct, plus the class-(c) disproof and the wider census.
 
 > **Planner.** *Goal:* specify the rewrite so it is safe against twelve phases writing in
-> parallel. *Hard constraints:* **no test's name and no assertion may change**; production files
-> before test files; files another phase is editing concurrently must be **re-read immediately
-> before editing** and staged by explicit path; if the block is de-scoped, the three
-> non-negotiable production citations are still handled. *Must return:* the ordered file list,
-> the per-file rewrite plan, and the split between the mandatory production pass and the optional
-> test pass.
+> parallel, and so the citation convention acquires the single source of truth it lacks.
+> *Hard constraints:* comments and docs in **English**; **no executable code change at all**;
+> **no test file touched**; no dated artefact under `docs/99-agent/` touched;
+> `src/backend/conftest.py` untouched; **no task target may be a line number**; no new dependency;
+> the commit touches only the 6 production files plus `docs/99-agent/rules.md`. *Must return:*
+> the ordered file sequence, the per-site rewrite plan, the documentation addition, the
+> mechanical acceptance gate, and the commit-message requirements recording the out-of-scope
+> routing.
 
 > **Validator.** *Goal:* judge whether a future reader is misled — a judgement about reviewer
-> experience that inspection cannot confirm. *Hard constraints:* change no code. *Must return:*
-> the re-derivation sweep showing zero remaining in-scope ambiguous citations, confirmation that
-> no assertion moved, and an explicit statement of what was left undone if de-scoped.
+> experience that inspection cannot confirm. *Hard constraints:* change no code.
+> *Must return:* the mechanical sweep proving zero bare `DB-0\d\d` in production `src/`, the
+> `03-DB-004` presence check at its 5 anchors, confirmation that no executable line moved, and an
+> explicit statement of what was left undone and why (the ~92 routed-out citations, the 50
+> test-file citations).
+
+> **Implementor.** *Goal:* rewrite 18 citations across 6 files, plus one documentation subsection.
+> *Hard constraints:* each comment's **technical claim is preserved verbatim** — only the citation
+> is touched; comments must remain useful **without** any id lookup; no test name and no assertion
+> may change; no line number may be used as a target — locate every site by symbol
+> (`submit_ad`, `ad_edit`, `Ad.transition_to`, `advisory_lock`, `bulk_approve`, `bulk_reject`,
+> `bulk_delete`, `set_moderation_failed`, `set_rejected`, `set_published`); re-read each file
+> immediately before editing; stage explicit paths.
 
 **Implementor task.**
 
 ```yaml
 id: task_03_b11_finding_id_disambiguation
-title: Disambiguate finding-id cross-references in production comments and docstrings
+title: Replace ambiguous DB-00N comment citations (Option C) and document the citation convention
 priority: medium
 depends_on: []
 source_reference: .ai/plans/03-db-concurrency-remediation.md
 source_section: "BLOCK 11 — Finding-ID namespace disambiguation (VAL-001)"
 extra_context: |
-  THIS BLOCK IS GATED ON A COORDINATOR DECISION (Q14 second half). DEFAULT IF UNANSWERABLE:
-  the block is DE-SCOPED and the de-scope is recorded. Under ANY option, the three production
-  citations this cycle already polluted must be disambiguated:
-  advisory_lock.py (DB-004 and DB-010 — two of these are handled inside BLOCK 2) and
-  send_alerts.py (phase 03 DB-007 — handed to the coordinator if the block is de-scoped).
-  ASSERTIONS ARE IMMUTABLE — comment and docstring text only, never a test name, never an
-  assertion. Do not "helpfully" rename tests.
-  NEVER INFER A CYCLE NUMBER. git blame / the audit history is the only evidence; where it
-  cannot be established, use the descriptive form, which needs no attribution. A confident-but-
-  wrong attribution is arguably worse than today's honest ambiguity.
-  SCOPE (execution plan 13 §1.3 N-5): the DEFAULT scope is the 8 PRODUCTION files. The 19 test
-  files are an OPTIONAL second pass, owned by phase 11, and run as a SEPARATE COMMIT if
-  scheduled at all.
-  CORRECTED INVENTORY (D-6, D-7): 68 citations across 27 files, NOT 26.
-  src/telegram_bot/services/ad_data/orm.py has ZERO citations and is NOT a target.
-  Files another phase is editing concurrently must be re-read immediately before editing and
-  staged by explicit path — never `git add -A` (the tree carries 19 tracked .ai/audit/**
-  deletions and 5 dirty docs, N-1).
+  OPTION C IS DECIDED (Q14 second half, CLOSED). No gate remains open.
+  Pure traceability change: ALL 18 comments are factually correct at HEAD 64a9de6 (Auditor
+  verified each against current code). DO NOT rewrite any technical claim — only the citation.
+  SCOPE IS THE GATE `(?<!03-)\bDB-[0-9]{3}\b` OVER PRODUCTION src/ ONLY. 6 files / 18 citations.
+  Test files are OUT OF SCOPE (phase 11). Never infer a cycle number for the 13 class-(b)
+  citations: the audit records are deleted and the origin commits carry bare ids in their own
+  subjects, so the cycle is unresolvable BY CONSTRUCTION. Describe the invariant instead.
+  The 6 files/18 citations supersede the source plan's "8 files / 68 citations across 26
+  files", which is unreproducible at HEAD (actual: 68 matches across 25 files, 18 production).
+  Do not widen the gate to the ~92 non-DB unqualified citations: routed out to the final report.
+  Re-read each file immediately before editing (5 of 6 are in this cycle's commit series) and
+  stage EXPLICIT paths — never `git add .`, never `git add -A`.
 
 description: >
-  Bare DB-00N ids are used for previous cycles' defects across 27 shipped files, while this
-  cycle's DB-004, DB-007 and DB-010 are cited naming-collision-identically. advisory_lock.py
-  cites both a previous cycle's DB-010 and this cycle's DB-004 three lines apart, beside a
-  previous cycle's DB-007. Apply the chosen disambiguation so a future reader is not misled,
-  and so the NN-DB-00N convention is unambiguous going forward.
+  Bare DB-00N ids from previous cycles are shipped in 6 production files, and this cycle's own
+  DB-004 was written bare in 3 of them — so advisory_lock.py and admin_actions.py cite a
+  previous cycle's id and this cycle's id naming-collision-identically, three lines apart.
+  Replace each unresolvable bare citation with a short self-contained description of the
+  invariant the comment defends, and phase-scope the five that are this cycle's own. Ship the
+  citation convention once, in docs/99-agent/rules.md, where no reader will miss it.
 
 goals:
-  - disambiguate every in-scope citation without asserting a cycle number that cannot be evidenced
-  - reserve the NN-DB-00N form for the current remediation cycle
-  - touch production files before test files
-  - change no behaviour, no test name and no assertion
+  - make every in-scope comment useful WITHOUT an id lookup
+  - phase-scope the 5 citations that are this cycle's own DB-004 → 03-DB-004
+  - add exactly one documentation subsection establishing NN-<PREFIX>-00N as the citation form
+  - change no executable line, no test file, no test name, no assertion
 
 files:
-  - path: src/backend/apps/core/utils/advisory_lock.py            # production, first
-    targets: [{ type: function, name: advisory_lock }, { type: module, name: advisory_lock }]
-    semantic_anchors: {}
+  - path: src/backend/apps/core/utils/advisory_lock.py
+    targets:
+      - { type: module, name: advisory_lock }
+      - { type: function, name: advisory_lock }
+    semantic_anchors:
+      autocommit_assert_comment: "to prevent the autocommit-release bug (DB-001)"
+      reserved_id_comment: "was removed in DB-007. IDs 14-99 are reserved"
+      timeout_ownership_comment: "phase 03 DB-004 owns any timeout wording"
   - path: src/backend/apps/moderation/admin_actions.py
-    targets: [{ type: class, name: ModerationAdminActions }, { type: module, name: admin_actions }]
-    semantic_anchors: {}
-  - path: src/backend/apps/moderation/services/moderation_log.py
-    targets: [{ type: module, name: moderation_log }]
-    semantic_anchors: {}
-  - path: src/backend/apps/ads/services/submission.py
-    targets: [{ type: function, name: submit_ad }]
-    semantic_anchors: {}
+    targets:
+      - { type: function, name: bulk_approve }
+      - { type: function, name: bulk_reject }
+      - { type: function, name: bulk_delete }
+    semantic_anchors:
+      lock_row_comments: "# DB-003: lock Ad rows through every transition"
+      max_ads_comment: "MaxAdsExceeded (DB-002)"
+      bulk_approve_timeout_comment: "# DB-004: the locking SELECT ... FOR UPDATE precedes"
+      bulk_reject_timeout_comment: "# DB-004: fail the bulk with nothing committed rather than hanging."
+      bulk_delete_timeout_comment: "# DB-004: fail the bulk with nothing committed rather than hanging."
   - path: src/backend/apps/ads/views/edit.py
     targets: [{ type: function, name: ad_edit }]
-    semantic_anchors: {}
+    semantic_anchors:
+      row_lock_comment: "# DB-003: re-fetch the Ad under a row lock"
+      timeout_boundary_comment: "# DB-004: a lock timeout aborts the transaction"
+  - path: src/backend/apps/ads/services/submission.py
+    targets: [{ type: function, name: submit_ad }]
+    semantic_anchors:
+      auto_moderate_scope_comment: "# DB-001: auto_moderate is inside the outer atomic()"
   - path: src/backend/apps/ads/models.py
     targets: [{ type: class, name: Ad }]
-    semantic_anchors: {}
-  - path: src/backend/apps/core/management/commands/archive_sweep.py
-    targets: [{ type: function, name: Command.handle }]
-    semantic_anchors: {}
-  - path: src/backend/apps/search/management/commands/send_alerts.py
-    targets: [{ type: class, name: Command }]
-    semantic_anchors: {}
-  # OPTIONAL SECOND PASS, SEPARATE COMMIT, phase-11 territory: the 19 test files.
-  # NOT a target: src/telegram_bot/services/ad_data/orm.py (zero citations, D-6).
+    semantic_anchors:
+      transition_to_refresh_comment: "# DB-003: re-read from DB to defeat stale-state races"
+  - path: src/backend/apps/moderation/services/moderation_log.py
+    targets:
+      - { type: function, name: set_moderation_failed }
+      - { type: function, name: set_rejected }
+      - { type: function, name: set_published }
+    semantic_anchors:
+      atomic_docstrings: "... are committed or rolled back together (DB-002)."
+      toctou_comment: "closing the TOCTOU race on max_ads_per_user (DB-002)."
+  - path: docs/99-agent/rules.md
+    targets: [{ type: module, name: rules }]
+    semantic_anchors:
+      new_subsection: "### Finding-id citations — added under the existing `## Rules` heading, next to `### Coding Standards`"
+
+implementation_sequence:
+  - step: 1
+    action: >
+      Re-derive the corpus mechanically and record the numbers in the task report:
+      PowerShell `Get-ChildItem src -Recurse -Include *.py | Select-String -Pattern '(?<!03-)\bDB-[0-9]{3}\b'`
+      → expect 68 matches / 25 files, of which 18 in the 6 production files
+      (submission 1, edit 2, models 1, advisory_lock 3, admin_actions 7, moderation_log 4).
+      If the production count is not 18, STOP and report — the tree moved under another phase.
+  - step: 2
+    action: >
+      src/backend/apps/core/utils/advisory_lock.py. Module docstring ×2 + `advisory_lock()` body.
+      `(DB-001)` → drop the id, keep the sentence's invariant. `removed in DB-007` → state that
+      the member was deleted. `phase 03 DB-004` → `03-DB-004`. Do NOT touch the `Atomic.__enter__`
+      or `enums.py`. Do NOT add a `AdvisoryLockId` member — BLOCK 2 owns that file's logic.
+  - step: 3
+    action: >
+      src/backend/apps/moderation/admin_actions.py — the densest file (7 sites).
+      The three `with transaction.atomic():` lines carry a `# pyright: ignore[...]` comment that
+      MUST be preserved byte-for-byte including its reason text; only the appended `DB-003: lock Ad
+      rows through every transition` fragment is touched, and it stays an inline comment.
+      `MaxAdsExceeded (DB-002)` → drop the parenthetical. The three `DB-004` sites become `03-DB-004`.
+  - step: 4
+    action: >
+      src/backend/apps/ads/views/edit.py — `ad_edit`, the two adjacent comments. `DB-003` → drop
+      the id; `DB-004` → `03-DB-004`. The `try:` that opens the timeout boundary must keep its
+      exact position relative to the comments.
+  - step: 5
+    action: >
+      src/backend/apps/ads/services/submission.py — `submit_ad`, the `# DB-001:` prefix drops.
+      The comment's five-line technical claim (outer atomic → savepoints → full rollback → ad stays
+      DRAFT) is preserved word for word.
+  - step: 6
+    action: >
+      src/backend/apps/ads/models.py — `Ad.transition_to`, the `# DB-003:` prefix drops.
+      Do NOT touch the two bare `AD-001` citations in the same file — phase 05, out of scope.
+  - step: 7
+    action: >
+      src/backend/apps/moderation/services/moderation_log.py — the only untouched-legacy file
+      (last modified by phase 05's 83c7f70), so it carries the highest drift risk: re-read it
+      completely before editing. Three identical docstring sentences drop `(DB-002)`; the
+      `set_published` inline comment drops it too. Do NOT touch the two bare `AD-002` citations.
+  - step: 8
+    action: >
+      docs/99-agent/rules.md — add the "Finding-id citations" subsection (see
+      documentation_deliverable). One addition under `## Rules`; nothing else in the file changes.
+  - step: 9
+    action: >
+      Run the gates in gate_commands SEQUENTIALLY and in the FOREGROUND. Then re-run the step-1
+      census and confirm 0 production matches, 50 test-file matches unchanged, and `03-DB-004`
+      present at all 5 class-(a) anchors.
 
 changes:
   - action: edit_comment
-    description: >
-      Option C (recommended): replace opaque ids with a description of the defect, or name the
-      symbol and the test that guard the fix. Option B: prefix with the cycle, ONLY where
-      attribution is evidenced by the audit history — never inferred.
+    detail: >
+      13 class-(b) sites: DELETE the ephemeral id, keep the sentence so it still explains the
+      invariant on its own. Deleting only the id token is correct — do not paraphrase the claim.
+  - action: edit_comment
+    detail: >
+      5 class-(a) sites: `DB-004` → `03-DB-004`. In advisory_lock.py the text is already
+      words-qualified (`phase 03 DB-004`) — normalise it to the hyphenated form only.
   - action: edit_docstring
-    description: >
-      Production-file docstrings first. Test-file docstrings may be rewritten in the optional
-      second pass; TEST NAMES AND ASSERTIONS MAY NOT, ever. Files another phase is editing
-      concurrently must be re-read immediately before editing and staged by explicit path.
+    detail: >
+      advisory_lock.py's module docstring ×2 and moderation_log.py's three docstrings. Docstring
+      prose is preserved; only the citation token is removed or phase-scoped.
+  - action: add_documentation
+    detail: >
+      One "Finding-id citations" subsection in docs/99-agent/rules.md. This is the ONLY
+      documentation change in the block.
+
+documentation_deliverable:
+  file: docs/99-agent/rules.md
+  where: >
+    A `### Finding-id citations` subsection inside the existing `## Rules` section, immediately
+    after `### Coding Standards`. It is a living convention doc (frontmatter `id: rules`), the
+    only correct home for a convention.
+  must_state:
+    - >
+      The citation format is `NN-<PREFIX>-00N` — a two-digit phase, a hyphen, the finding
+      prefix, a hyphen, the finding number. Example: `03-DB-004`.
+    - >
+      A citation MUST carry its phase prefix. A bare `DB-004` / `PII-001` / `AD-002` is
+      ambiguous because ids are reissued every cycle and the audit records that resolved the old
+      ones are deleted.
+    - >
+      A comment that defends a past fix should be SELF-CONTAINED: describe the invariant, or name
+      the guarding symbol or test, so it is useful without an id lookup.
+    - >
+      Where a cross-phase reference is genuinely needed, name the phase in words
+      ("the phase-06 `PII-104` predicate").
+    - >
+      English only.
+  must_not:
+    - >
+      Do NOT edit the dated artefacts in docs/99-agent/ (`test-audit-master-report.md`,
+      `test-audit-block-f-findings.md`, `test-audit-implementation-plan.md`,
+      `llm-tasks/seed-content-generation.md`). They are point-in-time reports of a finished
+      audit and are allowed to name symbols that have since moved. Rewriting history in a dated
+      report is wrong.
+    - >
+      Do NOT add finding-id citations of your own to the new subsection — it states the rule, it
+      does not become a citation site.
+    - >
+      Do NOT edit AGENTS.md, .kilo/rules/project.md or .kilo/rules/commands.md. rules.md is the
+      single source of truth; restating it elsewhere recreates the three-plans-one-convention
+      failure this block closes.
+
+commit_message_requirements:
+  - >
+    State that this is **Option C (descriptive replacement)** under the coordinator's scope
+    ruling, so the choice is discoverable from history.
+  - >
+    State that the **5 `DB-004` citations became phase-scoped (`03-DB-004`) because they are
+    this cycle's own finding**, written bare by 42d0edd.
+  - >
+    State that the **13 pre-phase-03 citations were DESCRIBED, not re-numbered, because the
+    audit records are deleted and inferring a cycle would fabricate provenance.**
+  - >
+    Record the OUT-OF-SCOPE ROUTING explicitly: the ~92 non-`DB-0\d\d` unqualified finding-id
+    citations elsewhere in the repo were deliberately NOT swept (sweeping ~61 files would be
+    scope creep across other phases' active work, colliding with phase 06 and phase 07 BLOCK 8)
+    and are routed to the final report; the 50 test-file `DB-0\d\d` citations are routed to
+    phase 11. Without this sentence the next reader assumes the sweep was complete.
+  - >
+    Record that the 6 production files + docs/99-agent/rules.md are the entire commit surface,
+    and that no executable line changed.
+  - >
+    No secrets, no `print()`, English only.
+
+gate_commands:
+  census_before: |
+    PowerShell (rg is unavailable; head/tail do not work):
+      Get-ChildItem -Path src -Recurse -Include *.py |
+        Select-String -Pattern '(?<!03-)\bDB-[0-9]{3}\b' |
+        Group-Object Path | ForEach-Object { "$($_.Count)  $($_.Name)" }
+  lint_and_types:
+    - uv run ruff check src/
+    - uv run basedpyright src/
+  tests: |
+    .\.Makefile.ps1 test
+  docker_only_note: |
+    `uv run pytest` locally ALWAYS FAILS — there is no DB on localhost:5432. Tests run through
+    the test service of the mko-bazuna-test Compose project:
+      $dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'
+      $dc run --rm --env PYTEST_SKIP_MARKERS=seed test
+    Run suites SEQUENTIALLY and in the FOREGROUND — never two at once.
+
+test_environment: |
+  Windows 11 · PowerShell · `uv` · PostgreSQL 18 in Docker (mko-bazuna-test, host port 5433).
+  DOCKER ONLY for tests; never `uv run pytest` locally.
+  - `PYTEST_OPTS` is UNQUOTED in docker/entrypoint-test.sh and word-splits on spaces; setting it
+    REPLACES the defaults (`--reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist
+    loadgroup`); bare file paths and `-k name` work, quoted multi-token values do not.
+  - NEVER `--override-ini=addopts=` — it strips `--import-mode=importlib`.
+  - `docker compose run` can abort with `dependency failed to start: ... is unhealthy` BEFORE
+    pytest runs; wait ~45 s and retry. A concurrent `--create-db` recreates the shared DB
+    mid-flight and produces spurious failures — never run one in parallel.
+  - Known pre-existing flakiness, NOT to be fixed: `django_db(transaction=True)` teardown is a
+    full-table flush — `ExchangeRateNotFoundError`, `test_bulk_delete_skips_hard_deleted_row`
+    seeing leftover `Ad` rows, `test_mko_bazuna is being accessed by other users`.
+  - The full suite is expected to show EXACTLY ONE failure:
+    `test_search_slo.py::...::test_search_at_seed_volume_meets_slo`. Any other failure is a
+    regression introduced here.
+  - `head`/`tail` do not work in PowerShell; `rg` is unavailable — use Select-String.
+  - The tree is dirty by design and other phases commit concurrently: never `git reset`,
+    `git checkout`, `git stash`, `git clean`, `git add -A`, `git add .`, or `git commit -a`.
+    Stage EXPLICIT paths. Watch for CRLF damage in the diff.
+
+verification:
+  - step: "Mechanical sweep (the gate that matters)"
+    command: |
+      Get-ChildItem -Path src -Recurse -Include *.py |
+        Where-Object { $_.FullName -notmatch '\\tests\\' } |
+        Select-String -Pattern '(?<!03-)\bDB-[0-9]{3}\b'
+    expect: "ZERO matches"
+  - step: "Class-(a) presence"
+    command: |
+      Select-String -Path src/backend/apps/core/utils/advisory_lock.py,
+                         src/backend/apps/ads/views/edit.py,
+                         src/backend/apps/moderation/admin_actions.py `
+                   -Pattern '03-DB-004'
+    expect: "5 comment sites: advisory_lock (1), edit (1), admin_actions (3)"
+  - step: "No executable line moved"
+    command: git diff --stat <base> -- src/backend/apps
+    expect: >
+      Only comment/docstring lines changed. Prove it by inspecting the diff: every changed line
+      must begin with `#`, be inside a docstring, or be an inline-comment fragment. A changed
+      statement line is a defect, not a style question.
+  - step: "Commit surface"
+    command: git show --stat HEAD
+    expect: "Exactly 7 paths: the 6 production files + docs/99-agent/rules.md. Nothing else."
+  - step: "Lint and types"
+    command: "uv run ruff check src/ ; uv run basedpyright src/"
+    expect: "ruff: All checks passed. basedpyright: 0 errors, 0 warnings, 0 notes."
+  - step: "Suite (Docker, sequential, foreground)"
+    command: .\.Makefile.ps1 test
+    expect: >
+      No new failure. The fast gate skips the `seed` suite; if the `test_search_slo.py` SLO
+      failure appears in the fast gate it is the known one and is acceptable.
 
 acceptance_criteria:
-  - zero remaining ambiguous citations among the production files this block was scoped to cover
-  - the three this-cycle production citations are disambiguated under any option, or the
-    de-scope explicitly hands send_alerts.py to the coordinator
-  - no test name and no assertion was changed (the full suite proves it)
-  - no behaviour changed: `.\Makefile.ps1 test` green, ruff and basedpyright green
-  - no file was clobbered from a concurrent phase's uncommitted edit
-  - no new AdvisoryLockId member and no change to advisory_lock's semantics — BLOCK 2 owns that
-    file's logic and its allocation table
+  - >
+    MECHANICAL GATE: `(?<!03-)\bDB-[0-9]{3}\b` returns ZERO matches across PRODUCTION `src/`
+    (all `*.py` excluding any path containing `tests\`, and excluding `migrations\`).
+    Rationale for the scoping: 50 bare `DB-0\d\d` citations live in test files, which this block
+    must not touch, so a literal repo-wide zero would be unsatisfiable without violating scope.
+    Those 50 are routed to phase 11 and the Implementor must report the post-change test-file
+    count as UNCHANGED at 50.
+  - >
+    `03-DB-004` is present at all 5 class-(a) sites: `advisory_lock.advisory_lock`, `ad_edit`,
+    `bulk_approve`, `bulk_reject`, `bulk_delete`.
+  - >
+    Every rewritten comment remains self-contained — a reader who has never seen the id can
+    still understand why the line exists, and no comment now dangles on a reference that no
+    longer resolves.
+  - >
+    Each comment's TECHNICAL CLAIM is preserved verbatim; only the citation token was removed
+    or phase-scoped. The Auditor re-verified all 18 claims at HEAD — do not "improve" them.
+  - >
+    NO EXECUTABLE CODE CHANGED: `git diff --stat` shows no changed line outside a comment or
+    docstring. This is the block's defining constraint.
+  - >
+    No test file edited. No test name and no assertion changed. No `AdvisoryLockId` member added
+    (BLOCK 2 owns advisory_lock's logic and its allocation table). No `src/backend/conftest.py`
+    edit. No dated artefact under `docs/99-agent/` edited.
+  - >
+    `docs/99-agent/rules.md` gained exactly one `### Finding-id citations` subsection; the rest
+    of that file is untouched.
+  - >
+    `uv run ruff check src/` and `uv run basedpyright src/` stay green. A comment change cannot
+    break them — the proof is required, not assumed.
+  - >
+    The Docker suite shows no new failure (the known `test_search_slo.py` SLO test is the only
+    tolerated one).
+  - >
+    The commit message records all four facts in `commit_message_requirements`, including the
+    out-of-scope routing of the ~92 non-`DB` citations.
+  - >
+    Exactly one commit for the block, touching no more than the 6 production files plus
+    `docs/99-agent/rules.md`.
 ```
 
 **Tests required.**
 
 - *Must be added:* **none.** A comment-only block cannot have a behavioural test, and writing one
-  would be testing trivia.
+  would be testing trivia. The mechanical census in `verification` is the substitute, and it is
+  strictly stronger than a test.
 - *Must be changed:* **none.** No test name and no assertion may change.
 - *Must keep passing unchanged:* the **entire** suite.
 
-**Exact gate command (Docker only).**
+**Exact gate commands (Docker only).**
 
 ```powershell
 .\Makefile.ps1 test
@@ -3363,13 +4847,19 @@ uv run basedpyright src/
 
 - *Risk:* rewriting a comment in a file **another phase is editing right now**, causing a
   conflict or a clobbered edit. Re-read each file immediately before editing; stage explicit paths.
-- *Risk:* attributing the wrong cycle (Option B) — confidently-wrong is worse than ambiguous.
-  Prefer the descriptive form wherever attribution is uncertain.
-- *Risk:* an Implementor renames tests or touches assertions "while in there". **Explicitly
-  forbidden.**
-- *Risk:* the block is treated as cosmetic and de-scoped, leaving three production citations
-  ambiguous. **Those three are non-negotiable.**
-- *Rollback:* comment-only; fully reversible.
+- *Risk:* **fabricating a cycle number** for one of the 13 class-(b) citations. Confidently-wrong
+  is worse than ambiguous — the audit records are deleted and inference would invent provenance.
+  Description is the required form.
+- *Risk:* **widening the gate** to the ~92 non-`DB` citations across ~61 files. That is scope
+  creep across other phases' active work (phase 06, phase 07 BLOCK 8) with real drift risk.
+- *Risk:* an Implementor "helpfully" touches the nearby bare `AD-001` / `AD-002` / `ME-003`
+  citations, or renames a test, or edits a dated audit artefact "while in there".
+  **Explicitly forbidden.**
+- *Risk:* a mechanical sweep reads as complete when it is partial. The commit-message routing
+  sentence is the mitigation and is mandatory.
+- *Risk:* the stale `advisory_lock.py` reserved-id sentence (`IDs 14-99`) — BLOCK 2 already
+  updated it and it is consistent with `enums.py` (`REPAIR_BOT_USERNAME = 13`). **No action.**
+- *Rollback:* comment- and doc-only; fully reversible with a single `git revert`.
 
 ---
 
@@ -3391,16 +4881,27 @@ message.
 | **Q6** | Does staging need protecting, and must `_STAGING_TTL_SECONDS` be re-derived? | BLOCK 6 | Researcher | **Must be closed inside BLOCK 6 before implementation.** One of the three stated answers is legitimate — including "a seller who abandons a dialog for N hours loses their photo, and that is acceptable and must be documented". |
 | **Q7** | **Where does the final media move happen relative to the transaction boundary?** | BLOCK 8 | Researcher + Planner | **Must be closed inside BLOCK 8 before implementation.** The single largest design question in the phase. Phase 01 explicitly deferred it; nothing in the tree pre-empts it. |
 | **Q8** | Is the cheaper re-check-before-unlink variant actually safe? | BLOCK 8 | Researcher + Planner | **Bundled into BLOCK 8's gate.** It narrows but does not close the window, and costs a transaction per candidate orphan inside a lock already held for the whole `os.walk`. |
-| **Q9** | Does the shared advisory lock close the double-send, or is `find_matching_saved_searches`' missing `NOT EXISTS` the real hole? | BLOCK 9 | Researcher + Planner | **Must be closed inside BLOCK 9 before implementation.** **Adding the lock alone is provably insufficient.** A block shipping only Option A must record in its commit message that the concurrency path is unproven and that B remains required. |
-| **Q10** | The delivery-state column: which states, who writes them, when, and what is the backfill? | BLOCK 9 | Planner | **Must be closed inside BLOCK 9 before implementation** (only if Q9 chooses Option B). The **nullable column with `NULL` backfill** is already binding; `NOT NULL DEFAULT false` is forbidden. |
+| **Q9** | Does the shared advisory lock close the double-send, or is `find_matching_saved_searches`' missing `NOT EXISTS` the real hole? | BLOCK 9 | Researcher + Planner | **Must be closed inside BLOCK 9 before implementation.** **Adding the lock alone is provably insufficient.** A block shipping only Option A must record in its commit message that the concurrency path is unproven and that B remains required. **✔ CLOSED and unchanged by the 2026-10-03 decision round** — the re-publish decision is recorded as **coordinator-approved**, not a Product Owner ruling, and is left exactly as written |
+| **Q10** | The delivery-state column: which states, who writes them, when, and what is the backfill? | BLOCK 9 | Planner | **Must be closed inside BLOCK 9 before implementation** (only if Q9 chooses Option B). The **nullable column with `NULL` backfill** is already binding; `NOT NULL DEFAULT false` is forbidden. **✔ CLOSED and unchanged by the 2026-10-03 decision round** |
 | **Q11** | How is "lock held once across per-batch commits" achieved, given `pg_advisory_xact_lock` releases with the enclosing transaction? | BLOCK 7 | Researcher + Planner | **Must be closed inside BLOCK 7 before implementation.** Structurally unresolvable as written. Option C (timeout only) **does not fix the finding** and is not a substitute. |
-| **Q12** | Which product rule — "a new draft replaces the current one" or "a second draft is rejected"? | BLOCK 10 | **User / product, via coordinator** | **FIXED DEFAULT: Option A — "a new draft replaces the current one."** It matches shipped `create_draft_ad` behaviour and needs no new i18n. If defaulted, the commit message **must record that the choice was made by default, not by decision**. **Option C is FORBIDDEN.** |
+| **Q12** | Which product rule — "a new draft replaces the current one" or "a second draft is rejected"? | BLOCK 10 | **Product Owner** | **✅ RESOLVED 2026-10-03 — Option A, "a new draft replaces the current one", ruled by the Product Owner as a DECISION.** **The earlier FIXED DEFAULT is superseded: the same option is now a recorded product decision, and the commit message must state that it was taken *by decision*, not by default.** It still matches shipped `create_draft_ad` behaviour and needs no new i18n. **Option C remains FORBIDDEN.** BLOCK 10's gate is closed and the block no longer carries a decision to make |
 | **Q13** | `03-VAL-003`: `AD-005` vs `03-DB-001` severity | BLOCK 4 (advisory) | **Coordinator** | **DECIDED.** One work item, one severity: **MEDIUM**, shipped in BLOCK 4. The phase-05 re-rating is escalated, not silently decided. **Advisory — must not block the phase** (§3.2). |
 | **Q14** | Cross-cutting: how does this cycle key its IDs, and are the shipped comments disambiguated? | BLOCK 11 | **Coordinator** | **Tracker half DECIDED:** `NN-<PREFIX>-00N`, recorded for phases 04–15. **Source half: FIXED DEFAULT is a RECORDED DE-SCOPE.** BLOCK 11 does not run; the three production citations this cycle polluted remain non-negotiable — two are handled inside BLOCK 2, `send_alerts.py` is handed to the coordinator. |
 
 **Options NOT decided here, by instruction:** Q1, Q3, Q5, Q6, Q7, Q9, Q10, Q11 (technical,
-Researcher/Planner, inside their blocks), and Q2. Q12 and Q14 are surfaced with the source
-plan's fixed defaults stated explicitly, as above.
+Researcher/Planner, inside their blocks), and Q2.
+
+**Answered by the Product Owner on 2026-10-03:** `Q12` only. Its disposition column now reads
+`RESOLVED`, the option is unchanged (**A**), and the *character* of the answer changed — it is a
+**recorded product decision**, not a plan-stated default. No other question in this table changed,
+and none of Q1–Q11 or Q13–Q14 may be re-litigated.
+
+**One follow-up remains deferred, with a named owner:** the "an edited live ad should re-alert"
+product question and its **content-revision-epoch** recommendation (§2.9, BLOCK 9 notes 3 and 5).
+It is **still deferred** — the 2026-10-03 round did not reach it. **Owner: the coordinator /
+Product Owner**, carried as follow-up item (a) in BLOCK 9's acceptance criteria. The epoch remains
+a **content-revision column, never `Ad.published_at`** (`published_at` is reset by
+`ad_reactivate` too, so it would re-alert the content-neutral case).
 
 ### 3.2 Escalations routed **out** of phase 03 — both **advisory, must not block the phase**
 
@@ -3544,7 +5045,7 @@ Update **this table** as blocks land. Do not edit the source plan's §8.6 checkl
 | 7 | `task_03_b07_per_batch_commit` | `03-DB-008` | **All five** | **Q11** | BLOCK 5 | — | ☐ | ☐ | ☐ |
 | 8 | `task_03_b08_media_promotion_window` | `03-DB-005` | **All five** | **Q7, Q8** | BLOCK 6 | `media/0002_*` only if schema changes | ☐ | ☐ | ☐ |
 | 9 | `task_03_b09_immediate_alert_serialisation` | `03-DB-007` | **All five** | **Q9, Q10** | BLOCK 5, BLOCK 7 | `search/0003_*` (Option B) | ☐ | ☐ | ☐ |
-| 10 | `task_03_b10_single_draft_policy` | `03-DB-009` | Impl, Auditor, Planner, Validator | **Q12** (default **A**) | BLOCK 4 | — | ☐ | ☐ | ☐ |
+| 10 | `task_03_b10_single_draft_policy` | `03-DB-009` | Impl, Auditor, Planner, Validator | **`Q12` — RESOLVED 2026-10-03, Product Owner, Option A as a DECISION** (gate closed) | BLOCK 4 | — | ☐ | ☐ | ☐ |
 | 11 | `task_03_b11_finding_id_disambiguation` | `03-VAL-001` | **All five** | **Q14** | — | — | ☐ | ☐ | ☐ |
 
 ### 5.3 Definition of done — phase 03
@@ -3562,9 +5063,11 @@ Distilled from the source plan §8 and **corrected where the tree at `ba23277` p
       and source half **shipped or explicitly de-scoped**; `VAL-002` landed as the `3 → 5`
       ordering edge and was honoured; `VAL-003` escalated (§3.2); `VAL-004` routed to the
       final report (§3.2).
-- [ ] **Every gated block (3, 5, 6, 7, 8, 9, 10) has a written decision** naming the option
-      chosen and the consequences accepted. Silence is not an acceptable outcome. For Q12 the
-      record states whether A was **decided or defaulted**.
+- [ ] **Every gated block (3, 5, 6, 7, 8, 9) has a written decision** naming the option
+      chosen and the consequences accepted. Silence is not an acceptable outcome. BLOCK 10 is
+      listed in that sweep for history only: its gate `Q12` is **RESOLVED — 2026-10-03,
+      Product Owner, Option A taken as a DECISION**, and the commit body records that date and
+      that it was a decision, not a default.
 - [ ] `03-DB-006`'s rejection is restated so it is not silently re-filed by a later phase.
 
 **Gates — all green**
