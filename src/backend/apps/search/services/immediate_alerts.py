@@ -39,6 +39,7 @@ from django.utils.translation import gettext as _, override as translation_overr
 from apps.ads.models import Ad
 from apps.ads.templatetags.price_tags import format_price_value
 from apps.core.enums import AdStatus, LanguageLocale
+from apps.core.utils.sanitize import mask_telegram_id
 from apps.search.models import SavedSearch
 from apps.search.services.alert_query import (
     find_matching_saved_searches,
@@ -258,7 +259,7 @@ async def _send_payloads(bot_token: str, payloads: list[dict]) -> None:
                     # Permanent failures — dead-letter (no retry).
                     logger.warning(
                         "Permanent immediate alert failure to chat %s: %s",
-                        payload["chat_id"],
+                        mask_telegram_id(payload["chat_id"]),
                         exc,
                     )
                 except (
@@ -286,7 +287,7 @@ async def _send_payloads(bot_token: str, payloads: list[dict]) -> None:
                     except AiogramError as retry_exc:
                         logger.warning(
                             "Immediate alert retry failed to chat %s: %s",
-                            payload["chat_id"],
+                            mask_telegram_id(payload["chat_id"]),
                             retry_exc,
                         )
 

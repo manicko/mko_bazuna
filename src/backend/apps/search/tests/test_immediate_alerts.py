@@ -10,6 +10,7 @@ Covers:
 
 from __future__ import annotations
 
+import logging
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -19,6 +20,8 @@ from aiogram.exceptions import (
     TelegramRetryAfter,
     TelegramServerError,
 )
+
+from apps.core.utils.sanitize import mask_telegram_id
 
 pytestmark = [pytest.mark.unit]
 
@@ -334,3 +337,101 @@ class TestBuildAlertMessageKeyboard:
         assert button.callback_data is not None
         assert button.callback_data.startswith("unsub:")
         assert button.callback_data.endswith("opaque_token_123")
+
+
+# ---------------------------------------------------------------------------
+# Identifier masking in the failure-branch logs (06-PII-102)
+# ---------------------------------------------------------------------------
+
+
+class TestFailureBranchLogsMaskIdentifier:
+    """Both failure branches mask the chat_id in the log and keep it in the send.
+
+    The log argument is masked through ``mask_telegram_id`` while the transport
+    argument (what ``send_message`` receives) stays the real integer. The mask
+    is asserted through ``mask_telegram_id`` itself — never on its width, prefix
+    or hash shape — because it is a keyed HMAC whose value is not fixed.
+    """
+
+    _RAW_CHAT_ID = 987654321
+
+    @pytest.mark.asyncio
+    async def test_permanent_failure_branch_masks_log_keeps_send(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Forbidden -> forever dead-lettered: log masked, send real."""
+        payload = _payload(self._RAW_CHAT_ID)
+
+        with patch(
+            "apps.search.services.immediate_alerts.Bot"
+        ) as mock_bot_cls:
+            mock_bot = mock_bot_cls.return_value
+            mock_bot.send_message = AsyncMock(
+                side_effect=TelegramForbiddenError(
+                    message="blocked by user",
+                    method=MagicMock(),
+                )
+            )
+            mock_bot.session.close = AsyncMock()
+
+            from apps.search.services.immediate_alerts import _send_payloads
+
+            with caplog.at_level(logging.WARNING):
+                await _send_payloads("test-token", [payload])
+
+        # The formatted log message does not contain the raw Telegram id.
+        assert str(self._RAW_CHAT_ID) not in caplog.text
+        # The mask produced by the production helper is what was logged.
+        assert mask_telegram_id(self._RAW_CHAT_ID) in caplog.text
+        # The transport value is untouched: the sender received the real id.
+        sent_kwargs = mock_bot.send_message.await_args.kwargs
+        assert sent_kwargs["chat_id"] == self._RAW_CHAT_ID
+        # The payload the sender consumed still carries the real id.
+        assert payload["chat_id"] == self._RAW_CHAT_ID
+
+    @pytest.mark.asyncio
+    async def test_post_retry_failure_branch_masks_log_keeps_send(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Transient then retry fails -> log masked, both sends real."""
+        payload = _payload(self._RAW_CHAT_ID)
+
+        retry_exc = TelegramRetryAfter(
+            message="too many requests",
+            method=MagicMock(),
+            retry_after=1,
+        )
+        second_exc = TelegramForbiddenError(
+            message="blocked",
+            method=MagicMock(),
+        )
+
+        with patch(
+            "apps.search.services.immediate_alerts.Bot"
+        ) as mock_bot_cls:
+            mock_bot = mock_bot_cls.return_value
+            mock_bot.send_message = AsyncMock(
+                side_effect=[retry_exc, second_exc]
+            )
+            mock_bot.session.close = AsyncMock()
+
+            from apps.search.services.immediate_alerts import _send_payloads
+
+            with (
+                caplog.at_level(logging.WARNING),
+                patch(
+                    "apps.search.services.immediate_alerts.asyncio.sleep",
+                    new=AsyncMock(),
+                ),
+            ):
+                await _send_payloads("test-token", [payload])
+
+        # Both the primary and the retry failure logs are masked.
+        assert str(self._RAW_CHAT_ID) not in caplog.text
+        assert mask_telegram_id(self._RAW_CHAT_ID) in caplog.text
+        # Both send attempts received the real integer, unmasked.
+        attempted = [
+            call.kwargs["chat_id"]
+            for call in mock_bot.send_message.await_args_list
+        ]
+        assert attempted == [self._RAW_CHAT_ID, self._RAW_CHAT_ID]
