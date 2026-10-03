@@ -123,6 +123,26 @@ def test_free_text_writer_stores_neither_phone_nor_email(
     assert "seller shared contact" in stored
 
 
+def test_title_case_prose_is_masked_by_the_name_rule(seller, category, city) -> None:
+    """The name mask also masks title-case prose, and this is the honest trade-off.
+
+    ``_NAME_PATTERN`` matches two or more consecutive capitalised words, so a
+    moderator who writes "Photos Are Blurry" loses two words. The over-match is
+    accepted rather than fixed: narrowing it would change masking behaviour for
+    every caller of the shared pattern, beyond this block's scope. The
+    ``help_text`` warns moderators that personal names are masked so the
+    behaviour is stated, not discovered, and the rest of the sentence survives.
+    """
+    reason = "Photos Are Blurry and the price is wrong"
+    log = _write_via_manual_reject(seller, category, city, reason)
+
+    stored = _stored_reason(log)
+    assert stored != reason
+    assert "Photos Are Blurry" not in stored
+    # Only the title-case run is masked; the lowercase prose is intact.
+    assert "and the price is wrong" in stored
+
+
 # ---------------------------------------------------------------------------
 # 2. Clean text and the fixed literals are byte-identical
 # ---------------------------------------------------------------------------
