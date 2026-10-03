@@ -69,6 +69,35 @@ class TestAdvisoryLockIdMembers:
         assert isinstance(member.value, int)
         assert member.name == "CATALOG_LOAD"
 
+    def test_purge_media_deletion_errors_lock_is_not_a_reuse(self) -> None:
+        """Lock 15 is allocated to the media retention purge and aliases nothing."""
+        member = AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS
+
+        assert member.value == 15
+        # A value collision makes IntEnum an ALIAS: the attribute resolves
+        # but .name is the pre-existing member's name.
+        assert member.name == "PURGE_MEDIA_DELETION_ERRORS"
+        # No alias anywhere on the enum (distinct values == distinct members).
+        assert len({m.value for m in AdvisoryLockId}) == len(list(AdvisoryLockId))
+
+    def test_existing_lock_ids_are_not_renumbered(self) -> None:
+        """Ids other blocks depend on keep their values."""
+        assert AdvisoryLockId.SWEEP_ORPHANED_MEDIA == 103
+        assert AdvisoryLockId.CONSENT_HARD_DELETE == 3
+
+    def test_allocation_docstring_records_the_media_retention_row(self) -> None:
+        """The advisory_lock allocation table names the new member.
+
+        The allocation is a three-file, one-commit unit: the enum member, the
+        docstring table row and this test. Reading the table from the module's
+        ``__doc__`` means the commit cannot be satisfied by one file alone.
+        """
+        from apps.core.utils import advisory_lock as advisory_lock_module
+
+        table = advisory_lock_module.advisory_lock.__doc__ or ""
+        assert "PURGE_MEDIA_DELETION_ERRORS" in table
+        assert "deletion-error retention purge" in table
+
 
 class TestAdvisoryLockIdReferences:
     """Scan all source to ensure every ``AdvisoryLockId.*`` reference
