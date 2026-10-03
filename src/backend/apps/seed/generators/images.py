@@ -10,6 +10,7 @@ from typing import Any
 from django.conf import settings
 
 from apps.ads.models import Ad, AdImage
+from apps.core.enums import ThumbnailSizeStrEnum, WriteMode
 from apps.media.services.filesystem import strip_photo_exif
 from apps.media.services.thumbnails import ThumbnailService
 from apps.seed.generators.base import BaseGenerator
@@ -173,15 +174,16 @@ class ImageGenerator(BaseGenerator):
                 unique=True,
             )
             for position, key in enumerate(selected, start=1):
-                if not self._preprocess_one(key, seed_dir, thumbnail_service):
+                published = self._preprocess_one(key, seed_dir, thumbnail_service)
+                if published is None:
                     continue
                 ad_img = AdImage(
                     ad=ad,
                     image=key,
                     position=position,
-                    thumbnail_small=self._thumbnail_key(key, "small"),
-                    thumbnail_medium=self._thumbnail_key(key, "medium"),
-                    thumbnail_large=self._thumbnail_key(key, "large"),
+                    thumbnail_small=published[ThumbnailSizeStrEnum.SMALL],
+                    thumbnail_medium=published[ThumbnailSizeStrEnum.MEDIUM],
+                    thumbnail_large=published[ThumbnailSizeStrEnum.LARGE],
                 )
                 ad_images.append(ad_img)
 
@@ -241,8 +243,10 @@ class ImageGenerator(BaseGenerator):
     ) -> list[str]:
         """Pre-process all manifest photos: write originals, generate thumbnails.
 
-        Deprecated eager bulk variant retained for compatibility; the lazy
-        ``generate`` path uses ``_preprocess_one`` instead.
+        Deprecated eager bulk variant retained for compatibility; it delegates
+        to ``_preprocess_one`` and shares the lazy path's verified-files
+        contract — a key is returned only when every thumbnail variant has a
+        file behind it on disk.
 
         Args:
             manifest_entries: List of manifest photo entries (each has 'filename').
@@ -255,22 +259,44 @@ class ImageGenerator(BaseGenerator):
         keys: list[str] = []
         for entry in manifest_entries:
             storage_key = f"seed/{entry['filename']}"
-            if self._preprocess_one(storage_key, seed_dir, thumbnail_service):
+            if self._preprocess_one(storage_key, seed_dir, thumbnail_service) is not None:
                 keys.append(storage_key)
         return keys
+
+    def _thumbnails_present(self, storage_key: str, seed_dir: str) -> bool:
+        """True when every thumbnail variant for *storage_key* exists on disk.
+
+        The size set is derived from ``ThumbnailSizeStrEnum`` — the same enum
+        ``ThumbnailService`` iterates — so the fast-path gate and the service
+        agree on the size set by construction (no hard-coded size list, no
+        import of the backfill command's private ``_SIZE_COLUMNS``).
+        """
+        return all(
+            os.path.exists(
+                os.path.join(seed_dir, self._thumbnail_name(storage_key, size))
+            )
+            for size in ThumbnailSizeStrEnum
+        )
 
     def _preprocess_one(
         self,
         storage_key: str,
         seed_dir: str,
         thumbnail_service: ThumbnailService,
-    ) -> bool:
+    ) -> dict[ThumbnailSizeStrEnum, str] | None:
         """Pre-process a single seed photo on demand.
 
         Reads the fixture JPEG, writes the original to ``seed_dir``, and
-        generates thumbnails. Skips photos whose fixture file is missing and
-        skips already-generated thumbnails (cache check), matching the old
-        eager pipeline's per-file behavior exactly.
+        generates thumbnails. Returns a mapping of thumbnail size to storage
+        key only when **every** variant has a file behind it on disk — the
+        generator asserts what it wrote, not what it intended.
+
+        When all three variants already exist the mapping is returned without
+        calling the service (the extended cache check). Otherwise the missing
+        variants are published with ``WriteMode.REPLACE`` (BLOCK 3's repair
+        mode): ``CREATE_ONLY`` raises ``FileExistsError`` on the first present
+        size (SMALL is first) and aborts the loop before reaching the missing
+        one, whereas ``REPLACE`` writes all three deterministically.
 
         Args:
             storage_key: Original storage key, e.g. ``"seed/kvartiry_01.jpg"``.
@@ -278,14 +304,15 @@ class ImageGenerator(BaseGenerator):
             thumbnail_service: ThumbnailService instance.
 
         Returns:
-            True if the photo is available (keys usable), False if its fixture
-            file is missing.
+            Mapping from ``ThumbnailSizeStrEnum`` to storage key when every
+            variant is present, otherwise ``None`` (missing fixture or a failed
+            publish/post-condition).
         """
         filename = storage_key[5:] if storage_key.startswith("seed/") else storage_key
         fixture_path = FIXTURES_IMAGES_DIR / filename
         if not fixture_path.exists():
             logger.warning("Photo file not found: %s, skipping", fixture_path)
-            return False
+            return None
 
         original_path = os.path.join(seed_dir, filename)
 
@@ -301,19 +328,39 @@ class ImageGenerator(BaseGenerator):
         with open(original_path, "wb") as f:
             f.write(img_bytes)
 
-        # Generate thumbnails
-        thumb_small = os.path.join(
-            seed_dir, f"{os.path.splitext(filename)[0]}-small.jpg"
+        mapping = {
+            size: self._thumbnail_key(storage_key, size.value)
+            for size in ThumbnailSizeStrEnum
+        }
+
+        # Extended cache check: every variant present → nothing to write.
+        if self._thumbnails_present(storage_key, seed_dir):
+            return mapping
+
+        # Repair path: publish the missing variants with REPLACE so the
+        # present ones are rewritten byte-identically and the missing ones
+        # are created. Never CREATE_ONLY here — it aborts on the first
+        # present size (SMALL) and never reaches the missing one.
+        published = thumbnail_service.generate_thumbnails(
+            img_bytes, filename, mode=WriteMode.REPLACE
         )
-        if os.path.exists(thumb_small):
-            return True
+        if set(published) != set(ThumbnailSizeStrEnum):
+            logger.error("Thumbnail size set mismatch for %s", filename)
+            return None
 
-        try:
-            thumbnail_service.generate_thumbnails(img_bytes, filename)
-        except FileExistsError:
-            logger.warning("Thumbnails already exist for %s, skipping", filename)
+        # Post-condition: what the service reported must exist on disk.
+        if not self._thumbnails_present(storage_key, seed_dir):
+            logger.error("Thumbnails missing after publish for %s", filename)
+            return None
 
-        return True
+        return mapping
+
+    @staticmethod
+    def _thumbnail_name(storage_key: str, size: ThumbnailSizeStrEnum) -> str:
+        """Return the on-disk filename for a thumbnail variant."""
+        filename = storage_key[5:] if storage_key.startswith("seed/") else storage_key
+        stem, _ = os.path.splitext(filename)
+        return f"{stem}-{size.value}.jpg"
 
     @staticmethod
     def _thumbnail_key(original_key: str, size: str) -> str:

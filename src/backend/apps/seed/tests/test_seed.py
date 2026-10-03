@@ -16,11 +16,19 @@ from django.core.management import call_command
 from django.core.management.base import CommandError
 from django.test import Client, override_settings
 from django.utils import timezone
+from PIL import Image
 
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
 from apps.categories.models import Category
-from apps.core.enums import AdSource, AdStatus, AdvisoryLockId, LanguageLocale
+from apps.core.enums import (
+    AdSource,
+    AdStatus,
+    AdvisoryLockId,
+    LanguageLocale,
+    ThumbnailSizeStrEnum,
+    WriteMode,
+)
 from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 from apps.media.services.thumbnails import ThumbnailService
@@ -378,6 +386,258 @@ class TestImageGenerator:
         for img in images:
             assert img.image.endswith(".jpg")
             assert len(img.image) > 10
+
+
+# ─── ImageGenerator truthfulness (BLOCK 5 / 07-MEDIA-008) ────────────────
+
+
+def _write_manifest(fixtures_dir: Path, photos: list[str]) -> None:
+    """Write a minimal manifest mapping ``apartments`` to *photos*.
+
+    The default pool is deliberately empty, matching the shipped manifest
+    (C-1). Filenames are relative to ``FIXTURES_IMAGES_DIR``.
+    """
+    fixtures_dir.mkdir(parents=True, exist_ok=True)
+    manifest = {
+        "version": 1,
+        "categories": {
+            "apartments": {"photos": [{"filename": name} for name in photos]},
+        },
+        "default": {"photos": []},
+    }
+    (fixtures_dir / "photo_manifest.json").write_text(
+        json.dumps(manifest), encoding="utf-8"
+    )
+
+
+def _write_jpeg(fixtures_dir: Path, name: str) -> None:
+    """Materialise a small valid JPEG fixture."""
+    fixtures_dir.mkdir(parents=True, exist_ok=True)
+    Image.new("RGB", (100, 100), color="red").save(fixtures_dir / name, format="JPEG")
+
+
+class TestImageGeneratorTruthfulness:
+    """The seed generator asserts only the thumbnails it actually wrote.
+
+    Guards ``07-MEDIA-008``: ``_preprocess_one`` used to short-circuit on a
+    single ``-small`` variant and report a half-written state as complete, so
+    ``generate`` manufactured rows pointing at files that were never written.
+
+    Every test does a real encode, so it is ``seed``-marked (nightly / full
+    suite); the C-1 manifest tripwire needs no DB and no encode and is
+    ``unit``-marked so it runs in the fast gate.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _setup_class(self, db: None) -> None:
+        """Reuse the standard status-grounded test ad and category."""
+        user = User.objects.create(
+            username="imgtruth-user",
+            telegram_id=9998,
+            chat_id=9998,
+            password="!",
+        )
+        cat = Category.objects.create(name="Тест", slug="apartments")
+        city = City.objects.create(
+            name="Тест", slug="truth-city", region="Test", country_code="ME"
+        )
+        self.ad = create_test_ad(
+            user,
+            cat,
+            city,
+            title="Truth Ad",
+            description="Test",
+            status=AdStatus.PUBLISHED,
+            source=AdSource.SEED,
+            price=100,
+            published_at=timezone.now(),
+            category_name="Тест",
+        )
+
+    def _isolate(
+        self,
+        monkeypatch: pytest.MonkeyPatch,
+        tmp_path: Path,
+        photos: list[str],
+    ) -> Path:
+        """Point ``FIXTURES_IMAGES_DIR`` at an isolated manifest + fixtures.
+
+        ``images.py`` reads ``FIXTURES_IMAGES_DIR`` as a module global inside
+        both ``_load_manifest`` and ``_preprocess_one``, so patching the module
+        attribute covers every read. Returns the seed directory.
+        """
+        fixtures_dir = tmp_path / "fixtures"
+        _write_manifest(fixtures_dir, photos)
+        for name in photos:
+            _write_jpeg(fixtures_dir, name)
+        monkeypatch.setattr(
+            "apps.seed.generators.images.FIXTURES_IMAGES_DIR", fixtures_dir
+        )
+        media_root = tmp_path / "media"
+        seed_dir = media_root / "seed"
+        seed_dir.mkdir(parents=True, exist_ok=True)
+        monkeypatch.setattr("django.conf.settings.MEDIA_ROOT", media_root)
+        return seed_dir
+
+    @pytest.mark.seed
+    def test_generate_thumbnails_all_exist(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """Every thumbnail_* on every row points at a file that exists."""
+        self._isolate(monkeypatch, tmp_path, ["truth_01.jpg", "truth_02.jpg"])
+        gen = ImageGenerator(
+            {"faker_seed": 42, "image_count": {"min": 1, "max": 2}},
+            [self.ad],
+        )
+        images = gen.generate()
+        assert images, "generator produced no AdImage rows"
+        media_root = tmp_path / "media"
+        for img in images:
+            assert img.thumbnail_small is not None
+            assert img.thumbnail_medium is not None
+            assert img.thumbnail_large is not None
+            for key in (img.thumbnail_small, img.thumbnail_medium, img.thumbnail_large):
+                assert (media_root / key).exists(), f"missing thumbnail file: {key}"
+
+    @pytest.mark.seed
+    def test_half_written_state_is_repaired(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """A half-written state (small present, medium/large absent) is repaired.
+
+        This is the OC-3 tripwire: it fails if the single-variant cache check
+        survives, because that check returned early without writing medium/large.
+        """
+        seed_dir = self._isolate(monkeypatch, tmp_path, ["half_01.jpg"])
+        gen = ImageGenerator({"faker_seed": 42}, [self.ad])
+        service = ThumbnailService(storage_dir=str(seed_dir))
+
+        # Simulate a crash mid-publish: original + -small only.
+        seed_dir.mkdir(parents=True, exist_ok=True)
+        stem = "half_01"
+        (seed_dir / f"{stem}.jpg").write_bytes(b"placeholder")
+        (seed_dir / f"{stem}-small.jpg").write_bytes(b"placeholder")
+        assert (seed_dir / f"{stem}-small.jpg").exists()
+        assert not (seed_dir / f"{stem}-medium.jpg").exists()
+        assert not (seed_dir / f"{stem}-large.jpg").exists()
+
+        published = gen._preprocess_one(
+            f"seed/{stem}.jpg", str(seed_dir), service
+        )
+        assert published is not None
+        assert set(published) == set(ThumbnailSizeStrEnum)
+        for size in ThumbnailSizeStrEnum:
+            key = published[size]
+            assert (tmp_path / "media" / key).exists(), f"missing {size} variant"
+
+    @pytest.mark.unit
+    def test_shipped_manifest_default_pool_is_empty(self) -> None:
+        """C-1 tripwire: the shipped manifest has an empty default pool.
+
+        Bounds the assertion to the manifest itself plus a small reconciled
+        generation over a hand-written subset — never the full 1004-photo pool.
+        """
+        manifest_path = FIXTURES_IMAGES_DIR / "photo_manifest.json"
+        with open(manifest_path, encoding="utf-8") as f:
+            manifest = json.load(f)
+        assert manifest.get("default", {}).get("photos") == []
+        assert len(manifest.get("categories", {})) == 205
+
+    @pytest.mark.seed
+    def test_eager_preprocess_images_contract(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """_preprocess_images returns present keys and omits missing fixtures."""
+        seed_dir = self._isolate(monkeypatch, tmp_path, ["eager_01.jpg"])
+        # A second entry whose fixture is deliberately absent.
+        gen = ImageGenerator({"faker_seed": 42}, [self.ad])
+        service = ThumbnailService(storage_dir=str(seed_dir))
+
+        keys = gen._preprocess_images(
+            [{"filename": "eager_01.jpg"}, {"filename": "eager_missing.jpg"}],
+            str(seed_dir),
+            service,
+        )
+        assert keys == ["seed/eager_01.jpg"]
+        for _key in keys:
+            stem = "eager_01"
+            for size in ThumbnailSizeStrEnum:
+                assert (tmp_path / "media" / f"seed/{stem}-{size.value}.jpg").exists()
+
+    @pytest.mark.seed
+    def test_fast_path_skips_service(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """All-three-present returns the mapping WITHOUT calling the service.
+
+        This distinguishes EXTEND from DROP and stops a later "simplification"
+        from silently reintroducing the cost.
+        """
+        seed_dir = self._isolate(monkeypatch, tmp_path, ["fast_01.jpg"])
+        gen = ImageGenerator({"faker_seed": 42}, [self.ad])
+        service = ThumbnailService(storage_dir=str(seed_dir))
+
+        # First pass populates all three variants.
+        assert gen._preprocess_one("seed/fast_01.jpg", str(seed_dir), service) is not None
+
+        calls: list[tuple] = []
+
+        def _spy(*args, **kwargs):  # type: ignore[no-untyped-def]
+            calls.append((args, kwargs))
+            raise AssertionError("generate_thumbnails must not be called on the fast path")
+
+        monkeypatch.setattr(service, "generate_thumbnails", _spy)
+        published = gen._preprocess_one("seed/fast_01.jpg", str(seed_dir), service)
+        assert published is not None
+        assert calls == []
+
+    @pytest.mark.seed
+    def test_repair_uses_replace_mode(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """The repair path publishes with mode=WriteMode.REPLACE.
+
+        Without REPLACE the repair aborts on FileExistsError at the present
+        -small and never reaches -medium.
+        """
+        seed_dir = self._isolate(monkeypatch, tmp_path, ["repair_01.jpg"])
+        gen = ImageGenerator({"faker_seed": 42}, [self.ad])
+        service = ThumbnailService(storage_dir=str(seed_dir))
+
+        seed_dir.mkdir(parents=True, exist_ok=True)
+        stem = "repair_01"
+        (seed_dir / f"{stem}.jpg").write_bytes(b"placeholder")
+        (seed_dir / f"{stem}-small.jpg").write_bytes(b"placeholder")
+
+        captured: dict[str, object] = {}
+        real = service.generate_thumbnails
+
+        def _capture(img_bytes, original_key, *, mode):  # type: ignore[no-untyped-def]
+            captured["mode"] = mode
+            return real(img_bytes, original_key, mode=mode)
+
+        monkeypatch.setattr(service, "generate_thumbnails", _capture)
+        published = gen._preprocess_one(f"seed/{stem}.jpg", str(seed_dir), service)
+        assert published is not None
+        assert captured.get("mode") is WriteMode.REPLACE
+        assert (seed_dir / f"{stem}-medium.jpg").exists()
+        assert (seed_dir / f"{stem}-large.jpg").exists()
+
+    @pytest.mark.seed
+    def test_publish_failure_propagates(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """A raising service propagates; _preprocess_one returns no truthy value."""
+        seed_dir = self._isolate(monkeypatch, tmp_path, ["fail_01.jpg"])
+        gen = ImageGenerator({"faker_seed": 42}, [self.ad])
+        service = ThumbnailService(storage_dir=str(seed_dir))
+
+        def _boom(*args, **kwargs):  # type: ignore[no-untyped-def]
+            raise ValueError("cannot decode")
+
+        monkeypatch.setattr(service, "generate_thumbnails", _boom)
+        with pytest.raises(ValueError, match="cannot decode"):
+            gen._preprocess_one("seed/fail_01.jpg", str(seed_dir), service)
 
 
 # ─── AnalyticsGenerator tests ────────────────────────────────────────────
