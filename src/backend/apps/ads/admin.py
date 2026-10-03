@@ -434,9 +434,27 @@ class AdAdmin(admin.ModelAdmin):
 
     @admin.action(description="Ban users from selected ads")
     def action_ban_user(self, request, queryset):
-        """Bulk ban users from selected ads, reporting performed vs skipped rows."""
+        """Bulk ban users from selected ads, reporting performed vs skipped rows.
+
+        A **fully** refused selection (``changed == 0`` with a non-zero skip
+        count) is reported at ``error`` level: the action did not take effect,
+        and a success-level toast would be the false-success class this guard
+        exists to remove. A **partial** success keeps ``success`` — some rows
+        were banned, so the action did take effect. This deliberately does not
+        copy ``UserAdmin.deactivate_user``, which reports the structurally
+        identical case at the default level.
+        """
         result = bulk_ban_users(queryset, request.user.id, "Bulk ban via admin action")
-        self.message_user(request, self._ban_message(result), level="success")
+        fully_refused = result.changed == 0 and (
+            result.skipped_self
+            or result.skipped_privileged
+            or result.already_in_state
+        )
+        self.message_user(
+            request,
+            self._ban_message(result),
+            level="error" if fully_refused else "success",
+        )
 
     def _ban_message(self, result: BanResult) -> str:
         """Build the operator toast for a bulk ban.

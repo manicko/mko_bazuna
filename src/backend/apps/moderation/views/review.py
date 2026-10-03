@@ -14,6 +14,7 @@ from django.views.decorators.http import require_POST
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus, ApproveOutcome
+from apps.moderation.admin_actions import BanRefusalReason, ban_refusal_reason
 from apps.moderation.views.decorators import staff_required
 
 logger = logging.getLogger(__name__)
@@ -28,6 +29,32 @@ _APPROVE_OUTCOME_MESSAGES: dict[ApproveOutcome, str] = {
     ApproveOutcome.TRANSITION_REFUSED: (
         "The ad could not be published: the ad's current status does not "
         "allow a transition to published."
+    ),
+}
+
+# Fixed, stable moderator-facing sentences for a refused ban. Like
+# ``_APPROVE_OUTCOME_MESSAGES`` these are English-only Python literals on a
+# staff-only surface (no ``.po`` entry, no template change). Each names the real
+# reason the target scope refused the ban.
+#
+# Honesty constraint (``19-R8``): the sentences must be truthful about tiers.
+# ``is_banned`` refuses login and publishing, but it does NOT revoke an existing
+# web session — the web tier has no per-request account-state gate
+# (``15-AUTHZ-001``). So the copy never claims a total lockout.
+_BAN_REFUSAL_MESSAGES: dict[BanRefusalReason, str] = {
+    BanRefusalReason.SELF: (
+        "The ban was not applied: the ad's owner is your own account."
+    ),
+    BanRefusalReason.PRIVILEGED: (
+        "The ban was not applied: the ad's owner is a staff or superuser "
+        "account you are not permitted to ban."
+    ),
+    BanRefusalReason.ALREADY_BANNED: (
+        "The ban was not applied: the ad's owner was already banned."
+    ),
+    BanRefusalReason.NOT_IN_TARGET_SET: (
+        "The ban was not applied: the ad's owner is outside the set of "
+        "accounts you may ban."
     ),
 }
 
@@ -170,12 +197,22 @@ def ban_user(request: HttpRequest, ad_id: int) -> HttpResponse:
             Ad.objects.select_for_update(),
             id=ad_id,
         )
-        ban_user_for_ad(
+        result = ban_user_for_ad(
             ad,
             request.user.id,
             request.POST.get("ban_reason", "No reason provided") or "No reason provided",
         )
 
-    logger.info("Admin %s banned user via ad %s", request.user.id, ad_id)
+        if result.changed:
+            logger.info("Admin %s banned user via ad %s", request.user.id, ad_id)
+        else:
+            outcome = ban_refusal_reason(result)
+            messages.warning(request, _BAN_REFUSAL_MESSAGES[outcome])
+            logger.info(
+                "Admin %s ban via ad %s not applied (%s)",
+                request.user.id,
+                ad_id,
+                outcome,
+            )
 
     return redirect("/admin/ads/ad/?status__exact=on_moderation")

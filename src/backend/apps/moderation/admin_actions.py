@@ -42,6 +42,7 @@ test.
 
 import logging
 from collections.abc import Iterable
+from enum import StrEnum
 from typing import NamedTuple
 
 from django.db import OperationalError, transaction
@@ -61,6 +62,29 @@ from apps.moderation.services.moderation_log import (
 from apps.users.models import User
 
 logger = logging.getLogger(__name__)
+
+
+class BanRefusalReason(StrEnum):
+    """Why a single-target ban was refused, as a stable moderator-facing value.
+
+    The vocabulary is shared by the refusal ``logger.warning`` and the
+    ``moderation:ban`` view's operator message, so it is a ``StrEnum`` (rule 10)
+    rather than the free-form strings a log-only marker could tolerate. The
+    members mirror the resolver's skip categories one-for-one:
+
+    - ``SELF``: the target is the acting operator's own row.
+    - ``PRIVILEGED``: the target is ``is_staff`` or ``is_superuser`` and the
+      actor is not a superuser.
+    - ``ALREADY_BANNED``: the target was permitted but already banned (a no-op).
+    - ``NOT_IN_TARGET_SET``: the target is outside the candidate set. Unreachable
+      for ``ban_user_for_ad``, which passes exactly ``[user.pk]``; retained as the
+      total-return fallback for a future caller (see ``ban_refusal_reason``).
+    """
+
+    SELF = "self"
+    PRIVILEGED = "privileged"
+    ALREADY_BANNED = "already_banned"
+    NOT_IN_TARGET_SET = "not_in_target_set"
 
 
 class BanResult(NamedTuple):
@@ -173,9 +197,10 @@ def reject_ad(ad: Ad, moderator_id: int, reason: str) -> None:
 
 def _resolve_ban_targets(
     user_ids: Iterable[int], moderator_id: int
-) -> tuple[QuerySet[User], BanResult]:
+) -> tuple[QuerySet[User], BanResult, str]:
     """
-    Apply the ban target scope; return the writable queryset and the counts.
+    Apply the ban target scope; return the writable queryset, the counts, and the
+    scope marker the actor's write actually ran under.
 
     The single home of the privilege rule for the ``is_banned`` lever, called by
     BOTH ``ban_user_for_ad`` and ``bulk_ban_users``. Order matters and is
@@ -210,6 +235,12 @@ def _resolve_ban_targets(
     write must observe one snapshot, or a concurrent flip between a count and the
     ``UPDATE`` can skew the *reported* count by one. The write scope itself is
     unaffected either way.
+
+    The returned marker names the scope the actor's write ran under
+    (``"unrestricted"`` or ``"non_privileged_only"``) and is derived from the
+    same ``actor_is_superuser`` lookup that chose the branch, so a caller that
+    logs it cannot report a scope different from the one that governed the write
+    — and the actor is not queried a second time.
     """
     candidates = User.objects.filter(pk__in=set(user_ids))
     actor_is_superuser = User.objects.filter(
@@ -219,6 +250,7 @@ def _resolve_ban_targets(
     if actor_is_superuser:
         permitted = candidates
         skipped_privileged = 0
+        target_scope = "unrestricted"
     else:
         permitted = candidates.exclude(is_staff=True).exclude(is_superuser=True)
         privileged = candidates.filter(is_staff=True) | candidates.filter(
@@ -227,6 +259,7 @@ def _resolve_ban_targets(
         # Exclude the actor's own row so a self+privileged row counts once, as
         # skipped_self (self is checked first).
         skipped_privileged = privileged.exclude(pk=moderator_id).distinct().count()
+        target_scope = "non_privileged_only"
 
     skipped_self = candidates.filter(pk=moderator_id).count()
 
@@ -234,12 +267,13 @@ def _resolve_ban_targets(
     already_in_state = (
         permitted.exclude(pk=moderator_id).filter(is_banned=True).count()
     )
-    return writable, BanResult(
+    result = BanResult(
         changed=0,
         skipped_self=skipped_self,
         skipped_privileged=skipped_privileged,
         already_in_state=already_in_state,
     )
+    return writable, result, target_scope
 
 
 def ban_user_for_ad(ad: Ad, moderator_id: int, reason: str) -> BanResult:
@@ -278,7 +312,9 @@ def ban_user_for_ad(ad: Ad, moderator_id: int, reason: str) -> BanResult:
                 already_in_state=0,
             )
 
-        writable, result = _resolve_ban_targets([user.pk], moderator_id)
+        writable, result, target_scope = _resolve_ban_targets(
+            [user.pk], moderator_id
+        )
 
         if writable.filter(pk=user.pk).exists():
             user.is_banned = True
@@ -295,7 +331,7 @@ def ban_user_for_ad(ad: Ad, moderator_id: int, reason: str) -> BanResult:
                 moderator_id,
             )
         else:
-            reason_dropped = _ban_refusal_reason(result)
+            reason_dropped = ban_refusal_reason(result)
             logger.warning(
                 "ban_user_for_ad: ban of user %s (ad %s) refused by target scope (%s)",
                 user.pk,
@@ -311,26 +347,34 @@ def ban_user_for_ad(ad: Ad, moderator_id: int, reason: str) -> BanResult:
         result.skipped_self,
         result.skipped_privileged,
         result.already_in_state,
-        "unrestricted"
-        if User.objects.filter(pk=moderator_id, is_superuser=True).exists()
-        else "non_privileged_only",
+        target_scope,
     )
     return result
 
 
-def _ban_refusal_reason(result: BanResult) -> str:
+def ban_refusal_reason(result: BanResult) -> BanRefusalReason:
     """Name why a single target was refused, derived from the resolver counts.
 
     Self is checked first, so a target that is both the actor's own and
-    privileged is reported as ``self`` only, mirroring the count categories.
+    privileged is reported as ``SELF`` only, mirroring the count categories.
+
+    The ``NOT_IN_TARGET_SET`` fallback keeps this helper's ``BanRefusalReason``
+    return **total**. It is unreachable for today's only caller,
+    ``ban_user_for_ad``, which passes exactly ``[user.pk]``: the candidate set is
+    filtered from that id, so the tested row is always in ``candidates`` and one
+    of the three counted categories always matches. The branch exists so the
+    helper stays total for any future caller whose candidate set could exclude
+    the tested row — dropping it would make a total-return function partial,
+    which is worse than a documented fallback. Every refusal path maps onto a
+    counted category.
     """
     if result.skipped_self:
-        return "self"
+        return BanRefusalReason.SELF
     if result.skipped_privileged:
-        return "privileged"
+        return BanRefusalReason.PRIVILEGED
     if result.already_in_state:
-        return "already_banned"
-    return "not_in_target_set"
+        return BanRefusalReason.ALREADY_BANNED
+    return BanRefusalReason.NOT_IN_TARGET_SET
 
 
 def soft_delete_ad(ad: Ad, moderator_id: int, reason: str) -> None:
@@ -499,7 +543,9 @@ def bulk_ban_users(queryset, moderator_id: int, reason: str) -> BanResult:
     user_ids = set(queryset.values_list("user_id", flat=True))
 
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
-        targets, result = _resolve_ban_targets(user_ids, moderator_id)
+        targets, result, target_scope = _resolve_ban_targets(
+            user_ids, moderator_id
+        )
 
         for banned_id in targets.order_by("pk").values_list("pk", flat=True):
             log_ban_account(
@@ -518,9 +564,7 @@ def bulk_ban_users(queryset, moderator_id: int, reason: str) -> BanResult:
         result.skipped_self,
         result.skipped_privileged,
         result.already_in_state,
-        "unrestricted"
-        if User.objects.filter(pk=moderator_id, is_superuser=True).exists()
-        else "non_privileged_only",
+        target_scope,
     )
     return result
 
