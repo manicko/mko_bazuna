@@ -93,6 +93,28 @@ Block/unblock/delete users. A blocked user cannot post but may still browse.
 service), and the user change form renders `is_banned` read-only, so un-blocking is a
 `manage.py shell` operation. The requirement is unchanged; only the UI moved.
 
+*Admin-surface note (plan 19):* **block** now also carries a **target scope**. A non-superuser
+operator may ban **ordinary sellers only** — `apps.moderation.admin_actions._resolve_ban_targets` is
+the single home of the rule (both ban writers, `ban_user_for_ad` and `bulk_ban_users`, go through it)
+and it excludes `is_staff` / `is_superuser` rows and the operator's own row; a superuser's selection
+is unrestricted. "Moderator" is the documented synonym for `is_staff` (there is no `MODERATOR` role),
+so a peer moderator is excluded by the same `is_staff` clause. Before this guard landed the flag was
+writable against any row, so a moderator could ban a superuser. Refusals are **reported on both
+operator surfaces** rather than applied silently: the *Ad* changelist toast counts the dropped
+`self` / `privileged` / already-banned rows and escalates to an error level when the whole selection
+was refused, and the moderation review page posts a warning naming the refusal. This is a **target**
+scope, not an actor gate. What it does **not** close: there is still no un-ban path anywhere in
+production, no per-request web gate for `is_banned` (a banned seller keeps an existing web session
+and can still re-list), no `django_session` janitor, the bot tier is still not revoked for
+`is_active`, the dead `<id>/password/` route is still rendered, and the wider moderator contract
+(`UserRole.MODERATOR`, `media_gate`, `AdminSite.has_permission`, the `ModelAdmin` permission
+overrides) is untouched and belongs to `15-AUTHZ-003` — so this is not phase 15 closing. Ad-level
+actions are a different defect class and stay unguarded: a moderator may still approve, reject and
+soft-delete a privileged account's ads.
+
+*Related, for reachability only:* the sibling lever (`is_active`) is reachable from the **Users**
+changelist as *Deactivate selected users* / *Reactivate selected users*, with its own target scope.
+
 ### US-A5 — Auto-remove stale ads
 Background sweep: archive @2 months, delete @4 months (from `published_at`); logged. See decision J.
 

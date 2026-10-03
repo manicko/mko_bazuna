@@ -665,6 +665,48 @@ targets: the service excludes `is_staff` / `is_superuser` rows and self, and
 reports the refused counts (product decision `18-D1` / `18-Q7`). `manage.py
 shell` is no longer the only writer.
 
+**Ban parity (plan 19).** The `is_banned` lever now carries the same kind of
+target scope, at its own single home: `apps.moderation.admin_actions._resolve_ban_targets`,
+called by **both** production writers of the flag (`ban_user_for_ad` and
+`bulk_ban_users`). A non-superuser operator may act only on **non-privileged**
+targets — `is_staff` / `is_superuser` rows and self are excluded, a superuser's
+selection is unrestricted — and both operator surfaces now **report** the
+refusal instead of applying it silently: `AdAdmin`'s toast counts the dropped
+`self` / `privileged` / already-banned rows and escalates to `error` when the
+whole selection was refused, and the `moderation:ban` view posts a
+`messages.warning` naming the refusal. On that view the tier clause appears only
+on the **refusal** path — a successful ban posts no message, so a moderator gets
+no tier statement and no confirmation there. Before plan 19 the flag was writable
+against any row, so a moderator could ban a superuser. Like deactivation this is
+a **target** scope, not an actor gate; "moderator" remains the documented synonym
+for `is_staff`, so a **peer moderator is `is_staff=True`** and is excluded by the
+same clause as staff and superusers.
+
+**The two levers have opposite tier profiles**, and the operator copy says so on
+both surfaces rather than claiming a total lockout: a ban refuses **login and
+publishing** and is enforced in the **Telegram bot**, but it does **not** revoke
+an existing web session, which keeps working until it expires. Publishing is
+refused because `AccountStateMiddleware` denies *every* bot interaction and ad
+creation is bot-only — **not** because of `can_publish_ad()`, which has no
+production call site. `is_active` is the mirror image: web-only, and not
+bot-enforced.
+
+**What plan 19 does NOT close.** No **un-ban path** exists anywhere in
+production, so a ban is still one-way from the UI (`D-19-2`). There is no
+per-request web gate for `is_banned`, so a **banned seller keeps a session and
+can still re-list**; the bot-tier `is_active` residual and the `django_session`
+janitor are likewise untouched (`D-19-3`, owner `15-AUTHZ-001`). The dead
+`<id>/password/` route is still rendered (`D-19-5`). And the whole moderator
+contract — `UserRole.MODERATOR`, `media_gate`, `AdminSite.has_permission`, the
+15-of-17 `ModelAdmin` permission overrides — is `15-AUTHZ-003`'s and is
+**untouched**; this landing must **not** be read as phase 15 closing. The
+remaining items (asymmetric `ModeratorActionLog` coverage, the un-locked read of
+the actor's privilege, the dead `can_publish_ad()` predicate, the deliberately
+undecided flag taxonomy) are enumerated with owners in **plan 19 §7** and are
+deliberately not absorbed here. Separately, approve / reject / soft-delete are
+**ad-level** actions with no target guard: a moderator may still act on a
+privileged account's ads.
+
 **The web-tier revocation is now proven, and an earlier record here was wrong.**
 A `django_session` row is still never **deleted** on an account-state change, but
 `is_active = False` **does revoke an already-authenticated session on the next

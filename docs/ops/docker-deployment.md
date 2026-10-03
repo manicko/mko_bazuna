@@ -1173,7 +1173,7 @@ so `AUTH_PASSWORD_VALIDATORS` applies to the new account. It is **superuser-only
 
 | Operator need | Where it is reachable |
 |---|---|
-| Ban a user | **Ad** changelist → select ads → *Ban users from selected ads* (`AdAdmin.action_ban_user`); **or** the moderation review page → *Ban* (`moderation/views/review.py::ban_user`, routed at `moderation/urls.py`, `@staff_required`) |
+| Ban a user | **Ad** changelist → select ads → *Ban users from selected ads* (`AdAdmin.action_ban_user`); **or** the moderation review page → *Ban* (`moderation/views/review.py::ban_user`, routed at `moderation/urls.py`, `@staff_required`). **Moderators may ban ordinary sellers only** — the target scope lives in `apps.moderation.admin_actions._resolve_ban_targets` (the single home, used by both ban writers) and removes every `is_staff`/`is_superuser` row and the operator's own row from the selection, reporting the skips. A superuser's selection is unrestricted, and "moderator" here means `is_staff`, so a peer moderator is excluded by the same clause. The refusal is **reported**, not silent: the changelist toast counts the dropped rows (error level when the whole selection was refused) and the review page posts a warning naming the refusal. This is a target scope only — approve / reject / soft-delete on a privileged account's ads carry no target guard. It closes none of the rows around it: no un-ban path, no per-request web gate for `is_banned`, no bot-tier `is_active` revocation, no `django_session` janitor, and not the moderator contract (`15-AUTHZ-003`) |
 | **Un-ban** a user | **nowhere in the admin** — there is no unban action and no unban service path. `manage.py shell` (`User.objects.filter(…).update(…)`) |
 | Disable an account (`is_active = False`) | **Users** changelist → select users → *Deactivate selected users* (`UserAdmin.deactivate_user`, gated by `has_deactivate_permission` → `is_staff or is_superuser`). **Moderators may deactivate ordinary sellers only** — the target scope lives in `apps.users.services.deactivation` and removes every `is_staff`/`is_superuser` row (and the operator's own row) from the selection, reporting the skips (product decision `18-D1` / `18-Q7`). A superuser's selection is unrestricted. See [the system-level record](../99-agent/architecture.md#operator-facing-account-kill-switch-emergent-from-b-01-b-05) |
 | Re-enable an account (`is_active = True`) | **Users** changelist → select users → *Reactivate selected users* (`UserAdmin.reactivate_user`). Same target restriction: a moderator may not undo a superuser's disable, and self is always excluded |
@@ -1192,6 +1192,14 @@ itself survives** until its `expire_date` — the `django_session` row is inert 
 handlers. See
 [`architecture.md`](../99-agent/architecture.md#account-state-and-session-revocation-04-aut-002),
 where `04-AUT-002` is recorded as **NOT closed**.
+
+A ban has the **opposite** tier profile, and the operator message states both halves. A ban refuses
+**login and publishing** and is enforced in the **Telegram bot** (`AccountStateMiddleware` denies
+every bot interaction, and ad creation is bot-only), but it does **not** revoke an existing web
+session: `MIDDLEWARE` has no per-request account-state gate, and `ModelBackend` consults `is_active`
+only — so a banned seller's session keeps working until it expires (14 days). Do not read the ban
+row as a total lockout, and do not copy the deactivation wording onto it. The privilege guard above
+changes only *which rows* may be banned; neither lever's tier residuals are closed.
 
 ### Changing the Telegram ID Placeholder
 

@@ -45,3 +45,9 @@ anywhere else.
   [`../02-database/db-indexes.md`](../02-database/db-indexes.md).
 - Audit zones referenced above: **R1** (erasure), **R3** (consent decline ≠ withdraw),
   **R4** (three account states), **D1/D2** (category search), **D3/D4** (moderation criteria).
+- The operator **ban target scope** (a moderator may ban ordinary sellers only; a superuser is
+  unrestricted) is **not** an O1–O5 owner decision and is deliberately not restated here. It is
+  stated once in
+  [`../01-spec/technical-specification.md` §H](../01-spec/technical-specification.md) (the
+  `is_banned` operator contract) and in the `apps/moderation/admin_actions.py` docstrings. Do not
+  duplicate it into this table — a second copy becomes a second source of truth.
