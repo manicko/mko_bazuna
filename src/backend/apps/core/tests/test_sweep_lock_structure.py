@@ -72,6 +72,7 @@ SWEEP_COMMANDS: list[tuple[str, AdvisoryLockId]] = [
     ("recompute_normalized_prices", AdvisoryLockId.RECOMPUTE_NORMALIZED_PRICES),
     ("repair_bot_username", AdvisoryLockId.REPAIR_BOT_USERNAME),
     ("purge_consent_records", AdvisoryLockId.CONSENT_RECORD_SWEEP),
+    ("purge_media_deletion_errors", AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS),
 ]
 
 # The exact set of transaction-scoped lock-taking commands covered above.
@@ -96,6 +97,7 @@ EXPECTED_SWEEP_COMMANDS: frozenset[str] = frozenset(
         "recompute_normalized_prices",
         "repair_bot_username",
         "purge_consent_records",
+        "purge_media_deletion_errors",
     }
 )
 
@@ -128,6 +130,7 @@ _LOCK_TARGET_MODULES: tuple[str, ...] = (
     "apps.currencies.management.commands.recompute_normalized_prices",
     "apps.core.management.commands.repair_bot_username",
     "apps.core.management.commands.purge_consent_records",
+    "apps.media.management.commands.purge_media_deletion_errors",
 )
 
 

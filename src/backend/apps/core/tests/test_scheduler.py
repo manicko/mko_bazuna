@@ -98,6 +98,7 @@ class TestSchedulerConstants:
             "purge_failed_ads",
             "purge_rejected_ads",
             "purge_deleted_ads",
+            "purge_media_deletion_errors",
         ]
 
     def test_daily_commands_include_send_alerts(self) -> None:
