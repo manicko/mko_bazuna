@@ -60,6 +60,21 @@ _TIMESTAMP_FIELD_FOR_STATUS: dict[AdStatus, str] = {
 # the stable substring.
 SKIPPED_BANNED_ROWS_PREFIX = "Skipped:"
 
+# Operator-facing statement of what a ban actually does, in the
+# ``WEB_ONLY_ENFORCEMENT`` shape (see ``apps/users/admin.py``). It states the
+# two-sided tier truth (``19-R8``, the ``18-D2`` rule restated for a lever with a
+# different tier profile): a ban refuses login and publishing AND is enforced in
+# the Telegram bot tier (``AccountStateMiddleware`` reads ``is_banned``), but it
+# does NOT revoke an existing web session — the web tier has no per-request
+# account-state gate for this flag (``15-AUTHZ-001``). This differs from the
+# deactivation toast, whose lever is web-only and NOT enforced in the bot: do not
+# copy that wording here, and never write "locked out everywhere".
+BAN_TIER_ENFORCEMENT = (
+    "A ban refuses login and publishing, and is enforced in the Telegram bot; "
+    "it does not revoke an existing web session, which keeps working until it "
+    "expires."
+)
+
 
 class AdAdminChangeForm(forms.ModelForm):
     """Change form enforcing the constraints the raw model form cannot.
@@ -445,10 +460,13 @@ class AdAdmin(admin.ModelAdmin):
         identical case at the default level.
         """
         result = bulk_ban_users(queryset, request.user.id, "Bulk ban via admin action")
-        fully_refused = result.changed == 0 and (
-            result.skipped_self
-            or result.skipped_privileged
-            or result.already_in_state
+        fully_refused = bool(
+            result.changed == 0
+            and (
+                result.skipped_self
+                or result.skipped_privileged
+                or result.already_in_state
+            )
         )
         self.message_user(
             request,
@@ -460,12 +478,12 @@ class AdAdmin(admin.ModelAdmin):
         """Build the operator toast for a bulk ban.
 
         Mirrors ``UserAdmin._deactivation_message``'s shape: name the bans
-        performed, then report the dropped rows so a partial or fully-refused
-        selection does not read as success. ``changed`` is bans performed, not
-        user ids seen, and the skip clauses name self/privileged refusals and
-        rows already banned.
+        performed, state what a ban actually does (``BAN_TIER_ENFORCEMENT``),
+        then report the dropped rows so a partial or fully-refused selection does
+        not read as success. ``changed`` is bans performed, not user ids seen, and
+        the skip clauses name self/privileged refusals and rows already banned.
         """
-        message = f"Banned {result.changed} user(s)."
+        message = f"Banned {result.changed} user(s). {BAN_TIER_ENFORCEMENT}"
         dropped: list[str] = []
         if result.skipped_self:
             dropped.append(f"{result.skipped_self} self")

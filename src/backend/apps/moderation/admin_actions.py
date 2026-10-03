@@ -69,16 +69,21 @@ class BanRefusalReason(StrEnum):
 
     The vocabulary is shared by the refusal ``logger.warning`` and the
     ``moderation:ban`` view's operator message, so it is a ``StrEnum`` (rule 10)
-    rather than the free-form strings a log-only marker could tolerate. The
-    members mirror the resolver's skip categories one-for-one:
+    rather than the free-form strings a log-only marker could tolerate. The first
+    three members mirror the resolver's skip categories one-for-one;
+    ``NOT_IN_TARGET_SET`` is the total-return fallback:
 
     - ``SELF``: the target is the acting operator's own row.
     - ``PRIVILEGED``: the target is ``is_staff`` or ``is_superuser`` and the
       actor is not a superuser.
     - ``ALREADY_BANNED``: the target was permitted but already banned (a no-op).
-    - ``NOT_IN_TARGET_SET``: the target is outside the candidate set. Unreachable
-      for ``ban_user_for_ad``, which passes exactly ``[user.pk]``; retained as the
-      total-return fallback for a future caller (see ``ban_refusal_reason``).
+    - ``NOT_IN_TARGET_SET``: no counted category matched, so the helper cannot
+      name a specific cause. This is the **all-zero** shape, reached by two
+      producers: a future caller whose candidate set excluded the tested row, and
+      — the reachable one today — ``ban_user_for_ad``'s ``User.DoesNotExist``
+      early return, where the ad owner's account no longer exists and every count
+      is zero. Its operator sentence is deliberately cause-neutral so it is true
+      for both producers (see ``ban_refusal_reason``).
     """
 
     SELF = "self"
@@ -358,15 +363,19 @@ def ban_refusal_reason(result: BanResult) -> BanRefusalReason:
     Self is checked first, so a target that is both the actor's own and
     privileged is reported as ``SELF`` only, mirroring the count categories.
 
-    The ``NOT_IN_TARGET_SET`` fallback keeps this helper's ``BanRefusalReason``
-    return **total**. It is unreachable for today's only caller,
-    ``ban_user_for_ad``, which passes exactly ``[user.pk]``: the candidate set is
-    filtered from that id, so the tested row is always in ``candidates`` and one
-    of the three counted categories always matches. The branch exists so the
-    helper stays total for any future caller whose candidate set could exclude
-    the tested row — dropping it would make a total-return function partial,
-    which is worse than a documented fallback. Every refusal path maps onto a
-    counted category.
+    ``NOT_IN_TARGET_SET`` is the **all-zero** fallback: it is returned only when
+    every count is zero, so no counted category can name the cause. That shape is
+    reachable by **both** return paths of ``ban_user_for_ad``:
+
+    * the resolver path, for a future caller whose candidate set excluded the
+      tested row, and
+    * the ``User.DoesNotExist`` early return, where the ad owner's account no
+      longer exists — the reachable producer today.
+
+    The branch is therefore retained (dropping it would make a total-return
+    helper partial on a ``BanRefusalReason`` return), and its operator sentence is
+    deliberately cause-neutral so it stays true for both producers rather than
+    asserting a cause that is false for one of them.
     """
     if result.skipped_self:
         return BanRefusalReason.SELF

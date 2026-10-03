@@ -52,11 +52,32 @@ _BAN_REFUSAL_MESSAGES: dict[BanRefusalReason, str] = {
     BanRefusalReason.ALREADY_BANNED: (
         "The ban was not applied: the ad's owner was already banned."
     ),
+    # The all-zero shape is reached by two producers with different causes (an
+    # owner account that no longer exists, and a candidate set that did not
+    # contain the row), so this sentence is deliberately cause-neutral: it must
+    # not assert a specific cause that is false for one of them.
     BanRefusalReason.NOT_IN_TARGET_SET: (
-        "The ban was not applied: the ad's owner is outside the set of "
-        "accounts you may ban."
+        "The ban was not applied: the ad's owner was not among the accounts "
+        "available to this action."
     ),
 }
+
+# The two-sided tier truth (``19-R8``), stated once on this surface so it does
+# not become a fifth parallel refusal sentence: it is NOT a member of
+# ``_BAN_REFUSAL_MESSAGES`` and is not repeated inside each of its four values.
+# It is interpolated once at the refusal call site instead. The wording is
+# identical to ``apps/ads/admin.py``'s ``BAN_TIER_ENFORCEMENT`` — same language
+# on both operator surfaces — and is deliberately a duplicated literal: importing
+# it would create a new app-to-app import edge (``moderation.views`` ->
+# ``ads.admin``), mirroring the ``SKIPPED_BANNED_ROWS_PREFIX`` precedent.
+# It states that a ban refuses login and publishing and is enforced in the
+# Telegram bot tier, but does NOT revoke an existing web session (no per-request
+# web gate for ``is_banned``, ``15-AUTHZ-001``); never claim a total lockout.
+BAN_TIER_ENFORCEMENT = (
+    "A ban refuses login and publishing, and is enforced in the Telegram bot; "
+    "it does not revoke an existing web session, which keeps working until it "
+    "expires."
+)
 
 
 @staff_required
@@ -207,7 +228,10 @@ def ban_user(request: HttpRequest, ad_id: int) -> HttpResponse:
             logger.info("Admin %s banned user via ad %s", request.user.id, ad_id)
         else:
             outcome = ban_refusal_reason(result)
-            messages.warning(request, _BAN_REFUSAL_MESSAGES[outcome])
+            messages.warning(
+                request,
+                f"{_BAN_REFUSAL_MESSAGES[outcome]} {BAN_TIER_ENFORCEMENT}",
+            )
             logger.info(
                 "Admin %s ban via ad %s not applied (%s)",
                 request.user.id,
