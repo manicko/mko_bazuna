@@ -11,11 +11,11 @@ from django.test import Client
 from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
-from apps.core.enums import AdStatus
+from apps.core.enums import AdStatus, ConsentChoice, CookieCategory
 from apps.core.models import SupportTicket
 from apps.search.models import SavedSearch, SearchHistory
 from apps.search.services.cache import get_search_version
-from apps.users.models import LoginToken, User
+from apps.users.models import ConsentRecord, LoginToken, User
 from apps.users.services.deletion import (
     decline_consent,
     give_consent,
@@ -472,10 +472,12 @@ class TestWithdrawConsentAtomicity:
     def test_withdraw_is_atomic_rollback(self, user: User, monkeypatch):
         """If soft_delete_user_ads raises, the entire transaction rolls back.
 
-        LoginTokens, the SavedSearch deactivation, the SearchHistory deletion
-        and the SupportTicket deletion must be fully restored when an error
-        occurs inside the transaction boundary, together with the user PII
-        writes.
+        LoginTokens, the SavedSearch deactivation, the SearchHistory deletion,
+        the SupportTicket deletion and the ConsentRecord audit row must be fully
+        restored when an error occurs inside the transaction boundary, together
+        with the user PII writes. The audit row is written AFTER the
+        monkeypatched ``soft_delete_user_ads``, so asserting it is gone is a
+        real rollback check, not a vacuous one.
         """
         now = timezone.now()
         token = LoginToken.objects.create(
@@ -510,6 +512,10 @@ class TestWithdrawConsentAtomicity:
         assert SearchHistory.objects.filter(pk=history.pk).exists()
         # SupportTicket deletion rolled back too (06-PII-101)
         assert SupportTicket.objects.filter(pk=ticket.pk).exists()
+        # The WITHDRAWN audit row rolled back with the erasure it documents.
+        assert not ConsentRecord.objects.filter(
+            user=user, choice=ConsentChoice.WITHDRAWN
+        ).exists()
         # User NOT soft-deleted — PII and flags rolled back
         user.refresh_from_db()
         assert user.is_deleted is False
@@ -575,6 +581,30 @@ class TestWithdrawConsentAtomicity:
         assert second == []
         # No extra token deletion on second call (already gone)
         assert not LoginToken.objects.filter(pk=token.pk).exists()
+
+    def test_withdraw_writes_audit_row_without_a_request(self, user: User):
+        """The service is the single writer: no view and no request needed.
+
+        ``withdraw_consent(user)`` called directly (the domain-layer entry
+        point, as the bot, commands and admin use it) writes exactly one
+        WITHDRAWN ``ConsentRecord`` for the user — the Art. 7(1) evidence is a
+        property of the service, not of the view. With no HTTP context the row
+        carries a NULL IP and an empty user agent. ``SKIPPED`` never applies
+        here: a fresh user is not already deleted.
+        """
+        withdraw_consent(user)
+
+        records = list(
+            ConsentRecord.objects.filter(user=user, choice=ConsentChoice.WITHDRAWN)
+        )
+        assert len(records) == 1
+        record = records[0]
+        assert record.categories == {
+            CookieCategory.ANALYTICS: False,
+            CookieCategory.PREFERENCES: False,
+        }
+        assert record.ip_address is None
+        assert record.user_agent == ""
 
     def test_soft_delete_user_ads_returns_keys_not_count(
         self, user: User, monkeypatch, category, city

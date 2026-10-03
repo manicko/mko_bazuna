@@ -119,6 +119,45 @@ def log_manual_publish(ad_id: int, moderator_id: int) -> ModeratorActionLog:
     return log
 
 
+def log_photo_removed(
+    ad_id: int, moderator_id: int, reason: str
+) -> ModeratorActionLog:
+    """
+    Log a moderator's removal of a single ad photo.
+
+    Creates a ModeratorActionLog entry with action_type=OTHER and the supplied
+    **canned** reason. The reason is passed through ``redact_free_text`` like
+    every other free-text writer, but callers must supply a fixed literal
+    rather than request text: phase 06's reason-redaction has not landed at the
+    ``apps.moderation.admin_actions`` boundary, so a canned value sidesteps the
+    redaction question entirely.
+
+    ``ModeratorActionLog`` has no dedicated actor column; its ``user`` field is
+    documented as "User who was moderated **or performed action**", so the
+    acting moderator is recorded there (there is no distinct moderated subject
+    for a single-photo removal, other than the ad itself, which ``ad_id``
+    carries).
+
+    Args:
+        ad_id: The ad the photo was removed from.
+        moderator_id: The moderator user ID who performed the removal.
+        reason: The canned removal reason (INTERNAL ONLY).
+
+    Returns:
+        The created ModeratorActionLog instance.
+    """
+    log = ModeratorActionLog.objects.create(
+        ad_id=ad_id,
+        user_id=moderator_id,
+        action_type=ModeratorActionType.OTHER,
+        reason=redact_free_text(reason),
+    )
+    logger.info(
+        "Logged photo removal for ad %s by moderator %s", ad_id, moderator_id
+    )
+    return log
+
+
 def log_ban_account(user_id: int, moderator_id: int, reason: str) -> ModeratorActionLog:
     """
     Log account ban action by moderator.

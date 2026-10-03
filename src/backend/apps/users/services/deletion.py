@@ -22,11 +22,15 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
-from apps.core.enums import AdStatus
+from apps.core.enums import AdStatus, ConsentChoice
 from apps.core.models import SupportTicket
 from apps.search.models import SavedSearch, SearchHistory
 from apps.search.services.cache import bump_search_cache_version
 from apps.users.models import LoginToken, User
+from apps.users.services.consent_record import (
+    WITHDRAWN_CATEGORIES,
+    record_consent_action_with_context,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -84,7 +88,13 @@ def decline_consent(user: User) -> None:
     )
 
 
-def withdraw_consent(user: User) -> list[str]:
+def withdraw_consent(
+    user: User,
+    *,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+    session_key: str | None = None,
+) -> list[str]:
     """
     Withdraw consent and trigger immediate soft-delete (decision F).
 
@@ -107,23 +117,41 @@ def withdraw_consent(user: User) -> list[str]:
 
     - Soft-deletes all user ads (status=DELETED, hidden immediately)
 
+    - Writes the ConsentRecord audit row (choice=WITHDRAWN) inside this transaction
+
     - DRAFT ads' media files are physically removed from disk
 
-    All DB mutations run inside ``transaction.atomic()`` so that a failure in
-    any step rolls back LoginToken deletion, PII nulling, ticket deletion and
-    ad soft-delete. Physical media files are deleted after the transaction
-    commits via the AdImage pre_delete signal's ``on_commit`` callback,
-    following the TX-then-FS pattern. A rollback must never remove files for
-    rows that remain in the DB.
+    All DB mutations — including the audit row — run inside
+    ``transaction.atomic()`` so that a failure in any step rolls back
+    LoginToken deletion, PII nulling, ticket deletion, ad soft-delete and the
+    audit write together. The row is written here, not by the view, so the
+    Art. 7(1) evidence commits atomically with the erasure it documents rather
+    than after it (a crash between the service commit and a view-side insert
+    would leave a ``consent_revoked_at`` with no WITHDRAWN row). Physical media
+    files are deleted after the transaction commits via the AdImage pre_delete
+    signal's ``on_commit`` callback, following the TX-then-FS pattern. A
+    rollback must never remove files for rows that remain in the DB.
+
+    Limitation (``06-NEW-02``): ``ConsentRecord`` has **no actor column**, so a
+    staff-initiated revocation (the admin action) is evidenced as "the subject
+    withdrew", indistinguishable from a self-service withdrawal. The admin row
+    also carries no IP and no user agent (the action supplies neither). No
+    column is invented and no migration is added here.
 
     Idempotency: if the user is already soft-deleted (``is_deleted=True``),
-    the call is a no-op returning ``[]``.
+    the call is a no-op returning ``[]`` and writes no audit row.
 
     Phase 4 will hard-delete (remove rows) 30 days after consent_revoked_at.
 
     Args:
 
         user: The user withdrawing consent.
+        ip_address: Resolved client IP from the caller, or ``None``. Sanitized
+            inside ``record_consent_action_with_context`` before storage.
+        user_agent: Raw User-Agent header from the caller, or ``None``.
+        session_key: Session key that authenticated the action, or ``None``.
+            The view supplies it so the row commits before ``logout()`` flushes
+            the session, identifying the session that actually acted.
 
     Returns:
 
@@ -191,6 +219,20 @@ def withdraw_consent(user: User) -> list[str]:
 
         # Soft-delete all user ads (DB-only: returns storage keys for FS cleanup)
         storage_keys = soft_delete_user_ads(user)
+
+        # Write the Art. 7(1) audit row INSIDE this transaction, and LAST in the
+        # block so that a raise from soft_delete_user_ads (exercised by
+        # test_withdraw_is_atomic_rollback) rolls it back — making that rollback
+        # assertion real rather than vacuous. No outer transaction is opened and
+        # the block's boundary is unchanged.
+        record_consent_action_with_context(
+            user,
+            ConsentChoice.WITHDRAWN,
+            WITHDRAWN_CATEGORIES,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            session_key=session_key,
+        )
 
     # Storage keys returned for the caller's logging/inspection; physical
     # file deletion is handled by the AdImage pre_delete signal via

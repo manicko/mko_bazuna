@@ -5,6 +5,12 @@ Creates ``ConsentRecord`` rows on every consent action (accept / decline /
 withdraw) for GDPR Article 7(1) accountability. HTTP-layer context (anonymized
 IP, truncated user agent) lives here; domain state mutation stays in the
 service layer (``deletion.py``).
+
+``record_consent_action`` takes an ``HttpRequest`` and is the view-layer entry
+point; ``record_consent_action_with_context`` takes already-resolved scalars and
+is the entry point for every caller without a request (the domain layer, the
+bot, management commands). The former delegates to the latter, so there is one
+insertion path and one place where the IP and user agent are sanitized.
 """
 
 from __future__ import annotations
@@ -16,6 +22,14 @@ from django.http import HttpRequest
 from apps.core.enums import ConsentChoice, ConsentVersion, CookieCategory
 from apps.core.utils.client_ip import get_client_ip
 from apps.users.models import ConsentRecord, User
+
+# Categories recorded when consent is withdrawn. Only the two non-essential
+# categories the withdrawal response clears are listed: ``ESSENTIAL`` is never
+# consent-gated, so it has no place in a withdrawal record (rule 10).
+WITHDRAWN_CATEGORIES: dict[CookieCategory, bool] = {
+    CookieCategory.ANALYTICS: False,
+    CookieCategory.PREFERENCES: False,
+}
 
 
 def _anonymize_ip(ip: str | None) -> str | None:
@@ -33,6 +47,19 @@ def _anonymize_ip(ip: str | None) -> str | None:
     packed = int(ipaddress.IPv6Address(ip))
     network_prefix = packed & (0xFFFFFFFFFFFFFFFF << 64)
     return str(ipaddress.IPv6Address(network_prefix))
+
+
+def anonymized_client_ip(request: HttpRequest) -> str | None:
+    """Resolve a request's client IP and anonymize it, mapping absence to ``None``.
+
+    The single owner of ``get_client_ip``'s ``"unknown"`` sentinel. That literal
+    is not a parseable address (``IPv6Address("unknown")`` raises
+    ``ValueError``), so it is mapped to ``None`` here rather than duplicated into
+    every caller — ``_anonymize_ip`` then canonicalizes the real address or
+    returns ``None`` for an absent peer.
+    """
+    resolved_ip = get_client_ip(request)
+    return _anonymize_ip(None if resolved_ip == "unknown" else resolved_ip)
 
 
 def record_consent_action(
@@ -65,40 +92,76 @@ def record_consent_action(
     Returns:
         The newly created ``ConsentRecord``.
     """
-    if request is not None:
-        # An anonymous consent must be attributable. A ``session_key`` is the
-        # sole identifier of an anonymous record (the ``search_fields`` entry on
-        # ``ConsentRecordAdmin``), so a row written with a NULL key is not
-        # evidence. Nothing on the anonymous consent path otherwise creates a
-        # session — ``SESSION_ENGINE`` is the DB-backed default,
-        # ``CSRF_USE_SESSIONS`` is unset (CSRF lives in a cookie), and the only
-        # ``request.session`` write in ``src/backend`` is the authenticated
-        # ``?lang=`` branch — so force the session into existence before the
-        # read. ``request.session.create()`` mints and saves the key here;
-        # setting ``session.modified`` instead would defer key creation to
-        # ``SessionMiddleware.process_response``, which has already run by the
-        # time the caller assigns ``response`` (06-PII-105).
-        if user is None and request.session.session_key is None:
-            request.session.create()
-        session_key = request.session.session_key
-        # `get_client_ip` returns the literal "unknown" when no usable peer
-        # exists; `_anonymize_ip` cannot parse that and would raise. Map the
-        # sentinel back to None so an absent peer stores a null IP instead of
-        # 500-ing, matching the pre-04-AUT-003 `or None` semantics.
-        resolved_ip = get_client_ip(request)
-        ip_address = _anonymize_ip(None if resolved_ip == "unknown" else resolved_ip)
-        user_agent = (request.META.get("HTTP_USER_AGENT") or "")[:500]
-    else:
-        session_key = None
-        ip_address = None
-        user_agent = ""
+    if request is None:
+        return record_consent_action_with_context(user, choice, categories)
 
+    # An anonymous consent must be attributable. A ``session_key`` is the
+    # sole identifier of an anonymous record (the ``search_fields`` entry on
+    # ``ConsentRecordAdmin``), so a row written with a NULL key is not
+    # evidence. Nothing on the anonymous consent path otherwise creates a
+    # session — ``SESSION_ENGINE`` is the DB-backed default,
+    # ``CSRF_USE_SESSIONS`` is unset (CSRF lives in a cookie), and the only
+    # ``request.session`` write in ``src/backend`` is the authenticated
+    # ``?lang=`` branch — so force the session into existence before the read.
+    # ``request.session.create()`` mints and saves the key here; setting
+    # ``session.modified`` instead would defer key creation to
+    # ``SessionMiddleware.process_response``, which has already run by the
+    # time the caller assigns ``response`` (06-PII-105).
+    if user is None and request.session.session_key is None:
+        request.session.create()
+
+    return record_consent_action_with_context(
+        user,
+        choice,
+        categories,
+        ip_address=anonymized_client_ip(request),
+        user_agent=request.META.get("HTTP_USER_AGENT") or "",
+        session_key=request.session.session_key,
+        consent_version=consent_version,
+    )
+
+
+def record_consent_action_with_context(
+    user: User | None,
+    choice: ConsentChoice,
+    categories: dict[CookieCategory, bool],
+    *,
+    ip_address: str | None = None,
+    user_agent: str | None = None,
+    session_key: str | None = None,
+    consent_version: str = ConsentVersion.V1_0.value,
+) -> ConsentRecord:
+    """Create a ``ConsentRecord`` from already-resolved request scalars.
+
+    The public writer for every entry point that does not (and must not) hold an
+    ``HttpRequest``: ``withdraw_consent`` in the domain layer, the Telegram bot,
+    management commands, ``consent_hard_delete`` and the admin. Taking resolved
+    values keeps ``django.http`` and the session/middleware graph out of every
+    importer and makes the audit write testable without a request (rule 3).
+
+    The IP and user agent are sanitized here, not by the caller: a future caller
+    cannot persist a raw client IP, and both transforms are idempotent, so a
+    pre-processed and an unprocessed caller store the same row. ``user`` is
+    nullable for anonymous cookie-based consent, identified by ``session_key``.
+
+    Args:
+        user: The acting user, or ``None`` for anonymous visitors.
+        choice: The ``ConsentChoice`` made (ACCEPTED / DECLINED / WITHDRAWN).
+        categories: Map of ``CookieCategory`` to whether it was accepted.
+        ip_address: Resolved client IP, or ``None``; anonymized before storage.
+        user_agent: Raw User-Agent header, or ``None``; truncated to 500 chars.
+        session_key: Session key identifying an anonymous consent action.
+        consent_version: Banner version the user was shown.
+
+    Returns:
+        The newly created ``ConsentRecord``.
+    """
     return ConsentRecord.objects.create(
         user=user if user is not None and user.is_authenticated else None,
         session_key=session_key,
         consent_version=consent_version,
         choice=choice,
         categories=categories,
-        ip_address=ip_address,
-        user_agent=user_agent,
+        ip_address=_anonymize_ip(ip_address),
+        user_agent=(user_agent or "")[:500],
     )

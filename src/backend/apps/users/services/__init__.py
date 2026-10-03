@@ -7,7 +7,7 @@ from .account_state import (
     get_account_state,
     get_state_badge,
 )
-from .consent_record import record_consent_action
+from .consent_record import anonymized_client_ip, record_consent_action
 from .deletion import (
     decline_consent,
     give_consent,
@@ -17,6 +17,7 @@ from .deletion import (
 
 __all__ = [
     "AccountState",
+    "anonymized_client_ip",
     "can_publish_ad",
     "can_login",
     "get_account_state",

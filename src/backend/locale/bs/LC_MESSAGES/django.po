@@ -1753,3 +1753,11 @@ msgstr ""
 #~ msgstr ""
 #~ "Povlačenjem soglasja trajno brišete vaš Telegram ID, sve oglase i sprečavate "
 #~ "ponovni priključak. Da li ste sigurni?"
+
+#: src/backend/apps/ads/admin.py
+msgid "Remove selected photos from the ad"
+msgstr "Ukloni odabrane fotografije sa oglasa"
+
+#: src/backend/apps/ads/admin.py
+msgid "Removed %(count)s photo(s)."
+msgstr "Uklonjeno fotografija: %(count)s."

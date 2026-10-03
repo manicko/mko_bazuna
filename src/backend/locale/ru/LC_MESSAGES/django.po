@@ -1774,3 +1774,11 @@ msgstr ""
 #~ msgstr ""
 #~ "Отозвание согласия постоянно удаляет ваш Telegram ID, все объявления и "
 #~ "предотвращает повторный вход. Вы уверены?"
+
+#: src/backend/apps/ads/admin.py
+msgid "Remove selected photos from the ad"
+msgstr "Удалить выбранные фотографии из объявления"
+
+#: src/backend/apps/ads/admin.py
+msgid "Removed %(count)s photo(s)."
+msgstr "Удалено фотографий: %(count)s."

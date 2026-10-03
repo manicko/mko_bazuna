@@ -1551,3 +1551,11 @@ msgstr ""
 #~ "Withdrawing consent permanently erases your Telegram ID, all ads, and "
 #~ "prevents re-login. Are you sure?"
 #~ msgstr ""
+
+#: src/backend/apps/ads/admin.py
+msgid "Remove selected photos from the ad"
+msgstr ""
+
+#: src/backend/apps/ads/admin.py
+msgid "Removed %(count)s photo(s)."
+msgstr ""

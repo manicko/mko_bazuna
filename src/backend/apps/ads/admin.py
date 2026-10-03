@@ -21,8 +21,10 @@ import logging
 
 from django import forms
 from django.contrib import admin
+from django.utils.translation import gettext_lazy as _
 
 from apps.ads.models import Ad, AdImage
+from apps.ads.services.ad_image_removal import remove_ad_image
 from apps.core.enums import AdStatus, ModeratorActionType
 from apps.moderation.admin_actions import (
     BanResult,
@@ -61,14 +63,15 @@ _TIMESTAMP_FIELD_FOR_STATUS: dict[AdStatus, str] = {
 SKIPPED_BANNED_ROWS_PREFIX = "Skipped:"
 
 # Operator-facing statement of what a ban actually does, in the
-# ``WEB_ONLY_ENFORCEMENT`` shape (see ``apps/users/admin.py``). It states the
-# two-sided tier truth (``19-R8``, the ``18-D2`` rule restated for a lever with a
-# different tier profile): a ban refuses login and publishing AND is enforced in
-# the Telegram bot tier (``AccountStateMiddleware`` reads ``is_banned``), but it
-# does NOT revoke an existing web session — the web tier has no per-request
-# account-state gate for this flag (``15-AUTHZ-001``). This differs from the
-# deactivation toast, whose lever is web-only and NOT enforced in the bot: do not
-# copy that wording here, and never write "locked out everywhere".
+# ``DEACTIVATION_ENFORCEMENT_NOTE`` shape (see ``apps/users/admin.py``). It
+# states the two-sided tier truth (``19-R8``, the ``18-D2`` rule restated for a
+# lever with a different tier profile): a ban refuses login and publishing AND
+# is enforced in the Telegram bot tier (``AccountStateMiddleware`` reads
+# ``is_banned``), but it does NOT revoke an existing web session — the web tier
+# has no per-request account-state gate for this flag (``15-AUTHZ-001``). This
+# differs from the deactivation toast only in shape, not in tier coverage:
+# since plan 19 the deactivation lever is enforced on **both** tiers too (with
+# a support restoration carve-out). Do not write "locked out everywhere".
 BAN_TIER_ENFORCEMENT = (
     "A ban refuses login and publishing, and is enforced in the Telegram bot; "
     "it does not revoke an existing web session, which keeps working until it "
@@ -523,12 +526,44 @@ class AdAdmin(admin.ModelAdmin):
 class AdImageAdmin(admin.ModelAdmin):
     """
     AdImage admin for managing ad images.
+
+    ``AdImage`` is append-only: rows are created by the bot, never edited, so
+    ``has_add_permission`` / ``has_change_permission`` / ``has_delete_permission``
+    all return ``False`` and the changelist is a read-only inspection surface.
+
+    The single moderator lever is ``action_remove_photo`` (``07-MEDIA-005``): a
+    moderator who finds an inappropriate photo in a published ad can remove that
+    one photo without destroying the listing or banning the seller. The action
+    deletes the **row** and lets ``apps.media.signals`` free the bytes through
+    BLOCK 2b's ``unreferenced_keys`` check — it never calls ``delete_photo``
+    itself, so there is exactly one byte-freeing route.
+
+    **Permission decision (OC-6, option b).** The action is decorated with
+    ``permissions=["view"]`` and ``has_delete_permission`` stays ``False``.
+    Django's ``ModelAdmin._filter_actions_by_permissions`` keeps an action only
+    when the request passes **one of its** ``allowed_permissions``, so:
+
+    * the stock ``delete_selected`` action carries ``permissions=["delete"]``
+      and is therefore **filtered out** — bulk row deletion is never reachable
+      from this changelist, and the only delete path is the audited service;
+    * ``action_remove_photo`` carries ``["view"]``, so it is present exactly
+      when ``has_view_permission`` is true — i.e. staff/superuser — and absent
+      for an anonymous or non-staff request.
+
+    ``has_change_permission`` is ``False`` by design (the model is not editable),
+    so ``permissions=["change"]`` would filter the action out; ``view`` is the
+    predicate that actually gates access to this page. Opening
+    ``has_delete_permission`` instead (option a) would re-expose ``delete_selected``
+    (a bulk delete surface wider than intended), which is why option (b) was
+    chosen. Phase 15's admin RBAC has not landed, so the surface stays small and
+    staff-only for a later hardening pass.
     """
 
     list_display = ["id", action_ad_link, "position"]
     list_filter = ["position"]
     search_fields = ["ad__title"]
     readonly_fields = ["image", "telegram_file_id", "position"]
+    actions = ["action_remove_photo"]
 
     def has_add_permission(self, request) -> bool:
         return False
@@ -541,3 +576,38 @@ class AdImageAdmin(admin.ModelAdmin):
 
     def has_delete_permission(self, request, obj=None) -> bool:
         return False
+
+    @admin.action(
+        description=_("Remove selected photos from the ad"), permissions=["view"]
+    )
+    def action_remove_photo(self, request, queryset):
+        """Remove each selected ``AdImage`` row, one audit row per photo.
+
+        Delegates to ``remove_ad_image`` (rule 3: the admin stays thin). The
+        audit row is written by the service; nothing here calls ``delete_photo``.
+        A row hard-deleted mid-selection (e.g. a second moderator acting on the
+        same photo) is skipped rather than aborting the whole action, matching
+        the ``bulk_delete`` / ``bulk_reject`` per-row skip convention.
+        """
+        removed = 0
+        for ad_image in queryset.order_by("pk"):
+            try:
+                result = remove_ad_image(ad_image, request.user.id)
+            except AdImage.DoesNotExist:
+                logger.warning(
+                    "Skipping AdImage %s: row already removed mid-action",
+                    ad_image.pk,
+                )
+                continue
+            removed += 1
+            logger.info(
+                "Removed AdImage %s (key %s) via admin; audit log %s",
+                ad_image.pk,
+                result.removed_key,
+                result.audit_log_id,
+            )
+        self.message_user(
+            request,
+            _("Removed %(count)s photo(s).") % {"count": removed},
+            level="success",
+        )

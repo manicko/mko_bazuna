@@ -196,11 +196,11 @@ class UserAdmin(admin.ModelAdmin):
     ]
     search_fields = ["telegram_id"]
     # Operator actions. The action strings must stay in sync with the method
-    # names below; ``permissions=["deactivate"]`` routes each one through
-    # ``has_deactivate_permission``. Adding this list is the shape that could
-    # tempt a future editor to also register ``withdraw_consent_action`` — see
-    # the comment at that method.
-    actions = ["deactivate_user", "reactivate_user"]
+    # names below. ``deactivate_user``/``reactivate_user`` route through
+    # ``has_deactivate_permission`` via ``permissions=["deactivate"]``;
+    # ``withdraw_consent_action`` routes through ``has_delete_permission`` (the
+    # superuser-only predicate) via ``permissions=["delete"]``.
+    actions = ["deactivate_user", "reactivate_user", "withdraw_consent_action"]
 
     def get_readonly_fields(self, request, obj=None):  # pyright: ignore[reportIncompatibleMethodOverride] - Django's own UserAdmin overrides this untyped hook the same way
         """
@@ -305,27 +305,54 @@ class UserAdmin(admin.ModelAdmin):
             message += f" {SKIPPED_ROWS_PREFIX} " + ", ".join(dropped) + "."
         return message
 
-    # ---------------------------------------------------------------------
-    # DO NOT REGISTER THIS ACTION. It is ``@admin.action``-decorated but is
-    # deliberately absent from ``UserAdmin.actions`` above. Gate ``G-B``
-    # (phase 04 / plan 16) refused to register it because ``withdraw_consent``
-    # is an irreversible PII-erasure operation that must not be reachable from
-    # the admin surface. The ``actions = [...]`` list added for
-    # deactivate/reactivate is exactly the shape a future editor might extend
-    # with this method — leave it unregistered (risk ``R-1`` / deferred work
-    # ``D-8``).
-    # ---------------------------------------------------------------------
-    @admin.action(description="Withdraw consent for selected users")
+    # Registered in ``UserAdmin.actions`` above, superuser-gated via
+    # ``permissions=["delete"]`` (Q-D7 resolved as WIRE). Gate ``G-B`` /
+    # deferred work ``D-8`` originally left it unregistered so that the
+    # irreversible PII erasure was not reachable from the admin; Q-D7 chose to
+    # wire it because the phase-04 readonly field contract leaves this as the
+    # only staff-side consent mutation. ``permissions=["delete"]`` is the whole
+    # gate: Django's ``_filter_actions_by_permissions`` dispatches it to
+    # ``has_delete_permission`` (``request.user.is_superuser``), so the action
+    # is filtered out of ``get_actions()`` for a plain moderator AND a forged
+    # POST is refused by action-form validation before the function is called.
+    # No in-body ``is_superuser`` check is added — the framework hook is the
+    # single gate.
+    @admin.action(
+        description="Withdraw consent for selected users", permissions=["delete"]
+    )
     def withdraw_consent_action(self, request, queryset):
         """
-        Admin action to trigger consent withdrawal for selected users.
+        Withdraw consent for the selected users and report what was skipped.
 
-        Calls withdraw_consent on each user, which sets consent_revoked_at,
-        soft-deletes the user and their ads, and nullifies PII.
+        Superuser-gated via ``permissions=["delete"]``. Calls
+        ``withdraw_consent`` per row, which sets consent_revoked_at, soft-deletes
+        the user and their ads, nullifies PII, and writes the WITHDRAWN
+        ``ConsentRecord`` audit row inside the same per-user transaction.
+
+        Limitation (``06-NEW-02``): ``ConsentRecord`` has **no actor column**, so
+        a staff-initiated revocation is evidenced as "the subject withdrew" —
+        indistinguishable from a self-service withdrawal. The admin-initiated
+        row also carries **no IP and no user agent** (the action supplies
+        neither). No column is invented and no migration is added.
+
+        A row already soft-deleted (``is_deleted=True``) is a no-op and is
+        reported as skipped rather than counted as a withdrawal.
         """
-        for user in queryset:
+        users = list(queryset)
+        withdrawn = 0
+        skipped = 0
+        for user in users:
+            if user.is_deleted:
+                skipped += 1
+                continue
             withdraw_consent(user)
-        self.message_user(request, f"Withdrew consent for {queryset.count()} user(s).")
+            withdrawn += 1
+        message = f"Withdrew consent for {withdrawn} user(s)."
+        if skipped:
+            message += (
+                f" {SKIPPED_ROWS_PREFIX} {skipped} {ALREADY_IN_STATE_CLAUSE}."
+            )
+        self.message_user(request, message)
 
 
 @admin.register(ConsentRecord)

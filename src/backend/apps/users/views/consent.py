@@ -35,6 +35,7 @@ from apps.locations.models import City
 from apps.users.models import User
 from apps.users.schemas import ConsentSubmission
 from apps.users.services import (
+    anonymized_client_ip,
     can_login,
     decline_consent,
     give_consent,
@@ -279,7 +280,17 @@ def consent_withdraw(request: HttpRequest) -> HttpResponse:
         Redirect to the dashboard.
     """
     user = request.user
-    withdraw_consent(user)
+    # The audit row is written by the service inside its transaction, so it
+    # commits BEFORE the logout below flushes the session. ``session_key``
+    # therefore identifies the session that actually authenticated the
+    # withdrawal rather than a post-flush value. Passing the scalars — not the
+    # request — keeps ``withdraw_consent`` free of ``django.http``.
+    withdraw_consent(
+        user,
+        ip_address=anonymized_client_ip(request),
+        user_agent=request.META.get("HTTP_USER_AGENT"),
+        session_key=request.session.session_key,
+    )
 
     # 04-AUT-002: flush the session on consent withdrawal so a withdrawn
     # (soft-deleted) identity cannot keep using seller features. This must
@@ -292,12 +303,6 @@ def consent_withdraw(request: HttpRequest) -> HttpResponse:
         ConsentChoice.WITHDRAWN,
         analytics=False,
         preferences=False,
-    )
-    record_consent_action(
-        user=user,
-        choice=ConsentChoice.WITHDRAWN,
-        categories={CookieCategory.ANALYTICS: False, CookieCategory.PREFERENCES: False},
-        request=request,
     )
     logger.info("User %s withdrew consent via web - soft-delete triggered", user.id)
     return response
