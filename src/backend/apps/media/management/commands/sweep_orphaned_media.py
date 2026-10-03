@@ -19,6 +19,18 @@ This is a backstop for MED-001/MED-002: any file that escapes every explicit
 deletion path (e.g. a bug in a sweep command or a partial write failure) is
 eventually reclaimed here. Safe to run as a periodic cron job.
 
+``--check`` is the report half of the same diff: it detects the reverse
+mismatch — a referenced ``AdImage`` row whose file is **absent** from
+MEDIA_ROOT ("dangling row") — and reports orphaned files on disk, then exits
+non-zero via ``CommandError`` when either count is non-zero so cron/monitoring
+observes the condition.  The report scope **includes ``seed/``** (unlike the
+destructive walk, which deliberately skips it) and probes each referenced key
+**verbatim** — stripping a ``seed/`` prefix would reproduce a 100% false
+positive against the seeded lifecycle.  ``staging/`` is the sole suppression:
+it is the one directory the sweep ignores by design, because its files are
+protected by the mtime TTL reclamation below.  ``--check`` is non-destructive
+and mutually exclusive with ``--dry-run``.
+
 Uses advisory lock 103 for safe concurrent execution.
 """
 
@@ -27,13 +39,13 @@ import os
 import time
 
 from django.conf import settings
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from apps.ads.models import AdImage
 from apps.core.enums import AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
-from apps.media.services.filesystem import STAGING_SUBDIR, delete_photo
+from apps.media.services.filesystem import STAGING_PREFIX, STAGING_SUBDIR, delete_photo
 
 logger = logging.getLogger(__name__)
 
@@ -67,23 +79,32 @@ def _collect_referenced_keys() -> set[str]:
     return keys
 
 
-def _walk_media_files(media_root: str) -> list[str]:
-    """Walk MEDIA_ROOT and return relative paths, excluding seed/ and staging/.
+def _walk_media_files(media_root: str, *, include_seed: bool = False) -> list[str]:
+    """Walk MEDIA_ROOT and return relative paths.
 
-    The ``staging/`` subdirectory holds in-flight uploads that are not yet
-    referenced by any AdImage row, **and** files awaiting post-commit promotion
-    (a committed AdImage row whose ``transaction.on_commit`` move has not run
-    yet — 03-DB-005).  Both are protected from the orphan sweep here and instead
-    reclaimed by ``_reclaim_stale_staging`` based on file age (TTL).  Excluding
-    ``staging/`` is what makes a promoted file invisible to this walk until its
-    row commits, closing the promote-before-commit race by construction.  Seed
-    data is excluded because it manages its own lifecycle.
+    The ``staging/`` subdirectory is **always** excluded.  It holds in-flight
+    uploads that are not yet referenced by any AdImage row, **and** files
+    awaiting post-commit promotion (a committed AdImage row whose
+    ``transaction.on_commit`` move has not run yet — 03-DB-005).  Both are
+    protected from the orphan sweep here and instead reclaimed by
+    ``_reclaim_stale_staging`` based on file age (TTL).  Excluding ``staging/``
+    is what makes a promoted file invisible to this walk until its row commits,
+    closing the promote-before-commit race by construction.
+
+    ``seed/`` is excluded by default because seed data manages its own
+    lifecycle and the destructive sweep must never touch it.  ``--check``
+    passes ``include_seed=True`` to widen the *report* scope to the whole
+    store — a dangling row whose key lives under ``seed/`` is exactly the
+    silent failure the report exists to surface.  This parameter is
+    report-only: the destructive call site keeps the default, preserving the
+    shipped ``seed/`` skip.
     """
     files: list[str] = []
     for dirpath, _dirnames, filenames in os.walk(media_root):
         rel_dir = os.path.relpath(dirpath, media_root)
-        # Skip seed directory (and any subdir starting with seed/)
-        if rel_dir == _SEED_SUBDIR or rel_dir.startswith(f"{_SEED_SUBDIR}/"):
+        if not include_seed and (
+            rel_dir == _SEED_SUBDIR or rel_dir.startswith(f"{_SEED_SUBDIR}/")
+        ):
             continue
         # Skip staging directory (and any subdir starting with staging/)
         if rel_dir == STAGING_SUBDIR or rel_dir.startswith(f"{STAGING_SUBDIR}/"):
@@ -92,6 +113,52 @@ def _walk_media_files(media_root: str) -> list[str]:
             rel_path = os.path.join(rel_dir, name) if rel_dir != "." else name
             files.append(rel_path)
     return files
+
+
+def _collect_dangling_keys(referenced: set[str], media_root: str) -> list[str]:
+    """Return referenced keys whose file is absent from MEDIA_ROOT.
+
+    Each key is probed **verbatim** as ``os.path.join(media_root, key)``.  The
+    join is load-bearing: a seeded row carries ``seed/kvartiry_01.jpg`` and its
+    three ``seed/…-small/medium/large.jpg`` variants, and the file genuinely
+    lives at ``MEDIA_ROOT/seed/…``.  Normalising to basenames or stripping the
+    ``seed/`` prefix before the probe would look for the file at the top level,
+    find nothing, and report a **100% false positive on every seeded key**
+    (finding VAL-005).  ``staging/`` is the sole suppression, because it is the
+    one directory the sweep deliberately ignores — its files are bounded by the
+    mtime TTL, not by row presence.
+
+    Args:
+        referenced: All storage keys referenced by live ``AdImage`` rows.
+        media_root: Absolute path to ``MEDIA_ROOT``.
+
+    Returns:
+        Sorted list of referenced keys whose file is absent.
+    """
+    return [
+        key
+        for key in sorted(referenced)
+        if not key.startswith(STAGING_PREFIX)
+        and not os.path.exists(os.path.join(media_root, key))
+    ]
+
+
+def _collect_report_orphan_files(referenced: set[str], media_root: str) -> list[str]:
+    """Return files on disk that no ``AdImage`` row references, ``seed/`` included.
+
+    The report walk uses ``include_seed=True`` so the *reported* orphan set is
+    computed against the same full store the dangling-row probe uses.  The
+    destructive sweep keeps the ``seed/`` skip — this is a read-only projection.
+
+    Args:
+        referenced: All storage keys referenced by live ``AdImage`` rows.
+        media_root: Absolute path to ``MEDIA_ROOT``.
+
+    Returns:
+        Sorted list of unreferenced relative paths on disk.
+    """
+    on_disk = set(_walk_media_files(media_root, include_seed=True))
+    return sorted(on_disk - referenced)
 
 
 def _reclaim_stale_staging(media_root: str, ttl_seconds: int) -> int:
@@ -146,18 +213,30 @@ class Command(BaseCommand):
     help = "Delete media files in MEDIA_ROOT that are not referenced by any AdImage"
 
     def add_arguments(self, parser) -> None:
-        """Add dry-run argument."""
-        parser.add_argument(
+        """Add the mutually exclusive ``--dry-run`` and ``--check`` modes."""
+        mode = parser.add_mutually_exclusive_group()
+        mode.add_argument(
             "--dry-run",
             action="store_true",
             dest="dry_run",
             default=False,
             help="List orphaned files without deleting them",
         )
+        mode.add_argument(
+            "--check",
+            action="store_true",
+            dest="check",
+            default=False,
+            help=(
+                "Report referenced rows whose file is missing and files no row "
+                "references, without deleting; exits non-zero on any mismatch"
+            ),
+        )
 
     def handle(self, *args, **options) -> None:
-        """Execute the orphan sweep with advisory lock."""
+        """Execute the orphan sweep or the read-only reconciliation check."""
         dry_run: bool = options["dry_run"]
+        check: bool = options["check"]
 
         media_root = str(settings.MEDIA_ROOT)
 
@@ -167,6 +246,11 @@ class Command(BaseCommand):
         with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             with advisory_lock(AdvisoryLockId.SWEEP_ORPHANED_MEDIA):
                 referenced = _collect_referenced_keys()
+
+                if check:
+                    self._check(media_root, referenced)
+                    return
+
                 on_disk = set(_walk_media_files(media_root))
 
                 orphans = on_disk - referenced
@@ -186,11 +270,19 @@ class Command(BaseCommand):
                     return
 
                 deleted = 0
-                for key in sorted(orphans):
+                for processed, key in enumerate(sorted(orphans), start=1):
                     delete_photo(key)
-                    deleted += 1
-                    if deleted % 100 == 0:
-                        logger.info("Deleted %d orphaned files...", deleted)
+                    # Count only files the sweep actually removed. ``delete_photo``
+                    # returns ``None`` on every path and swallows failures, so an
+                    # increment-per-attempt miscounts a terminal
+                    # ``FileNotFoundError`` and a retry exhaustion as deletions.
+                    # A post-call existence probe is the only signal that is
+                    # correct under every caller stub, and it never re-calls
+                    # ``delete_photo`` (the exactly-once contract).
+                    if not os.path.exists(os.path.join(media_root, key)):
+                        deleted += 1
+                    if processed % 100 == 0:
+                        logger.info("Processed %d orphaned files...", processed)
 
                 logger.info("Orphan sweep complete: deleted %d files.", deleted)
                 self.stdout.write(
@@ -208,3 +300,45 @@ class Command(BaseCommand):
                             f"Reclaimed {reclaimed} stale staging files."
                         )
                     )
+
+    def _check(self, media_root: str, referenced: set[str]) -> None:
+        """Report store/database mismatches and exit non-zero on any.
+
+        Read-only: nothing is deleted.  ``CommandError`` is the established
+        non-zero-exit idiom (``apps.search.management.commands.send_alerts``
+        raises it when every attempted target fails), so cron/monitoring
+        observes the condition instead of a permanent silent success.
+
+        Args:
+            media_root: Absolute path to ``MEDIA_ROOT``.
+            referenced: All storage keys referenced by live ``AdImage`` rows.
+        """
+        dangling = _collect_dangling_keys(referenced, media_root)
+        orphans = _collect_report_orphan_files(referenced, media_root)
+
+        if dangling:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"{len(dangling)} referenced media file(s) missing on disk:"
+                )
+            )
+            for key in dangling:
+                self.stdout.write(f"  {key}")
+        if orphans:
+            self.stdout.write(
+                self.style.WARNING(
+                    f"{len(orphans)} orphaned media file(s) on disk:"
+                )
+            )
+            for key in orphans:
+                self.stdout.write(f"  {key}")
+
+        if dangling or orphans:
+            raise CommandError(
+                "Media store/database mismatch: "
+                f"{len(dangling)} dangling row(s), {len(orphans)} orphaned file(s)."
+            )
+
+        self.stdout.write(
+            self.style.SUCCESS("Media store matches the database.")
+        )

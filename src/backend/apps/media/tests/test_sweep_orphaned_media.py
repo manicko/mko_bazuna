@@ -14,14 +14,17 @@ Uses an isolated temporary MEDIA_ROOT with real files on disk.
 from __future__ import annotations
 
 import os
+import re
 import tempfile
 from collections.abc import Generator
-from contextlib import contextmanager
+from contextlib import contextmanager, suppress
+from io import StringIO
 from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
 from django.core.management import call_command
+from django.core.management.base import CommandError
 from django.test import override_settings
 
 from apps.ads.models import AdImage
@@ -281,3 +284,166 @@ class TestSweepLockScope:
             "delete_photo was called outside the advisory-lock scope: "
             f"{delete_call_lock_state}"
         )
+
+
+# ---------------------------------------------------------------------------
+# BLOCK 6: dangling-row reconciliation (--check) + truthful deletion counter
+# ---------------------------------------------------------------------------
+
+
+def _deleted_count(stdout: str) -> int:
+    """Extract the deletion count from the command's success line.
+
+    The count is the *channel*; the surrounding prose is deliberately not
+    pinned.  A regex over the ``Deleted <n> orphaned`` fragment keeps the
+    assertion on the number while tolerating message edits.
+    """
+    match = re.search(r"Deleted (\d+) orphaned", stdout)
+    assert match is not None, f"deletion count not found in output: {stdout!r}"
+    return int(match.group(1))
+
+
+class TestSweepCheckMode:
+    """``--check`` reconciles the store against the database, read-only."""
+
+    def test_check_reports_dangling_seed_reference(
+        self, seller, category, city, isolated_media_root
+    ):
+        """A referenced ``seed/`` key whose file is gone is reported.
+
+        The probe must use the **verbatim** key and the report scope must
+        **include ``seed/``**.  The present seed file guards the verbatim rule:
+        a probe that stripped the ``seed/`` prefix would look for
+        ``present.jpg`` at the top level, miss, and flag a live file as
+        dangling.
+        """
+        seed_dir = isolated_media_root / "seed"
+        seed_dir.mkdir()
+        (seed_dir / "present.jpg").write_bytes(b"seed data")
+
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        AdImage.objects.create(ad=ad, image="seed/present.jpg", position=0)
+        AdImage.objects.create(ad=ad, image="seed/missing.jpg", position=1)
+
+        out = StringIO()
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            with pytest.raises(CommandError):
+                call_command("sweep_orphaned_media", check=True, stdout=out)
+
+        report = out.getvalue()
+        assert "seed/missing.jpg" in report
+        assert "seed/present.jpg" not in report
+
+    def test_check_reports_nothing_when_store_matches(
+        self, seller, category, city, isolated_media_root
+    ):
+        """A store that agrees with the database yields no mismatch, seed included."""
+        seed_dir = isolated_media_root / "seed"
+        seed_dir.mkdir()
+        (seed_dir / "present.jpg").write_bytes(b"seed data")
+        (isolated_media_root / "top-level.jpg").write_bytes(b"image data")
+
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        AdImage.objects.create(ad=ad, image="seed/present.jpg", position=0)
+        AdImage.objects.create(ad=ad, image="top-level.jpg", position=1)
+
+        out = StringIO()
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            call_command("sweep_orphaned_media", check=True, stdout=out)
+
+        assert "Media store matches the database." in out.getvalue()
+
+    def test_check_suppresses_staging_references(
+        self, seller, category, city, isolated_media_root
+    ):
+        """A row referencing a missing ``staging/`` file is not a dangling row.
+
+        ``staging/`` is the only suppression: it is the one directory the sweep
+        ignores by design, so its files are bounded by the TTL, never by row
+        presence.
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        AdImage.objects.create(ad=ad, image="staging/legacy-uuid.jpg")
+
+        out = StringIO()
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            call_command("sweep_orphaned_media", check=True, stdout=out)
+
+        assert "staging/legacy-uuid.jpg" not in out.getvalue()
+
+    def test_check_and_dry_run_are_mutually_exclusive(
+        self, seller, category, city, isolated_media_root
+    ):
+        """``--check`` and ``--dry-run`` cannot be combined.
+
+        The flags are passed as **command-line arguments** deliberately: when
+        both are supplied as ``call_command`` keyword arguments, Django merges
+        them into ``options`` and bypasses argparse, so the mutual-exclusion
+        group never runs.  String args go through ``CommandParser.error``,
+        which ``call_command`` wraps as ``CommandError``.
+        """
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            with pytest.raises(CommandError):
+                call_command("sweep_orphaned_media", "--dry-run", "--check")
+
+    def test_both_modes_are_nondestructive(
+        self, seller, category, city, isolated_media_root
+    ):
+        """Neither ``--dry-run`` nor ``--check`` deletes an orphan file."""
+        for mode in ("dry_run", "check"):
+            key = "non-destructive-orphan.jpg"
+            (isolated_media_root / key).write_bytes(b"orphan data")
+
+            out = StringIO()
+            with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+                with suppress(CommandError):
+                    call_command("sweep_orphaned_media", stdout=out, **{mode: True})
+
+            assert (isolated_media_root / key).exists(), (
+                f"{mode} deleted {key}"
+            )
+
+
+class TestSweepDeletionCounter:
+    """The reported count equals the files actually removed, not attempts."""
+
+    def test_count_excludes_failed_removals(
+        self, seller, category, city, isolated_media_root, monkeypatch
+    ):
+        """A FileNotFoundError and a retry exhaustion are not counted.
+
+        Three orphan files exist.  ``os.remove`` is driven so that one file is
+        genuinely removed, one raises the terminal ``FileNotFoundError``, and
+        one raises ``PermissionError`` on every attempt (retry exhaustion).
+        The reported count must be ``1`` — the number actually removed — not
+        ``3`` (attempts) and not ``2``.
+        """
+        removed_key = "counted-removed.jpg"
+        terminal_key = "counted-terminal.jpg"
+        exhausted_key = "counted-exhausted.jpg"
+        for key in (removed_key, terminal_key, exhausted_key):
+            (isolated_media_root / key).write_bytes(b"orphan data")
+
+        real_remove = os.remove
+
+        def fake_remove(path: str) -> None:
+            name = os.path.basename(path)
+            if name == terminal_key:
+                raise FileNotFoundError(path)
+            if name == exhausted_key:
+                raise PermissionError(path)
+            real_remove(path)
+
+        monkeypatch.setattr(
+            "apps.media.services.filesystem.os.remove", fake_remove
+        )
+
+        out = StringIO()
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            call_command("sweep_orphaned_media", stdout=out)
+
+        assert not (isolated_media_root / removed_key).exists()
+        assert (isolated_media_root / terminal_key).exists()
+        assert (isolated_media_root / exhausted_key).exists()
+        assert _deleted_count(out.getvalue()) == 1
+
