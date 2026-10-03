@@ -3,7 +3,12 @@ Management command to backfill thumbnails for existing AdImage records.
 
 Iterates over AdImage records that have an original image but missing
 thumbnail keys, generates all three thumbnail variants, and persists
-them. Idempotent — skips records that already have thumbnails.
+them. Idempotent — skips records that already have every thumbnail.
+
+A row with a missing column whose destination file already exists (a stale
+leftover from a dead run, or a concurrent generation not yet persisted) is
+repaired with ``WriteMode.REPLACE``; a clean destination uses the default
+``WriteMode.CREATE_ONLY``.  The column is the source of truth.
 
 Uses advisory lock 102 for safe concurrent execution.
 
@@ -17,6 +22,7 @@ The workflow is split into three phases:
 """
 
 import logging
+import os
 from pathlib import Path
 
 from django.conf import settings
@@ -25,13 +31,23 @@ from django.db import transaction
 from django.db.models import Q
 
 from apps.ads.models import AdImage
-from apps.core.enums import AdvisoryLockId, ThumbnailSizeStrEnum
+from apps.core.enums import AdvisoryLockId, ThumbnailSizeStrEnum, WriteMode
 from apps.core.utils.advisory_lock import advisory_lock
 from apps.media.services.thumbnails import ThumbnailService
 
 logger = logging.getLogger(__name__)
 
 LOCK_ID = AdvisoryLockId.BACKFILL_THUMBNAILS
+
+# Column name -> generated key for each thumbnail size.  Used to decide, per
+# row, whether the destination files for the *missing* columns are already on
+# disk (a stale leftover from a dead run) and therefore need REPLACE rather
+# than CREATE_ONLY.
+_SIZE_COLUMNS: dict[ThumbnailSizeStrEnum, str] = {
+    ThumbnailSizeStrEnum.SMALL: "thumbnail_small",
+    ThumbnailSizeStrEnum.MEDIUM: "thumbnail_medium",
+    ThumbnailSizeStrEnum.LARGE: "thumbnail_large",
+}
 
 
 class Command(BaseCommand):
@@ -163,6 +179,20 @@ class Command(BaseCommand):
         need updating.  Does **not** write to the database — persistence
         is deferred to the caller (Phase 3).
 
+        The write mode is decided from the row's column state, which is the
+        single source of truth; the file on disk is derived state:
+
+        - every ``thumbnail_*`` column populated -> the row was filtered out in
+          Phase 1 and is not reached here.
+        - ``NULL`` columns and none of their target files present -> a fresh
+          generation, published ``CREATE_ONLY``.
+        - ``NULL`` columns with at least one target file already present -> a
+          stale leftover from a dead run (or a concurrent generation not yet
+          persisted), published ``REPLACE`` and logged ``stale-leftover``.
+          ``REPLACE`` rewrites byte-identical content from the same original,
+          so a genuine race converges on the same idempotent action and needs
+          no separate branch.
+
         Args:
             service: ThumbnailService for generating variants.
             ad_image: The AdImage record to process.
@@ -171,8 +201,7 @@ class Command(BaseCommand):
             ``(ad_image.id, update_kwargs)`` on success, where
             ``update_kwargs`` contains only the thumbnail fields that
             are still ``None`` on ``ad_image``.  Returns ``None`` when
-            the original file is missing or thumbnails already exist
-            (race condition).
+            the original file is missing.
 
         Raises:
             ValueError: If the image bytes cannot be decoded (propagates
@@ -192,16 +221,11 @@ class Command(BaseCommand):
         with open(str(original_path), "rb") as f:
             photo_bytes = f.read()
 
-        try:
-            thumbnail_keys = service.generate_thumbnails(
-                photo_bytes, ad_image.image
-            )
-        except FileExistsError:
-            logger.warning(
-                "Thumbnail files already exist for AdImage %d (race), skipping",
-                ad_image.id,
-            )
-            return None
+        mode = self._decide_write_mode(ad_image, original_path.parent)
+
+        thumbnail_keys = service.generate_thumbnails(
+            photo_bytes, ad_image.image, mode=mode
+        )
 
         # Only update the fields that are still missing (idempotency
         # check) — preserves any thumbnails already present.
@@ -220,3 +244,27 @@ class Command(BaseCommand):
             ]
 
         return (ad_image.id, update_kwargs)
+
+    @staticmethod
+    def _decide_write_mode(ad_image: AdImage, storage_dir: Path) -> WriteMode:
+        """Choose the publication mode for a row with at least one missing column.
+
+        The column is the source of truth and the file is derived state, so
+        only the destination file's presence is inspected — never the row's
+        populated columns, which by definition are already filled.  A leftover
+        file at any missing column's final path means a dead run (or an
+        in-flight concurrent run) already wrote bytes there; ``REPLACE`` may
+        overwrite them, whereas a clean destination uses ``CREATE_ONLY``.
+        """
+        stem, _ = os.path.splitext(str(ad_image.image))
+        for size_enum in ThumbnailSizeStrEnum:
+            if getattr(ad_image, _SIZE_COLUMNS[size_enum]) is not None:
+                continue
+            if (storage_dir / f"{stem}-{size_enum.value}.jpg").exists():
+                logger.info(
+                    "AdImage %d: repairing stale-leftover %s thumbnail",
+                    ad_image.id,
+                    size_enum.value,
+                )
+                return WriteMode.REPLACE
+        return WriteMode.CREATE_ONLY

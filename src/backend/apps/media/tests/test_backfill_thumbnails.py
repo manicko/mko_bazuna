@@ -258,3 +258,105 @@ class TestBackfillThumbnails:
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             # Should not raise
             call_command("backfill_thumbnails", batch_size=10)
+
+    def test_backfill_repairs_stale_leftover_small_file(
+        self, seller, category, city, isolated_media_root
+    ):
+        """A row with all-NULL columns and a leftover ``-small.jpg`` is repaired.
+
+        This is the D2 tripwire: a dead run leaves ``-small.jpg`` on disk with
+        every column ``NULL``.  The shipped guard's first ``O_EXCL`` collision
+        skipped the row forever, so the columns stayed ``NULL``.  With the
+        repair guard the leftover is overwritten and all three columns land.
+        """
+        ad_image = _create_adimage_with_original(
+            seller, category, city, isolated_media_root
+        )
+        # Simulate the dead run: small file written, no columns persisted.
+        leftover = isolated_media_root / f"{ad_image.image.rsplit('.', 1)[0]}-small.jpg"
+        leftover.write_bytes(b"truncated-leftover")
+
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            call_command("backfill_thumbnails", batch_size=10)
+
+        ad_image.refresh_from_db()
+        assert ad_image.thumbnail_small is not None
+        assert ad_image.thumbnail_medium is not None
+        assert ad_image.thumbnail_large is not None
+        for field in ["thumbnail_small", "thumbnail_medium", "thumbnail_large"]:
+            thumb_path = isolated_media_root / getattr(ad_image, field)
+            assert thumb_path.is_file()
+            with Image.open(thumb_path) as img:
+                img.verify()
+
+    def test_backfill_repair_run_is_idempotent(
+        self, seller, category, city, isolated_media_root
+    ):
+        """A second repair run is a no-op — values unchanged, no errors.
+
+        After the first run every column is populated, so Phase 1's queryset
+        no longer selects the row; a second run must not touch it.
+        """
+        ad_image = _create_adimage_with_original(
+            seller, category, city, isolated_media_root
+        )
+        leftover = isolated_media_root / f"{ad_image.image.rsplit('.', 1)[0]}-small.jpg"
+        leftover.write_bytes(b"truncated-leftover")
+
+        with override_settings(MEDIA_ROOT=str(isolated_media_root)):
+            call_command("backfill_thumbnails", batch_size=10)
+            ad_image.refresh_from_db()
+            first = {
+                "thumbnail_small": ad_image.thumbnail_small,
+                "thumbnail_medium": ad_image.thumbnail_medium,
+                "thumbnail_large": ad_image.thumbnail_large,
+            }
+            mtimes = {
+                field: (isolated_media_root / value).stat().st_mtime_ns
+                for field, value in first.items()
+            }
+            call_command("backfill_thumbnails", batch_size=10)
+
+        ad_image.refresh_from_db()
+        assert ad_image.thumbnail_small == first["thumbnail_small"]
+        assert ad_image.thumbnail_medium == first["thumbnail_medium"]
+        assert ad_image.thumbnail_large == first["thumbnail_large"]
+        # No file was rewritten by the second run.
+        for field, value in first.items():
+            assert (isolated_media_root / value).stat().st_mtime_ns == mtimes[field]
+
+    def test_decide_write_mode_three_cases(self, tmp_path):
+        """The guard's decision table: skip / CREATE_ONLY / REPLACE.
+
+        The column state is the source of truth:
+
+        - a fully-populated row is not reached (filtered in Phase 1);
+        - ``NULL`` columns with no files present -> ``CREATE_ONLY``;
+        - ``NULL`` columns with a file present -> ``REPLACE`` (stale leftover).
+        """
+        from apps.core.enums import WriteMode
+        from apps.media.management.commands.backfill_thumbnails import Command
+
+        command = Command()
+        row = AdImage.__new__(AdImage)
+        row.id = 1
+
+        # NULL columns, no files on disk -> CREATE_ONLY.
+        row.image = "case.jpg"
+        row.thumbnail_small = None
+        row.thumbnail_medium = None
+        row.thumbnail_large = None
+        assert command._decide_write_mode(row, tmp_path) is WriteMode.CREATE_ONLY
+
+        # NULL columns, leftover small file present -> REPLACE.
+        (tmp_path / "case-small.jpg").write_bytes(b"x")
+        assert command._decide_write_mode(row, tmp_path) is WriteMode.REPLACE
+
+        # A fully-populated row is not consulted; every missing column absent
+        # and populated columns pointing elsewhere -> CREATE_ONLY.
+        row.thumbnail_small = "existing-small.jpg"
+        row.thumbnail_medium = None
+        row.thumbnail_large = None
+        (tmp_path / "case-small.jpg").unlink()
+        assert command._decide_write_mode(row, tmp_path) is WriteMode.CREATE_ONLY
+

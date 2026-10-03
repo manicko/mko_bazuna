@@ -98,6 +98,20 @@ class ThumbnailSizeStrEnum(StrEnum):
     LARGE = "large"
 
 
+class WriteMode(StrEnum):
+    """Publication semantics for a thumbnail write.
+
+    ``CREATE_ONLY`` (default) publishes a new file without ever overwriting an
+    existing one -- a collision raises ``FileExistsError`` exactly as the
+    historical ``O_EXCL`` create path did.  ``REPLACE`` publishes by replacing
+    whatever is at the destination and is reserved for repair callers that
+    intend to overwrite a stale leftover.
+    """
+
+    CREATE_ONLY = "create_only"
+    REPLACE = "replace"
+
+
 class AdPriorityLevel(StrEnum):
     """Priority levels for moderation queue triage."""
 
@@ -363,6 +377,7 @@ __all__ = [
     "AdPriorityLevel",
     "PriorityFilter",
     "ThumbnailSizeStrEnum",
+    "WriteMode",
     "SearchSuggestionSource",
     "LanguageLocale",
     "PriceStep",
