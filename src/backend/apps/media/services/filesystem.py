@@ -23,6 +23,7 @@ import time
 import uuid
 from collections.abc import Iterable
 from pathlib import Path
+from typing import Final
 
 from django.conf import settings
 from PIL import Image, ImageOps
@@ -335,12 +336,28 @@ def _record_deletion_error(storage_key: str, exc: OSError) -> None:
         logger.exception("Failed to persist MediaDeletionError for %s", storage_key)
 
 
+# Quality of the stored original, made explicit.
+#
+# ``strip_photo_exif`` previously passed no ``quality=`` and silently inherited
+# Pillow's implicit default (measured at 75 against the pinned pillow 12.3.0
+# wheel).  Naming it here means the number the store actually uses is recorded
+# at the call site instead of being an undocumented property of Pillow.
+#
+# Do not confuse this with ``ThumbnailService.QUALITY`` (85), the deliberate
+# quality of the derived thumbnails: the two modules have no import edge, so
+# this constant is declared here rather than shared.  The store is therefore
+# mixed-quality by design — originals at ``STORED_JPEG_QUALITY``, thumbnails at
+# 85 — and nothing re-derives already-stored bytes.
+STORED_JPEG_QUALITY: Final[int] = 75
+
+
 def strip_photo_exif(photo_bytes: bytes) -> bytes:
     """
     Strip EXIF/metadata from a JPEG photo and re-encode it.
 
     Applies exif_transpose to correct orientation, removes EXIF data,
-    and saves with optimize=True. This also hardens against malicious JPEGs.
+    and saves with optimize=True at the explicit :data:`STORED_JPEG_QUALITY`.
+    This also hardens against malicious JPEGs.
 
     Args:
         photo_bytes: Raw JPEG bytes
@@ -353,5 +370,12 @@ def strip_photo_exif(photo_bytes: bytes) -> bytes:
     img.info.pop("exif", None)
     img.info.pop("icc_profile", None)
     buf = io.BytesIO()
-    img.save(buf, format="JPEG", optimize=True, comment=b"", exif=b"")
+    img.save(
+        buf,
+        format="JPEG",
+        optimize=True,
+        quality=STORED_JPEG_QUALITY,
+        comment=b"",
+        exif=b"",
+    )
     return buf.getvalue()
