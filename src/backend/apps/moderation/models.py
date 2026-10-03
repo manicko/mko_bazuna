@@ -117,7 +117,12 @@ class ModeratorActionLog(models.Model):
         help_text="Type of moderator action",
     )
     reason = models.TextField(
-        help_text="Moderation reason (INTERNAL ONLY - never shown to seller)",
+        help_text=(
+            "Moderation reason (INTERNAL ONLY - never shown to seller). "
+            "Do not paste a seller's contact details: phone numbers, e-mail "
+            "addresses and personal names are masked when this row is written, "
+            "and the masking is irreversible. The text is never shortened."
+        ),
     )
     created_at = models.DateTimeField(
         auto_now_add=True,

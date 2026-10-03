@@ -46,6 +46,7 @@ repeating them.
 - Launch with a moderator from day one.
 - Seller rejection path: bot replies "ad failed moderation" + rules link; **no specific reason disclosed**.
 - **ModerationCriteria has no price-range fields** (no min_price/max_price); criteria are length, count, and text-based only (zone D3/D4, US-A11, O4).
+- **`ModeratorActionLog.reason` is redacted at write time** (phone numbers, e-mail addresses, multi-word personal names, via `redact_free_text()`; never truncated). The row survives user erasure with `user_id = NULL`, so the redaction — not erasure — is what keeps a moderator's verbatim quote from persisting the data subject's contact details. The masking is irreversible and applies to new writes only.
 
 ### B. Third-party group monitoring — OUT OF PHASE 1
 Phase 1 accepts ads **only via our Telegram bot** (US-S2). Group/channel monitoring is a separate future phase.

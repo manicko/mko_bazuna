@@ -112,6 +112,36 @@ def redact_search_query(query: str) -> str:
     return redacted[:_MAX_QUERY_LENGTH]
 
 
+def redact_free_text(text: str) -> str:
+    """Redact PII from staff-authored free text before it is persisted.
+
+    Masks phone numbers, e-mail addresses and multi-word personal names using
+    the same patterns and masks as ``redact_search_query``, but unlike that
+    helper it does NOT truncate: the caller is storing moderator prose in an
+    unbounded ``TextField``, where a 100-character cap would silently discard
+    the operator's own words.
+
+    Two measured properties this contract depends on:
+
+    * It never lengthens its input, so an unbounded column cannot overflow and a
+      render-time truncation cannot grow.
+    * It is idempotent. Each mask leaves a run of ``*``; ``*`` is in none of the
+      three character classes and cannot form a match, so a second pass is a
+      no-op and a placeholder is never corrupted by double redaction.
+
+    Args:
+        text: The raw staff-authored text.
+
+    Returns:
+        The redacted text, untruncated.
+    """
+    if not text:
+        return text
+    redacted = _EMAIL_PATTERN.sub(_mask_email, text)
+    redacted = _PHONE_PATTERN.sub(_mask_phone, redacted)
+    return _NAME_PATTERN.sub(_mask_name, redacted)
+
+
 def search_query_key(query: str) -> str:
     """Derive the persisted dedup key for a search query.
 

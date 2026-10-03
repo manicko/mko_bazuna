@@ -11,6 +11,7 @@ from django.db import transaction
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus, ModeratorActionType
+from apps.core.utils.sanitize import redact_free_text
 from apps.moderation.models import ModerationCriteria, ModeratorActionLog
 from apps.moderation.services.exceptions import MaxAdsExceeded
 from apps.users.models import User
@@ -67,7 +68,7 @@ def log_manual_reject(
         ad_id=ad_id,
         user_id=user_id,
         action_type=ModeratorActionType.REJECT,
-        reason=reason,
+        reason=redact_free_text(reason),
     )
     logger.info("Logged manual rejection for ad %s by moderator %s", ad_id, moderator_id)
     return log
@@ -135,7 +136,7 @@ def log_ban_account(user_id: int, moderator_id: int, reason: str) -> ModeratorAc
     log = ModeratorActionLog.objects.create(
         user_id=user_id,
         action_type=ModeratorActionType.BAN_ACCOUNT,
-        reason=reason,
+        reason=redact_free_text(reason),
     )
     logger.info("Logged ban account for user %s by moderator %s", user_id, moderator_id)
     return log
@@ -162,7 +163,7 @@ def log_soft_delete(
         ad_id=ad_id,
         user_id=user_id,
         action_type=ModeratorActionType.SOFT_DELETE,
-        reason=reason,
+        reason=redact_free_text(reason),
     )
     logger.info("Logged soft delete for ad %s by moderator %s", ad_id, moderator_id)
     return log
