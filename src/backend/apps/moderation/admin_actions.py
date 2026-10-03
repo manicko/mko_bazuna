@@ -3,11 +3,49 @@ Admin moderation actions service for Mko Bazuna.
 
 Functions for individual ad actions: approve, reject, ban, soft delete.
 Used by moderation review views and admin actions.
+
+Ban target scope (plan 19 ``B-1``, ``18-Q7``)
+---------------------------------------------
+Both writers of ``User.is_banned`` in production code are in this module —
+``ban_user_for_ad`` and ``bulk_ban_users`` — so the privilege rule has exactly
+one home here: ``_resolve_ban_targets``. A non-superuser ``moderator_id`` may
+not ban a target that is ``is_staff=True`` OR ``is_superuser=True``, and may
+not ban its own row; a superuser is unrestricted. **Self-exclusion is
+unconditional, including for a superuser** — there is no un-ban path and no
+per-request web gate for this flag, so a self-ban is an operator lockout the UI
+cannot repair. Skip categories are counted **self first, then privilege**, so a
+row that is both the actor's own and privileged is counted once, as
+``skipped_self``.
+
+The rule is a **target scope** (which rows may be written), not an actor gate
+(*who may run the action*). Actor scope stays in the permission layer
+(``AdAdmin.has_view_permission`` / ``has_change_permission`` and
+``moderation.views.decorators.staff_required``) and is deliberately not
+re-implemented here; ``apps/users/services/deactivation.py`` documents the same
+split for the ``is_active`` lever. ``moderator_id`` is an ``int`` pk, so the
+superuser-unrestricted branch is reproduced by a lookup, and an unknown pk
+fails **closed** (treated as a non-superuser).
+
+Why no row lock on the bulk ban path
+------------------------------------
+``bulk_ban_users`` takes no ``select_for_update()``: a bare bulk ``UPDATE`` does
+not read, and the privilege / self / already-banned exclusions are ``WHERE``
+clauses evaluated by the database at write time, so a lock would buy nothing.
+``ban_user_for_ad`` **does** hold ``select_for_update()``, because it reads a
+row and writes fields from the read instance (a genuine read-then-write). **Do
+not "fix" the bulk path by adding a lock.** This rationale lives here, not in
+the function, because ``TestBulkLockingStructure::test_bulk_ban_users_not_locked``
+asserts the absence of that token over the **whole function source** — a
+docstring or comment inside ``bulk_ban_users`` that named it would fail the
+test.
 """
 
 import logging
+from collections.abc import Iterable
+from typing import NamedTuple
 
 from django.db import OperationalError, transaction
+from django.db.models import QuerySet
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus, ApproveOutcome
@@ -23,6 +61,40 @@ from apps.moderation.services.moderation_log import (
 from apps.users.models import User
 
 logger = logging.getLogger(__name__)
+
+
+class BanResult(NamedTuple):
+    """Outcome of a ban by ``ban_user_for_ad`` / ``bulk_ban_users``.
+
+    ``changed`` is the number of bans actually performed. It is *also* the
+    number of rows the pre-filtered bulk ``UPDATE`` targeted, because the
+    already-banned rows were removed first — **a bare ``UPDATE`` reports the
+    matched-row count, not the changed-row count** (Postgres semantics), which
+    is the whole reason the ``is_banned=False`` pre-filter exists. A future
+    editor must not remove that filter on the assumption that the database
+    reports changes.
+
+    ``skipped_self`` and ``skipped_privileged`` are the counts refused before
+    the write: the actor's own row, and rows a non-superuser actor is not
+    permitted to touch. ``already_in_state`` is the count of selected rows the
+    actor *was* permitted to touch but that were already banned (a no-op). All
+    three are reported so a partial or fully-refused selection does not read as
+    success; without ``already_in_state``, a selection of 10 rows of which 3
+    are already banned would say "Banned 7 user(s)" with no hint that 3 were
+    dropped.
+
+    When a row is both the actor's own and privileged, it is counted as
+    ``skipped_self`` only: self-exclusion is checked first, so the skip
+    categories never double-count a row.
+
+    This is a ``NamedTuple``, not persisted and not a ``StrEnum``: it satisfies
+    the constants rule by its type and needs no migration.
+    """
+
+    changed: int
+    skipped_self: int
+    skipped_privileged: int
+    already_in_state: int
 
 
 def approve_ad(ad: Ad, moderator_id: int) -> ApproveOutcome:
@@ -99,14 +171,96 @@ def reject_ad(ad: Ad, moderator_id: int, reason: str) -> None:
     logger.info("Ad %s rejected by moderator %s", ad.id, moderator_id)
 
 
-def ban_user_for_ad(ad: Ad, moderator_id: int, reason: str) -> None:
+def _resolve_ban_targets(
+    user_ids: Iterable[int], moderator_id: int
+) -> tuple[QuerySet[User], BanResult]:
     """
-    Ban the user who posted the ad.
+    Apply the ban target scope; return the writable queryset and the counts.
+
+    The single home of the privilege rule for the ``is_banned`` lever, called by
+    BOTH ``ban_user_for_ad`` and ``bulk_ban_users``. Order matters and is
+    deliberate: **self first, then privilege**, so a row that is both is counted
+    once, as ``skipped_self``. The skip counts are computed against the *original*
+    candidate set so the operator is told how many selected rows were refused,
+    then the exclusions produce the writable set.
+
+    ``moderator_id`` is an ``int`` pk, so the actor is resolved by a lookup
+    rather than read off a passed instance. The superuser-unrestricted branch is
+    reproduced by asking whether that pk is a superuser; an unknown pk (or the
+    ``None`` id a caller may pass) fails **closed** — the actor is treated as a
+    non-superuser, so the selection is restricted. That is the safe default for
+    an input no production or test producer creates.
+
+    Candidates are built from the supplied ids, so ``None`` and dangling ids
+    match no row and are neither banned nor counted, preserving the callers'
+    tolerance of a null ``user_id`` without a per-item guard.
+
+    A non-superuser actor is restricted to non-privileged targets
+    (``exclude(is_staff=True).exclude(is_superuser=True)``); a superuser keeps
+    the full set minus their own row. Rows already banned are **not** in the
+    writable set — a bare ``UPDATE`` would otherwise report the matched-row count
+    and mask the no-op — but they **are** counted in ``already_in_state`` so the
+    operator sees they were dropped rather than silently omitted.
+
+    Takes no row lock: a lock here would apply to both writers and would defeat
+    the documented policy. The bulk update's exclusions are ``WHERE`` clauses
+    evaluated at write time; the single-ad writer holds its own legitimate lock.
+
+    Call this inside the caller's ``transaction.atomic()``: the counts and the
+    write must observe one snapshot, or a concurrent flip between a count and the
+    ``UPDATE`` can skew the *reported* count by one. The write scope itself is
+    unaffected either way.
+    """
+    candidates = User.objects.filter(pk__in=set(user_ids))
+    actor_is_superuser = User.objects.filter(
+        pk=moderator_id, is_superuser=True
+    ).exists()
+
+    if actor_is_superuser:
+        permitted = candidates
+        skipped_privileged = 0
+    else:
+        permitted = candidates.exclude(is_staff=True).exclude(is_superuser=True)
+        privileged = candidates.filter(is_staff=True) | candidates.filter(
+            is_superuser=True
+        )
+        # Exclude the actor's own row so a self+privileged row counts once, as
+        # skipped_self (self is checked first).
+        skipped_privileged = privileged.exclude(pk=moderator_id).distinct().count()
+
+    skipped_self = candidates.filter(pk=moderator_id).count()
+
+    writable = permitted.exclude(pk=moderator_id).filter(is_banned=False)
+    already_in_state = (
+        permitted.exclude(pk=moderator_id).filter(is_banned=True).count()
+    )
+    return writable, BanResult(
+        changed=0,
+        skipped_self=skipped_self,
+        skipped_privileged=skipped_privileged,
+        already_in_state=already_in_state,
+    )
+
+
+def ban_user_for_ad(ad: Ad, moderator_id: int, reason: str) -> BanResult:
+    """
+    Ban the user who posted the ad, subject to the ban target scope.
+
+    The target is read under ``select_for_update()`` (a genuine read-then-write
+    on the instance), then ``_resolve_ban_targets`` gives the authoritative
+    single-target decision. A refused target (self / privileged / already
+    banned) writes nothing and reaches no audit row; ``log_ban_account`` is
+    called ONLY when the resolver's writable set contains the target, so no
+    ``BAN_ACCOUNT`` row exists for a ban that did not happen.
 
     Args:
         ad: Ad instance whose user will be banned
         moderator_id: Moderator user ID performing the action
         reason: Ban reason (INTERNAL ONLY)
+
+    Returns:
+        A ``BanResult``. ``changed`` is 1 on a performed ban and 0 on any
+        refusal; the three skip counts report why rows were dropped.
     """
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         try:
@@ -117,22 +271,66 @@ def ban_user_for_ad(ad: Ad, moderator_id: int, reason: str) -> None:
                 ad.user_id,
                 ad.id,
             )
-            return
+            return BanResult(
+                changed=0,
+                skipped_self=0,
+                skipped_privileged=0,
+                already_in_state=0,
+            )
 
-        if not user.is_banned:
+        writable, result = _resolve_ban_targets([user.pk], moderator_id)
+
+        if writable.filter(pk=user.pk).exists():
             user.is_banned = True
             user.save(update_fields=["is_banned"])
-
             log_ban_account(
                 user_id=user.id,
                 moderator_id=moderator_id,
                 reason=reason,
             )
+            result = result._replace(changed=1)
             logger.info(
                 "User %s banned by moderator %s",
                 mask_telegram_id(user.telegram_id),
                 moderator_id,
             )
+        else:
+            reason_dropped = _ban_refusal_reason(result)
+            logger.warning(
+                "ban_user_for_ad: ban of user %s (ad %s) refused by target scope (%s)",
+                user.pk,
+                ad.id,
+                reason_dropped,
+            )
+
+    logger.info(
+        "ban_user_for_ad by moderator %s: changed=%s skipped_self=%s "
+        "skipped_privileged=%s already_in_state=%s (target_scope=%s)",
+        moderator_id,
+        result.changed,
+        result.skipped_self,
+        result.skipped_privileged,
+        result.already_in_state,
+        "unrestricted"
+        if User.objects.filter(pk=moderator_id, is_superuser=True).exists()
+        else "non_privileged_only",
+    )
+    return result
+
+
+def _ban_refusal_reason(result: BanResult) -> str:
+    """Name why a single target was refused, derived from the resolver counts.
+
+    Self is checked first, so a target that is both the actor's own and
+    privileged is reported as ``self`` only, mirroring the count categories.
+    """
+    if result.skipped_self:
+        return "self"
+    if result.skipped_privileged:
+        return "privileged"
+    if result.already_in_state:
+        return "already_banned"
+    return "not_in_target_set"
 
 
 def soft_delete_ad(ad: Ad, moderator_id: int, reason: str) -> None:
@@ -273,9 +471,20 @@ def bulk_reject(queryset, moderator_id: int, reason: str) -> int:
     return count
 
 
-def bulk_ban_users(queryset, moderator_id: int, reason: str) -> int:
+def bulk_ban_users(queryset, moderator_id: int, reason: str) -> BanResult:
     """
-    Bulk ban users who posted the ads.
+    Bulk ban the users who posted the ads, subject to the ban target scope.
+
+    The candidate ids come from the ad queryset, then ``_resolve_ban_targets``
+    gives the authoritative decision: the privilege exclusions, the actor's
+    self-exclusion, and the already-banned pre-filter. The audit loop runs over
+    the writable targets only (ascending pk, so it is deterministic) and the
+    single ``UPDATE`` carries the same exclusions and runs AFTER the loop — so a
+    failed audit write rolls the whole block back, nothing is banned, and no
+    ``BAN_ACCOUNT`` row is written for a target the scope refused or that was
+    already banned.
+
+    The bulk update performs no prior read and takes no row lock.
 
     Args:
         queryset: Ad queryset to identify users
@@ -283,23 +492,37 @@ def bulk_ban_users(queryset, moderator_id: int, reason: str) -> int:
         reason: Ban reason (INTERNAL ONLY)
 
     Returns:
-        Number of users banned
+        A ``BanResult``. ``changed`` is the number of bans performed — not the
+        number of user ids seen — with the three skip counts reporting refused
+        and already-banned rows.
     """
     user_ids = set(queryset.values_list("user_id", flat=True))
-    count = 0
 
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
-        for user_id in user_ids:
-            if user_id:
-                log_ban_account(
-                    user_id=user_id,
-                    moderator_id=moderator_id,
-                    reason=reason,
-                )
-                count += 1
+        targets, result = _resolve_ban_targets(user_ids, moderator_id)
 
-        User.objects.filter(id__in=user_ids).update(is_banned=True)
-    return count
+        for banned_id in targets.order_by("pk").values_list("pk", flat=True):
+            log_ban_account(
+                user_id=banned_id,
+                moderator_id=moderator_id,
+                reason=reason,
+            )
+
+        result = result._replace(changed=targets.update(is_banned=True))
+
+    logger.info(
+        "bulk_ban_users by moderator %s: changed=%s skipped_self=%s "
+        "skipped_privileged=%s already_in_state=%s (target_scope=%s)",
+        moderator_id,
+        result.changed,
+        result.skipped_self,
+        result.skipped_privileged,
+        result.already_in_state,
+        "unrestricted"
+        if User.objects.filter(pk=moderator_id, is_superuser=True).exists()
+        else "non_privileged_only",
+    )
+    return result
 
 
 def bulk_delete(queryset, moderator_id: int, reason: str) -> int:

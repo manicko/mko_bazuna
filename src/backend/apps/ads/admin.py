@@ -25,6 +25,7 @@ from django.contrib import admin
 from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus, ModeratorActionType
 from apps.moderation.admin_actions import (
+    BanResult,
     bulk_approve,
     bulk_ban_users,
     bulk_delete,
@@ -50,6 +51,14 @@ _TIMESTAMP_FIELD_FOR_STATUS: dict[AdStatus, str] = {
     AdStatus.REJECTED: "rejected_at",
     AdStatus.ON_MODERATION_FAILED: "moderation_failed_at",
 }
+
+# Operator-facing label for the ban toast's dropped-row clause. Deliberately a
+# bare English-only literal on a staff-only surface, like the deactivation
+# toast's ``SKIPPED_ROWS_PREFIX`` in ``apps/users/admin.py`` — the literal is
+# duplicated here on purpose: importing it would create a new app-to-app import
+# edge (``ads`` -> ``users.admin``), and a local literal is what lets a test pin
+# the stable substring.
+SKIPPED_BANNED_ROWS_PREFIX = "Skipped:"
 
 
 class AdAdminChangeForm(forms.ModelForm):
@@ -425,9 +434,30 @@ class AdAdmin(admin.ModelAdmin):
 
     @admin.action(description="Ban users from selected ads")
     def action_ban_user(self, request, queryset):
-        """Bulk ban users from selected ads."""
-        count = bulk_ban_users(queryset, request.user.id, "Bulk ban via admin action")
-        self.message_user(request, f"Banned {count} user(s).", level="success")
+        """Bulk ban users from selected ads, reporting performed vs skipped rows."""
+        result = bulk_ban_users(queryset, request.user.id, "Bulk ban via admin action")
+        self.message_user(request, self._ban_message(result), level="success")
+
+    def _ban_message(self, result: BanResult) -> str:
+        """Build the operator toast for a bulk ban.
+
+        Mirrors ``UserAdmin._deactivation_message``'s shape: name the bans
+        performed, then report the dropped rows so a partial or fully-refused
+        selection does not read as success. ``changed`` is bans performed, not
+        user ids seen, and the skip clauses name self/privileged refusals and
+        rows already banned.
+        """
+        message = f"Banned {result.changed} user(s)."
+        dropped: list[str] = []
+        if result.skipped_self:
+            dropped.append(f"{result.skipped_self} self")
+        if result.skipped_privileged:
+            dropped.append(f"{result.skipped_privileged} privileged (not permitted)")
+        if result.already_in_state:
+            dropped.append(f"{result.already_in_state} already in the requested state")
+        if dropped:
+            message += f" {SKIPPED_BANNED_ROWS_PREFIX} " + ", ".join(dropped) + "."
+        return message
 
     @admin.action(description="Soft delete selected ads")
     def action_soft_delete(self, request, queryset):
