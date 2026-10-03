@@ -324,6 +324,32 @@ class TestDeletePhoto:
         assert error.error_type == "PermissionError"
         assert error.attempts == DELETE_PHOTO_MAX_ATTEMPTS
 
+    @pytest.mark.django_db
+    def test_delete_photo_swallows_a_failed_deletion_error_record(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A DB failure while recording the failure never propagates (07-MEDIA-010)."""
+        from django.db import OperationalError
+
+        from apps.media.models import MediaDeletionError
+
+        with (
+            patch(
+                "apps.media.services.filesystem.os.remove",
+                side_effect=PermissionError("denied"),
+            ) as mock_remove,
+            patch("apps.media.services.filesystem.time.sleep"),
+            patch.object(
+                MediaDeletionError.objects,
+                "create",
+                side_effect=OperationalError("db down"),
+            ),
+        ):
+            delete_photo("locked.jpg")  # must not raise
+
+        assert mock_remove.call_count == DELETE_PHOTO_MAX_ATTEMPTS
+        assert "Failed to persist MediaDeletionError" in caplog.text
+
 
 # ---------------------------------------------------------------------------
 # Test — strip_photo_exif

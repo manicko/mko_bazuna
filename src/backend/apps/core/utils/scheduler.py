@@ -91,7 +91,12 @@ def _handle_shutdown_signal(signum: int, frame: Any) -> None:
     logger.info("Received signal %s; requesting graceful scheduler shutdown", signum)
     _stop_event.set()
 
-# Phase 4 hourly sweeps + Phase 2 purges (run every hour)
+# Phase 4 hourly sweeps + Phase 2 purges + the media deletion-error
+# retention purge (07-MEDIA-010, AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS).
+# The purge is hourly, not daily, because a DAILY command's exit code is
+# load-bearing for the durable daily marker: a non-zero exit would leave the
+# day unrecorded and re-dispatch send_alerts / rollup_daily_metrics on every
+# subsequent hourly tick. An hourly command only gates the liveness marker.
 HOURLY_COMMANDS: list[str] = [
     "archive_sweep",
     "delete_sweep",
@@ -102,6 +107,7 @@ HOURLY_COMMANDS: list[str] = [
     "purge_failed_ads",
     "purge_rejected_ads",
     "purge_deleted_ads",
+    "purge_media_deletion_errors",
 ]
 
 # Daily at 08:00 UTC — first hourly tick >= 08:00 UTC each calendar day.

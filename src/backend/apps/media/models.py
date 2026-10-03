@@ -2,7 +2,9 @@
 Media models for Mko Bazuna.
 
 ``MediaDeletionError`` records filesystem deletion failures that exhausted
-all retries in ``delete_photo``, enabling operational escalation (ME-003).
+all retries in ``delete_photo``. It has an operator surface
+(``apps.media.admin``) and a bounded retention window
+(``purge_media_deletion_errors``, 30 days) as of 07-MEDIA-010.
 """
 
 from django.db import models
