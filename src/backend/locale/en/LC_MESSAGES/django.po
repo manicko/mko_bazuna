@@ -1547,6 +1547,16 @@ msgid ""
 "consent first."
 msgstr ""
 
+#: src/telegram_bot/middlewares/permissions.py
+msgid ""
+"To post an ad, please sign in and accept the personal data storage consent "
+"first."
+msgstr ""
+
+#: src/backend/apps/ads/views/edit.py
+msgid "To manage ads, please accept the personal data storage consent first."
+msgstr ""
+
 #~ msgid ""
 #~ "Withdrawing consent permanently erases your Telegram ID, all ads, and "
 #~ "prevents re-login. Are you sure?"

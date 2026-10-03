@@ -55,7 +55,7 @@ def dashboard_seller(category, city):
 
     Also creates another seller (noise) whose events should not appear.
     """
-    seller = make_user(991001001)
+    seller = make_user(991001001, consent_given_at=timezone.now())
     other_user = make_user(991001002)
 
     ad_a = create_test_ad(
@@ -300,7 +300,7 @@ class TestDashboardEdgeCases:
 
     def test_empty_stats_when_no_events(self, category, city) -> None:
         """Seller with no events gets zeroed stats."""
-        empty_user = make_user(991001003)
+        empty_user = make_user(991001003, consent_given_at=timezone.now())
         client = Client()
         client.force_login(empty_user)
         create_test_ad(

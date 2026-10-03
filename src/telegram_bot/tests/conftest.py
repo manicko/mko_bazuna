@@ -83,7 +83,13 @@ def dp() -> Dispatcher:
 
 @pytest_asyncio.fixture
 async def user() -> Any:
-    """Create a test user."""
+    """Create a test user with granted storage consent.
+
+    ``consent_given_at`` is repaired explicitly after ``get_or_create`` (not
+    only in ``defaults=``) because a row left over from a previous
+    ``--reuse-db`` run never receives a new default — and the create-time
+    ad-creation gate (06-PII-109) would then refuse it.
+    """
     from apps.users.models import User
 
     user, _ = await sync_to_async(User.objects.get_or_create)(
@@ -95,6 +101,9 @@ async def user() -> Any:
             "last_name": "User",
         },
     )
+    if user.consent_given_at is None:
+        user.consent_given_at = timezone.now()
+        await sync_to_async(user.save)(update_fields=["consent_given_at"])
     return user
 
 
@@ -127,7 +136,9 @@ def seller() -> User:
     Uses telegram_id 900 000 100 to match the bot test-suite convention.
     Note: the ``user`` fixture above also uses this ID — no single test
     requests both. Uses ``get_or_create`` (like ``user`` above) so it is
-    idempotent and survives ``--reuse-db``.
+    idempotent and survives ``--reuse-db``. ``consent_given_at`` is repaired
+    explicitly after ``get_or_create`` for the same ``--reuse-db`` reason
+    (06-PII-109).
     """
     user, _ = User.objects.get_or_create(
         telegram_id=900000100,
@@ -136,6 +147,9 @@ def seller() -> User:
             "password": "x",
         },
     )
+    if user.consent_given_at is None:
+        user.consent_given_at = timezone.now()
+        user.save(update_fields=["consent_given_at"])
     return user
 
 

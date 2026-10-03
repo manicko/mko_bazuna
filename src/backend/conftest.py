@@ -172,11 +172,14 @@ def _restore_test_schema_post_db_setup(django_db_setup, django_db_blocker):
 
 @pytest.fixture
 def seller() -> User:
-    """Create a generic seller user.
+    """Create a generic seller user with granted storage consent.
 
     Uses ``get_or_create`` keyed on the fixed ``telegram_id`` so the fixture
     is idempotent and survives ``--reuse-db`` (stale rows left by an
-    interrupted run do not cause IntegrityError).
+    interrupted run do not cause IntegrityError). ``consent_given_at`` is set
+    **explicitly after** ``get_or_create`` (not only in ``defaults=``): a row
+    left over from a previous ``--reuse-db`` run never receives a new default,
+    so the create-time ad-creation gate (06-PII-109) would refuse it.
     """
     user, _ = User.objects.get_or_create(
         telegram_id=900000001,
@@ -185,12 +188,19 @@ def seller() -> User:
             "password": "x",
         },
     )
+    if user.consent_given_at is None:
+        user.consent_given_at = timezone.now()
+        user.save(update_fields=["consent_given_at"])
     return user
 
 
 @pytest.fixture
 def user() -> User:
-    """Create a generic user (alias of seller for modules that use 'user')."""
+    """Create a generic user (alias of seller for modules that use 'user').
+
+    ``consent_given_at`` is repaired explicitly after ``get_or_create`` for the
+    same ``--reuse-db`` reason as the ``seller`` fixture (06-PII-109).
+    """
     user, _ = User.objects.get_or_create(
         telegram_id=900000002,
         defaults={
@@ -198,12 +208,19 @@ def user() -> User:
             "password": "x",
         },
     )
+    if user.consent_given_at is None:
+        user.consent_given_at = timezone.now()
+        user.save(update_fields=["consent_given_at"])
     return user
 
 
 @pytest.fixture
 def buyer() -> User:
-    """Create a generic buyer user (password 'y', next ID after user)."""
+    """Create a generic buyer user (password 'y', next ID after user).
+
+    Granted storage consent after ``get_or_create`` for ``--reuse-db`` safety
+    (06-PII-109).
+    """
     user, _ = User.objects.get_or_create(
         telegram_id=900000003,
         defaults={
@@ -211,6 +228,9 @@ def buyer() -> User:
             "password": "y",
         },
     )
+    if user.consent_given_at is None:
+        user.consent_given_at = timezone.now()
+        user.save(update_fields=["consent_given_at"])
     return user
 
 

@@ -27,6 +27,7 @@ from apps.search.models import SavedSearch
 from apps.users.models import User
 from apps.users.services import (
     AccountState,
+    can_create_ad,
     can_login,
     can_publish_ad,
     get_account_state,
@@ -539,3 +540,66 @@ def test_alert_query_imports_in_fresh_interpreter() -> None:
     result = _run_in_subprocess(env, code)
     assert result.returncode == 0, result.stderr
     assert "IMPORT_OK" in result.stdout
+
+
+
+# ---------------------------------------------------------------------------
+# Tests: can_create_ad — the composed create-time gate (06-PII-109)
+# ---------------------------------------------------------------------------
+
+
+class TestCanCreateAd:
+    """The conjunction of can_publish_ad and can_store_personal_data.
+
+    Neither predicate alone is the rule: can_publish_ad deliberately omits
+    ``consent_given_at`` and can_store_personal_data deliberately omits
+    ``ads_auto_publish``. Composing them is what keeps the existing
+    ``TestCanPublishAd`` matrix green (no card was mutated).
+    """
+
+    def test_consented_unrestricted_user_can_create(self, user: User) -> None:
+        """A consented, unblocked user passes the composed gate."""
+        assert user.consent_given_at is not None
+        assert can_create_ad(user) is True
+
+    def test_never_consented_user_cannot_create(self) -> None:
+        """A user without a granted consent_given_at cannot create."""
+        u = make_user(900001050)
+        assert u.consent_given_at is None
+        assert can_create_ad(u) is False
+
+    def test_declined_user_cannot_create(self) -> None:
+        """A declined user is refused by the storage-consent conjunct.
+
+        The decline is enforced via ``is_declined`` in
+        ``can_store_personal_data``; ``can_publish_ad`` alone would allow this
+        account, which is exactly why the composition — not a mutation of
+        ``can_publish_ad`` — is the rule.
+        """
+        u = make_user(900001051, is_declined=True)
+        assert can_publish_ad(u) is True  # unchanged: decline is not a publish flag
+        assert can_create_ad(u) is False
+
+    def test_restricted_user_cannot_create(self) -> None:
+        """ads_auto_publish=False is refused by the publish conjunct."""
+        from django.utils import timezone
+
+        u = make_user(
+            900001052, ads_auto_publish=False, consent_given_at=timezone.now()
+        )
+        assert can_create_ad(u) is False
+
+    def test_give_consent_restores_creation(self, user: User) -> None:
+        """A declined user regains creation after give_consent with no code change."""
+        from apps.users.services.deletion import decline_consent, give_consent
+
+        decline_consent(user)
+        user.refresh_from_db()
+        assert can_create_ad(user) is False
+
+        give_consent(user)
+        user.refresh_from_db()
+        assert user.consent_given_at is not None
+        assert can_create_ad(user) is True
+        assert user.consent_revoked_at is None
+        assert user.is_declined is False

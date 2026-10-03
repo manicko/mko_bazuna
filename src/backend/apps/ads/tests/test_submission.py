@@ -26,7 +26,7 @@ from apps.ads.services.submission import (
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.models import ExchangeRate
-from conftest import create_test_ad
+from conftest import create_test_ad, make_user
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -723,3 +723,93 @@ def test_moderation_failure_still_reclaims_skipped_files(
 
         # The first photo's row committed and its files were promoted.
         assert AdImage.objects.filter(ad=ad).count() == 1
+
+
+
+# ---------------------------------------------------------------------------
+# 06-PII-109: create-time storage-consent gate — refused before any write
+# ---------------------------------------------------------------------------
+
+
+class TestSubmitAdStorageConsentGate:
+    """``submit_ad`` refuses a never-consented seller before any write.
+
+    The gate is the FIRST statement of ``submit_ad``: before the staged-media
+    plan, thumbnail generation and ``transaction.atomic()``. A refused seller
+    therefore has no row mutated, no ``AdImage`` created and no filesystem touch.
+    """
+
+    def _input_for(self, ad: Ad, *, photos: list[dict] | None = None) -> SubmitAdInput:
+        return SubmitAdInput(
+            ad_id=ad.id,
+            title_ru="Should not be written",
+            desc_ru="Should not be written",
+            category_id=ad.category_id,
+            city_id=ad.city_id,
+            price_amount=Decimal("100"),
+            price_currency=CurrencyCode.EUR,
+            photos=photos or [],
+            user_id=ad.user_id,
+        )
+
+    def test_never_consented_seller_refused(self, category, city) -> None:
+        """A never-consented seller gets CONSENT_REQUIRED and no row change."""
+        seller = make_user(900000710)
+        assert seller.consent_given_at is None
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.DRAFT, title="Original"
+        )
+
+        result = submit_ad(self._input_for(ad))
+
+        assert result.outcome is SubmitAdOutcome.CONSENT_REQUIRED
+        assert result.errors  # carries a user-facing reason
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.DRAFT
+        assert ad.title == "Original"
+
+    def test_refusal_precedes_the_staged_media_plan(self, category, city, tmp_path) -> None:
+        """The gate wins over ``PHOTO_UNAVAILABLE`` — it runs before the plan.
+
+        A staged photo key whose file is missing would normally raise inside
+        ``plan_staging_promotion`` and yield PHOTO_UNAVAILABLE. Observing
+        CONSENT_REQUIRED instead proves the consent gate is the first statement,
+        ahead of every filesystem touch.
+        """
+        from django.test import override_settings
+
+        from apps.media.services.filesystem import STAGING_PREFIX
+
+        seller = make_user(900000711)
+        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+
+        photos = [
+            {
+                "storage_key": f"{STAGING_PREFIX}never-uploaded.jpg",
+                "telegram_file_id": "AgADBQ",
+                "position": 0,
+            }
+        ]
+
+        with override_settings(MEDIA_ROOT=str(tmp_path)):
+            result = submit_ad(self._input_for(ad, photos=photos))
+
+        assert result.outcome is SubmitAdOutcome.CONSENT_REQUIRED
+        assert result.outcome is not SubmitAdOutcome.PHOTO_UNAVAILABLE
+        assert not (tmp_path / STAGING_PREFIX / "never-uploaded.jpg").exists()
+
+    def test_consented_seller_submits_unchanged(self, seller, category, city) -> None:
+        """A consented seller submits exactly as before (the gate is transparent)."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+
+        with patch(
+            "apps.moderation.services.auto_moderation.auto_moderate",
+            return_value=True,
+        ):
+            result = submit_ad(self._input_for(ad))
+
+        assert result.outcome is SubmitAdOutcome.PUBLISHED
+        assert result.errors == []
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION
+        assert ad.title == "Should not be written"

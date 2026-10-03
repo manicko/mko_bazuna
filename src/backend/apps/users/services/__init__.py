@@ -2,6 +2,7 @@
 
 from .account_state import (
     AccountState,
+    can_create_ad,
     can_login,
     can_publish_ad,
     get_account_state,
@@ -18,6 +19,7 @@ from .deletion import (
 __all__ = [
     "AccountState",
     "anonymized_client_ip",
+    "can_create_ad",
     "can_publish_ad",
     "can_login",
     "get_account_state",

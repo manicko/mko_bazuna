@@ -13,6 +13,7 @@ from datetime import timedelta
 
 import pytest
 from django.test import Client
+from django.urls import reverse
 from django.utils import timezone
 from pydantic import ValidationError
 
@@ -610,24 +611,35 @@ class TestConsentBannerGuard:
 
     The banner include in every template is guarded by:
     ``{% if not request.user.is_authenticated or not request.user.is_deleted %}``
-    so that soft-deleted users never see the consent banner, even when they
-    briefly pass through a view before any redirect.
+    so that soft-deleted users never see the consent banner.
+
+    These assertions use the **public listings page**, not the dashboard: under
+    the create-time storage-consent gate (06-PII-109) a never-consented user is
+    refused the dashboard with a 403, so the dashboard can no longer be the
+    surface where an un-consented banner is observed. The public page carries
+    the same banner include and the same guard.
     """
 
     def test_banner_hidden_for_deleted_user(self, deleted_user: User) -> None:
-        """Deleted users do *not* see the consent banner on the dashboard."""
+        """Deleted users do *not* see the consent banner on the public page."""
         client = Client()
         client.force_login(deleted_user)
-        response = client.get("/dashboard/")
+        response = client.get(reverse("ads:listings"))
 
         assert response.status_code == 200
         assert b"consent-banner" not in response.content
 
-    def test_banner_shown_for_active_user(self, user: User) -> None:
-        """Active, non-consenting users see the consent banner on the dashboard."""
+    def test_banner_shown_for_active_user(self) -> None:
+        """Active, non-consenting users see the consent banner on the public page."""
+        un_consented = User.objects.create(
+            telegram_id=900000032,
+            chat_id=900000032,
+            password="x",
+        )
+        assert un_consented.consent_given_at is None
         client = Client()
-        client.force_login(user)
-        response = client.get("/dashboard/")
+        client.force_login(un_consented)
+        response = client.get(reverse("ads:listings"))
 
         assert response.status_code == 200
         assert b"consent-banner" in response.content

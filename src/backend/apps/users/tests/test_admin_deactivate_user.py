@@ -265,7 +265,9 @@ def test_moderator_cannot_reactivate_a_superuser(
 
 def test_deactivate_user_revokes_an_existing_web_session(superuser: User) -> None:
     """The §1 probe promoted: deactivation kills a live web session next request."""
-    target = _make_user(930000116)
+    from django.utils import timezone
+
+    target = _make_user(930000116, consent_given_at=timezone.now())
 
     client = Client()
     client.force_login(target)
@@ -288,8 +290,9 @@ def test_deactivate_user_leaves_the_django_session_row_in_place(
     ``15-AUTHZ-001``. This asserts the residual deliberately.
     """
     from django.contrib.sessions.models import Session
+    from django.utils import timezone
 
-    target = _make_user(930000117)
+    target = _make_user(930000117, consent_given_at=timezone.now())
 
     client = Client()
     client.force_login(target)

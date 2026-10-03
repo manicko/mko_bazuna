@@ -110,6 +110,40 @@ def _text_fields_changed(dto: AdEditInput, ad: Ad) -> bool:
     return dto.title != ad.title or dto.description != ad.description
 
 
+def _seller_may_create_ad(user) -> bool:
+    """Whether the authenticated seller may create/edit an ad (06-PII-109).
+
+    Thin view-layer seam over the composed ``can_create_ad`` predicate so every
+    seller write surface consults the same rule. This is deliberately separate
+    from, and checked alongside, the ownership check: an account that owns the
+    ad is still refused when it has not granted (or has withdrawn) storage
+    consent, so the gate is consulted rather than the ownership check firing.
+    """
+    from apps.users.services.account_state import can_create_ad
+
+    return can_create_ad(user)
+
+
+def _consent_required_forbidden(user, ad_id: int) -> HttpResponseForbidden:
+    """Log and build the storage-consent 403 for a seller write surface.
+
+    Uses ``HttpResponseForbidden`` with a distinct message — the same shape
+    these views already use for the ownership refusal. There is no GET consent
+    page (``users/urls.py`` exposes POST-only consent endpoints), so a 403 with
+    a clear message is the honest response.
+    """
+    logger.warning(
+        "User %s refused ad %s write: personal-data storage consent required",
+        user.id,
+        ad_id,
+    )
+    return HttpResponseForbidden(
+        _(
+            "To manage ads, please accept the personal data storage consent first."
+        )
+    )
+
+
 @login_required
 def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
@@ -141,6 +175,9 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
             ad.user_id,
         )
         return HttpResponseForbidden(_("You do not have permission to edit this ad."))
+
+    if not _seller_may_create_ad(request.user):
+        return _consent_required_forbidden(request.user, ad_id)
 
     if request.method == "GET":
         # Prefetch images for the edit template
@@ -387,6 +424,9 @@ def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
                 _("You do not have permission to archive this ad.")
             )
 
+        if not _seller_may_create_ad(request.user):
+            return _consent_required_forbidden(request.user, ad_id)
+
         if ad.status == AdStatus.PUBLISHED:
             ad.transition_to(AdStatus.ARCHIVED)
             logger.info("Ad %s archived by user %s", ad_id, request.user.id)
@@ -424,6 +464,9 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
             return HttpResponseForbidden(
                 _("You do not have permission to reactivate this ad.")
             )
+
+        if not _seller_may_create_ad(request.user):
+            return _consent_required_forbidden(request.user, ad_id)
 
         if ad.status == AdStatus.ARCHIVED:
             # Update status to ON_MODERATION for re-check (transition_to clears archived_at)

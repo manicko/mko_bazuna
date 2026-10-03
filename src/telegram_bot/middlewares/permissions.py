@@ -7,20 +7,30 @@ users with ads_auto_publish=False.
 """
 
 import logging
-from typing import Any
+from typing import Any, Final
 
 from aiogram import BaseMiddleware
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, TelegramObject, Update
 from asgiref.sync import sync_to_async
-from django.utils.translation import gettext as _
+from django.utils.translation import gettext as _, gettext_lazy
 
 from apps.users.models import User
-from apps.users.services.account_state import get_account_state
+from apps.users.services.account_state import can_create_ad, get_account_state
 from telegram_bot.schemas.callbacks import BotCallbackPrefix
 from telegram_bot.states import ContactUsState
 
 logger = logging.getLogger(__name__)
+
+# Shown when a registered, otherwise-unblocked seller who has not granted
+# personal-data storage consent sends ``/post``. Creating an ad stores the
+# seller's text and photos, so the entry point is refused before the FSM opens.
+# ``gettext_lazy`` keeps the translation deferred to handler-run time so it
+# resolves under the per-user locale, not the import-time ``LANGUAGE_CODE``.
+AD_CONSENT_REQUIRED_MESSAGE: Final = gettext_lazy(
+    "To post an ad, please sign in and accept the personal data storage "
+    "consent first."
+)
 
 
 def _is_login_deep_link(text: str) -> bool:
@@ -446,6 +456,12 @@ class AccountStateMiddleware(BaseMiddleware):
 
         Pure: no DB access, no mutation of ``user``.
 
+        The ``ads_auto_publish`` branch stays **first**: its wording is the
+        established publishing-restriction answer and is asserted by an
+        existing test. The storage-consent term follows, delegating to the
+        composed :func:`can_create_ad` predicate (06-PII-109). A seller blocked
+        by either fact is refused here, before the ad-creation FSM is entered.
+
         Args:
             user: The resolved acting user, or None if unregistered.
 
@@ -464,4 +480,6 @@ class AccountStateMiddleware(BaseMiddleware):
                     "Your account has publishing restrictions. Contact support for assistance."
                 ),
             )
+        if not can_create_ad(user):
+            return (False, str(AD_CONSENT_REQUIRED_MESSAGE))
         return (True, "")

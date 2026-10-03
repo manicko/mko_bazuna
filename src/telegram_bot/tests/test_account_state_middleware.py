@@ -1133,6 +1133,69 @@ class TestUserIdBackfill:
 
 
 # ---------------------------------------------------------------------------
+# Create-time storage-consent gate at /post (06-PII-109)
+# ---------------------------------------------------------------------------
+
+
+class TestPostStorageConsentGate:
+    """A never-consented seller is refused at the /post entry point.
+
+    The storage-consent term is added *after* the ``ads_auto_publish`` branch,
+    so a publish-restricted account still gets its established wording (asserted
+    in ``TestUserIdBackfill.test_post_backfill_uses_the_same_row_as_the_state_gate``).
+    A registered, otherwise-unblocked account whose ``consent_given_at`` is NULL
+    is refused with the consent message.
+    """
+
+    @pytest.mark.asyncio
+    async def test_post_refused_without_storage_consent(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A never-consented user sending /post is refused, handler NOT called."""
+        from telegram_bot.middlewares.permissions import (
+            AD_CONSENT_REQUIRED_MESSAGE,
+        )
+
+        chat_id = _BASE_CHAT_ID + 900
+        user = await sync_to_async(make_user)(chat_id)
+        assert user.consent_given_at is None
+
+        update = _make_message_update(chat_id, "/post")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result is None
+        handler.assert_not_awaited()
+        mock_answer.assert_awaited_once()
+        assert str(AD_CONSENT_REQUIRED_MESSAGE) == mock_answer.call_args[0][0]
+
+    @pytest.mark.asyncio
+    async def test_post_allowed_with_storage_consent(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A consented user sending /post reaches the handler."""
+        from apps.users.services.deletion import give_consent
+
+        chat_id = _BASE_CHAT_ID + 901
+        user = await sync_to_async(make_user)(chat_id)
+        await sync_to_async(give_consent)(user)
+
+        update = _make_message_update(chat_id, "/post")
+        handler = AsyncMock(return_value="proceed")
+        mock_answer = AsyncMock()
+        monkeypatch.setattr(Message, "answer", mock_answer)
+
+        result = await AccountStateMiddleware()(handler, update, {})
+
+        assert result == "proceed"
+        handler.assert_awaited_once_with(update, {})
+        mock_answer.assert_not_awaited()
+
+
+# ---------------------------------------------------------------------------
 # Contact deep-link classifier (PII-001)
 # ---------------------------------------------------------------------------
 

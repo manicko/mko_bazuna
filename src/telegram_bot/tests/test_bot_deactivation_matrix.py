@@ -539,7 +539,7 @@ def test_web_session_still_revoked() -> None:
     A deactivated user's live session is treated as anonymous on the next
     request — the plan-18 guarantee this plan leaves untouched.
     """
-    user = make_user(900000999, is_active=True)
+    user = make_user(900000999, is_active=True, consent_given_at=timezone.now())
     user.set_password("testpass")
     user.save(update_fields=["password"])
 

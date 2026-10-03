@@ -13,7 +13,11 @@ from django.shortcuts import render
 from django.utils.translation import gettext_lazy as _
 
 from apps.ads.models import Ad
-from apps.ads.views.edit import EDIT_FORM_AVAILABLE_STATUSES
+from apps.ads.views.edit import (
+    EDIT_FORM_AVAILABLE_STATUSES,
+    _consent_required_forbidden,
+    _seller_may_create_ad,
+)
 from apps.analytics.services.seller_stats import SellerStats
 from apps.core.enums import AdStatus, TimeRange
 
@@ -38,6 +42,13 @@ def dashboard(request: HttpRequest) -> HttpResponse:
     Returns:
         Rendered dashboard template with grouped ads
     """
+    # Create-time storage-consent gate (06-PII-109). The dashboard is a seller
+    # write surface (its Edit/Archive/Reactivate links lead to gated views), so
+    # a never-consented or withdrawn account is refused here too. No ad id is
+    # involved, so ``ad_id=0`` is only the log correlator.
+    if not _seller_may_create_ad(request.user):
+        return _consent_required_forbidden(request.user, 0)
+
     # Parse time range filter from request
     selected_range_value = request.GET.get("time_range", TimeRange.ALL_TIME.value)
     try:

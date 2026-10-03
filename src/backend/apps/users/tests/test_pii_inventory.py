@@ -401,6 +401,38 @@ def test_support_ticket_entries_are_delete_row() -> None:
         )
 
 
+def test_ad_text_entries_are_delete_row() -> None:
+    """All six ``ads.Ad`` text columns are ``DELETE_ROW`` citing 06-PII-109.
+
+    The owner's decision (option (b), finding 06-PII-109) is that ad text is
+    **not** scrubbed during the 30-day grace window: the row genuinely *is*
+    deleted, by the hourly ``consent_hard_delete`` sweep at its named bound via
+    ``Ad.user`` ``on_delete=CASCADE``. A ``CLEAR`` action here would declare a
+    scrub that does not happen; a ``RETAIN`` action would declare the text
+    survives indefinitely. Neither is true.
+    """
+    lookup = _entry_lookup()
+    ad_text_columns = (
+        "title",
+        "title_en",
+        "title_bs",
+        "description",
+        "description_en",
+        "description_bs",
+    )
+
+    for column in ad_text_columns:
+        entry = lookup.get(("ads.Ad", column))
+        assert entry is not None, f"ads.Ad.{column} must be declared"
+        _label, _name, action, reason = entry
+        assert action == ErasureAction.DELETE_ROW, (
+            f"ads.Ad.{column} must be DELETE_ROW"
+        )
+        assert "06-PII-109" in reason, (
+            f"ads.Ad.{column} reason must cite 06-PII-109"
+        )
+
+
 def test_declared_entries_are_unique() -> None:
     """No duplicate ``(model_label, column)`` in the declaration."""
     keys = [(model_label, column) for model_label, column, _a, _r in PII_ERASURE_ENTRIES]

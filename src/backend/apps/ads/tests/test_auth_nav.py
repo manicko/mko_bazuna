@@ -41,12 +41,20 @@ def _clear_cache() -> Generator[None]:
 
 @pytest.fixture
 def staff_user() -> User:
-    """Create a staff user (admin-eligible)."""
+    """Create a staff user (admin-eligible) with granted storage consent.
+
+    The dashboard is a seller write surface gated on the create-time
+    storage-consent predicate (06-PII-109), so the staff user must have a
+    granted ``consent_given_at`` to reach it.
+    """
+    from django.utils import timezone
+
     return User.objects.create(
         telegram_id=920000002,
         chat_id=920000002,
         password="x",
         is_staff=True,
+        consent_given_at=timezone.now(),
     )
 
 
@@ -149,11 +157,23 @@ class TestAuthenticatedHeader:
         assert "Удалить данные" in content
         assert 'action="/consent/withdraw/"' in content
 
-    def test_consent_banner_shown_for_active_user(self, user: User) -> None:
-        """Unacted authenticated users still see the consent banner (CR9)."""
+    def test_consent_banner_shown_for_active_user(self) -> None:
+        """Un-consented authenticated users still see the consent banner (CR9).
+
+        Observed on the public listings page: under the create-time
+        storage-consent gate (06-PII-109) a never-consented user is refused the
+        dashboard with a 403, so the banner is shown on the public page, which
+        carries the same include.
+        """
+        un_consented = User.objects.create(
+            telegram_id=920000003,
+            chat_id=920000003,
+            password="x",
+        )
+        assert un_consented.consent_given_at is None
         client = Client()
-        client.force_login(user)
-        response = client.get(reverse("ads:dashboard") + "?lang=ru")
+        client.force_login(un_consented)
+        response = client.get(reverse("ads:listings") + "?lang=ru")
         assert response.status_code == 200
         assert b"consent-banner" in response.content
 

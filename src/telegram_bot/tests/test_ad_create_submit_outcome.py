@@ -273,6 +273,44 @@ class TestProcessPreviewOutcomes:
         assert len(drafts) == 1
 
     @pytest.mark.asyncio
+    async def test_consent_required_clears_state_and_shows_its_own_message(
+        self, seller, category, city
+    ) -> None:
+        """``CONSENT_REQUIRED`` is terminal for the dialog: answer + clear.
+
+        Unlike the recoverable non-content outcomes, a consent refusal cannot
+        be retried by pressing confirm again (the same gate would refuse), so
+        the handler answers the outcome's own message and clears the FSM rather
+        than re-pointing it at a fresh draft.
+        """
+        from apps.ads.services.submission import (
+            SubmitAdOutcome,
+            SubmitAdResult,
+        )
+        from telegram_bot.handlers.ad_create import process_preview
+
+        state = _build_state(_preview_data(seller, category, city))
+        message = _build_message()
+
+        with (
+            patch(
+                "telegram_bot.handlers.ad_create.submit.translate_all_languages",
+                _mock_translate,
+            ),
+            patch(
+                "telegram_bot.handlers.ad_create.submit.submit_ad",
+                return_value=SubmitAdResult(
+                    SubmitAdOutcome.CONSENT_REQUIRED, ["consent needed"]
+                ),
+            ),
+        ):
+            await process_preview(message, state)
+
+        assert message.answer.await_args.args[0] == "consent needed"
+        state.clear.assert_awaited()
+        state.update.assert_not_awaited()
+
+    @pytest.mark.asyncio
     async def test_moderation_failed_clears_state(
         self, seller, category, city
     ) -> None:

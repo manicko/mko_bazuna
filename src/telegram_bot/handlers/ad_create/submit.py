@@ -163,6 +163,22 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
 
             await state.clear()
 
+        elif result.outcome is SubmitAdOutcome.CONSENT_REQUIRED:
+            # The seller has withdrawn/lost storage consent: the dialog cannot
+            # continue (a re-confirm would be refused again), so this is NOT a
+            # recoverable content failure. Answer the outcome's own message and
+            # close the FSM. The service wraps it in gettext_lazy, so ``str``
+            # forces the catalog lookup here, under the seller's locale.
+            await message.answer(
+                str(result.errors[0])
+                if result.errors
+                else _(
+                    "Please accept the personal data storage consent first."
+                )
+            )
+
+            await state.clear()
+
         elif result.outcome is SubmitAdOutcome.MODERATION_FAILED:
             # A genuine content failure: the seller should start a new ad either
             # way, so the dialog is closed and the moderation reason rendered.

@@ -1747,6 +1747,20 @@ msgstr ""
 "Da biste kontaktirali podršku, prvo se prijavite i prihvatite saglasnost za "
 "pohranu ličnih podataka."
 
+#: src/telegram_bot/middlewares/permissions.py
+msgid ""
+"To post an ad, please sign in and accept the personal data storage consent "
+"first."
+msgstr ""
+"Da biste objavili oglas, prvo se prijavite i prihvatite saglasnost za "
+"pohranu ličnih podataka."
+
+#: src/backend/apps/ads/views/edit.py
+msgid "To manage ads, please accept the personal data storage consent first."
+msgstr ""
+"Da biste upravljali oglasima, prvo prihvatite saglasnost za pohranu ličnih "
+"podataka."
+
 #~ msgid ""
 #~ "Withdrawing consent permanently erases your Telegram ID, all ads, and "
 #~ "prevents re-login. Are you sure?"

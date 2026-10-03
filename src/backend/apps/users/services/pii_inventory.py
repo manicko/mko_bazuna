@@ -214,48 +214,56 @@ PII_ERASURE_ENTRIES: tuple[tuple[str, str, ErasureAction, str], ...] = (
     (
         "ads.Ad",
         "title",
-        ErasureAction.CLEAR,
-        "NOT implemented today: user-authored free text, surviving the 30-day "
-        "window byte-for-byte and listed and full-text searchable by any staff "
-        "account. BLOCK 11 (06-PII-109) owns the scrub or the spec correction; "
-        "the scope choice is the product's (Q-D3). DECLARATION-ONLY.",
+        ErasureAction.DELETE_ROW,
+        "Implemented today (BLOCK 11, 06-PII-109): the whole ad row is DELETED, "
+        "not scrubbed. On withdrawal the ad is soft-deleted and hidden "
+        "immediately, and the user-authored text is NOT anonymised during the "
+        "30-day grace window — then the hourly consent_hard_delete sweep hard-"
+        "deletes it via Ad.user on_delete=CASCADE. Nothing is derived from the "
+        "row at its named bound, so deleting the row is conservation-correct.",
     ),
     (
         "ads.Ad",
         "title_en",
-        ErasureAction.CLEAR,
-        "NOT implemented today: per-language variant of Ad.title; same owner "
-        "and deferral (BLOCK 11, 06-PII-109, Q-D3). DECLARATION-ONLY.",
+        ErasureAction.DELETE_ROW,
+        "Implemented today (BLOCK 11, 06-PII-109): per-language variant of "
+        "Ad.title; it leaves with the whole row on the consent_hard_delete "
+        "sweep's CASCADE. Not anonymised during the 30-day window.",
     ),
     (
         "ads.Ad",
         "title_bs",
-        ErasureAction.CLEAR,
-        "NOT implemented today: per-language variant of Ad.title; same owner "
-        "and deferral (BLOCK 11, 06-PII-109, Q-D3). DECLARATION-ONLY.",
+        ErasureAction.DELETE_ROW,
+        "Implemented today (BLOCK 11, 06-PII-109): per-language variant of "
+        "Ad.title; it leaves with the whole row on the consent_hard_delete "
+        "sweep's CASCADE. Not anonymised during the 30-day window.",
     ),
     (
         "ads.Ad",
         "description",
-        ErasureAction.CLEAR,
-        "NOT implemented today: on a classifieds board the description is the "
-        'most likely place for a seller to have typed a name, a phone number '
-        'or a "call me at" line. BLOCK 11 (06-PII-109) owns the scrub; Q-D3 '
-        "decides scrub versus spec correction. DECLARATION-ONLY.",
+        ErasureAction.DELETE_ROW,
+        "Implemented today (BLOCK 11, 06-PII-109): on a classifieds board the "
+        "description is the most likely place for a seller to have typed a name, "
+        "a phone number or a 'call me at' line. It is NOT anonymised during the "
+        "30-day grace window so moderation records stay reviewable for dispute "
+        "resolution; the consent_hard_delete sweep then deletes the whole row "
+        "via Ad.user on_delete=CASCADE.",
     ),
     (
         "ads.Ad",
         "description_en",
-        ErasureAction.CLEAR,
-        "NOT implemented today: per-language variant of Ad.description; same "
-        "owner and deferral (BLOCK 11, 06-PII-109, Q-D3). DECLARATION-ONLY.",
+        ErasureAction.DELETE_ROW,
+        "Implemented today (BLOCK 11, 06-PII-109): per-language variant of "
+        "Ad.description; it leaves with the whole row on the consent_hard_delete "
+        "sweep's CASCADE. Not anonymised during the 30-day window.",
     ),
     (
         "ads.Ad",
         "description_bs",
-        ErasureAction.CLEAR,
-        "NOT implemented today: per-language variant of Ad.description; same "
-        "owner and deferral (BLOCK 11, 06-PII-109, Q-D3). DECLARATION-ONLY.",
+        ErasureAction.DELETE_ROW,
+        "Implemented today (BLOCK 11, 06-PII-109): per-language variant of "
+        "Ad.description; it leaves with the whole row on the consent_hard_delete "
+        "sweep's CASCADE. Not anonymised during the 30-day window.",
     ),
     (
         "moderation.ModeratorActionLog",

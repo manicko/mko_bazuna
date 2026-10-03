@@ -91,6 +91,10 @@ class TestAuthenticatedState:
 
     def test_active_user_without_consent_shows_banner(self, user) -> None:
         """Authenticated user with no consent state => banner shown."""
+        # The shared ``user`` fixture now grants storage consent (06-PII-109
+        # fixture repair), so clear it to restore this test's premise.
+        user.consent_given_at = None
+        user.save(update_fields=["consent_given_at"])
         ctx = consent_state(_auth_request(user))
         assert ctx["consent_shown"] is False
 

@@ -819,18 +819,22 @@ class TestBanUserSessionKnownGap:
         # The moderator's session is still live: the ban did not log them out.
         assert "_auth_user_id" in staff_client.session
 
-    def test_banned_seller_can_still_reach_the_dashboard(
+    def test_banned_seller_is_now_refused_the_dashboard(
         self,
         staff_user: User,
         seller: User,
         category: Category,
         city: City,
     ) -> None:
-        """Pin G-A: a banned seller's live session still reaches ``/dashboard/``.
+        """The banned seller's live session is refused by the seller surfaces.
 
-        The web tier has zero per-request account-state enforcement, so the
-        banned seller's surviving session is not merely present but usable.
-        Owner: phase 15, ``15-AUTHZ-001``.
+        This **supersedes the former G-A dashboard pin**: 06-PII-109 added a
+        seller-surface account-state gate (``can_create_ad``, composed from
+        ``can_publish_ad`` + ``can_store_personal_data``), which refuses a
+        banned seller on ``/dashboard/`` with a 403. The deeper phase-15 gap —
+        ``ban_user`` still revokes no ``django_session`` row (the sibling test
+        pins that residual) — is unchanged; the subject simply can no longer
+        *use* the surviving session on the seller surfaces.
 
         Vacuity guard: log in first, then ban while the session is live.
         """
@@ -850,9 +854,9 @@ class TestBanUserSessionKnownGap:
         seller.refresh_from_db()
         assert seller.is_banned is True
 
-        # Known gap: the seller is authenticated and the dashboard renders.
+        # The banned seller's surviving session is refused on the seller surface.
         dashboard = seller_client.get("/dashboard/")
-        assert dashboard.status_code == 200
+        assert dashboard.status_code == 403
 
 
 # ---------------------------------------------------------------------------

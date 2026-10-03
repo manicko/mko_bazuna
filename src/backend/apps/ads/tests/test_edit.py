@@ -38,7 +38,7 @@ from apps.ads.views.edit import (
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.services.price_normalizer import PriceNormalizer
-from conftest import create_test_ad
+from conftest import create_test_ad, make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -1298,39 +1298,30 @@ class TestDashboardEditLinkGate:
 
 
 # ---------------------------------------------------------------------------
-# Known gap (04-AUT-002, G-A) — a banned seller can archive and relist an ad
+# The account-state check now closes the relist gap on the web surfaces
+# (06-PII-109 supersedes the phase-15 known-gap pin for these two views)
 # ---------------------------------------------------------------------------
 
 
-class TestBannedSellerRelistKnownGap:
-    """Pin that a banned seller's ad can return to PUBLISHED through the real
-    relist chain (``ad_archive`` -> ``ad_reactivate`` -> real ``auto_moderate``).
+class TestBannedSellerRelistNowRefused:
+    """A banned seller is refused by ``ad_archive``/``ad_reactivate``.
 
-    Known gap: ``ad_edit`` and ``ad_reactivate`` have NO account-state check, and
-    ``apps.moderation.services.auto_moderation.auto_moderate`` never reads
-    ``is_banned`` — it consults ``ModerationCriteria`` only. A ban that lets the
-    seller relist is not a ban. This test asserts the CURRENT, DEFECTIVE
-    behaviour; it is a red-to-green specification for phase 15's
-    ``15-AUTHZ-001`` and turns red the moment ``ad_edit``/``ad_reactivate`` gain
-    an account-state check or ``auto_moderate`` starts reading ``is_banned``.
+    This replaces the former ``TestBannedSellerRelistKnownGap``. That test pinned
+    the *defective* behaviour — a banned seller archiving then reactivating an ad
+    back to ``PUBLISHED`` — and its own docstring said it "turns red the moment
+    ``ad_edit``/``ad_reactivate`` gain an account-state check". This block
+    (06-PII-109) adds exactly that check: the seller web surfaces now consult the
+    composed ``can_create_ad`` predicate, which refuses a banned account.
 
-    Owner of the fix: phase 15, ``15-AUTHZ-001``. Produced by B-07 gate G-A.
+    The deeper phase-15 gap — ``auto_moderate`` never reading ``is_banned`` — is
+    not addressed here; it is simply unreachable through this relist chain once
+    the view refuses.
     """
 
-    def test_banned_seller_can_archive_and_reactivate_an_ad(
-        self,
-        seller,
-        category,
-        city,
-        permissive_criteria,
+    def test_banned_seller_is_refused_on_archive_and_reactivate(
+        self, seller, category, city
     ) -> None:
-        """A banned seller archives then reactivates a PUBLISHED ad; the real
-        ``auto_moderate`` returns it to PUBLISHED.
-
-        The ban is applied AFTER login so a live session drives the chain, and
-        ``auto_moderate`` is NOT mocked: its failure to read ``is_banned`` is the
-        point of the test. Asserts on the ad's final status only.
-        """
+        """A banned seller's archive/reactivate POSTs are 403; the ad is unchanged."""
         ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         client = Client()
         client.force_login(seller)
@@ -1339,21 +1330,121 @@ class TestBannedSellerRelistKnownGap:
         # Ban the seller while the session is live.
         seller.is_banned = True
         seller.save(update_fields=["is_banned"])
-        seller.refresh_from_db()
-        assert seller.is_banned is True
 
-        # Archive the ad (PUBLISHED -> ARCHIVED).
         archive_response = client.post(reverse("ads:archive", args=[ad.id]))
-        assert archive_response.status_code == 302
+        assert archive_response.status_code == 403
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED
+
+        reactivate_response = client.post(reverse("ads:reactivate", args=[ad.id]))
+        assert reactivate_response.status_code == 403
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED
+
+
+
+# ---------------------------------------------------------------------------
+# 06-PII-109: create-time storage-consent gate on the seller web surfaces
+# ---------------------------------------------------------------------------
+
+
+class TestSellerWebStorageConsentGate:
+    """A never-consented owner is refused on every seller write surface.
+
+    Ownership alone is not sufficient: each refusal below is for an account
+    that genuinely **owns** the ad, so the assertion proves the consent gate is
+    consulted rather than the ownership check firing. Each surface returns
+    ``HttpResponseForbidden`` (403) with the consent message.
+    """
+
+    def _never_consented_owner(self):
+        owner = make_user(900000760)
+        assert owner.consent_given_at is None
+        return owner
+
+    def _login(self, owner) -> Client:
+        client = Client()
+        client.force_login(owner)
+        return client
+
+    def test_edit_get_refused_for_owner_without_consent(
+        self, category, city
+    ) -> None:
+        """GET ad_edit is 403 for a never-consented owner."""
+        owner = self._never_consented_owner()
+        ad = create_test_ad(owner, category, city, status=AdStatus.PUBLISHED)
+        client = self._login(owner)
+
+        response = client.get(reverse("ads:edit", args=[ad.id]))
+
+        assert response.status_code == 403
+        assert "consent" in response.content.decode().lower()
+
+    def test_edit_post_refused_and_writes_nothing(self, category, city) -> None:
+        """POST ad_edit is 403 for a never-consented owner; the ad is untouched."""
+        owner = self._never_consented_owner()
+        ad = create_test_ad(
+            owner, category, city, status=AdStatus.PUBLISHED, title="Original"
+        )
+        client = self._login(owner)
+
+        response = client.post(
+            reverse("ads:edit", args=[ad.id]),
+            data={
+                "title": "Hacked",
+                "description": "hacked",
+                "price_amount": "999",
+                "price_currency": CurrencyCode.EUR.value,
+            },
+        )
+
+        assert response.status_code == 403
+        ad.refresh_from_db()
+        assert ad.title == "Original"
+
+    def test_archive_refused_for_owner_without_consent(self, category, city) -> None:
+        """POST ad_archive is 403 for a never-consented owner."""
+        owner = self._never_consented_owner()
+        ad = create_test_ad(owner, category, city, status=AdStatus.PUBLISHED)
+        client = self._login(owner)
+
+        response = client.post(reverse("ads:archive", args=[ad.id]))
+
+        assert response.status_code == 403
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED
+
+    def test_reactivate_refused_for_owner_without_consent(
+        self, category, city
+    ) -> None:
+        """POST ad_reactivate is 403 for a never-consented owner."""
+        owner = self._never_consented_owner()
+        ad = create_test_ad(owner, category, city, status=AdStatus.ARCHIVED)
+        client = self._login(owner)
+
+        response = client.post(reverse("ads:reactivate", args=[ad.id]))
+
+        assert response.status_code == 403
         ad.refresh_from_db()
         assert ad.status == AdStatus.ARCHIVED
 
-        # Reactivate it: the view transitions ARCHIVED -> ON_MODERATION and then
-        # calls the real ``auto_moderate``, which does not read ``is_banned``.
-        reactivate_response = client.post(reverse("ads:reactivate", args=[ad.id]))
-        assert reactivate_response.status_code == 302
+    def test_dashboard_refused_for_owner_without_consent(self, category, city) -> None:
+        """GET dashboard is 403 for a never-consented owner."""
+        owner = self._never_consented_owner()
+        create_test_ad(owner, category, city, status=AdStatus.PUBLISHED)
+        client = self._login(owner)
 
-        ad.refresh_from_db()
-        # Known gap (G-A): the banned seller's ad is PUBLISHED again.
-        assert ad.status == AdStatus.PUBLISHED
-        assert ad.published_at is not None
+        response = client.get(reverse("ads:dashboard"))
+
+        assert response.status_code == 403
+        assert "consent" in response.content.decode().lower()
+
+    def test_consented_owner_reaches_all_four_surfaces(
+        self, seller, category, city
+    ) -> None:
+        """A consented owner reaches the same surfaces (the gate is transparent)."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = self._login(seller)
+
+        assert client.get(reverse("ads:edit", args=[ad.id])).status_code == 200
+        assert client.get(reverse("ads:dashboard")).status_code == 200

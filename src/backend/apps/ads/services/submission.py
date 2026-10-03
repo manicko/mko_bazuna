@@ -44,6 +44,8 @@ from apps.media.services.filesystem import (
 )
 from apps.media.services.hash_service import FileHashService
 from apps.media.services.thumbnails import ThumbnailService
+from apps.users.models import User
+from apps.users.services.account_state import can_create_ad
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +64,7 @@ class SubmitAdOutcome(StrEnum):
     PHOTO_UNAVAILABLE = "photo_unavailable"
     DRAFT_GONE = "draft_gone"
     INVALID_TRANSITION = "invalid_transition"
+    CONSENT_REQUIRED = "consent_required"
 
 
 class SubmitAdResult(NamedTuple):
@@ -210,6 +213,22 @@ def submit_ad(input: SubmitAdInput) -> SubmitAdResult:
     committed.  A staged file that is missing raises before the transaction and
     becomes a recoverable seller message.
     """
+    # Create-time storage-consent gate (06-PII-109). This is the FIRST statement:
+    # it runs before any filesystem work, the staged-media plan, thumbnail
+    # generation and ``transaction.atomic()``, so a never-consented seller
+    # cannot have a single byte written or a row mutated. The seller is resolved
+    # by pk; a missing user is ``DRAFT_GONE``'s business (the draft row cannot
+    # exist without its owner), not this gate's — so an unresolved pk falls
+    # through to the existing not-found handling rather than being reported as
+    # a consent refusal.
+    if input.user_id is not None:
+        seller = User.objects.filter(id=input.user_id).first()
+        if seller is not None and not can_create_ad(seller):
+            return SubmitAdResult(
+                SubmitAdOutcome.CONSENT_REQUIRED,
+                [str(_("Please accept the personal data storage consent first."))],
+            )
+
     # Capture each photo's staged key and read path BEFORE the plan rewrites the
     # staging keys in place.  Staged photos are read from ``staging/<key>`` and
     # keep the staging prefix on the generated thumbnails (stripped and queued

@@ -1768,6 +1768,20 @@ msgstr ""
 "Чтобы связаться с поддержкой, сначала войдите и примите согласие на "
 "хранение персональных данных."
 
+#: src/telegram_bot/middlewares/permissions.py
+msgid ""
+"To post an ad, please sign in and accept the personal data storage consent "
+"first."
+msgstr ""
+"Чтобы разместить объявление, сначала войдите и примите согласие на хранение "
+"персональных данных."
+
+#: src/backend/apps/ads/views/edit.py
+msgid "To manage ads, please accept the personal data storage consent first."
+msgstr ""
+"Чтобы управлять объявлениями, сначала примите согласие на хранение "
+"персональных данных."
+
 #~ msgid ""
 #~ "Withdrawing consent permanently erases your Telegram ID, all ads, and "
 #~ "prevents re-login. Are you sure?"

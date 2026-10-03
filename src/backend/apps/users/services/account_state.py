@@ -267,3 +267,41 @@ def can_store_personal_data(user: User) -> bool:
         and not state.consent_revoked
         and user.consent_given_at is not None
     )
+
+
+
+def can_create_ad(user: User) -> bool:
+    """Whether the account may create (or edit into moderation) an ad (06-PII-109).
+
+    This is the create-time gate that was missing on both tiers. It is the
+    **conjunction** of two independent predicates, and neither alone is the
+    rule:
+
+    * :func:`can_publish_ad` reads ``is_banned`` / ``is_deleted`` /
+      ``ads_auto_publish`` and deliberately does **not** read
+      ``consent_given_at`` — it answers "is this account allowed to publish
+      at all". Folding the storage-consent term into it would make a declined
+      (but otherwise unblocked) seller un-publishable for the wrong reason and
+      would turn ``TestCanPublishAd::test_declined_user_can_publish`` red.
+    * :func:`can_store_personal_data` reads the storage consent terms (granted
+      ``consent_given_at`` plus not banned/deleted/declined/withdrawn) and
+      deliberately omits ``ads_auto_publish`` — it answers "may this account
+      have personal data stored for it", which support intake also needs.
+
+    An ad carries the seller's user-authored text and photos, so creating one
+    is also a personal-data-storage act. Composing the two predicates is what
+    enforces both facts without mutating either one, which is also why no
+    existing ``can_publish_ad`` assertion needed re-pinning.
+
+    ``is_active`` is deliberately not read here: Django's ``ModelBackend``
+    already revokes the web session for an inactive user and the bot's
+    ``_evaluate_user_state`` refuses one, so re-adding it would silently
+    re-close the plan-19 support carve-out (see :func:`can_store_personal_data`).
+
+    Args:
+        user: User instance to check.
+
+    Returns:
+        True when the account may create or edit an ad, False otherwise.
+    """
+    return can_publish_ad(user) and can_store_personal_data(user)
