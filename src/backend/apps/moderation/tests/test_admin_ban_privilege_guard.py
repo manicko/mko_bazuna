@@ -58,9 +58,11 @@ literal that is unique to its target value.
 so ``staff_user`` / ``superuser`` and ``_make_user`` are module-local, built with
 ``get_or_create`` on the reserved unclaimed ``9300003xx`` block (``93xxxxxxx`` is
 the users-test block; ``900000xxx`` belongs to the moderation tests; ``99xxxxxxx``
-to analytics/search) so ``--reuse-db`` works. Assert observable state and counts,
-never query shapes; a test that re-derived the exclusion in its body would pass
-vacuously.
+to analytics/search) so ``--reuse-db`` works. That block is used up to ``328``:
+``301``/``302`` are the actor fixtures and ``303``-``325`` are the per-test
+targets, with the ``A2`` fail-closed test taking ``326``-``328``. Assert
+observable state and counts, never query shapes; a test that re-derived the
+exclusion in its body would pass vacuously.
 """
 
 from __future__ import annotations
@@ -87,9 +89,10 @@ from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
-# Reserved ``9300003xx`` block (unclaimed at B-1; B-3 uses ``313``-``325``; see
-# module docstring). Distinct from ``9300001xx`` (users tests) and ``9300002xx``
-# (users password recovery).
+# Reserved ``9300003xx`` block (unclaimed at B-1; B-3 uses ``313``-``325``; the
+# ``A2`` fail-closed test extends it to ``326``-``328``; see module docstring).
+# Distinct from ``9300001xx`` (users tests) and ``9300002xx`` (users password
+# recovery).
 _STAFF_ID = 930000301
 _SUPERUSER_ID = 930000302
 
@@ -267,6 +270,57 @@ def test_resolve_ban_targets_marker_is_restricted_for_a_non_superuser(
     _, _, target_scope = _resolve_ban_targets([target.pk], staff_user.id)
 
     assert target_scope == "non_privileged_only"
+
+
+def test_resolve_ban_targets_fails_closed_for_an_unknown_actor() -> None:
+    """An unknown ``moderator_id`` is treated as a non-superuser — ``A2``.
+
+    The resolver is handed an ``int`` pk, not a ``User``, so an id that names no
+    row is resolved to no privileged actor and must fall to the **restricted**
+    branch. This is the deliberate fail-closed default documented on the resolver
+    (``admin_actions.py``), in the module docstring, and in the plan-19 record.
+    The sibling tests above both pass a **real** actor, so they cannot see the
+    default: inverting it (``permitted = candidates`` for an unknown id) leaves
+    the marker and both sibling tests green. This test is the one that turns red.
+
+    **Non-vacuity.** If the default were inverted to fail open, the unknown id
+    would take the ``actor_is_superuser`` branch: the returned marker would be
+    ``"unrestricted"`` (not ``"non_privileged_only"``), the peer ``is_staff`` row
+    and the superuser row would be writable (both would end up ``is_banned``
+    ``True`` instead of ``False``), and ``skipped_privileged`` would be ``0``
+    instead of ``2``. Every assertion below changes under that mutation, so the
+    test cannot pass both ways.
+
+    The actor id is chosen above the reserved ``9300003xx`` block and far above
+    any id this suite creates, so it names no row and cannot collide with a real
+    account (the resolver's fail-closed path exists precisely for such an
+    input). The target ids come from the reserved block and are created fresh in
+    this test, so they are ordinary rows.
+    """
+    seller = _make_user(930000326)
+    peer_moderator = _make_user(930000327, is_staff=True)
+    privileged_superuser = _make_user(930000328, is_superuser=True, is_staff=False)
+    # An id that names no row: far above both the reserved block and anything
+    # the suite creates, so the ``is_superuser`` lookup matches nothing.
+    no_such_moderator_id = 939999999
+
+    writable, result, target_scope = _resolve_ban_targets(
+        [seller.pk, peer_moderator.pk, privileged_superuser.pk],
+        no_such_moderator_id,
+    )
+
+    # The fail-closed default: an unknown actor is restricted, not unrestricted.
+    assert target_scope == "non_privileged_only"
+    # The writable set excludes both privileged rows and keeps the ordinary one.
+    writable.update(is_banned=True)
+    seller.refresh_from_db()
+    peer_moderator.refresh_from_db()
+    privileged_superuser.refresh_from_db()
+    assert seller.is_banned is True
+    assert peer_moderator.is_banned is False
+    assert privileged_superuser.is_banned is False
+    # ...and the returned counts name both privileged rows as skipped.
+    assert result.skipped_privileged == 2
 
 
 # ---------------------------------------------------------------------------
