@@ -30,7 +30,7 @@ The **one** deliberate exception is
 constants on purpose because its assertion is about *equality* between the two
 surfaces (a drift pin), not about the content. See that test's docstring.
 
-The three operator-message tests (the ``AdAdmin`` toast and the ``moderation:ban``
+The operator-message tests (the ``AdAdmin`` toast and the ``moderation:ban``
 view notice) are a **security-relevant pin**, not coverage theatre: all of
 ``B-2``'s operator copy was unpinned before them (plan §17.3). The refusal
 *sentences* are pinned the same way: ``test_each_refusal_sentence_names_its_own_cause``
@@ -41,6 +41,18 @@ tests assert ``msg.level`` (``ERROR`` for a fully-refused selection, ``SUCCESS``
 for a partial one) and the two scope tests assert the resolver's returned
 ``target_scope`` marker — both hard-coded, neither re-derived from the constant
 under test.
+
+The ``B-3`` advisories close the remaining holes in the same **operator-reporting**
+layer: ``test_ban_view_refusal_from_self_states_the_self_cause`` and
+``test_ban_view_refusal_from_an_already_banned_target_states_that_cause`` drive
+the real ``moderation:ban`` view for the ``SELF`` and ``ALREADY_BANNED``
+branches of ``ban_refusal_reason`` respectively (the view test above pins only
+``PRIVILEGED``), and ``test_ban_toast_names_self_rows`` /
+``test_ban_toast_names_already_in_state_rows`` pin the ``"N self"`` and
+``"N already in the requested state"`` toast clauses that ``ads/admin.py``
+duplicates from the sibling deactivation surface. Each asserts a **hard-coded**
+literal that is unique to its target value.
+
 
 ``conftest.py`` is contended territory and supplies no admin/superuser fixture,
 so ``staff_user`` / ``superuser`` and ``_make_user`` are module-local, built with
@@ -75,7 +87,7 @@ from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
-# Reserved ``9300003xx`` block (unclaimed at B-1; B-3 uses ``313``-``321``; see
+# Reserved ``9300003xx`` block (unclaimed at B-1; B-3 uses ``313``-``325``; see
 # module docstring). Distinct from ``9300001xx`` (users tests) and ``9300002xx``
 # (users password recovery).
 _STAFF_ID = 930000301
@@ -856,3 +868,172 @@ def test_not_in_target_set_refusal_copy_asserts_no_cause() -> None:
     sentence = review._BAN_REFUSAL_MESSAGES[BanRefusalReason.NOT_IN_TARGET_SET]
     assert "was not among the accounts available to this action" in sentence
     assert "outside the set of accounts you may ban" not in sentence
+
+
+# ---------------------------------------------------------------------------
+# 15-16. The remaining refusal branches on the real view (``ban_refusal_reason``
+# analytics). The view test above pins only ``PRIVILEGED``; these two drive the
+# SAME view for ``SELF`` and ``ALREADY_BANNED`` so that deleting or reordering
+# either branch in ``ban_refusal_reason`` goes red instead of silently falling
+# through to ``NOT_IN_TARGET_SET``. Each asserts a hard-coded literal that is
+# UNIQUE to its ``_BAN_REFUSAL_MESSAGES`` value (see the docstrings): a literal
+# shared with another value would not discriminate.
+# ---------------------------------------------------------------------------
+
+
+def test_ban_view_refusal_from_self_states_the_self_cause(
+    staff_user: User, category, city
+) -> None:
+    """The real ``moderation:ban`` view reports the ``SELF`` cause for a self-ban.
+
+    The reachable self-ban: a moderator bans the owner of an ad they authored.
+    ``ban_refusal_reason`` checks ``skipped_self`` first, so the refusal is
+    ``SELF`` and not ``NOT_IN_TARGET_SET``. Deleting or reordering the
+    ``if result.skipped_self:`` branch would make this fall through to the
+    cause-neutral ``NOT_IN_TARGET_SET`` sentence, so the moderator would read a
+    false cause; this test is the one that goes red then.
+
+    The asserted literal — ``"the ad's owner is your own account"`` — is unique
+    to the ``SELF`` value: no other of the four ``_BAN_REFUSAL_MESSAGES``
+    sentences contains it, so it discriminates ``SELF`` from the other three.
+    """
+    ad = create_test_ad(staff_user, category, city, status=AdStatus.ON_MODERATION)
+
+    client = Client()
+    client.force_login(staff_user)
+    response = client.post(
+        reverse("moderation:ban", args=[ad.id]),
+        data={"ban_reason": "policy violation"},
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    text = " ".join(str(m) for m in response.context["messages"])
+    assert "the ad's owner is your own account" in text
+    staff_user.refresh_from_db()
+    assert staff_user.is_banned is False
+
+
+def test_ban_view_refusal_from_an_already_banned_target_states_that_cause(
+    staff_user: User, category, city
+) -> None:
+    """The real view reports the ``ALREADY_BANNED`` cause for a repeat ban.
+
+    An ordinary (non-privileged, non-self) seller who is already banned is
+    permitted by the scope but is a no-op, so ``ban_refusal_reason`` returns
+    ``ALREADY_BANNED`` — and nothing else, because ``skipped_self`` and
+    ``skipped_privileged`` are both zero and the all-zero ``NOT_IN_TARGET_SET``
+    fallback must not be reached. Deleting or reordering the
+    ``if result.already_in_state:`` branch would report the wrong cause; this
+    test is the one that goes red then.
+
+    The row is banned by construction (``is_banned=True``) before the request,
+    so it is banned when the test body runs. The asserted literal —
+    ``"the ad's owner was already banned"`` — is unique to the
+    ``ALREADY_BANNED`` value and discriminates it from the other three.
+    """
+    already_banned = _make_user(930000322, is_banned=True)
+    assert already_banned.is_banned is True
+    ad = create_test_ad(already_banned, category, city, status=AdStatus.ON_MODERATION)
+
+    client = Client()
+    client.force_login(staff_user)
+    response = client.post(
+        reverse("moderation:ban", args=[ad.id]),
+        data={"ban_reason": "policy violation"},
+        follow=True,
+    )
+
+    assert response.status_code == 200
+    text = " ".join(str(m) for m in response.context["messages"])
+    assert "the ad's owner was already banned" in text
+    already_banned.refresh_from_db()
+    assert already_banned.is_banned is True
+
+
+# ---------------------------------------------------------------------------
+# 17-18. The remaining ``AdAdmin`` toast clauses. ``test_operator_toast_...``
+# pins ``"1 privileged"`` on this surface; ``_ban_message`` has two more
+# dropped-row clauses, and neither is pinned anywhere. Both are asserted in the
+# toast (the operator-visible surface), not on the ``BanResult``.
+# ---------------------------------------------------------------------------
+
+
+def test_ban_toast_names_self_rows(
+    staff_user: User, category, city
+) -> None:
+    """The toast reports the ``"N self"`` clause for the actor's own row.
+
+    The acting moderator's selection contains their own ad among an ordinary
+    seller's, so ``skipped_self == 1`` and ``changed == 1``: a partial success.
+    The clause is asserted as the hard-coded literal ``"1 self"`` in the
+    operator toast, so dropping the ``if result.skipped_self:`` clause from
+    ``_ban_message`` goes red rather than leaving the operator under-informed.
+    """
+    seller = _make_user(930000323)
+    self_ad = create_test_ad(
+        staff_user, category, city, status=AdStatus.ON_MODERATION
+    )
+    seller_ad = create_test_ad(
+        seller, category, city, status=AdStatus.ON_MODERATION
+    )
+
+    client = Client()
+    client.force_login(staff_user)
+    response = client.post(
+        reverse("admin:ads_ad_changelist"),
+        data={
+            "action": "action_ban_user",
+            "_selected_action": [str(self_ad.pk), str(seller_ad.pk)],
+            "index": "0",
+        },
+        follow=True,
+    )
+
+    text = " ".join(str(m) for m in response.context["messages"])
+    assert "Banned 1 user(s)" in text
+    assert "1 self" in text
+    staff_user.refresh_from_db()
+    assert staff_user.is_banned is False
+
+
+def test_ban_toast_names_already_in_state_rows(
+    superuser: User, category, city
+) -> None:
+    """The toast reports the ``"N already in the requested state"`` clause.
+
+    This is the ban-surface twin of
+    ``test_admin_deactivate_user.py::test_operator_message_reports_already_in_state_rows``.
+    ``ads/admin.py`` duplicates the exact wording the sibling pins with
+    ``assert "1 already in the requested state" in text``; nothing pinned the
+    ban copy before this test. A superuser selects one enabled seller and one
+    already-banned seller: the toast must say ``"Banned 1 user(s)"`` and name
+    the one row already in the requested state, so a partial selection does not
+    read as a full success.
+    """
+    fresh = _make_user(930000324)
+    already_banned = _make_user(930000325, is_banned=True)
+    assert already_banned.is_banned is True
+    fresh_ad = create_test_ad(fresh, category, city, status=AdStatus.ON_MODERATION)
+    already_banned_ad = create_test_ad(
+        already_banned, category, city, status=AdStatus.ON_MODERATION
+    )
+
+    client = Client()
+    client.force_login(superuser)
+    response = client.post(
+        reverse("admin:ads_ad_changelist"),
+        data={
+            "action": "action_ban_user",
+            "_selected_action": [str(fresh_ad.pk), str(already_banned_ad.pk)],
+            "index": "0",
+        },
+        follow=True,
+    )
+
+    text = " ".join(str(m) for m in response.context["messages"])
+    assert "Banned 1 user(s)" in text
+    assert "Skipped:" in text
+    assert "1 already in the requested state" in text
+    fresh.refresh_from_db()
+    assert fresh.is_banned is True
