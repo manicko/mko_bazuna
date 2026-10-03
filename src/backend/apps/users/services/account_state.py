@@ -210,3 +210,46 @@ def get_state_badge(user: User) -> str:
         badges.append("restricted")
 
     return ", ".join(badges)
+
+
+def can_store_personal_data(user: User) -> bool:
+    """Whether the account may have personal data stored for it (06-PII-101).
+
+    This is the storage-consent gate the support intake needs. It answers a
+    *different* question from :func:`account_state_q`: that predicate asks *"may
+    this account receive messages"* and deliberately omits ``consent_given_at``
+    — a never-consented registered user passes all five of its conjuncts. This
+    predicate asks *"may this account have personal data stored"*, so it
+    composes the :func:`get_account_state` blocking flags (banned / deleted /
+    declined / consent-revoked) **plus** a granted ``consent_given_at``.
+
+    It deliberately **omits** ``is_active``. ``is_active`` is the operator
+    access kill-switch: a deactivated user is refused every bot path by
+    ``AccountStateMiddleware`` *except* the support restoration carve-out
+    (plan 19, ``B-1``/``B-2``), whose whole purpose is to let them contact the
+    desk. Re-checking ``is_active`` here would silently re-close that
+    carve-out, so a deactivated user who has consented must still be able to
+    store a ticket (Fork 2, test §7). Storage consent is orthogonal to the
+    operator access switch.
+
+    It is an instance predicate, not a second ``Q`` factory: every consumer
+    (the bot gate) already holds a resolved ``User``, and the erasure sweep
+    filters *users to delete*, not *users who may store data*.
+    ``account_state_q`` is intentionally left unmodified — it is
+    contract-frozen by plan 19's bot gate and the phase-06 alert gate.
+
+    Args:
+        user: User instance to check.
+
+    Returns:
+        True when the account is not banned/deleted/declined, has not withdrawn
+        consent, and has granted consent to personal-data storage.
+    """
+    state = get_account_state(user)
+    return (
+        not state.is_banned
+        and not state.is_deleted
+        and not state.is_declined
+        and not state.consent_revoked
+        and user.consent_given_at is not None
+    )

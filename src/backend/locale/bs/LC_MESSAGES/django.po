@@ -712,11 +712,11 @@ msgid "Your Ads"
 msgstr "Vaši oglasi"
 
 msgid ""
-"Withdrawing consent permanently erases your Telegram ID, all ads, and "
-"prevents re-login. Are you sure?"
+"Withdrawing consent permanently erases your Telegram ID, all ads, and your "
+"support requests, and prevents re-login. Are you sure?"
 msgstr ""
-"Povlačenjem soglasja trajno brišete vaš Telegram ID, sve oglase i sprečavate "
-"ponovni priključak. Da li ste sigurni?"
+"Povlačenjem soglasja trajno brišete vaš Telegram ID, sve oglase, vaše "
+"zahtjeve za podršku i sprečavate ponovni priključak. Da li ste sigurni?"
 
 msgid "Withdraw Data"
 msgstr "Povuci podatke"
@@ -1703,3 +1703,22 @@ msgid ""
 msgstr ""
 "Zapisi moderacije i tekst već pregledanih oglasa čuvaju se radi povjerenja i "
 "sigurnosti te radi rješavanja sporova."
+
+#: src/backend/templates/privacy.html
+msgid "Your support requests to our help desk are deleted."
+msgstr "Vaši zahtjevi za podršku se brišu."
+
+#: src/telegram_bot/handlers/support.py
+msgid ""
+"To contact support, please sign in and accept the personal data storage "
+"consent first."
+msgstr ""
+"Da biste kontaktirali podršku, prvo se prijavite i prihvatite saglasnost za "
+"pohranu ličnih podataka."
+
+#~ msgid ""
+#~ "Withdrawing consent permanently erases your Telegram ID, all ads, and "
+#~ "prevents re-login. Are you sure?"
+#~ msgstr ""
+#~ "Povlačenjem soglasja trajno brišete vaš Telegram ID, sve oglase i sprečavate "
+#~ "ponovni priključak. Da li ste sigurni?"

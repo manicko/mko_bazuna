@@ -188,9 +188,16 @@ async def test_deactivated_user_can_complete_the_support_ticket() -> None:
     Free text while in the support-intake FSM must pass the state-based
     carve-out, and the ticket must actually be persisted. An event-type
     allowlist would let the user tap the button but never complete the ticket.
+
+    Re-pinned for the storage-consent gate (06-PII-101): the deactivated user
+    must also have granted consent, which is the carve-out's real purpose —
+    "contact support to restore your account" stays reachable for anyone who
+    actually consented. ``_make_deactivated`` forwards ``**overrides`` to
+    ``make_user``, so ``consent_given_at`` is set explicitly here rather than
+    relying on a fixture default.
     """
     chat_id = _BASE_CHAT_ID + 4
-    user = await _make_deactivated(chat_id)
+    user = await _make_deactivated(chat_id, consent_given_at=timezone.now())
 
     state = _make_support_fsm(chat_id)
     await state.set_state(ContactUsState.AWAITING_MESSAGE)
@@ -245,6 +252,64 @@ async def test_deactivated_user_can_complete_the_support_ticket() -> None:
     assert ticket.telegram_id == chat_id
     assert ticket.text == "Please restore my account"
     assert ticket.user_id == user.id
+
+
+@pytest.mark.asyncio
+async def test_deactivated_user_without_consent_is_refused() -> None:
+    """A deactivated user without storage consent is refused (06-PII-101).
+
+    Complementary half of ``test_deactivated_user_can_complete_the_support_ticket``:
+    the carve-out must not exempt a deactivated account from the storage-consent
+    gate. The free-text update still passes the middleware (the carve-out is a
+    state rule), but the handler refuses it, so no ticket is created.
+    """
+    chat_id = _BASE_CHAT_ID + 21
+    user = await _make_deactivated(chat_id)  # no consent_given_at
+
+    state = _make_support_fsm(chat_id)
+    await state.set_state(ContactUsState.AWAITING_MESSAGE)
+    await state.update_data(user_id=user.id)
+
+    update = _make_message_update(chat_id, "Please restore my account")
+
+    result, handler, answer = await _run_gate(update, {"state": state})
+    assert result == "proceed"
+
+    handler_message = MagicMock()
+    handler_message.from_user = MagicMock()
+    handler_message.from_user.id = chat_id
+    handler_message.from_user.is_bot = False
+    handler_message.from_user.username = "deactivated_no_consent"
+    handler_message.chat = MagicMock()
+    handler_message.chat.id = chat_id
+    handler_message.text = "Please restore my account"
+    handler_message.answer = AsyncMock()
+    bot = MagicMock()
+    bot.get_me = AsyncMock(return_value=MagicMock(username="mybot"))
+
+    from unittest.mock import patch
+
+    with (
+        patch(
+            "telegram_bot.handlers.support.send_support_notification_email",
+            new=AsyncMock(),
+        ),
+        patch(
+            "telegram_bot.handlers.support.send_support_notification_telegram",
+            new=AsyncMock(),
+        ),
+        patch(
+            "telegram_bot.handlers.support.get_support_contacts_async",
+            new=AsyncMock(return_value=[]),
+        ),
+    ):
+        await handle_support_message(handler_message, bot, state)
+
+    from apps.core.models import SupportTicket
+
+    count = await sync_to_async(SupportTicket.objects.count)()
+    assert count == 0
+    handler_message.answer.assert_awaited_once()
 
 
 @pytest.mark.asyncio

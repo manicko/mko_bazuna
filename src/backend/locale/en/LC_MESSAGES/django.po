@@ -630,8 +630,8 @@ msgid "Your Ads"
 msgstr ""
 
 msgid ""
-"Withdrawing consent permanently erases your Telegram ID, all ads, and "
-"prevents re-login. Are you sure?"
+"Withdrawing consent permanently erases your Telegram ID, all ads, and your "
+"support requests, and prevents re-login. Are you sure?"
 msgstr ""
 
 msgid "Withdraw Data"
@@ -1516,3 +1516,18 @@ msgid ""
 "Moderation records and the text of advertisements already reviewed are "
 "retained for trust and safety and for the resolution of disputes."
 msgstr ""
+
+#: src/backend/templates/privacy.html
+msgid "Your support requests to our help desk are deleted."
+msgstr ""
+
+#: src/telegram_bot/handlers/support.py
+msgid ""
+"To contact support, please sign in and accept the personal data storage "
+"consent first."
+msgstr ""
+
+#~ msgid ""
+#~ "Withdrawing consent permanently erases your Telegram ID, all ads, and "
+#~ "prevents re-login. Are you sure?"
+#~ msgstr ""

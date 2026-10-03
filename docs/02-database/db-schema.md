@@ -545,12 +545,13 @@ The bot reads active contacts via `apps.core.services.support.get_support_contac
 Support tickets submitted by sellers/buyers via the bot (`/start` → "Contact support" → free-text
 message) (`apps/core/models.py`, `SupportTicket`; migration `0004_support_models`). The `ticket_ref`
 (`SUP-YYYYMM-NNN`) is auto-generated in `save()` on first save by counting same-month rows.
-Admin displays `SupportTicketAdmin` as a read-only audit trail (add/delete disabled).
+`SupportTicketAdmin` is view-and-filter only (add/delete disabled); a ticket is not an audit trail —
+it is personal data deleted with its subject (06-PII-101).
 
 | Column | Type | Notes |
 |---|---|---|
 | `id` | PK | `BigAutoField` |
-| `user_id` | FK → users.id, nullable, SET_NULL (`related_name="support_tickets"`) | Null when anonymous |
+| `user_id` | FK → users.id, nullable, **CASCADE** (`related_name="support_tickets"`) | Deleted with the user; null only for a legacy unattributed row |
 | `chat_id` | BIGINT | Telegram `chat_id` of the submitter |
 | `telegram_id` | BIGINT | Submitter's Telegram ID |
 | `username` | VARCHAR(255), nullable | Telegram username (if available) |
@@ -564,6 +565,18 @@ The bot persists tickets in a single `sync_to_async` ORM call (`handle_support_o
 `telegram_bot/handlers/support.py`) and confirms to the user with the generated `ticket_ref`.
 Delivery channels are the `[support_contacts](#support_contacts)` rows (email + Telegram) and the
 `SUPPORT_NOTIFICATION_RECIPIENTS` setting. See [`db-enums.md`](db-enums.md#supporttickestatus).
+
+**Erasure (06-PII-101).** A ticket is deleted, not scrubbed: `withdraw_consent` deletes the user's
+tickets inside its existing `transaction.atomic()`, the `CASCADE` on `user_id` removes them on a
+hard user delete (the 30-day sweep and superuser admin delete), and `consent_hard_delete` also
+sweeps any already-orphaned (`user_id IS NULL`) rows. The bot refuses to create a ticket for a
+sender who has not consented to personal-data storage, so no new unattributed ticket is written.
+
+**Known limitation — `ticket_ref` reuse.** `ticket_ref` is computed as
+`count() + 1` over live same-month rows, so deleting a mid-month ticket makes the next ticket reuse
+a reference a user may already have quoted to the desk. This is a documented limitation, not fixed
+here: changing a user-visible identifier is a separate, behaviour-visible change (follow-up:
+06-PII-101 ticket-ref sequence hardening).
 
 ---
 

@@ -10,7 +10,8 @@ Covers:
   Telegram, and confirms with the generated ``ticket_ref``.
 - Validation guards: bots rejected (no persistence/delivery), empty text
   rejected, over-length text rejected.
-- Anonymous senders leave the ``user`` FK null.
+- Storage-consent gate (06-PII-101): an unregistered ``chat_id`` is refused
+  with the consent notice and **no ticket** is created.
 """
 
 from collections.abc import Iterator
@@ -23,9 +24,11 @@ from aiogram.fsm.storage.base import StorageKey
 from aiogram.fsm.storage.memory import MemoryStorage
 from asgiref.sync import sync_to_async
 from django.core.cache import cache
+from django.utils import timezone
 from django.utils.functional import Promise
 
 from telegram_bot.handlers.support import (
+    SUPPORT_CONSENT_REQUIRED_MESSAGE,
     SUPPORT_MESSAGE_MAX_LENGTH,
     SUPPORT_MESSAGE_TOO_LONG_MESSAGE,
     SUPPORT_PROMPT_MESSAGE,
@@ -76,15 +79,20 @@ def _mock_message(
     text: str = "Hello support",
     user_id: int = 123,
     is_bot: bool = False,
+    chat_id: int = 123,
 ) -> MagicMock:
-    """Build a ``Message`` double for ``handle_support_message``."""
+    """Build a ``Message`` double for ``handle_support_message``.
+
+    ``chat_id`` defaults to 123 (mirroring a private chat); pass a value
+    matching a registered user's ``User.chat_id`` for attribution tests.
+    """
     message = MagicMock()
     message.from_user = MagicMock()
     message.from_user.id = user_id
     message.from_user.is_bot = is_bot
     message.from_user.username = "ticket_user"
     message.chat = MagicMock()
-    message.chat.id = 123
+    message.chat.id = chat_id
     message.text = text
     message.answer = AsyncMock()
     return message
@@ -122,7 +130,10 @@ class TestSupportStart:
 
     @pytest.mark.asyncio
     async def test_sets_state_and_prompts(self, fsm_context: FSMContext) -> None:
-        """A normal user is moved to AWAITING_MESSAGE and prompted."""
+        """A consenting registered user is moved to AWAITING_MESSAGE and prompted."""
+        from conftest import make_user
+
+        await sync_to_async(make_user)(301, consent_given_at=timezone.now())
         callback = _mock_callback(user_id=301)
 
         await handle_support_start(callback, fsm_context)
@@ -132,6 +143,20 @@ class TestSupportStart:
         callback.message.answer.assert_awaited_once()
         sent_text = callback.message.answer.await_args.args[0]
         assert str(sent_text) == str(SUPPORT_PROMPT_MESSAGE)
+
+    @pytest.mark.asyncio
+    async def test_unregistered_user_is_refused_with_consent_notice(
+        self, fsm_context: FSMContext
+    ) -> None:
+        """An unregistered chat_id is refused at the start gate (06-PII-101)."""
+        callback = _mock_callback(user_id=306)
+
+        await handle_support_start(callback, fsm_context)
+
+        callback.message.answer.assert_awaited_once()
+        sent_text = callback.message.answer.await_args.args[0]
+        assert str(sent_text) == str(SUPPORT_CONSENT_REQUIRED_MESSAGE)
+        assert await fsm_context.get_state() is None
 
     @pytest.mark.asyncio
     async def test_is_bot_skipped_without_budget(self, fsm_context: FSMContext) -> None:
@@ -147,7 +172,17 @@ class TestSupportStart:
 
     @pytest.mark.asyncio
     async def test_rate_limited_sends_cooldown(self, fsm_context: FSMContext) -> None:
-        """6th support trigger within the window yields the cooldown message."""
+        """6th support trigger within the window yields the cooldown message.
+
+        Re-pinned for the storage-consent gate (06-PII-101): the gate runs
+        **before** the rate limit, so the caller must be a consenting registered
+        user for the cooldown branch to be reachable; an unregistered caller gets
+        the consent notice first. The test's intent — the 6th trigger within the
+        window is rate-limited — is unchanged.
+        """
+        from conftest import make_user
+
+        await sync_to_async(make_user)(303, consent_given_at=timezone.now())
         for _ in range(5):
             assert await check_support_message_rate_limit(303) is True
 
@@ -171,7 +206,15 @@ class TestSupportMessage:
 
     @pytest.mark.asyncio
     async def test_persists_and_delivers(self, fsm_context: FSMContext) -> None:
-        """A valid message persists a ticket, delivers, and confirms with ref."""
+        """An unregistered sender is refused: no ticket, one consent notice.
+
+        This **inverts the test's original purpose.** Under the storage-consent
+        gate (06-PII-101) ``user304`` is unregistered, i.e. exactly the
+        no-consent case, so the intake must refuse rather than persist. The
+        former happy-path assertions (ticket row, email + Telegram delivery,
+        ``ticket_ref`` confirmation) now belong to
+        ``test_registered_user_is_attributed``.
+        """
         await fsm_context.set_state(ContactUsState.AWAITING_MESSAGE)
         message = _mock_message(text="I lost my password", user_id=304)
         bot = _mock_bot()
@@ -192,39 +235,30 @@ class TestSupportMessage:
         ):
             await handle_support_message(message, bot, fsm_context)
 
-        # DB row persisted with the expected attributes.
-        assert await _count_tickets() == 1
-        ticket = await _latest_ticket()
-        assert ticket.chat_id == 123
-        assert ticket.telegram_id == 304
-        assert ticket.username == "ticket_user"
-        assert ticket.text == "I lost my password"
-        assert ticket.status == "open"
-        assert ticket.ticket_ref.startswith("SUP-")
-
-        # Delivered via both email and Telegram with the created ticket.
-        mock_email.assert_awaited_once()
-        email_call = mock_email.await_args
-        assert email_call is not None
-        delivered_ticket = email_call.args[0]
-        assert delivered_ticket.id == ticket.id
-        assert email_call.args[1] == "mybot"
-        mock_telegram.assert_awaited_once()
-        telegram_call = mock_telegram.await_args
-        assert telegram_call is not None
-        assert telegram_call.args[0].id == ticket.id
-
-        # Confirmation reply carries the ticket_ref.
+        # No ticket, no delivery, exactly one notice naming the consent rule.
+        assert await _count_tickets() == 0
+        mock_email.assert_not_awaited()
+        mock_telegram.assert_not_awaited()
         message.answer.assert_awaited_once()
         sent_text = message.answer.await_args.args[0]
-        assert str(ticket.ticket_ref) in str(sent_text)
+        assert str(sent_text) == str(SUPPORT_CONSENT_REQUIRED_MESSAGE)
 
-        # FSM reset back to IDLE.
+        # FSM reset to IDLE on refusal.
         assert await fsm_context.get_state() == ContactUsState.IDLE
 
     @pytest.mark.asyncio
-    async def test_anonymous_user_has_null_user_fk(self, fsm_context: FSMContext) -> None:
-        """Anonymous senders (no user_id in state) get a null ``user`` FK."""
+    async def test_unregistered_sender_is_refused_no_ticket(
+        self, fsm_context: FSMContext
+    ) -> None:
+        """An unregistered sender (no consent) is refused with the notice.
+
+        Renamed from ``test_anonymous_user_has_null_user_fk``: under the
+        storage-consent gate (06-PII-101) the bot never creates an unattributed
+        ticket, so "null user FK" is no longer reachable at the bot boundary.
+        The model can still store one
+        (``test_support_models.py::TestSupportTicketAnonymous``); the *bot*
+        refuses.
+        """
         await fsm_context.set_state(ContactUsState.AWAITING_MESSAGE)
         message = _mock_message(text="Hi", user_id=305)
         bot = _mock_bot()
@@ -245,22 +279,74 @@ class TestSupportMessage:
         ):
             await handle_support_message(message, bot, fsm_context)
 
-        ticket = await _latest_ticket()
-        assert ticket.user_id is None
+        assert await _count_tickets() == 0
+        message.answer.assert_awaited_once()
+        sent_text = message.answer.await_args.args[0]
+        assert str(sent_text) == str(SUPPORT_CONSENT_REQUIRED_MESSAGE)
+        assert await fsm_context.get_state() == ContactUsState.IDLE
 
     @pytest.mark.asyncio
     async def test_registered_user_is_attributed(self, fsm_context: FSMContext) -> None:
-        """A registered user (user_id in state) is attributed to the ticket."""
+        """A consenting registered user is attributed and completes the ticket.
+
+        The user must have ``consent_given_at`` set (the storage-consent gate)
+        and its ``chat_id`` must match the message's ``chat.id``, because the
+        actor is resolved server-side by ``chat_id`` (06-PII-101).
+        """
         from apps.users.models import User
 
         user = await sync_to_async(User.objects.create)(
             telegram_id=900000100,
             chat_id=900000100,
             password="x",
+            consent_given_at=timezone.now(),
         )
         await fsm_context.set_state(ContactUsState.AWAITING_MESSAGE)
         await fsm_context.update_data(user_id=user.id)
-        message = _mock_message(text="I am registered", user_id=900000100)
+        message = _mock_message(
+            text="I am registered", user_id=900000100, chat_id=900000100
+        )
+        bot = _mock_bot()
+
+        with (
+            patch(
+                "telegram_bot.handlers.support.send_support_notification_email",
+                new=AsyncMock(),
+            ) as mock_email,
+            patch(
+                "telegram_bot.handlers.support.send_support_notification_telegram",
+                new=AsyncMock(),
+            ),
+            patch(
+                "telegram_bot.handlers.support.get_support_contacts_async",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            await handle_support_message(message, bot, fsm_context)
+
+        assert await _count_tickets() == 1
+        ticket = await _latest_ticket()
+        assert ticket.user_id == user.id
+        assert ticket.chat_id == 900000100
+        assert ticket.telegram_id == 900000100
+        assert ticket.text == "I am registered"
+        mock_email.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_registered_user_without_consent_is_refused(
+        self, fsm_context: FSMContext
+    ) -> None:
+        """A registered user without ``consent_given_at`` gets no ticket."""
+        from apps.users.models import User
+
+        user = await sync_to_async(User.objects.create)(
+            telegram_id=900000101,
+            chat_id=900000101,
+            password="x",
+        )
+        await fsm_context.set_state(ContactUsState.AWAITING_MESSAGE)
+        await fsm_context.update_data(user_id=user.id)
+        message = _mock_message(text="No consent", user_id=900000101, chat_id=900000101)
         bot = _mock_bot()
 
         with (
@@ -279,8 +365,60 @@ class TestSupportMessage:
         ):
             await handle_support_message(message, bot, fsm_context)
 
-        ticket = await _latest_ticket()
-        assert ticket.user_id == user.id
+        assert await _count_tickets() == 0
+        message.answer.assert_awaited_once()
+        assert str(message.answer.await_args.args[0]) == str(
+            SUPPORT_CONSENT_REQUIRED_MESSAGE
+        )
+
+    @pytest.mark.asyncio
+    async def test_stale_fsm_user_id_is_refused(self, fsm_context: FSMContext) -> None:
+        """A stale FSM ``user_id`` that disagrees with the actor is refused.
+
+        Free text captured before consent (or under a different identity) must
+        not become a ticket. The FSM ``user_id`` is a cross-check only; a
+        mismatch refuses even when the resolved actor itself could store data.
+        """
+        from apps.users.models import User
+
+        actor = await sync_to_async(User.objects.create)(
+            telegram_id=900000102,
+            chat_id=900000102,
+            password="x",
+            consent_given_at=timezone.now(),
+        )
+        other = await sync_to_async(User.objects.create)(
+            telegram_id=900000103,
+            chat_id=900000103,
+            password="x",
+            consent_given_at=timezone.now(),
+        )
+        await fsm_context.set_state(ContactUsState.AWAITING_MESSAGE)
+        await fsm_context.update_data(user_id=other.id)
+        message = _mock_message(text="Stale", user_id=900000102, chat_id=900000102)
+        bot = _mock_bot()
+
+        with (
+            patch(
+                "telegram_bot.handlers.support.send_support_notification_email",
+                new=AsyncMock(),
+            ),
+            patch(
+                "telegram_bot.handlers.support.send_support_notification_telegram",
+                new=AsyncMock(),
+            ),
+            patch(
+                "telegram_bot.handlers.support.get_support_contacts_async",
+                new=AsyncMock(return_value=[]),
+            ),
+        ):
+            await handle_support_message(message, bot, fsm_context)
+
+        assert await _count_tickets() == 0
+        assert str(message.answer.await_args.args[0]) == str(
+            SUPPORT_CONSENT_REQUIRED_MESSAGE
+        )
+        assert actor.id != other.id
 
     @pytest.mark.asyncio
     async def test_bot_rejected_no_persistence(self, fsm_context: FSMContext) -> None:

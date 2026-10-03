@@ -8,14 +8,23 @@ prompted to write their question. The free-text reply is persisted as a
 Telegram) so the desk can reply out-of-band.
 
 Access control is governed by ``AccountStateMiddleware`` before the handler
-runs: anonymous users may reach support (``_resolve_user`` returns ``None`` and
-the state gate fails open), and a **deactivated** user reaches it through the
-plan 19 support carve-out. Banned / deleted / consent-revoked users are blocked.
+runs: a **deactivated** user reaches the intake through the plan 19 support
+carve-out. Banned / deleted / consent-revoked users are blocked.
 **DECLINE users cannot reach support**: ``SUPPORT_START`` is not a contact
 deep-link, so a DECLINE user's ``/start`` greeting is rejected and they never
 see the keyboard (pre-existing behaviour, recorded as ``19-D5``/``D-3`` — not
 fixed by plan 19). The handler itself only guards against bots, mirroring
 ``contact.py``.
+
+**Storage-consent gate (06-PII-101).** Support intake requires consent to
+personal-data storage. The actor is resolved server-side from the
+Telegram-signed ``chat_id`` (never a client-supplied field) and must satisfy
+``can_store_personal_data`` — a registered account that has granted consent and
+is not blocked. An unregistered ``chat_id`` is refused with
+:data:`SUPPORT_CONSENT_REQUIRED_MESSAGE`, which points at sign-in and consent;
+no ticket is created. When the FSM holds a ``user_id`` it is cross-checked
+against the server-resolved actor, so free text captured before consent cannot
+become a ticket afterwards. The FSM is reset to ``IDLE`` on refusal.
 """
 
 import logging
@@ -65,6 +74,14 @@ SUPPORT_MESSAGE_TOO_LONG_MESSAGE: Final = gettext_lazy(
     "Your message is too long. Please write no more than 4000 characters."
 )
 
+# Shown when the sender is not allowed to store personal data: an unregistered
+# chat_id, or a registered account that has not consented / is blocked. The
+# notice names the remedy (sign in and accept consent). No ticket is created.
+SUPPORT_CONSENT_REQUIRED_MESSAGE: Final = gettext_lazy(
+    "To contact support, please sign in and accept the personal data storage "
+    "consent first."
+)
+
 
 @router.callback_query(F.data == SUPPORT_START_CALLBACK)
 async def handle_support_start(
@@ -72,10 +89,14 @@ async def handle_support_start(
 ) -> None:
     """Enter the support intake flow from the "Contact support" button.
 
-    Ordering mirrors ``contact.handle_contact_us_start`` (OQ1): bots are
-    rejected first (fail fast, never consuming rate budget), then the per-user
-    support-message rate limit is applied, then the FSM is moved to
-    ``AWAITING_MESSAGE`` and the user is prompted for their question.
+    Ordering mirrors ``contact.handle_contact_us_start`` (OQ1) with the
+    storage-consent gate (06-PII-101) ahead of the rate limit: bots are rejected
+    first (fail fast), then the gate refuses a sender who may not store personal
+    data — before any rate budget is consumed — and only then is the per-user
+    support-message rate limit applied, the FSM moved to ``AWAITING_MESSAGE`` and
+    the user prompted. A sender who may not store personal data gets the consent
+    notice instead of the prompt, so no message is invited that could never be
+    persisted, and a refused sender is never told to "try again later".
     """
     await callback.answer()  # dismiss spinner
 
@@ -84,6 +105,10 @@ async def handle_support_start(
 
     if callback.message is None:
         return  # No originating message to reply to
+
+    if not await _actor_may_store(callback.from_user.id):
+        await callback.message.answer(SUPPORT_CONSENT_REQUIRED_MESSAGE)
+        return
 
     if not await check_support_message_rate_limit(callback.from_user.id):
         await callback.message.answer(SUPPORT_RATE_LIMITED_MESSAGE)
@@ -104,6 +129,13 @@ async def handle_support_message(
     call (mirroring ``contact.handle_contact_orm`` under CONN_MAX_AGE=0), then
     delivers via email + Telegram and confirms with the generated ``ticket_ref``.
 
+    The persistence call also enforces the storage-consent gate (06-PII-101):
+    it resolves the actor server-side from the signed ``chat_id`` and refuses
+    (returning ``None``) when the sender is unregistered, when the FSM
+    ``user_id`` disagrees with the resolved actor, or when the actor may not
+    store personal data. On refusal the consent notice is shown and no ticket is
+    created.
+
     The FSM is reset back to ``IDLE`` once the message has been handled.
     """
     if not message.from_user or message.from_user.is_bot:
@@ -120,9 +152,10 @@ async def handle_support_message(
         await message.answer(SUPPORT_MESSAGE_TOO_LONG_MESSAGE)
         return
 
-    # Attribute the ticket to the authenticated user when available (the
-    # AccountStateMiddleware backfills ``user_id`` into FSM state for
-    # registered users); anonymous senders leave ``user`` null.
+    # Attribute the ticket to the account resolved server-side from the signed
+    # chat_id (06-PII-101). The FSM ``user_id`` is only a cross-check, never the
+    # source of identity: a stale value must not let free text captured before
+    # consent become a ticket.
     user_id: int | None = (await state.get_data()).get("user_id")
 
     ticket = await handle_support_orm(
@@ -132,6 +165,12 @@ async def handle_support_message(
         text=text,
         user_id=user_id,
     )
+
+    if ticket is None:
+        # Refused on the storage-consent gate: no ticket, no delivery.
+        await message.answer(SUPPORT_CONSENT_REQUIRED_MESSAGE)
+        await state.set_state(ContactUsState.IDLE)
+        return
 
     bot_username = await _get_bot_username(bot)
 
@@ -160,20 +199,35 @@ async def handle_support_orm(
     Django's sync worker thread in one call to reduce DB connection churn with
     CONN_MAX_AGE=0. The ``ticket_ref`` is generated in the model's ``save()``
     override; the returned instance carries it for the confirmation reply.
+
+    The actor is resolved server-side from the Telegram-signed ``chat_id`` — the
+    same key ``AccountStateMiddleware._resolve_user`` uses — so no
+    client-supplied identity can attribute a ticket. Returns ``None`` (refusal)
+    when:
+
+    - the ``chat_id`` resolves to no ``User`` (unregistered sender), or
+    - the FSM ``user_id`` is present but differs from the resolved actor (a
+      stale FSM captured before consent), or
+    - ``can_store_personal_data`` is false (no granted consent, or blocked).
+
+    A ``None`` return is the single refusal signal; the caller shows the consent
+    notice and creates no ticket.
     """
     from apps.core.enums import SupportTicketStatus
     from apps.core.models import SupportTicket
+    from apps.users.models import User
+    from apps.users.services.account_state import can_store_personal_data
 
     @sync_to_async
-    def _create() -> SupportTicket:
-        user = None
-        if user_id is not None:
-            from apps.users.models import User
-
-            try:
-                user = User.objects.get(id=user_id)
-            except User.DoesNotExist:
-                user = None
+    def _create() -> SupportTicket | None:
+        try:
+            user = User.objects.get(chat_id=chat_id)
+        except User.DoesNotExist:
+            return None  # Unregistered sender: refuse.
+        if user_id is not None and user_id != user.id:
+            return None  # Stale FSM identity: refuse.
+        if not can_store_personal_data(user):
+            return None  # No storage consent (or blocked): refuse.
         return SupportTicket.objects.create(
             user=user,
             chat_id=chat_id,
@@ -184,6 +238,28 @@ async def handle_support_orm(
         )
 
     return await _create()
+
+
+async def _actor_may_store(chat_id: int) -> bool:
+    """Whether the signed ``chat_id`` resolves to a user who may store data.
+
+    Single-resolution gate used by ``handle_support_start`` before inviting a
+    message. Resolves server-side (never from client input) and delegates to
+    ``can_store_personal_data`` (06-PII-101). An unregistered ``chat_id`` is a
+    refusal.
+    """
+    from apps.users.models import User
+    from apps.users.services.account_state import can_store_personal_data
+
+    @sync_to_async
+    def _check() -> bool:
+        try:
+            user = User.objects.get(chat_id=chat_id)
+        except User.DoesNotExist:
+            return False
+        return can_store_personal_data(user)
+
+    return await _check()
 
 
 async def _get_bot_username(bot: Bot) -> str:

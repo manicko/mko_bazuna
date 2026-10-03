@@ -48,10 +48,13 @@ class SupportContactAdmin(admin.ModelAdmin):
 @admin.register(SupportTicket)
 class SupportTicketAdmin(admin.ModelAdmin):
     """
-    SupportTicket admin (read-only audit trail).
+    SupportTicket admin (view and filter only).
 
     Tickets are created via the Telegram bot; the admin can only view and
-    filter them. Add/delete are disabled to preserve the audit trail.
+    filter them. Add/delete are disabled because the bot is the only writer and
+    tickets are never edited by staff. A ticket is not an audit trail: it is
+    personal data deleted with its subject on withdrawal or erasure
+    (06-PII-101).
     """
 
     list_display = ["ticket_ref", "status", "user", "chat_id_display", "telegram_id_display", "created_at"]

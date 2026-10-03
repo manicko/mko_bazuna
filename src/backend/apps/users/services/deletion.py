@@ -23,6 +23,7 @@ from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus
+from apps.core.models import SupportTicket
 from apps.search.models import SavedSearch, SearchHistory
 from apps.search.services.cache import bump_search_cache_version
 from apps.users.models import LoginToken, User
@@ -102,16 +103,18 @@ def withdraw_consent(user: User) -> list[str]:
 
     - Clears User.preferred_city
 
+    - Deletes the user's SupportTicket rows (06-PII-101)
+
     - Soft-deletes all user ads (status=DELETED, hidden immediately)
 
     - DRAFT ads' media files are physically removed from disk
 
     All DB mutations run inside ``transaction.atomic()`` so that a failure in
-    any step rolls back LoginToken deletion, PII nulling, and ad soft-delete.
-    Physical media files are deleted after the transaction commits via the
-    AdImage pre_delete signal's ``on_commit`` callback, following the
-    TX-then-FS pattern. A rollback must never remove files for rows that
-    remain in the DB.
+    any step rolls back LoginToken deletion, PII nulling, ticket deletion and
+    ad soft-delete. Physical media files are deleted after the transaction
+    commits via the AdImage pre_delete signal's ``on_commit`` callback,
+    following the TX-then-FS pattern. A rollback must never remove files for
+    rows that remain in the DB.
 
     Idempotency: if the user is already soft-deleted (``is_deleted=True``),
     the call is a no-op returning ``[]``.
@@ -178,6 +181,13 @@ def withdraw_consent(user: User) -> list[str]:
                 "preferred_city",
             ]
         )
+
+        # Delete the user's support tickets (06-PII-101). This is load-bearing:
+        # withdraw_consent is a SOFT delete, so the user row survives and the
+        # FK's CASCADE can never fire here. Placed BEFORE
+        # soft_delete_user_ads(user) so a failure there rolls the deletion back
+        # (test_withdraw_is_atomic_rollback).
+        SupportTicket.objects.filter(user=user).delete()
 
         # Soft-delete all user ads (DB-only: returns storage keys for FS cleanup)
         storage_keys = soft_delete_user_ads(user)

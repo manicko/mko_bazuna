@@ -175,40 +175,40 @@ PII_ERASURE_ENTRIES: tuple[tuple[str, str, ErasureAction, str], ...] = (
     (
         "core.SupportTicket",
         "chat_id",
-        ErasureAction.NULL,
-        "NOT implemented today: denormalised Telegram chat id copied verbatim "
-        "from the sender, currently NON-NULLABLE, so the clear requires BLOCK "
-        "13's core-app migration first. It survives withdrawal and the 30-day "
-        "sweep byte-for-byte, on a row the FK SET_NULL has already orphaned "
-        "(06-PII-101).",
+        ErasureAction.DELETE_ROW,
+        "Implemented today (BLOCK 13, 06-PII-101): the whole ticket row is "
+        "DELETED, not scrubbed. withdraw_consent deletes the user's tickets "
+        "inside its existing transaction.atomic(), the FK CASCADE removes them "
+        "on a hard user delete, and consent_hard_delete sweeps them before its "
+        "queryset.delete(). The row is deleted, so this denormalised Telegram "
+        "chat id leaves with it.",
     ),
     (
         "core.SupportTicket",
         "telegram_id",
-        ErasureAction.NULL,
-        "NOT implemented today: denormalised Telegram id copied verbatim from "
-        "the sender, currently NON-NULLABLE, so BLOCK 13's core-app migration "
-        "must land first. Survives withdrawal and the sweep as an orphan "
-        "(06-PII-101).",
+        ErasureAction.DELETE_ROW,
+        "Implemented today (BLOCK 13, 06-PII-101): the denormalised Telegram "
+        "id leaves with the whole ticket row on withdrawal's explicit delete, on "
+        "the hard delete's CASCADE, and on the sweep. Nothing is derived from a "
+        "ticket, so the row is deleted rather than scrubbed.",
     ),
     (
         "core.SupportTicket",
         "username",
-        ErasureAction.NULL,
-        "NOT implemented today: the public handle copied verbatim from the "
-        "sender; already nullable. Survives as an orphan with no remaining "
-        "account link (06-PII-101). BLOCK 13 owns the scrub.",
+        ErasureAction.DELETE_ROW,
+        "Implemented today (BLOCK 13, 06-PII-101): the public handle leaves "
+        "with the whole ticket row on withdrawal, on the hard delete's CASCADE, "
+        "and on the consent_hard_delete sweep. The row is deleted, not scrubbed.",
     ),
     (
         "core.SupportTicket",
         "text",
-        ErasureAction.RETAIN,
-        "NOT implemented today (retention): the ticket BODY is the support "
-        "record, not a denormalised identity column — 06-PII-101's scope is "
-        "the three identity columns above. BLOCK 12 (06-PII-106) drops it from "
-        "SupportTicketAdmin.search_fields and masks the changelist. No "
-        "retention boundary for the body is decided in phase 06 — declared so "
-        "the deferral is visible.",
+        ErasureAction.DELETE_ROW,
+        "Implemented today (BLOCK 13, 06-PII-101): the ticket body is deleted "
+        "with the row. Nothing is derived from a ticket — no trigger, index, "
+        "aggregate, AnalyticsEvent type, stamp or signal receiver — so erasing "
+        "the whole row is conservation-correct. The bot also refuses to create a "
+        "ticket without storage consent.",
     ),
     (
         "ads.Ad",

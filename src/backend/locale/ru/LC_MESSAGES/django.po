@@ -724,11 +724,11 @@ msgid "Your Ads"
 msgstr "Ваши объявления"
 
 msgid ""
-"Withdrawing consent permanently erases your Telegram ID, all ads, and "
-"prevents re-login. Are you sure?"
+"Withdrawing consent permanently erases your Telegram ID, all ads, and your "
+"support requests, and prevents re-login. Are you sure?"
 msgstr ""
-"Отозвание согласия постоянно удаляет ваш Telegram ID, все объявления и "
-"предотвращает повторный вход. Вы уверены?"
+"Отозвание согласия постоянно удаляет ваш Telegram ID, все объявления, ваши "
+"обращения в поддержку и предотвращает повторный вход. Вы уверены?"
 
 msgid "Withdraw Data"
 msgstr "Удалить данные"
@@ -1725,3 +1725,22 @@ msgid ""
 msgstr ""
 "Записи модерации и текст уже проверенных объявлений сохраняются для "
 "обеспечения безопасности и урегулирования споров."
+
+#: src/backend/templates/privacy.html
+msgid "Your support requests to our help desk are deleted."
+msgstr "Ваши обращения в поддержку удаляются."
+
+#: src/telegram_bot/handlers/support.py
+msgid ""
+"To contact support, please sign in and accept the personal data storage "
+"consent first."
+msgstr ""
+"Чтобы связаться с поддержкой, сначала войдите и примите согласие на "
+"хранение персональных данных."
+
+#~ msgid ""
+#~ "Withdrawing consent permanently erases your Telegram ID, all ads, and "
+#~ "prevents re-login. Are you sure?"
+#~ msgstr ""
+#~ "Отозвание согласия постоянно удаляет ваш Telegram ID, все объявления и "
+#~ "предотвращает повторный вход. Вы уверены?"

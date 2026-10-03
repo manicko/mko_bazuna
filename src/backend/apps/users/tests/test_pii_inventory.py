@@ -343,13 +343,18 @@ def test_retained_free_text_entries_name_their_owning_block() -> None:
     column must carry an explicit entry whose reason names the owning block —
     a deferral with an owner, not a silent omission. The columns this
     acceptance criterion calls RETAIN must actually be RETAIN.
+
+    ``core.SupportTicket.text`` is deliberately **not** in the RETAIN set
+    (06-PII-101): the ticket row is deleted, so the body is ``DELETE_ROW``. It
+    stays in ``all_free_text`` so its "is a declared entry" and "reason names
+    its owning block" assertions still run.
     """
     retained_free_text = {
-        ("core.SupportTicket", "text"),
         ("moderation.ModeratorActionLog", "reason"),
         ("search.SavedSearch", "query"),
     }
     all_free_text = retained_free_text | {
+        ("core.SupportTicket", "text"),
         ("ads.Ad", "title"),
         ("ads.Ad", "title_en"),
         ("ads.Ad", "title_bs"),
@@ -372,6 +377,28 @@ def test_retained_free_text_entries_name_their_owning_block() -> None:
         assert entry is not None, f"{key} must be a declared entry"
         _label, _column, action, _reason = entry
         assert action == ErasureAction.RETAIN, f"{key} must be RETAIN"
+
+
+def test_support_ticket_entries_are_delete_row() -> None:
+    """All four ``core.SupportTicket`` columns are ``DELETE_ROW`` (06-PII-101).
+
+    The owner's decision is that a ticket is **deleted, not scrubbed**, so every
+    ticket column leaves with the row on withdrawal and erasure. A ``NULL`` or
+    ``RETAIN`` action here would revive the silent-retention defect.
+    """
+    lookup = _entry_lookup()
+    ticket_columns = ("chat_id", "telegram_id", "username", "text")
+
+    for column in ticket_columns:
+        entry = lookup.get(("core.SupportTicket", column))
+        assert entry is not None, f"core.SupportTicket.{column} must be declared"
+        _label, _name, action, reason = entry
+        assert action == ErasureAction.DELETE_ROW, (
+            f"core.SupportTicket.{column} must be DELETE_ROW"
+        )
+        assert "06-PII-101" in reason, (
+            f"core.SupportTicket.{column} reason must cite 06-PII-101"
+        )
 
 
 def test_declared_entries_are_unique() -> None:

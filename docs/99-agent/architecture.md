@@ -978,15 +978,23 @@ Delivery targets admin-configured channels via two fail-open seams:
   429 `TelegramRetryAfter` retry-after retry); `EMAIL`-type contacts are skipped.
 
 Access control is enforced upstream by `AccountStateMiddleware` (`telegram_bot/middlewares/permissions.py`):
-anonymous and DECLINE users may reach support, while banned/deleted/consent-revoked users are
-blocked before the handler runs. For `callback_query` updates the acting-user identity is resolved
-from `callback_query.from_user.id` (the button-clicker), **not** `callback_query.message.from_user.id`
-(the bot account that sent the inline keyboard) — the prior use of `message.from_user` produced a
-fail-open `User.DoesNotExist` bypass of account-state gating on all callback-driven bot interactions.
-The middleware resolves the acting user exactly once per update by the stable `chat_id` (never
-`telegram_id`, which is nulled on GDPR withdrawal) and reuses that single instance for the interaction
-gate, the publish gate, and the FSM `user_id` backfill; an unregistered `chat_id` is a memoised absent
-state (`None`), not an error.
+banned/deleted/consent-revoked users are blocked before the handler runs, and DECLINE users cannot
+reach support because `SUPPORT_START` is not a contact deep-link (pre-existing). A deactivated user
+reaches the intake only through the plan-19 support carve-out.
+**Storage-consent gate (06-PII-101).** Support intake additionally requires consent to personal-data
+storage: the handler resolves the actor server-side from the Telegram-signed `chat_id` and enforces
+`apps.users.services.account_state.can_store_personal_data` (the six account flags plus a granted
+`consent_given_at`). An unregistered `chat_id`, an account without consent, or a stale FSM `user_id`
+that disagrees with the resolved actor is refused with a notice pointing at sign-in and consent — no
+ticket is created. The bot's handler is the only ticket writer; the model still accepts an
+unattributed ticket, but the bot never creates one. For `callback_query` updates the acting-user
+identity is resolved from `callback_query.from_user.id` (the button-clicker), **not**
+`callback_query.message.from_user.id` (the bot account that sent the inline keyboard) — the prior
+use of `message.from_user` produced a fail-open `User.DoesNotExist` bypass of account-state gating on
+all callback-driven bot interactions. The middleware resolves the acting user exactly once per update
+by the stable `chat_id` (never `telegram_id`, which is nulled on GDPR withdrawal) and reuses that
+single instance for the interaction gate, the publish gate, and the FSM `user_id` backfill; an
+unregistered `chat_id` is a memoised absent state (`None`), not an error.
 The handler additionally guards against bots (mirroring `contact.py`). `SupportContact`/`SupportTicket` schema
 and the `SupportChannelType`/`SupportTicketStatus` enums are documented in
 [`db-schema.md`](../02-database/db-schema.md#support_contacts) /

@@ -159,11 +159,14 @@ class SupportTicket(models.Model):
 
     user = models.ForeignKey(
         settings.AUTH_USER_MODEL,
-        on_delete=models.SET_NULL,
+        on_delete=models.CASCADE,
         null=True,
         blank=True,
         related_name="support_tickets",
-        help_text="Authenticated user who opened the ticket (null if anonymous)",
+        help_text=(
+            "Authenticated user who opened the ticket (null if unattributed). "
+            "Deleted with the user (06-PII-101): nothing is derived from a ticket."
+        ),
     )
     chat_id = models.BigIntegerField(
         help_text="Telegram chat_id for anonymous attribution",

@@ -15,6 +15,7 @@ from django.utils import timezone
 
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdvisoryLockId
+from apps.core.models import SupportTicket
 from apps.core.utils.advisory_lock import advisory_lock
 from apps.moderation.models import ModeratorActionLog
 from apps.users.models import User
@@ -71,6 +72,20 @@ class Command(BaseCommand):
                 ModeratorActionLog.objects.filter(user_id__in=user_ids).update(
                     user_id=None
                 )
+
+                # Delete support tickets for the users about to be hard-deleted
+                # (06-PII-101). The FK's CASCADE would remove them with the user
+                # row, but the delete is stated explicitly so the erasure intent
+                # is visible in this path rather than implied by a model option.
+                SupportTicket.objects.filter(user_id__in=user_ids).delete()
+
+                # Sweep already-orphaned tickets (user_id IS NULL). This is a
+                # CORRECTNESS STATEMENT, not a data fix: no cascade can reach an
+                # orphan and this population is 0 rows in dev and test today.
+                # Stating it here keeps the invariant "no unattributed ticket
+                # outlives its subject" true without a migration that deletes
+                # rows (constraint 10).
+                SupportTicket.objects.filter(user_id__isnull=True).delete()
 
                 # Delete users - CASCADE will handle their ads (and ad_images via ORM)
                 deleted_count, _ = queryset.delete()

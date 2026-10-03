@@ -22,6 +22,7 @@ from apps.core.enums import (
     AnalyticsEventType,
     ModeratorActionType,
 )
+from apps.core.models import SupportTicket
 from apps.moderation.models import ModeratorActionLog
 from apps.users.models import User
 from conftest import create_test_ad
@@ -137,6 +138,12 @@ class TestConsentHardDelete:
             action_type=ModeratorActionType.BAN_ACCOUNT,
             reason="internal",
         )
+        ticket = SupportTicket.objects.create(
+            user=seller,
+            chat_id=seller.chat_id,
+            telegram_id=seller.telegram_id,
+            text="rollback ticket",
+        )
 
         # Patch User.objects.filter to return a mock that crashes on delete
         # but allows count() and values_list()
@@ -169,12 +176,40 @@ class TestConsentHardDelete:
         # Restore original filter so post-crash assertions use real DB
         monkeypatch.setattr(User.objects, "filter", original_filter)
 
-        # Verify atomicity: user still exists, history not nulled
+        # Verify atomicity: user still exists, history not nulled, ticket restored
         assert User.objects.filter(pk=seller.pk).exists()
         event.refresh_from_db()
         assert event.user_id == seller.pk
         log.refresh_from_db()
         assert log.user_id == seller.pk
+        # The ticket sweep is inside the same atomic() and rolls back too.
+        assert SupportTicket.objects.filter(pk=ticket.pk).exists()
+
+    def test_hard_delete_cascades_support_tickets_and_spares_others(self, seller):
+        """A hard-deleted user's ticket goes with them; another user's survives."""
+        seller.consent_revoked_at = timezone.now() - timedelta(days=60)
+        seller.save()
+        other = User.objects.create(
+            telegram_id=900000777, chat_id=900000777, password="x"
+        )
+        mine = SupportTicket.objects.create(
+            user=seller,
+            chat_id=seller.chat_id,
+            telegram_id=seller.telegram_id,
+            text="mine",
+        )
+        theirs = SupportTicket.objects.create(
+            user=other,
+            chat_id=other.chat_id,
+            telegram_id=other.telegram_id,
+            text="theirs",
+        )
+
+        call_command("consent_hard_delete")
+
+        assert not User.objects.filter(pk=seller.pk).exists()
+        assert not SupportTicket.objects.filter(pk=mine.pk).exists()
+        assert SupportTicket.objects.filter(pk=theirs.pk).exists()
 
     @pytest.mark.django_db(transaction=True)
     def test_log_reports_user_count_not_cascade_total(

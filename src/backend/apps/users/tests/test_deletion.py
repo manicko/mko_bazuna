@@ -12,6 +12,7 @@ from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
 from apps.core.enums import AdStatus
+from apps.core.models import SupportTicket
 from apps.search.models import SavedSearch, SearchHistory
 from apps.search.services.cache import get_search_version
 from apps.users.models import LoginToken, User
@@ -415,9 +416,10 @@ class TestWithdrawConsentAtomicity:
     def test_withdraw_is_atomic_rollback(self, user: User, monkeypatch):
         """If soft_delete_user_ads raises, the entire transaction rolls back.
 
-        LoginTokens, the SavedSearch deactivation and the SearchHistory deletion
-        must be fully restored when an error occurs inside the transaction
-        boundary, together with the user PII writes.
+        LoginTokens, the SavedSearch deactivation, the SearchHistory deletion
+        and the SupportTicket deletion must be fully restored when an error
+        occurs inside the transaction boundary, together with the user PII
+        writes.
         """
         now = timezone.now()
         token = LoginToken.objects.create(
@@ -428,6 +430,9 @@ class TestWithdrawConsentAtomicity:
         saved = SavedSearch.objects.create(user=user, query="rollback", is_active=True)
         history = SearchHistory.objects.create(
             user=user, query="rollback", query_normalized="rollback"
+        )
+        ticket = SupportTicket.objects.create(
+            user=user, chat_id=user.chat_id, telegram_id=user.telegram_id, text="rollback"
         )
 
         def _raise(*args, **kwargs):
@@ -447,6 +452,8 @@ class TestWithdrawConsentAtomicity:
         saved.refresh_from_db()
         assert saved.is_active is True
         assert SearchHistory.objects.filter(pk=history.pk).exists()
+        # SupportTicket deletion rolled back too (06-PII-101)
+        assert SupportTicket.objects.filter(pk=ticket.pk).exists()
         # User NOT soft-deleted — PII and flags rolled back
         user.refresh_from_db()
         assert user.is_deleted is False
@@ -635,3 +642,57 @@ class TestWithdrawConsentMultiSessionKnownGap:
 
         user.refresh_from_db()
         assert user.is_deleted is True
+
+
+# ---------------------------------------------------------------------------
+# SupportTicket erasure on withdrawal (06-PII-101)
+# ---------------------------------------------------------------------------
+
+
+class TestWithdrawDeletesSupportTickets:
+    """``withdraw_consent`` deletes the user's tickets while the User row stays.
+
+    ``withdraw_consent`` is a SOFT delete, so the FK's ``CASCADE`` can never
+    fire here; the explicit ``SupportTicket.objects.filter(user=user).delete()``
+    is the load-bearing step. These tests prove the ticket disappears **and**
+    the ``User`` row still exists, which is exactly what distinguishes the
+    explicit delete from a cascade.
+    """
+
+    def test_withdraw_deletes_ticket_but_keeps_user_row(self, user: User) -> None:
+        """The user's ticket is gone; the user row still exists after withdrawal."""
+        ticket = SupportTicket.objects.create(
+            user=user,
+            chat_id=user.chat_id,
+            telegram_id=user.telegram_id,
+            text="please help",
+        )
+
+        withdraw_consent(user)
+
+        # Ticket gone, but the soft-deleted User row remains (CASCADE never fired).
+        assert not SupportTicket.objects.filter(pk=ticket.pk).exists()
+        assert User.objects.filter(pk=user.pk).exists()
+        user.refresh_from_db()
+        assert user.is_deleted is True
+
+    def test_withdraw_spares_another_users_ticket(self, user: User) -> None:
+        """An over-broad filter is caught: another user's ticket is untouched."""
+        other = make_user(900000555, consent_given_at=timezone.now())
+        mine = SupportTicket.objects.create(
+            user=user,
+            chat_id=user.chat_id,
+            telegram_id=user.telegram_id,
+            text="my ticket",
+        )
+        theirs = SupportTicket.objects.create(
+            user=other,
+            chat_id=other.chat_id,
+            telegram_id=other.telegram_id,
+            text="their ticket",
+        )
+
+        withdraw_consent(user)
+
+        assert not SupportTicket.objects.filter(pk=mine.pk).exists()
+        assert SupportTicket.objects.filter(pk=theirs.pk).exists()

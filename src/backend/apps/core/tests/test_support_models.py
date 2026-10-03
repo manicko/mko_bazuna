@@ -18,7 +18,7 @@ import pytest
 from django.db import IntegrityError, transaction
 from django.utils import timezone
 
-from apps.core.enums import SupportChannelType, SupportTicketStatus
+from apps.core.enums import AdStatus, SupportChannelType, SupportTicketStatus
 from apps.core.models import SupportContact, SupportTicket
 from apps.users.models import User
 
@@ -199,3 +199,50 @@ class TestSupportTicketAnonymous:
             text="Authenticated help request",
         )
         assert ticket.user == user
+
+
+# ---------------------------------------------------------------------------
+# SupportTicket deletion conservation (06-PII-101)
+# ---------------------------------------------------------------------------
+
+
+class TestSupportTicketDeletionConservation:
+    """Deleting a ticket changes no other row.
+
+    Nothing is derived from a ticket: no trigger, no aggregate, no
+    ``AnalyticsEvent`` type, no signal receiver. This is the verify-only axis
+    of 06-PII-101 — deleting a ticket must leave analytics and ad metrics
+    untouched.
+    """
+
+    def test_deleting_ticket_changes_no_other_row(
+        self, user: User, category, city
+    ) -> None:
+        """A ticket delete leaves AnalyticsEvent and DailyAdMetrics counts intact."""
+        from datetime import date
+
+        from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
+        from apps.core.enums import AnalyticsEventType
+        from conftest import create_test_ad
+
+        ad = create_test_ad(user, category, city, status=AdStatus.PUBLISHED)
+        AnalyticsEvent.objects.create(
+            event_type=AnalyticsEventType.SEARCH_PERFORMED, user=user
+        )
+        DailyAdMetrics.objects.create(ad=ad, date=date(2026, 1, 1))
+
+        ticket = SupportTicket.objects.create(
+            user=user,
+            chat_id=user.chat_id,
+            telegram_id=user.telegram_id,
+            text="to delete",
+        )
+
+        analytics_before = AnalyticsEvent.objects.count()
+        metrics_before = DailyAdMetrics.objects.count()
+
+        ticket.delete()
+
+        assert not SupportTicket.objects.filter(pk=ticket.pk).exists()
+        assert AnalyticsEvent.objects.count() == analytics_before
+        assert DailyAdMetrics.objects.count() == metrics_before
