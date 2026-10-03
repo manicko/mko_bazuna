@@ -4,6 +4,10 @@ Signal handlers for the media app.
 - ``delete_adimage_files_on_delete``: cleans up physical files
   (original + thumbnails) when an ``AdImage`` row is deleted,
   using the project's TX-then-FS pattern (delete after commit).
+  A key is freed only when no ``AdImage`` row references it in any of
+  its four key columns; that check is delegated to
+  ``apps.media.services.references.unreferenced_keys`` and runs inside
+  the ``on_commit`` closure.
 """
 
 import logging
@@ -14,45 +18,49 @@ from django.dispatch import receiver
 
 from apps.ads.models import AdImage
 from apps.media.services.filesystem import delete_photo
+from apps.media.services.references import unreferenced_keys
 
 logger = logging.getLogger(__name__)
 
 
 @receiver(pre_delete, sender=AdImage)
 def delete_adimage_files_on_delete(sender, instance, **kwargs):
-    """Delete physical AdImage files (original + thumbnails) after the
-    DB transaction commits, preserving the project's TX-then-FS pattern.
+    """Delete physical AdImage files (original + thumbnails) after commit.
 
-    Collects storage_keys() at pre_delete time (when instance fields
-    are populated) and defers file deletion via transaction.on_commit().
+    Preserves the project's TX-then-FS pattern: the departing row's
+    ``storage_keys()`` are captured **by value** at ``pre_delete`` time (when
+    the instance fields are still populated) and file deletion is deferred via
+    ``transaction.on_commit()``.
 
-    A storage key is deleted only when no *other* ``AdImage`` row still
-    references it. ``copy_ad`` deliberately points a copy at the source ad's
-    keys (no file duplication), so the same key is legitimately shared across
-    ads; when one sharing row is deleted the file must survive for the others.
-    The existence check therefore excludes the instance being deleted -- at
-    ``pre_delete`` time the row is still in the table (the cascade has not
-    finished), so a naive ``filter(image=key).exists()`` would always match
-    the row itself, skip every deletion and silently stop all file cleanup.
-    That second failure mode is the more dangerous one: it leaks every
-    orphaned file forever with no error. Do not "simplify" the exclusion away.
+    The liveness check runs **inside the closure**, after commit, and is
+    unexcluded.  Django's ``Collector.delete()`` sends ``pre_delete`` for
+    every collected instance *before* any ``DELETE``, so a check taken here
+    would still see sibling rows that are about to disappear; two rows sharing
+    a key in one cascade would each skip and the file would leak.  After
+    commit those rows are gone, so ``unreferenced_keys()`` answers the correct
+    question -- "referenced by any row" -- and the multi-row-cascade leak is
+    eliminated.  The closure therefore must not touch ``instance``:
+    ``Collector`` sets ``instance.pk = None`` after its ``atomic()`` block, so
+    an ``.exclude(pk=instance.pk)`` would raise ``ValueError``.
+
+    A key shared through **any** of the four columns (``image``,
+    ``thumbnail_small``, ``thumbnail_medium``, ``thumbnail_large``) survives
+    while another ``AdImage`` still references it.  ``copy_ad`` deliberately
+    points a copy at the source ad's keys (no file duplication), so keys are
+    legitimately shared across ads.
+
+    Residual, accepted characteristic: in a multi-row cascade a shared key is
+    passed to ``delete_photo`` **once per departing row**.  The second call
+    hits the terminal ``FileNotFoundError`` path and returns before
+    ``_record_deletion_error``, so it logs one WARN and writes no
+    ``MediaDeletionError`` row.
     """
-    keys = list(instance.storage_keys())
+    keys = tuple(instance.storage_keys())
     if not keys:
         return
 
-    # At pre_delete time this row still exists, so exclude it explicitly by pk.
-    shared = set(
-        AdImage.objects.filter(image__in=keys)
-        .exclude(pk=instance.pk)
-        .values_list("image", flat=True)
-    )
-    orphaned = [key for key in keys if key not in shared]
-    if not orphaned:
-        return
-
     def _cleanup() -> None:
-        for key in orphaned:
+        for key in unreferenced_keys(keys):
             try:
                 delete_photo(key)
             except Exception:  # noqa: BLE001 — never let FS failure break the cascade

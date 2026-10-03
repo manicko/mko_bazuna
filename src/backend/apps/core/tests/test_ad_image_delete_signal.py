@@ -202,3 +202,112 @@ class TestAdImageDeleteSignal:
 
         assert not (isolated_media_root / key).exists()
         assert not AdImage.objects.filter(pk=img.pk).exists()
+
+    @pytest.mark.parametrize(
+        "column", ["thumbnail_small", "thumbnail_medium", "thumbnail_large"]
+    )
+    def test_thumbnail_shared_key_survives_other_row_deletion(
+        self, seller, category, city, isolated_media_root, monkeypatch, column
+    ):
+        """A key shared only via a thumbnail column survives the other row's deletion.
+
+        This is the actual ``07-MEDIA-001`` regression: the shipped receiver
+        built its ``shared`` set from other rows' ``image`` values only, so a
+        key shared solely through a ``thumbnail_*`` column was classified as
+        orphaned and destroyed while another ``AdImage`` still referenced it.
+        Row B's ``image`` is distinct, so the defect never matches B at all.
+
+        ``delete_photo`` is patched by string (exercising the module-level
+        binding contract) with a recorder that delegates to the real function,
+        asserting both the call boundary and the filesystem outcome.
+        """
+        from apps.media.services.filesystem import delete_photo as real_delete_photo
+
+        shared_key = f"b2-shared-via-{column}.jpg"
+
+        ad_a = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        img_a = AdImage.objects.create(
+            ad=ad_a, image="b2-a-original.jpg", position=0, **{column: shared_key}
+        )
+        ad_b = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        AdImage.objects.create(
+            ad=ad_b, image="b2-b-original.jpg", position=0, **{column: shared_key}
+        )
+
+        (isolated_media_root / shared_key).write_bytes(b"shared data")
+
+        called_keys: list[str] = []
+
+        def _recording_delete(storage_key: str) -> None:
+            called_keys.append(storage_key)
+            real_delete_photo(storage_key)
+
+        monkeypatch.setattr("apps.media.signals.delete_photo", _recording_delete)
+        monkeypatch.setattr(settings, "MEDIA_ROOT", str(isolated_media_root))
+
+        with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
+            img_a.delete()
+            # on_commit fires here; row B still references ``shared_key``.
+
+        assert (isolated_media_root / shared_key).exists()
+        assert AdImage.objects.filter(ad=ad_b, **{column: shared_key}).exists()
+        assert shared_key not in called_keys
+
+    def test_cascade_delete_frees_shared_key(
+        self, seller, category, city, isolated_media_root, monkeypatch
+    ):
+        """Two rows sharing keys deleted in one cascade still free the files.
+
+        Under the shipped ``pre_delete``-time check both rows saw the other
+        still present, both skipped, and after commit zero rows referenced the
+        keys -- a silent leak.  The post-commit unexcluded check fixes this.
+
+        ``delete_photo`` is asserted ``>= 1`` per shared key, never ``== 1``:
+        the chosen shape deliberately frees a shared key once per departing
+        row, so pinning exactly-once would contradict the very leak this test
+        proves is gone.  ``>= 1`` still fails on the shipped code, where the
+        count is 0.
+        """
+        from apps.media.services.filesystem import delete_photo as real_delete_photo
+
+        shared_image = "b2-cascade-shared.jpg"
+        shared_thumb = "b2-cascade-shared-small.jpg"
+
+        ad_a = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        AdImage.objects.create(
+            ad=ad_a,
+            image=shared_image,
+            position=0,
+            thumbnail_small=shared_thumb,
+        )
+        ad_b = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        AdImage.objects.create(
+            ad=ad_b,
+            image=shared_image,
+            position=0,
+            thumbnail_small=shared_thumb,
+        )
+
+        (isolated_media_root / shared_image).write_bytes(b"shared data")
+        (isolated_media_root / shared_thumb).write_bytes(b"shared data")
+
+        called_keys: list[str] = []
+
+        def _recording_delete(storage_key: str) -> None:
+            called_keys.append(storage_key)
+            real_delete_photo(storage_key)
+
+        monkeypatch.setattr("apps.media.signals.delete_photo", _recording_delete)
+        monkeypatch.setattr(settings, "MEDIA_ROOT", str(isolated_media_root))
+
+        with transaction.atomic():  # type: ignore[reportGeneralTypeIssues]
+            Ad.objects.filter(pk__in=[ad_a.pk, ad_b.pk]).delete()
+            # on_commit fires here; both departing rows are gone.
+
+        assert not Ad.objects.filter(pk__in=[ad_a.pk, ad_b.pk]).exists()
+        assert not AdImage.objects.filter(ad_id__in=[ad_a.pk, ad_b.pk]).exists()
+        assert not (isolated_media_root / shared_image).exists()
+        assert not (isolated_media_root / shared_thumb).exists()
+        # Deliberately >= 1, not == 1 — see docstring.
+        assert called_keys.count(shared_image) >= 1
+        assert called_keys.count(shared_thumb) >= 1
