@@ -41,6 +41,7 @@ ALLOWED_ENV_VARS = frozenset({
     "DEFAULT_FROM_EMAIL", "SUPPORT_NOTIFICATION_RECIPIENTS",
     "RUN_TRANSLATION_BACKFILL",
     "LOCK_TIMEOUT_SECONDS",
+    "MEDIA_STAGING_BYTE_BUDGET",
     # --- Bootstrap control flags (honoured only from the process environment) ---
     # DJANGO_BUILD: Docker image builder stage only (collectstatic, no .env file).
     # DJANGO_ONESHOT: dev bootstrap one-shots, which run config.settings.oneshot.
@@ -453,6 +454,31 @@ MEDIA_URL = "/media/"
 # MEDIA_ROOT lives at /app/media so uploads land on the media_volume mount
 # (media_volume:/app/media for web/bot, shared with nginx via media_volume).
 MEDIA_ROOT = BASE_DIR.parent / "media"
+
+# Global byte budget for the in-flight upload area (MEDIA_ROOT/staging/).
+#
+# Nothing else bounds the total bytes in ``staging/``: the only reclamation is
+# the 2 h mtime TTL in ``sweep_orphaned_media`` and the FSM-skip reclaim, so a
+# burst of uploads (many photos, or many sellers at once) can fill the media
+# volume before either runs and take the whole site down.  This setting is the
+# primary space control; the TTL stays the backstop.
+#
+# The budget is necessarily GLOBAL, not per seller.  Staging keys are minted by
+# ``generate_storage_key()`` as ``<uuid4>.jpg`` — deliberately PII-free — so no
+# attribute of a staged file identifies its owner, and per-seller attribution
+# would require a key-format change that breaks unguessability and every key
+# ``CheckConstraint``.  The accepted trade-off: one abusive account can exhaust
+# the shared budget and cause a legitimate seller's upload to be refused.
+#
+# 2 GiB bounds the arithmetic it must cover.  ``MAX_PHOTO_BYTES`` is 2 MB per
+# photo, the FSM caps a dialog at 5 photos, and the rate limiter allows 10
+# uploads / 60 s per seller: one account can accumulate ~2.4 GB inside a single
+# 2 h TTL window.  2 GiB stops a single account before the TTL would, and it is
+# ~180 fully-staged dialogs (≈11 MB each) of legitimate headroom.  Env-
+# overridable so an operator can raise it without a code change.
+MEDIA_STAGING_BYTE_BUDGET = int(
+    os.environ.get("MEDIA_STAGING_BYTE_BUDGET", 2 * 1024 * 1024 * 1024)
+)
 
 # Default primary key field type
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"

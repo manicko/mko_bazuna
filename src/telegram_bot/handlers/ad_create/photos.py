@@ -9,6 +9,7 @@ the package init.
 
 from aiogram import types
 from aiogram.fsm.context import FSMContext
+from django.conf import settings
 from django.utils.translation import gettext as _
 
 from apps.media.services.filesystem import generate_storage_key, validate_photo
@@ -17,6 +18,7 @@ from telegram_bot.schemas.message_payloads import PhotoCountPayload
 from telegram_bot.services.ad_data import (
     download_photo,
     save_photo,
+    staging_bytes_used,
     touch_draft,
     touch_staging_photos,
 )
@@ -96,6 +98,15 @@ async def process_photos(message: types.Message, state: FSMContext) -> None:
 
     if photo.file_size is not None and photo.file_size > MAX_PHOTO_BYTES:
         await message.answer(_("Photo too large. Maximum size is approximately 2MB."))
+        return
+
+    # Global staging byte budget (MEDIA-007). Refuse before downloading or
+    # writing anything, so a refused upload leaves no bytes behind. The check
+    # reads the bounded ``staging_bytes_used`` total (O(entries), no tree walk)
+    # and compares it against the shared budget — it is deliberately global
+    # because staging keys are PII-free UUIDs with no owner attribute.
+    if staging_bytes_used() >= settings.MEDIA_STAGING_BYTE_BUDGET:
+        await message.answer(_("Storage is temporarily full. Please try again later."))
         return
 
     # Download photo bytes for validation

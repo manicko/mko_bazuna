@@ -1569,3 +1569,7 @@ msgstr ""
 #: src/backend/apps/ads/admin.py
 msgid "Removed %(count)s photo(s)."
 msgstr ""
+
+#: src/telegram_bot/handlers/ad_create/photos.py
+msgid "Storage is temporarily full. Please try again later."
+msgstr ""

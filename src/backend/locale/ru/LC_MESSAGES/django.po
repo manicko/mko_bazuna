@@ -1796,3 +1796,7 @@ msgstr "Удалить выбранные фотографии из объявл
 #: src/backend/apps/ads/admin.py
 msgid "Removed %(count)s photo(s)."
 msgstr "Удалено фотографий: %(count)s."
+
+#: src/telegram_bot/handlers/ad_create/photos.py
+msgid "Storage is temporarily full. Please try again later."
+msgstr "Хранилище временно заполнено. Пожалуйста, попробуйте позже."

@@ -36,6 +36,7 @@ from telegram_bot.services.ad_data.keyboards import (
 from telegram_bot.services.ad_data.media import (
     download_photo,
     save_photo,
+    staging_bytes_used,
     touch_staging_photos,
 )
 from telegram_bot.services.ad_data.orm import (
@@ -67,6 +68,7 @@ __all__ = [
     "get_all_cities",
     "download_photo",
     "save_photo",
+    "staging_bytes_used",
     "touch_staging_photos",
     "get_category",
     "get_city",

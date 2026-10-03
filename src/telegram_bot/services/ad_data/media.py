@@ -15,6 +15,7 @@ from django.conf import settings
 
 from apps.media.services.filesystem import (
     STAGING_PREFIX,
+    STAGING_SUBDIR,
     generate_storage_key,
     strip_photo_exif,
 )
@@ -24,6 +25,7 @@ logger = logging.getLogger(__name__)
 __all__ = [
     "download_photo",
     "save_photo",
+    "staging_bytes_used",
     "touch_staging_photos",
 ]
 
@@ -87,6 +89,44 @@ async def download_photo(file_id: str, bot: Bot) -> bytes | None:
     except Exception as e:
         logger.error("Failed to download photo %s: %s", file_id, e)
         return None
+
+
+def staging_bytes_used() -> int:
+    """Return the total bytes currently held in ``MEDIA_ROOT/staging/``.
+
+    This is the bounded byte source for the global staging budget
+    (``settings.MEDIA_STAGING_BYTE_BUDGET``).  It scans **only the top level**
+    of the staging directory with ``os.scandir`` and sums regular-file sizes —
+    it never recurses and never calls ``os.walk``, so its cost is O(entries in
+    ``staging/``) per call and does not scale with directory depth.  Walking the
+    whole media tree on every upload would make the control cost more than it
+    saves.
+
+    A missing staging directory means nothing is in flight and returns ``0``.
+    Entries that vanish mid-scan or cannot be stat'ed are skipped rather than
+    failing the upload: a bound that is momentarily stale by one file is
+    harmless, while an error here would refuse a legitimate seller.
+
+    The FSM photo list is deliberately **not** consulted: its size records only
+    what one dialog has staged, whereas the budget bounds every seller's bytes
+    (the setting is global by design).
+
+    Returns:
+        The sum of staging-file sizes in bytes.
+    """
+    staging_root = os.path.join(str(settings.MEDIA_ROOT), STAGING_SUBDIR)
+    total = 0
+    try:
+        with os.scandir(staging_root) as entries:
+            for entry in entries:
+                try:
+                    if entry.is_file():
+                        total += entry.stat().st_size
+                except OSError:
+                    continue
+    except FileNotFoundError:
+        return 0
+    return total
 
 
 async def save_photo(storage_key: str, photo_bytes: bytes) -> str:
