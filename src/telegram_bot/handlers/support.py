@@ -7,9 +7,14 @@ prompted to write their question. The free-text reply is persisted as a
 ``SupportTicket`` and delivered to the configured support channels (email +
 Telegram) so the desk can reply out-of-band.
 
-Access control is governed by ``AccountStateMiddleware`` (anonymous + DECLINE
-users may reach support; banned/deleted/consent-revoked users are blocked
-before the handler runs). The handler itself only guards against bots, mirroring
+Access control is governed by ``AccountStateMiddleware`` before the handler
+runs: anonymous users may reach support (``_resolve_user`` returns ``None`` and
+the state gate fails open), and a **deactivated** user reaches it through the
+plan 19 support carve-out. Banned / deleted / consent-revoked users are blocked.
+**DECLINE users cannot reach support**: ``SUPPORT_START`` is not a contact
+deep-link, so a DECLINE user's ``/start`` greeting is rejected and they never
+see the keyboard (pre-existing behaviour, recorded as ``19-D5``/``D-3`` — not
+fixed by plan 19). The handler itself only guards against bots, mirroring
 ``contact.py``.
 """
 

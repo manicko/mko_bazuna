@@ -447,6 +447,9 @@ msgid "Login successful! You can now create ads with /post."
 msgstr ""
 "Вход выполнен успешно! Теперь вы можете создавать объявления с помощью /post."
 
+msgid "Your account is deactivated. To restore access, contact support."
+msgstr "Ваш аккаунт деактивирован. Чтобы восстановить доступ, обратитесь в поддержку."
+
 msgid "Your account is restricted. Contact support for assistance."
 msgstr "Ваш аккаунт ограничен. Обратитесь в поддержку для получения помощи."
 

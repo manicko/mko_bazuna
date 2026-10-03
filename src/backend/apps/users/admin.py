@@ -22,15 +22,22 @@ from apps.users.services.deactivation import (
 # **hard-coded** copies of these substrings, not the constants, so a reword that
 # drops the invariant fails the test (the guard must be able to go red).
 #
-# ``WEB_ONLY_ENFORCEMENT`` states the ``18-D2`` limit plainly: the operator
-# promise is "this person cannot get back in" on the **web tier**; the change
-# is **not** enforced in the Telegram bot (the bot holds no session and its
-# per-message gate reads the other flags, never ``is_active``). Operators must
-# not read the toast as "locked out everywhere". The invariant a test pins is
-# ``NOT enforced in the Telegram bot``.
-WEB_ONLY_ENFORCEMENT = (
-    "This takes effect immediately on the website (the account cannot get back "
-    "in), but is NOT enforced in the Telegram bot."
+# ``DEACTIVATION_ENFORCEMENT_NOTE`` states the current enforcement truth
+# plainly. ``is_active = False`` is enforced on **both** tiers (plan 19,
+# ``19-D2``): the web session dies on the next request (``ModelBackend``), and
+# the Telegram bot's per-message ``AccountStateMiddleware`` gate — which now
+# reads ``is_active`` from the shared ``get_account_state`` predicate — refuses
+# the account every path. In the bot the account can neither create ads nor be
+# contacted as a seller. The **only** carve-out is the support restoration
+# channel: the user can still reach Support to request reactivation. Operators
+# must read the toast as "enforced on both tiers, with a Support escape hatch",
+# not as "locked out everywhere". The invariants a test pins are the hard-coded
+# substrings ``immediately on the website``, ``enforced in the Telegram bot``
+# and ``contact Support``.
+DEACTIVATION_ENFORCEMENT_NOTE = (
+    "This takes effect immediately on the website, and is also enforced in the "
+    "Telegram bot (the account cannot create ads or be contacted as a seller). "
+    "The user can still contact Support to request restoration."
 )
 # Invariant a test pins: the literal ``Skipped:`` label appears whenever rows
 # were dropped for any reason.
@@ -278,14 +285,15 @@ class UserAdmin(admin.ModelAdmin):
         Build the operator toast for a deactivation/reactivation.
 
         Two requirements are mandatory (``18-D2``, risk ``R-5``): the message
-        must name the **bot-tier limit** (``WEB_ONLY_ENFORCEMENT``), and it
-        must **report dropped rows** so a partial selection does not read as
-        success. Dropped rows are self/privileged refusals plus rows already in
-        the requested state (``already_in_state``); a selection of 10 rows of
-        which 3 were already disabled must not say "Deactivated 7 user(s)" with
-        no hint that 3 were dropped.
+        must state the **enforcement truth** on both tiers plus the Support
+        carve-out (``DEACTIVATION_ENFORCEMENT_NOTE``), and it must **report
+        dropped rows** so a partial selection does not read as success. Dropped
+        rows are self/privileged refusals plus rows already in the requested
+        state (``already_in_state``); a selection of 10 rows of which 3 were
+        already disabled must not say "Deactivated 7 user(s)" with no hint that
+        3 were dropped.
         """
-        message = f"{verb} {result.changed} user(s). {WEB_ONLY_ENFORCEMENT}"
+        message = f"{verb} {result.changed} user(s). {DEACTIVATION_ENFORCEMENT_NOTE}"
         dropped: list[str] = []
         if result.skipped_self:
             dropped.append(f"{result.skipped_self} self")

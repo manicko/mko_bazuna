@@ -437,6 +437,9 @@ msgstr ""
 msgid "Login successful! You can now create ads with /post."
 msgstr "Prijava usječna! Sada možete kreirati oglase sa /post."
 
+msgid "Your account is deactivated. To restore access, contact support."
+msgstr "Vaš nalog je deaktiviran. Da biste vratili pristup, kontaktirajte podršku."
+
 msgid "Your account is restricted. Contact support for assistance."
 msgstr "Vaš nalog je ograničen. Kontaktirajte podršku za pomoć."
 

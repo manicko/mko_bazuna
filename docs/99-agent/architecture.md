@@ -610,16 +610,19 @@ red; that test currently encodes the defect (`GET /dashboard/` → `200` for a
 soft-deleted user) and phase 15 must budget its rewrite.
 
 **Bot-tier residual (asked-for-here so `04-AUT-002` reads in one place):** the
-Telegram bot tier has **no account-state enforcement at all for `is_active`** —
-the bot holds no web session, resolves identity per message from `chat_id`, and
-its `AccountStateMiddleware` gate reads `is_banned` / `is_deleted` /
-`is_declined` / `consent_revoked` but **never `is_active`**. A deactivated user
-can still reach every bot handler. Probed and pinned by
-`src/telegram_bot/tests/test_account_state_deactivation_probe.py` (plan 18
-`B-3`), which asserts the residual by design. **Owner of the fix: phase 15,
-`15-AUTHZ-001`** (deferred-work `D-2`). This is the third open piece of
-`04-AUT-002`, alongside the unrevoked `is_banned` / `is_deleted` / `is_declined`
-sessions and the absent `django_session` janitor.
+Telegram bot tier now **enforces `is_active`, with a support carve-out** (plan
+19, 2026-10-03). `AccountStateMiddleware` reads the shared
+`get_account_state` predicate, which now carries `is_active`; a deactivated user
+is refused every bot path **except** the no-argument `/start` greeting,
+the `SUPPORT_START` callback, and free text inside the support-intake FSM — the
+restoration channel (plan 19 `19-D2`/`19-D6`). This closes plan 18's
+deferred-work `D-2`. Probed and pinned by
+`src/telegram_bot/tests/test_bot_deactivation_matrix.py`. **The three-flag
+remainder is still open:** `is_banned` / `is_deleted` / `is_declined` still have
+**no bot-tier gate** and no per-request web gate. **Owner of the remainder:
+phase 15, `15-AUTHZ-001`.** This is the open piece of `04-AUT-002`, alongside
+the unrevoked `is_banned` / `is_deleted` / `is_declined` sessions and the absent
+`django_session` janitor.
 
 **No `django_session` janitor exists:** `clearsessions` appears nowhere in
 `src/`, `docs/`, `docker/`, `.github/`, `Makefile` or `Makefile.ps1`, so the
@@ -688,13 +691,15 @@ publishing** and is enforced in the **Telegram bot**, but it does **not** revoke
 an existing web session, which keeps working until it expires. Publishing is
 refused because `AccountStateMiddleware` denies *every* bot interaction and ad
 creation is bot-only — **not** because of `can_publish_ad()`, which has no
-production call site. `is_active` is the mirror image: web-only, and not
-bot-enforced.
+production call site. `is_active` is no longer the mirror image: since plan 19
+(2026-10-03) it is enforced on **both** tiers — the web's `ModelBackend` **and**
+the bot's `AccountStateMiddleware` (with the support carve-out).
 
 **What plan 19 does NOT close.** No **un-ban path** exists anywhere in
 production, so a ban is still one-way from the UI (`D-19-2`). There is no
 per-request web gate for `is_banned`, so a **banned seller keeps a session and
-can still re-list**; the bot-tier `is_active` residual and the `django_session`
+can still re-list**; the bot-tier `is_banned` / `is_deleted` / `is_declined`
+residual and the `django_session`
 janitor are likewise untouched (`D-19-3`, owner `15-AUTHZ-001`). The dead
 `<id>/password/` route is still rendered (`D-19-5`). And the whole moderator
 contract — `UserRole.MODERATOR`, `media_gate`, `AdminSite.has_permission`, the
@@ -733,23 +738,29 @@ re-read this note. `is_banned` / `is_deleted` / `is_declined` remain unrevoked
 (`D-1`); this correction is about `is_active` only and must **not** be generalised
 to the other flags.
 
-**The bot (Telegram) tier is NOT revoked.** The bot holds no web session and
-resolves identity per message; `AccountStateMiddleware` reads `is_banned` /
-`is_deleted` / `is_declined` / `consent_revoked`, **never** `is_active`. A
-deactivated user can still reach every bot handler. Probed and pinned by
-`test_account_state_deactivation_probe.py` (plan 18 `B-3`), which asserts the
-residual by design. **Owner of the fix: phase 15, `15-AUTHZ-001`** (`D-2`). The
-operator message names this limit (`18-D2`), so the promise is *"cannot get back
-in to the website"*, not total lockout.
+**The bot (Telegram) tier now enforces `is_active` — with a support carve-out.**
+The bot holds no web session and resolves identity per message;
+`AccountStateMiddleware` reads `is_banned` / `is_deleted` / `is_declined` /
+`consent_revoked` **and, since plan 19, `is_active`**. A deactivated user is
+refused every path except the no-argument `/start` greeting, the
+`SUPPORT_START` callback, and free text in the support-intake FSM — the
+restoration channel (plan 19 `19-D2`/`19-D6`, closing plan 18 `D-2`). Probed and
+pinned by `test_bot_deactivation_matrix.py`. The operator toast
+(`DEACTIVATION_ENFORCEMENT_NOTE`) now states both-tier enforcement plus the
+Support carve-out. **`is_banned` / `is_deleted` / `is_declined` remain
+bot-unenforced** (`D-1`, owner `15-AUTHZ-001`).
 
 **`04-AUT-002` is NOT closed.** What remains open is enumerated in
 [Account-State and Session Revocation (04-AUT-002)](#account-state-and-session-revocation-04-aut-002)
 above: no per-request gate for `is_banned` / `is_deleted` / `is_declined`, no
-`django_session` janitor, and no bot-tier enforcement.
+`django_session` janitor, and **no bot-tier enforcement for those same three
+flags** (`is_active` is now bot-enforced with a support carve-out; plan 19).
 
 **Operationally:** a moderator **can** disable an ordinary seller and **can**
 revoke their live web session; a moderator **cannot** touch a staff/superuser row;
-the bot tier is unenforced. The reachability facts are enumerated in the operator
+the bot tier enforces `is_active` (with the support carve-out) but not
+`is_banned` / `is_deleted` / `is_declined`. The reachability facts are
+enumerated in the operator
 inventory in
 [`docker-deployment.md`](../ops/docker-deployment.md#the-admin-user-change-form-contract-04-aut-005).
 

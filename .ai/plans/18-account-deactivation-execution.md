@@ -79,7 +79,7 @@ consistent with phase 15's validator, which recorded the same `302` for `is_acti
 | Web, existing session | **Killed on next request** (anonymous) | probe, above |
 | Web, new issuance | Refused (`login_status` → `410`, `B-05`) | `B-05` |
 | Web, `django_session` row | **Survives** until `expire_date` — inert but retained | by construction |
-| **Bot (Telegram)** | **NOT revoked.** The bot holds no session; a deactivated user can still message it and reach every bot handler. | not probed here — **must be probed in `B-3`** |
+| **Bot (Telegram)** | **Now enforced — plan 21 (2026-10-03, renumbered from 19).** `B-3` probed and found the bot did **not** block a deactivated user. Plan 19 added `is_active` to the shared predicate and an `is_active` branch to `AccountStateMiddleware`, with a support carve-out (no-arg `/start`, `SUPPORT_START`, support-intake free text). `D-2` is **closed**; the three other flags remain unenforced. | `B-3` probe (plan 18); plan 19 `B-1`/`B-2` |
 | `is_banned` / `is_deleted` / `is_declined` | **Unaffected** — no per-request check exists for any of them | `04-AUT-002` |
 
 The guarantee is also **backend-dependent**: it holds because `ModelBackend.user_can_authenticate()`
@@ -180,6 +180,12 @@ bot**, and per `18-D1` it must **report how many selected rows were skipped** as
 privileged. A "Deactivated N users" toast that hides a skip reads as success on a partial
 operation. This is `18-D2` and it is **not optional**.
 
+> **Amendment (plan 21, 2026-10-03; renumbered from 19).** The bot-tier half of that wording is no longer true: plan
+> 19 enforces `is_active` in the bot with a Support restoration carve-out. `DEACTIVATION_ENFORCEMENT_NOTE`
+> (renamed from `WEB_ONLY_ENFORCEMENT`) now states enforcement on **both** tiers plus the carve-out.
+> The original requirement is preserved here as the plan-18 record; the current requirement is the
+> amended one.
+
 **Gate `18-G2`:** `has_deactivate_permission` and `has_delete_permission` are distinct methods;
 the action is gated by its own permission, not by `change`; `withdraw_consent_action` is still
 unregistered; the docstring names the bot-tier limit.
@@ -243,7 +249,7 @@ design constraint** — see §3 `B-2` and `R-4`.
 | # | Question | **Decision (2026-10-02)** | Consequence recorded |
 |---|---|---|---|
 | **18-D1** | Who may deactivate? | **Superusers AND moderators.** | **NOT a blanket `is_staff` gate.** A moderator reaching *every* row is the escalation `B-01` closed (`has_change_permission` ignores `obj`). Decided as **actor-scope + target-scope**: the action is available to any ADMIN, but **a non-superuser actor may not target a staff or superuser row**, and `reactivate_user` is under the same restriction — otherwise a moderator could undo a superuser's disable. Implemented in the **service**, not the view, so it cannot be bypassed. See `B-1`, `B-2`, `R-4`. |
-| **18-D2** | What does "deactivate" promise? | **The recommended option** — *"this person cannot get back in"*, stated plainly. | The operator message **must** name the bot-tier limit (`B-2`) and must not imply total lockout. The web tier is immediate (`B-5` in §1's table / test 5); the bot tier is bounded by `B-3`'s probe. |
+| **18-D2** | What does "deactivate" promise? | **The recommended option** — *"this person cannot get back in"*, stated plainly. | The operator message **must** name the bot-tier limit (`B-2`) and must not imply total lockout. The web tier is immediate (`B-5` in §1's table / test 5); the bot tier is bounded by `B-3`'s probe. **Superseded 2026-10-03:** plan 19 enforced `is_active` in the bot (with a support carve-out), so the bot-tier limit no longer exists; `WEB_ONLY_ENFORCEMENT` was renamed to `DEACTIVATION_ENFORCEMENT_NOTE` and reworded to both-tier enforcement + Support carve-out, and its pinning test renamed (see `18-Q5`). |
 | **18-D3** | Ship reactivation in the same change? | **Yes.** | `deactivate_users` / `reactivate_users` ship together in `B-1`, and both actions in `B-2`. Both carry the `18-D1` target restriction. |
 | **18-D4** | Three overlapping account-state flags? | Recorded; **not decided here.** | Deferred to `D-4` / phase 15 BLOCK 9. `B-4` must not present the three flags as a settled taxonomy. |
 | **18-D5** | Ads on deactivation? | Unchanged. | `B-4` records the current behaviour; no scope expansion. |
@@ -262,7 +268,7 @@ index, not new invention. Verify each attribution before relying on it.
 | # | Work | Owner | Named at |
 |---|---|---|---|
 | D-1 | **Session revocation for `is_banned` / `is_deleted` / `is_declined`.** `is_active` is the only flag with a per-request gate, and only because `ModelBackend` supplies it. The other three still leave a live session. `04-AUT-002`, HIGH, **NOT closed**. | `15-AUTHZ-001` (phase 15 BLOCK 6) | `architecture.md:526-539` |
-| D-2 | **Bot-tier account-state enforcement.** **PROBED (`B-3`, 2026-10-02): the bot does NOT block a deactivated user** — `AccountStateMiddleware` reads `is_banned` / `is_deleted` / `is_declined` / `consent_revoked`, never `is_active`. Asserted as a residual by `test_account_state_deactivation_probe.py`; the `B-2` operator message names the limit. | `15-AUTHZ-001` | this plan, `B-3` |
+| D-2 | **Bot-tier account-state enforcement.** **CLOSED by plan 21 (2026-10-03, renumbered from 19).** `B-3` probed (2026-10-02) that the bot did **not** block a deactivated user — `AccountStateMiddleware` read `is_banned` / `is_deleted` / `is_declined` / `consent_revoked`, never `is_active`. Plan 19 added `is_active` to the shared `get_account_state` predicate and an `is_active` branch (with a support carve-out for the restoration channel) to the middleware. `test_account_state_deactivation_probe.py` was inverted rather than deleted; the matrix is pinned by `test_bot_deactivation_matrix.py`. The probe's residual is no longer asserted because it no longer exists. | `15-AUTHZ-001` — **closed** | this plan, `B-3`; closed by plan 19 |
 | D-3 | **`django_session` rows are never deleted** on any account-state change. Inert, but retained. `django_session.session_data` is zlib+HMAC-signed with **no user column**, so a `LIKE` scan is **impossible, not slow**. Gate `G-A` is CLOSED and rules the decode scan and the per-request gate out of non-phase-15 hands; `User.session_epoch` was explicitly rejected as phase 15's. | `15-AUTHZ-001` | `.ai/plans/16-...:3656-3668`, `:3840` |
 | D-4 | **Full moderator contract** — including whether `has_deactivate_permission` is the right gate. | `15-AUTHZ-003` (BLOCK 9) | `15-authorization-remediation.md:2232` |
 | D-5 | **`is_banned` has no un-ban path** anywhere in the repo. | product + phase 15 | `docker-deployment.md:1177` |
@@ -306,7 +312,7 @@ not `test_admin_change_form.py` (owns the *form* contract). An action is neither
 | 9 | `test_deactivate_user_leaves_the_django_session_row_in_place` | The row **survives**. Assert the residual with an owner-naming docstring (`15-AUTHZ-001`, gate `G-A`), per `.ai/plans/16-...:6723-6731`. |
 | 10 | `test_deactivate_users_service_is_idempotent` | Second call returns `changed == 0`; no extra write. |
 | 11 | `test_reactivate_user_restores_an_enabled_account` | The inverse. |
-| 12 | **`test_operator_message_names_the_bot_tier_limit`** | `18-D2`: the `message_user` text states the web-only enforcement. Otherwise the promise is aspirational. |
+| 12 | **`test_operator_message_states_the_bot_tier_and_the_support_carve_out`** | `18-D2` as amended by plan 21: the `message_user` text states enforcement on **both** tiers plus the Support carve-out. Renamed from `test_operator_message_names_the_bot_tier_limit` when the old web-only claim became false. |
 | 13 | **`test_operator_message_reports_skipped_rows`** | `18-D1`: a partial selection reports its skips. |
 | 14 | `test_bot_tier_account_state_after_deactivation` | The `B-3` probe, kept permanent. Owner-naming docstring if it asserts a residual. |
 
@@ -385,10 +391,10 @@ and this plan must not introduce one.)
 | ID | Question | Owner | Status |
 |---|---|---|---|
 | `18-Q1` | Superusers only, or moderator-capable? (`18-D1`) | product | **ANSWERED 2026-10-02** — both, with a target restriction (see §4). Superseded by `18-Q7`. |
-| `18-Q2` | What does "deactivate" promise? (`18-D2`) | product | **ANSWERED 2026-10-02** — *"cannot get back in"*, stated plainly; bot-tier limit named in the operator message. |
+| `18-Q2` | What does "deactivate" promise? (`18-D2`) | product | **ANSWERED 2026-10-02** — *"cannot get back in"*, stated plainly; **amended 2026-10-03 by plan 19**: the promise now holds on both tiers (enforcement + Support carve-out), so the operator message states both-tier enforcement rather than a bot-tier limit. |
 | `18-Q3` | Pair shipped or alone? (`18-D3`) | product | **ANSWERED 2026-10-02** — pair, both under the `18-D1` restriction. |
 | `18-Q4` | Three overlapping account-state flags? (`18-D4`) | product | Open — deferred to `D-4` / phase 15 BLOCK 9. Non-blocking. |
-| `18-Q5` | Bot-tier behaviour after deactivation? | `B-3` probe, then `15-AUTHZ-001` | **ANSWERED 2026-10-02 by the `B-3` probe** — the bot does **not** block a deactivated user, so the `B-2` operator message correctly states web-only enforcement. Enforcement remains `15-AUTHZ-001` (`D-2`). |
+| `18-Q5` | Bot-tier behaviour after deactivation? | `B-3` probe, then `15-AUTHZ-001` | **ANSWERED 2026-10-02 by the `B-3` probe; SUPERSEDED 2026-10-03 by plan 19.** The probe found the bot did **not** block a deactivated user, so `B-2`'s operator message correctly stated web-only enforcement *at the time*. Plan 19 then enforced `is_active` in the bot with a support carve-out and closed `D-2`. The old `WEB_ONLY_ENFORCEMENT` constant was **renamed and reworded** to `DEACTIVATION_ENFORCEMENT_NOTE` (both-tier enforcement + Support carve-out), and its pinning test renamed to `test_operator_message_states_the_bot_tier_and_the_support_carve_out`. The earlier "reword deferred" note is **resolved**. |
 | `18-Q6` | 14-day session lifetime acceptable? (`18-D6`) | product | Cross-reference only; `D-10` stays open. Non-blocking. |
 | `18-Q7` | **Is the target restriction correct?** A moderator may deactivate/reactivate **non-staff** rows only; a superuser may act on anyone. | **ANSWERED 2026-10-02 by the product owner** — *"moderators may deactivate ordinary sellers, but must not be able to deactivate staff/superusers/other moderators."* This is now a decision, not a coordinator safety constraint. `B-1`'s target scope and tests 5, 6 and 7 implement it verbatim. |
 

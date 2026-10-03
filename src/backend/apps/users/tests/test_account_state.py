@@ -55,12 +55,19 @@ class TestGetAccountState:
         """Default user has all flags at false/true defaults."""
         state = get_account_state(user)
         assert state == AccountState(
+            is_active=True,
             is_banned=False,
             is_deleted=False,
             is_declined=False,
             ads_auto_publish=True,
             consent_revoked=False,
         )
+
+    def test_deactivated_user(self) -> None:
+        """Deactivated user has is_active=False (plan 19, B-1)."""
+        u = make_user(900001005, is_active=False)
+        state = get_account_state(u)
+        assert state.is_active is False
 
     def test_banned_user(self) -> None:
         """Banned user has is_banned=True."""
@@ -161,11 +168,21 @@ class TestCanPublishAd:
 
 
 class TestCanLogin:
-    """Flag matrix for can_login: banned, declined."""
+    """Flag matrix for can_login: is_active, banned, declined."""
 
     def test_normal_user_can_login(self, user: User) -> None:
         """Default user can login."""
         assert can_login(user) is True
+
+    def test_deactivated_user_cannot_login(self) -> None:
+        """Deactivated user cannot login (plan 19, B-1: is_active is checked).
+
+        Mirrors Django's ``ModelBackend.user_can_authenticate`` so the shared
+        predicate agrees with the web session gate. The ``consent.py`` view
+        still returns a uniform ``410`` either way (R-2).
+        """
+        u = make_user(900001025, is_active=False)
+        assert can_login(u) is False
 
     def test_banned_user_cannot_login(self) -> None:
         """Banned user cannot login."""
@@ -321,11 +338,13 @@ class TestPredicateConjunctIsLoadBearing:
     def test_is_active_false_excludes(self) -> None:
         """``is_active=False`` alone excludes the row.
 
-        This is the predicate-only conjunct: ``get_account_state`` has no
-        ``is_active`` term, so the instance helper is NOT cross-checked here.
+        Plan 19 ``B-1`` closed the divergence: ``get_account_state`` now
+        carries ``is_active`` too, so the instance helper is cross-checked here
+        as it is for every other conjunct.
         """
         u = _state_user(5, is_active=False)
         assert _is_eligible(u) is False
+        assert get_account_state(u).is_active is False
 
     def test_ads_auto_publish_false_still_included(self) -> None:
         """A publishing restriction is orthogonal to messaging (rule 5)."""

@@ -18,12 +18,19 @@ and its ``conftest.py`` redefines the DB fixtures; backend conftest fixtures
 are not importable from this tree (see ``src/telegram_bot/tests/conftest.py``).
 
 Outcome (recorded at implementation time, plan 18 ``B-3`` gate ``18-G3``):
-**the bot does not block a deactivated user.** ``AccountStateMiddleware``
-delegates to ``get_account_state``, whose five fields are
+**the bot did not block a deactivated user.** ``AccountStateMiddleware``
+delegated to ``get_account_state``, whose five fields were
 ``is_banned`` / ``is_deleted`` / ``is_declined`` / ``ads_auto_publish`` /
 ``consent_revoked`` — **none of them is ``is_active``**. A deactivated user
-passes the gate and reaches every bot handler. The asserted residual below
-carries the owner name.
+passed the gate and reached every bot handler.
+
+**Updated by plan 19 (2026-10-03).** Plan 19 ``B-1``/``B-2`` added
+``is_active`` to the shared predicate and an ``is_active`` branch (with a
+support carve-out) to the middleware, closing plan 18's deferred work ``D-2``.
+The assertion below is therefore **inverted**: a deactivated user is now
+refused by the default gate (``deactivation_carve_out`` defaults to False).
+See ``test_bot_deactivation_matrix.py`` for the carve-out paths that remain
+reachable.
 """
 
 import pytest
@@ -44,17 +51,19 @@ _CHAT_ID = 900000301
 
 @pytest.mark.asyncio
 async def test_bot_tier_account_state_after_deactivation() -> None:
-    """KNOWN GAP (owner: ``15-AUTHZ-001``): the bot does NOT revoke ``is_active``.
+    """Plan 18 ``D-2`` is closed: the bot NOW refuses a deactivated user.
 
     Drives a deactivated user through the real ``AccountStateMiddleware`` gate
-    — the per-message bot handler gate — and records that it **passes**.
+    — the per-message bot handler gate — and records that it is **refused**
+    outside the plan 19 support carve-out.
 
-    This asserts the residual deliberately. Phase 15 ``15-AUTHZ-001`` owns the
-    bot-tier account-state gate (deferred-work ``D-2``); when that lands, this
-    test must be inverted to a positive assertion that a deactivated user is
-    refused. Until then a green run here means "still unenforced", so the
-    ``assert can_interact is True`` line is load-bearing evidence of the gap,
-    not a desired behaviour.
+    Inverted by plan 19 (``B-1``/``B-2``) from plan 18 ``B-3``'s residual
+    assertion. Plan 18 ``B-3`` created this test as permanent evidence of the
+    gap (``assert can_interact is True``); plan 19 closes ``D-2``, so the
+    assertion is inverted rather than deleted, preserving the audit trail
+    (``R-4``). The default ``_check_user_state(chat_id)`` carries no
+    ``deactivation_carve_out``, so this is the plain hard-block path; the
+    support carve-out is covered by ``test_bot_deactivation_matrix.py``.
     """
     user, _ = await sync_to_async(User.objects.get_or_create)(
         chat_id=_CHAT_ID,
@@ -71,9 +80,9 @@ async def test_bot_tier_account_state_after_deactivation() -> None:
     middleware = AccountStateMiddleware()
     can_interact, message = await middleware._check_user_state(_CHAT_ID)
 
-    assert can_interact is True, (
-        "is_active is not consulted by the bot gate; if this fails, the bot "
-        "tier now blocks a deactivated user and 15-AUTHZ-001's residual is "
-        "closed — invert this test and revise B-2's operator message."
+    assert can_interact is False, (
+        "the bot tier now consults is_active (plan 19 B-1/B-2) and refuses a "
+        "deactivated user by default; if this fails, the is_active branch or "
+        "the shared predicate regressed and plan 18's D-2 re-opened."
     )
-    assert message == ""
+    assert message != ""

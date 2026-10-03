@@ -366,6 +366,9 @@ msgstr ""
 msgid "Login successful! You can now create ads with /post."
 msgstr ""
 
+msgid "Your account is deactivated. To restore access, contact support."
+msgstr ""
+
 msgid "Your account is restricted. Contact support for assistance."
 msgstr ""
 

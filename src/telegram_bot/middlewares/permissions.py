@@ -17,6 +17,8 @@ from django.utils.translation import gettext as _
 
 from apps.users.models import User
 from apps.users.services.account_state import get_account_state
+from telegram_bot.schemas.callbacks import BotCallbackPrefix
+from telegram_bot.states import ContactUsState
 
 logger = logging.getLogger(__name__)
 
@@ -27,27 +29,53 @@ class AccountStateMiddleware(BaseMiddleware):
 
     Delegates flag evaluation to the shared ``get_account_state`` predicate
     (``apps.users.services.account_state``) so that bot and web dashboard
-    share a single source of truth for account-state flags.
+    share a single source of truth for account-state flags. That claim is now
+    literal (plan 19, ``B-2``): the predicate carries ``is_active``, the field
+    the bot middleware previously could not see.
 
-    Enforces four independent account flags:
+    Enforces five independent account flags (plus the publish restriction):
+    - is_active: Operator kill-switch (plan 18), blocks all bot interactions
+      EXCEPT the support carve-out below
     - is_banned: Admin action, blocks all bot interactions
     - is_deleted: GDPR withdrawal, blocks all bot interactions (telegram_id nulled)
     - is_declined: User declined consent, blocks posting but allows contact deep-links (browse-only)
     - consent_revoked: Consent withdrawn, blocks all bot interactions (data erasing)
     - ads_auto_publish=False: Restricts /post command only
 
-    For banned/deleted/declined/withdrawn users: responds with rejection message and skips handler.
-    For publish-restricted users: allows other commands but blocks /post.
+    **Support carve-out for a deactivated user (plan 19, ``19-D2``/``19-D6``).**
+    Unlike every other blocking flag, deactivation is recoverable by the user,
+    so a deactivated account is allowed exactly three things: the
+    **no-argument** ``/start`` greeting (which carries the "Contact support"
+    button), the ``BotCallbackPrefix.SUPPORT_START`` callback, and free text
+    while in the support-intake FSM state (``ContactUsState.AWAITING_MESSAGE``).
+    Everything else — every other command, the whole ad-creation flow, and the
+    ``contact_us`` / ``contact_<id>`` deep-links — is blocked. ``/start`` with
+    any argument is blocked (``19-D6``): a stale ``login_<token>`` link cannot
+    succeed anyway, so rendering its keyboard would only widen the carve-out.
+
+    The carve-out is **state-based, not event-based** (``R-1``): the free-text
+    step of the intake flow is ordinary text, so an event-type allowlist would
+    let the user tap the button but never complete the ticket. It is granted
+    only when deactivation is the account's *sole* blocking flag, so a
+    deactivated-and-banned / erased account gets no restoration channel. The
+    support message intake is rate-limited (5 per 600 s,
+    ``telegram_bot.services.rate_limit``); this middleware adds no second limiter.
+
+    For banned/deleted/declined/withdrawn users: responds with rejection
+    message and skips handler. For a deactivated user outside the carve-out:
+    responds with a deactivation message pointing at support. For
+    publish-restricted users: allows other commands but blocks /post.
 
     Resolution contract: the acting ``User`` is resolved exactly once per
     update, keyed on the stable ``chat_id`` (never ``telegram_id`` — see
     ``_resolve_user`` for the column rationale).  All three consumers — the
     interaction gate, the publish gate, and the FSM ``user_id`` backfill —
-    share that one resolution.  An unregistered ``chat_id`` is a memoised
-    absent state (``None``), not an error, and each consumer applies its own
-    existing tolerance to it.  Any new consumer must take the resolved
-    instance, must not re-query, and must not mutate or ``.save()`` it (the
-    login path owns its own instance).
+    share that one resolution, and the deactivation carve-out reads the FSM
+    state from the shared ``data`` dict rather than re-querying.  An
+    unregistered ``chat_id`` is a memoised absent state (``None``), not an
+    error, and each consumer applies its own existing tolerance to it.  Any new
+    consumer must take the resolved instance, must not re-query, and must not
+    mutate or ``.save()`` it (the login path owns its own instance).
     """
 
     async def __call__(
@@ -114,8 +142,25 @@ class AccountStateMiddleware(BaseMiddleware):
         # telegram_id: see the class docstring for the column rationale.
         user = await self._resolve_user(chat_id)
 
+        # The support carve-out (plan 19, 19-D2) needs the FSM state. Read it
+        # from the shared ``data`` dict — the same ``FSMContext`` the backfill
+        # below uses — and only for a deactivated account, so a normal update
+        # pays no extra storage round-trip and the carve-out never re-queries
+        # the user.
+        is_support_intake = False
+        if user is not None and not user.is_active:
+            is_support_intake = await self._is_in_support_intake(data)
+
+        deactivation_carve_out = self._deactivated_carve_out(
+            text=text,
+            callback_data=callback_data,
+            is_support_intake=is_support_intake,
+        )
+
         can_interact, state_reason = self._evaluate_user_state(
-            user, is_contact_link=is_contact_link
+            user,
+            is_contact_link=is_contact_link,
+            deactivation_carve_out=deactivation_carve_out,
         )
         if not can_interact:
             await message.answer(state_reason)
@@ -147,7 +192,10 @@ class AccountStateMiddleware(BaseMiddleware):
         return await handler(event, data)
 
     async def _check_user_state(
-        self, chat_id: int, is_contact_link: bool = False
+        self,
+        chat_id: int,
+        is_contact_link: bool = False,
+        deactivation_carve_out: bool = False,
     ) -> tuple[bool, str]:
         """
         Resolve a chat_id and evaluate the interaction gate in one step.
@@ -157,9 +205,11 @@ class AccountStateMiddleware(BaseMiddleware):
         it — it resolves once and calls ``_evaluate_user_state`` so that the
         publish gate and the FSM backfill share the same instance.
 
-        The signature is load-bearing: ``TestCheckUserStateMessages`` and
-        ``TestCrossPredicateAgreement`` call ``_check_user_state(chat_id)``
-        with a single positional argument.  Do not change it.
+        The signature's first parameter is load-bearing:
+        ``TestCheckUserStateMessages`` and ``TestCrossPredicateAgreement`` call
+        ``_check_user_state(chat_id)`` with a single positional argument.  Do
+        not change it.  ``deactivation_carve_out`` defaults to False, so those
+        existing calls are unaffected and a deactivated user is blocked.
 
         Args:
             chat_id: Stable Telegram chat ID.
@@ -167,12 +217,61 @@ class AccountStateMiddleware(BaseMiddleware):
                 (``/start contact_<ad_id>``, ``/start contact_us``, or the
                 inline ``contact_us`` callback).  DECLINE users are allowed
                 through contact deep-links only (browse-only consent).
+            deactivation_carve_out: True if a deactivated user's update falls
+                inside the support carve-out (no-arg ``/start``,
+                ``SUPPORT_START`` callback, or support-intake free text).
 
         Returns:
             Tuple of (can_interact, rejection_message).
         """
         user = await self._resolve_user(chat_id)
-        return self._evaluate_user_state(user, is_contact_link=is_contact_link)
+        return self._evaluate_user_state(
+            user,
+            is_contact_link=is_contact_link,
+            deactivation_carve_out=deactivation_carve_out,
+        )
+
+    async def _is_in_support_intake(self, data: dict[str, Any]) -> bool:
+        """Whether the update is free text inside the support-intake FSM.
+
+        Reads the FSM state from the shared ``data["state"]`` (never a fresh
+        storage lookup) so the carve-out stays state-based (``R-1``) without
+        re-querying the user. A missing ``state`` — or a storage backend that
+        has no entry — is treated as "not in the flow".
+        """
+        state: FSMContext | None = data.get("state")
+        if state is None:
+            return False
+        return await state.get_state() == ContactUsState.AWAITING_MESSAGE
+
+    def _deactivated_carve_out(
+        self,
+        *,
+        text: str,
+        callback_data: str | None,
+        is_support_intake: bool,
+    ) -> bool:
+        """Whether a deactivated user's update is inside the support carve-out.
+
+        Exactly three shapes qualify (plan 19 §3): the ``SUPPORT_START``
+        callback, ordinary free text in the support-intake state, and the
+        **no-argument** ``/start`` greeting. ``/start <anything>`` is
+        deliberately excluded (``19-D6``). Contact deep-links are excluded
+        (``19-D2``). The intake carve-out admits **free text only** — a
+        command (``/post``, ``/language``, …) typed while in the intake state
+        is still blocked, so the carve-out never becomes a route to the
+        ad-creation or any other command flow.
+        """
+        if callback_data == BotCallbackPrefix.SUPPORT_START:
+            return True
+        if (
+            is_support_intake
+            and callback_data is None
+            and text.strip()
+            and not text.lstrip().startswith("/")
+        ):
+            return True
+        return text.strip().lower() == "/start"
 
     @sync_to_async
     def _resolve_user(self, chat_id: int) -> User | None:
@@ -202,7 +301,11 @@ class AccountStateMiddleware(BaseMiddleware):
             return None
 
     def _evaluate_user_state(
-        self, user: User | None, *, is_contact_link: bool
+        self,
+        user: User | None,
+        *,
+        is_contact_link: bool,
+        deactivation_carve_out: bool = False,
     ) -> tuple[bool, str]:
         """
         Evaluate the interaction gate from an already-resolved user.
@@ -211,12 +314,19 @@ class AccountStateMiddleware(BaseMiddleware):
         to the shared ``get_account_state`` predicate so the bot and the web
         dashboard evaluate account-state flags from one source of truth.
 
+        ``is_active`` is evaluated **first** (plan 19, ``B-2``): a deactivated
+        account gets one clear answer, and its recovering support carve-out is
+        unreachable when any other blocking flag is set.
+
         Args:
             user: The resolved acting user, or None if unregistered.
             is_contact_link: True if the current event is a contact deep-link
                 (``/start contact_<ad_id>``, ``/start contact_us``, or the
                 inline ``contact_us`` callback).  DECLINE users are allowed
                 through contact deep-links only (browse-only consent).
+            deactivation_carve_out: True if a deactivated user's update is the
+                no-arg ``/start`` / ``SUPPORT_START`` / support-intake free
+                text. Ignored for a non-deactivated account.
 
         Returns:
             Tuple of (can_interact, rejection_message).  An unregistered user
@@ -226,6 +336,27 @@ class AccountStateMiddleware(BaseMiddleware):
             return (True, "")  # User not registered yet
 
         state = get_account_state(user)
+
+        # Plan 19, 19-D2: a deactivated account is recoverable by the user, so
+        # it is granted a support carve-out — but only when deactivation is its
+        # SOLE blocking flag. A deactivated-and-banned / erased account gets no
+        # restoration channel (the carve-out is unreachable for it).
+        if not state.is_active:
+            if (
+                deactivation_carve_out
+                and not state.is_banned
+                and not state.is_deleted
+                and not state.is_declined
+                and not state.consent_revoked
+            ):
+                return (True, "")  # Support carve-out: restoration channel
+            return (
+                False,
+                _(
+                    "Your account is deactivated. To restore access, "
+                    "contact support."
+                ),
+            )
 
         if state.is_banned:
             return (

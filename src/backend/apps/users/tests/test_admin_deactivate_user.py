@@ -329,15 +329,22 @@ def test_reactivate_user_restores_an_enabled_account(superuser: User) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_operator_message_names_the_bot_tier_limit(superuser: User) -> None:
-    """``18-D2``: the toast states web-only enforcement, not total lockout.
+def test_operator_message_states_the_bot_tier_and_the_support_carve_out(
+    superuser: User,
+) -> None:
+    """The toast states the true enforcement on both tiers plus Support.
 
-    Asserts **hard-coded** invariant substrings, not the imported constants: a
-    test that pins ``WEB_ONLY_ENFORCEMENT in text`` while importing
-    ``WEB_ONLY_ENFORCEMENT`` from the module under test is a tautology — it
-    stays green if the constant is reworded to "Accounts disabled.". The two
-    literals below are the load-bearing promise and must be reworded only by
-    changing this test too.
+    Plan 19 (``19-D2``): ``is_active`` is enforced on the web **and** in the
+    Telegram bot; the only carve-out is the support restoration channel. The
+    old toast claimed the change was *"NOT enforced in the Telegram bot"* —
+    false once plan 19 landed, so this test asserts the **new, true** facts.
+
+    Asserts **hard-coded** invariant substrings, not the imported constant: a
+    test that pins ``DEACTIVATION_ENFORCEMENT_NOTE in text`` while importing
+    ``DEACTIVATION_ENFORCEMENT_NOTE`` from the module under test is a tautology
+    — it stays green if the constant is reworded to anything. The literals
+    below are the load-bearing facts and must be reworded only by changing this
+    test too.
     """
     target = _make_user(930000120)
 
@@ -354,8 +361,11 @@ def test_operator_message_names_the_bot_tier_limit(superuser: User) -> None:
     )
 
     text = _messages_text(response)
-    assert "cannot get back in" in text
-    assert "NOT enforced in the Telegram bot" in text
+    assert "immediately on the website" in text
+    assert "enforced in the Telegram bot" in text
+    assert "contact Support" in text
+    # The old, now-false claim must be gone.
+    assert "NOT enforced in the Telegram bot" not in text
 
 
 def test_operator_message_reports_skipped_rows(
