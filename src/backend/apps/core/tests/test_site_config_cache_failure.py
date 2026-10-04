@@ -14,15 +14,20 @@ value, and keep two controls:
 
 - ``/health/`` must still report ``cache: fail`` with a 503 — proving the fix
   degrades requests without silencing the outage signal.
-- The cache getters are patched (not the whole cache object) so the rate-limit
-  guards, which are a separate finding (BLOCK 2), do not manufacture the
-  failure.
+- The site-config getters are patched, not the shared ``cache`` object. This is
+  deliberate: the getter is the seam that ``get_site_name`` /
+  ``get_bot_username`` call, so a patch there exercises the highest layer of the
+  read path while leaving every other cache consumer untouched. It is a choice,
+  not a constraint — each of the seven rate-limit guards does its own
+  ``from django.core.cache import cache``, so patching
+  ``apps.core.utils.cache.cache`` rebinds only that one module's global and
+  cannot reach them either.
 """
 
 from __future__ import annotations
 
 from typing import Any
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 import redis
@@ -158,13 +163,46 @@ def test_bot_username_falls_back_under_database_fault() -> None:
         assert get_bot_username() == "bazuna_bot"
 
 
-def test_cache_getters_swallow_redis_error() -> None:
-    """A bare redis.RedisError (not ConnectionInterrupted) also fails open."""
+def test_site_service_survives_a_redis_error_from_its_getter() -> None:
+    """A bare redis.RedisError surfaced by the getter also falls back.
+
+    Scoped deliberately: this patches ``get_cached_site_config`` wholesale, so
+    ``cache_get_or_none`` never executes. It therefore proves only that
+    ``get_site_name`` survives an error raised *at the getter boundary* — the
+    helper's own exception handling is covered separately by
+    ``test_cache_get_or_none_fails_open_at_the_cache_seam`` below.
+    """
     with patch(
         "apps.core.utils.cache.get_cached_site_config",
         Mock(side_effect=redis.RedisError("redis down")),
     ):
         assert get_site_name() == "Bazuna"
+
+
+def test_cache_get_or_none_fails_open_at_the_cache_seam() -> None:
+    """``cache_get_or_none`` swallows a real Redis outage and returns ``None``.
+
+    Patches the module-level ``cache`` name inside ``apps.core.utils.cache`` with
+    a ``MagicMock`` whose ``get`` raises ``ConnectionInterrupted(None)`` — the
+    shape mandated by the plan's §1.5 and used by
+    ``src/telegram_bot/tests/test_update_id_dedup.py::test_redis_unavailable_fail_open``.
+    The observable outcome is asserted through the public getters: each must
+    return the database value, not the fallback constant, because the helper
+    degrades an unreachable read to a cache miss.
+    """
+    config = SiteConfig.get_singleton()
+    config.name = "SeamSite"
+    config.bot_username = "seam_bot"
+    config.save()
+
+    failing_cache = MagicMock()
+    failing_cache.get.side_effect = ConnectionInterrupted(None)
+
+    with patch("apps.core.utils.cache.cache", failing_cache):
+        assert get_site_name() == "SeamSite"
+        assert get_bot_username() == "seam_bot"
+
+    failing_cache.get.assert_called()
 
 
 # ---------------------------------------------------------------------------
