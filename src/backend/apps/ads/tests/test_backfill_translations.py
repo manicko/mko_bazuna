@@ -5,7 +5,9 @@ Verifies:
 - Ads with NULL ``title_en``/``title_bs`` get translated and ``original_language``
   is set to ``"ru"``.
 - Already-translated ads are skipped (idempotent).
-- Translation failures fall back to the original text (graceful degradation).
+- A translation failure leaves the column NULL and is counted as a fallback, so
+  the row still matches the selection query and a re-run retries it (09-API-007).
+- ``--limit`` bounds the run.
 - No-op when no ads need translation.
 
 The external Google Cloud Translation API is mocked so tests run without
@@ -113,12 +115,18 @@ class TestBackfillTranslations:
             call_command("backfill_translations", batch_size=10)
         mock_translate.assert_not_called()
 
-    def test_translation_failure_skips_gracefully(
+    def test_translation_failure_leaves_columns_null(
         self, seller, category, city
     ) -> None:
-        """When ``translate_text`` falls back to the original text, fields get
-        the original Russian text (Path A consistency) and the ad is still
-        marked processed rather than left NULL."""
+        """When ``translate_text`` falls back to the original text, the columns
+        stay NULL and the row is counted as a fallback.
+
+        The old assertion that the original Russian text *was* written into
+        ``title_en``/``title_bs`` documented the defect (09-API-007): once the
+        source is written into the column, the nullability-derived selection
+        query never matches the row again and the failure is unrecoverable.
+        Production code is king, so the assertion changed with the fix.
+        """
         ad = create_test_ad(
             seller,
             category,
@@ -142,17 +150,87 @@ class TestBackfillTranslations:
         with patch(_TRANSLATE_PATCH, side_effect=_fallback_to_original) as mock_translate:
             call_command("backfill_translations", batch_size=10)
 
-        # All four translation calls were attempted and fell back to the
-        # original text.
+        # All four translation calls were attempted and fell back to the source.
         assert mock_translate.call_count == 4
         ad.refresh_from_db()
-        assert ad.title_en == "Красный велосипед"
-        assert ad.title_bs == "Красный велосипед"
-        assert ad.description_en == "Продается детский велосипед"
-        assert ad.description_bs == "Продается детский велосипед"
-        # updates was non-empty (original text populated the fields), so the ad
-        # was processed and original_language was set.
+        # Nothing was written: every fallback leaves its column NULL.
+        assert ad.title_en is None
+        assert ad.title_bs is None
+        assert ad.description_en is None
+        assert ad.description_bs is None
+        # No successful update touched the row, so original_language stays NULL.
+        assert ad.original_language is None
+
+    def test_failed_translation_is_retried_on_second_run(
+        self, seller, category, city
+    ) -> None:
+        """A failed translation leaves the row matching the selection query, so a
+        second run revisits it.
+
+        This is the assertion that distinguishes the fix from the defect: a
+        command that wrote NULL but filtered on something else would satisfy the
+        NULL assertion yet remain unrecoverable.
+        """
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Красный велосипед",
+            description="Продается детский велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+        Ad.objects.filter(pk=ad.pk).update(
+            title_en=None,
+            title_bs=None,
+            description_en=None,
+            description_bs=None,
+            original_language=None,
+        )
+        ad.refresh_from_db()
+
+        with patch(_TRANSLATE_PATCH, side_effect=_fallback_to_original):
+            call_command("backfill_translations", batch_size=10)
+
+        # The failed row still matches the selection query.
+        still_missing = Ad.objects.filter(title_en__isnull=True) | Ad.objects.filter(
+            title_bs__isnull=True
+        )
+        assert still_missing.filter(pk=ad.pk).exists()
+
+        # The second run retries the same row.
+        with patch(_TRANSLATE_PATCH, side_effect=_fake_translate) as mock_translate:
+            call_command("backfill_translations", batch_size=10)
+
+        assert mock_translate.call_count == 4
+        ad.refresh_from_db()
+        assert ad.title_en == "Красный велосипед_en"
+        assert ad.title_bs == "Красный велосипед_bs"
         assert ad.original_language == "ru"
+
+    def test_limit_bounds_the_run(self, seller, category, city) -> None:
+        """``--limit`` caps the number of ads processed."""
+        for index in range(3):
+            ad = create_test_ad(
+                seller,
+                category,
+                city,
+                title=f"Красный велосипед {index}",
+                description="Продается детский велосипед",
+                status=AdStatus.PUBLISHED,
+            )
+            Ad.objects.filter(pk=ad.pk).update(
+                title_en=None,
+                title_bs=None,
+                description_en=None,
+                description_bs=None,
+                original_language=None,
+            )
+
+        with patch(_TRANSLATE_PATCH, side_effect=_fake_translate) as mock_translate:
+            call_command("backfill_translations", batch_size=10, limit=1)
+
+        # One ad -> two locales x (title + description) = 4 calls.
+        assert mock_translate.call_count == 4
 
     def test_uses_translate_text_not_raw_api(
         self, seller, category, city
