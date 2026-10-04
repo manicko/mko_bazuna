@@ -32,6 +32,12 @@ class PopularSearch(models.Model):
 
     class Meta:
         db_table = "popular_searches"
+        constraints = [
+            models.UniqueConstraint(
+                fields=["query_normalized"],
+                name="uq_popular_search_query_normalized",
+            ),
+        ]
 
     def __str__(self) -> str:
         return f"{self.query} ({self.hit_count})"

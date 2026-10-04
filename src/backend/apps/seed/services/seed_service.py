@@ -341,28 +341,29 @@ class SeedService:
         """Create PopularSearch records from config and ad titles.
 
         Reads curated queries from the seed config (``popular_searches``) and
-        derives additional keyword queries from seed ad titles. Uses
-        ``update_or_create`` keyed on ``query_normalized`` (matching the
-        ``increment_popular_search`` runtime service) for idempotency on re-seed.
+        derives additional keyword queries from seed ad titles. Rows are scoped
+        to ``source=AdSource.SEED`` so a real user's production row (source
+        NULL) is never matched, flipped to SEED and deleted by the next
+        ``_clean``. ``query_normalized`` is unique (08-SRCH-003), so when a
+        production row already owns the key the seed row is skipped rather than
+        colliding with the constraint.
+
         ``SeedService._clean`` removes all seed ``PopularSearch`` rows by
         ``source=AdSource.SEED`` before this runs.
         """
         count = 0
         config_searches = self.config.get("popular_searches", [])
         for item in config_searches:
-            PopularSearch.objects.update_or_create(
-                query_normalized=search_query_key(item["query"]),
-                defaults={
-                    "query": item["query"],
-                    "hit_count": item["hit_count"],
-                    "source": AdSource.SEED,
-                },
+            self._upsert_seed_popular_search(
+                search_query_key(item["query"]),
+                query=item["query"],
+                hit_count=item["hit_count"],
             )
             count += 1
 
         rng = random.Random(self.config.get("faker_seed", 42) + 200)
         # Exclude config queries so they are not upserted twice. The key must
-        # be derived the same way as the update_or_create above (06-PII-108).
+        # be derived the same way as the upsert above (06-PII-108).
         existing: set[str] = {
             search_query_key(item["query"]) for item in config_searches
         }
@@ -377,14 +378,36 @@ class SeedService:
                     title_words.add(word)
 
         for word in sorted(title_words)[:limit]:
-            PopularSearch.objects.update_or_create(
-                query_normalized=search_query_key(word),
-                defaults={
-                    "query": word,
-                    "hit_count": max(rng.randint(5, 30), 10),
-                    "source": AdSource.SEED,
-                },
+            self._upsert_seed_popular_search(
+                search_query_key(word),
+                query=word,
+                hit_count=max(rng.randint(5, 30), 10),
             )
             count += 1
 
         return count
+
+    def _upsert_seed_popular_search(
+        self, key: str, *, query: str, hit_count: int
+    ) -> None:
+        """Upsert one SEED-owned ``PopularSearch`` row, never touching production.
+
+        The lookup is scoped to ``source=AdSource.SEED`` (08-SRCH-003). A row
+        owned by any other source already holds the unique ``query_normalized``
+        key, so the seed row is skipped instead of raising ``IntegrityError`` or
+        stealing the production row's provenance.
+        """
+        managed = PopularSearch.objects.filter(
+            query_normalized=key, source=AdSource.SEED
+        )
+        if managed.exists():
+            managed.update(query=query, hit_count=hit_count)
+            return
+        if PopularSearch.objects.filter(query_normalized=key).exists():
+            return
+        PopularSearch.objects.create(
+            query_normalized=key,
+            query=query,
+            hit_count=hit_count,
+            source=AdSource.SEED,
+        )

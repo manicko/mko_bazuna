@@ -825,7 +825,7 @@ Tracks popular search queries for autocomplete suggestions.
 ```
 id (PK)
 query (VARCHAR(200), db_index=True)                              # PII-redacted at write time (SRH-004); phones, emails, multi-word names masked via redact_search_query()
-query_normalized (VARCHAR(200), db_index=True)                   # lookup/dedup key = search_query_key(query): redact-then-lower on the RAW query, so it carries no more PII than `query` (06-PII-108). NOT a digest — get_popular_suggestions reads query_normalized__startswith, which a keyed digest has no structure for
+query_normalized (VARCHAR(200), unique)                          # lookup/dedup key = search_query_key(query): redact-then-lower on the RAW query, so it carries no more PII than `query` (06-PII-108). NOT a digest — get_popular_suggestions reads query_normalized__startswith, which a keyed digest has no structure for. UNIQUE (uq_popular_search_query_normalized): increment_popular_search's get_or_create assumes one row per key, and a duplicate would raise MultipleObjectsReturned on the anonymous GET /search/ path (08-SRCH-003)
 hit_count (POSITIVE INT, default 1)
 last_seen (TIMESTAMP, auto_now=True)
 source (StrEnum: TELEGRAM | SEED, nullable, default NULL)  # 'SEED' marks seed-generated rows for cleanup

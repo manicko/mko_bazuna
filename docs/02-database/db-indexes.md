@@ -219,7 +219,12 @@ models.Index(fields=["escalation_required"])
 ```python
 # Implicit via db_index=True on model fields
 models.CharField("query", max_length=200, db_index=True)
-models.CharField("query_normalized", max_length=200, db_index=True)
+# query_normalized carries a UniqueConstraint (08-SRCH-003). The unique index
+# it creates supersedes the plain db_index=True index — a unique index IS the
+# index — so no separate non-unique index is needed on this column.
+models.UniqueConstraint(
+    fields=["query_normalized"], name="uq_popular_search_query_normalized"
+)
 ```
 
 ## Indexes — search_history
