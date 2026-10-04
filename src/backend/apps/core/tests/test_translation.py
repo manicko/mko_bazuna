@@ -310,3 +310,173 @@ class TestTranslateTextSuccess:
 
         assert result == "Translated"
         assert _CIRCUIT_BREAKER.is_open is False
+
+
+# ---------------------------------------------------------------------------
+# Log-field redaction and observability (09-API-017)
+# ---------------------------------------------------------------------------
+
+# Seller-authored ad text carrying both a phone number and an e-mail address.
+# Neither identifier may reach ANY log record this module emits.
+_HOSTILE_TEXT = "Selling bike call +387 61 123 456 or seller@example.com"
+
+
+class TestTranslationLogRedaction:
+    """translate_text's log sites must not leak PII from ad text (09-API-017)."""
+
+    def _assert_no_pii(self, caplog: pytest.LogCaptureFixture) -> None:
+        joined = "\n".join(record.getMessage() for record in caplog.records)
+        assert "+387 61 123 456" not in joined
+        assert "seller@example.com" not in joined
+
+    def test_open_circuit_line_redacts_ad_text(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The open-circuit INFO line masks phone and e-mail."""
+        _CIRCUIT_BREAKER._failure_count = _CIRCUIT_BREAKER.failure_threshold
+        _CIRCUIT_BREAKER._last_failure_time = time.monotonic()
+        assert _CIRCUIT_BREAKER.is_open
+
+        with caplog.at_level(
+            logging.INFO, logger="apps.core.services.translation"
+        ):
+            result = translate_text(_HOSTILE_TEXT, "ru", "en")
+
+        assert result == _HOSTILE_TEXT
+        self._assert_no_pii(caplog)
+
+    def test_debug_success_line_redacts_input_and_output(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The DEBUG success line masks BOTH the input and the translated output.
+
+        A phone number survives translation into the recipient language, so
+        masking the input alone is insufficient.
+        """
+        with patch(
+            "apps.core.services.translation._translate_via_api",
+            return_value=_HOSTILE_TEXT,
+        ), caplog.at_level(
+            logging.DEBUG, logger="apps.core.services.translation"
+        ):
+            result = translate_text(_HOSTILE_TEXT, "ru", "en")
+
+        assert result == _HOSTILE_TEXT
+        self._assert_no_pii(caplog)
+        # The success line is the DEBUG one; prove it fired so the assertion
+        # above is not vacuous.
+        assert any(
+            "Translated" in record.getMessage() for record in caplog.records
+        )
+
+    def test_transport_failure_line_redacts_ad_text(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The transport-failure WARNING masks phone and e-mail."""
+        with patch(
+            "apps.core.services.translation._translate_via_api",
+            side_effect=httpx.ConnectError("refused"),
+        ), patch(
+            "apps.core.services.translation.time.sleep", return_value=None
+        ), caplog.at_level(
+            logging.WARNING, logger="apps.core.services.translation"
+        ):
+            result = translate_text(_HOSTILE_TEXT, "ru", "en")
+
+        assert result == _HOSTILE_TEXT
+        self._assert_no_pii(caplog)
+
+    def test_http_failure_line_redacts_ad_text(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """The HTTP-failure WARNING masks phone and e-mail."""
+        url = httpx.URL("https://translation.googleapis.com/language/translate/v2")
+        request = httpx.Request("POST", url)
+        response = httpx.Response(403, request=request)
+        http_error = httpx.HTTPStatusError(
+            "Client error '403 Forbidden'", request=request, response=response
+        )
+        with patch(
+            "apps.core.services.translation._translate_via_api",
+            side_effect=http_error,
+        ), patch(
+            "apps.core.services.translation.time.sleep", return_value=None
+        ), caplog.at_level(
+            logging.WARNING, logger="apps.core.services.translation"
+        ):
+            result = translate_text(_HOSTILE_TEXT, "ru", "en")
+
+        assert result == _HOSTILE_TEXT
+        self._assert_no_pii(caplog)
+
+    def test_ordinary_text_still_logged(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """Control: text with no identifiers still appears in the log.
+
+        A blanket "log nothing" change would satisfy the redaction tests and
+        destroy triage; this test prevents it.
+        """
+        with patch(
+            "apps.core.services.translation._translate_via_api",
+            return_value="Bicycle for sale",
+        ), caplog.at_level(
+            logging.DEBUG, logger="apps.core.services.translation"
+        ):
+            translate_text("Bicycle for sale", "ru", "en")
+
+        joined = "\n".join(record.getMessage() for record in caplog.records)
+        assert "Bicycle for sale" in joined
+
+
+class TestTranslationMetrics:
+    """The three 09-API-017 metrics exist and track the service's behaviour."""
+
+    def test_requests_and_fallbacks_counters_increment(self) -> None:
+        """A success increments requests only; a failure increments both."""
+        from apps.core.services.translation import (
+            TRANSLATION_FALLBACKS,
+            TRANSLATION_REQUESTS,
+        )
+
+        requests_before = TRANSLATION_REQUESTS._value.get()
+        fallbacks_before = TRANSLATION_FALLBACKS._value.get()
+
+        with patch(
+            "apps.core.services.translation._translate_via_api",
+            return_value="Translated",
+        ):
+            translate_text("Hello", "en", "ru")
+
+        assert TRANSLATION_REQUESTS._value.get() == requests_before + 1
+        assert TRANSLATION_FALLBACKS._value.get() == fallbacks_before
+
+        with patch(
+            "apps.core.services.translation._translate_via_api",
+            side_effect=httpx.ConnectError("refused"),
+        ), patch(
+            "apps.core.services.translation.time.sleep", return_value=None
+        ):
+            # A distinct string avoids the lru_cache hit from the success above.
+            translate_text("Goodbye", "en", "ru")
+
+        assert TRANSLATION_REQUESTS._value.get() == requests_before + 2
+        assert TRANSLATION_FALLBACKS._value.get() == fallbacks_before + 1
+
+    def test_circuit_open_gauge_tracks_is_open(self) -> None:
+        """The gauge is 1 while the breaker is open and 0 after a success."""
+        from apps.core.services.translation import TRANSLATION_CIRCUIT_OPEN
+
+        _CIRCUIT_BREAKER._failure_count = 0
+        _CIRCUIT_BREAKER.record_success()
+        assert TRANSLATION_CIRCUIT_OPEN._value.get() == 0
+
+        _CIRCUIT_BREAKER.record_failure()
+        _CIRCUIT_BREAKER.record_failure()
+        _CIRCUIT_BREAKER.record_failure()
+        assert _CIRCUIT_BREAKER.is_open is True
+        assert TRANSLATION_CIRCUIT_OPEN._value.get() == 1
+
+        _CIRCUIT_BREAKER.record_success()
+        assert TRANSLATION_CIRCUIT_OPEN._value.get() == 0
+
