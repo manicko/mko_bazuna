@@ -4,12 +4,26 @@ on:
   push:
     branches: [main, develop]
 
+# Do NOT cancel in progress (12-OPS-009): a cancelled run reports `cancelled`,
+# never `success`, so it can never be mistaken for a green gate — but a required
+# status check that is cancelled turns into a permanently pending check on the
+# branch. The shared buildcache reference is written by this workflow, so two
+# overlapping pushes would otherwise race the same cache target.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
       packages: write
       contents: read
+    # One image coordinate for this workflow (12-OPS-009). `deploy.yml` is a
+    # separate workflow and cannot read this output; it derives its coordinate
+    # from REGISTRY/REPOSITORY in .env.prod instead (see docker-compose.prod.yml).
+    env:
+      IMAGE_REPOSITORY: mko-bazuna/mko_bazuna
     outputs:
       image_tag: ${{ github.sha }}
     steps:
@@ -34,9 +48,9 @@ jobs:
           push: true
           tags: |
             mko-bazuna:ci
-            ghcr.io/mko-bazuna/mko_bazuna:${{ github.sha }}
-          cache-from: type=registry,ref=ghcr.io/manicko/mko_bazuna:buildcache
-          cache-to: type=registry,ref=ghcr.io/manicko/mko-bazuna:buildcache,mode=max
+            ghcr.io/${{ env.IMAGE_REPOSITORY }}:${{ github.sha }}
+          cache-from: type=registry,ref=ghcr.io/${{ env.IMAGE_REPOSITORY }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ env.IMAGE_REPOSITORY }}:buildcache,mode=max
 
       - name: Scan Docker image for vulnerabilities
         if: always()
@@ -500,7 +514,7 @@ jobs:
           fi
           echo "p95 ${ACTUAL_P95}ms within SLO of ${P95_SLO}ms"
 
-  # Deploy-check gate (OPS-001): run manage.py check --deploy against the
+  # Deploy-check gate (12-OPS-021): run manage.py check --deploy against the
   # production settings module so deployment warnings (W-series) fail the
   # build. The previous step ran against config.settings.test and produced
   # 6 false-positive warnings that masked real gaps. No DB service container

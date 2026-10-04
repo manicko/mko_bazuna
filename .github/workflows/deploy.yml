@@ -17,6 +17,14 @@ permissions:
   contents: read
   packages: read
 
+# Do NOT cancel in progress (12-OPS-009): two manual dispatches would otherwise
+# interleave `pull` and `up -d` against one production host, and a half-applied
+# mix of images can report green. A deploy must always run to completion or
+# fail loudly.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
 jobs:
   deploy:
     name: Deploy to production
@@ -36,7 +44,11 @@ jobs:
             echo "No image_tag provided; using current commit SHA: $TAG"
           fi
           echo "image_tag=$TAG" >> "$GITHUB_OUTPUT"
-          echo "Deploying image: ghcr.io/mko-bazuna/mko_bazuna:$TAG"
+          # Coordinate note (12-OPS-009): the image is built by ci.yml under the
+          # canonical ghcr.io/mko-bazuna/mko_bazuna coordinate. On the host, the
+          # same coordinate is resolved by compose from .env.prod's
+          # REGISTRY/REPOSITORY (docker-compose.prod.yml default matches).
+          echo "Deploying coordinate: ghcr.io/mko-bazuna/mko_bazuna:$TAG"
 
       - name: Deploy to production via SSH
         id: deploy
