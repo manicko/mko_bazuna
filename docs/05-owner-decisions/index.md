@@ -78,3 +78,35 @@ it to the **alert** path. `SRCH-004` is absorbed by `06-PII-104` verbatim and ph
 
 Also: any `TRUSTED_PROXY_NETWORKS`-style "known gap" language recording that a banned seller can
 still relist is **closed** by Q7′ — do not record it as accepted.
+
+### O6 breadth — the predicate's five conjuncts (recorded, not hidden)
+
+The read-boundary fix for Q7 replaced the lone `user__is_declined=False` term with the shared
+`account_state_q("user__")` declaration. That predicate carries **five** conjuncts, so the change
+newly excludes more than the ban alone. Recorded here so the breadth is not hidden:
+
+1. `is_banned=False` — the **intended** term; Q7's ban enforcement.
+2. `is_deleted=True` — newly excluded. A deleted account is a GDPR-withdrawal state; hiding its
+   inventory is strictly more privacy-protective.
+3. `consent_revoked_at IS NOT NULL` — newly excluded.
+4. `is_declined=False` — the pre-existing term, now carried by the shared predicate.
+5. `is_active=False` — newly excluded. No owner has ruled on hiding a **deactivated** seller's
+   inventory; the exclusion self-heals on reactivation, but it is a behaviour change beyond the
+   ban.
+
+Two of the newly-excluded terms (2 and 3) **are consent concepts**, which sits awkwardly against
+the instruction that the change must never be argued as a consent fix. They are present as a **side
+effect of reusing one shared predicate** (the plan's Q6 answer explicitly asked for one named
+predicate, not two), not as a consent justification. The change is still recorded as **ban
+enforcement**; the enumeration is here so no reader mistakes it for ban-only.
+
+### The favourites list — the fifth public surface (O6)
+
+O6's original wording claimed exclusion from "every public surface" while the four named surfaces
+were search, category listings, ad detail and the media gate. The authenticated favourites list
+(`apps/cabinet/views/favorites.py`) renders through the same `ads/partials/ad_list.html` card and
+originally filtered neither by status nor by account state, so a banned seller's PUBLISHED ad
+stayed visible there with its title, price, thumbnail and contact affordance. That over-claim is
+closed: the favourites list now applies the **same** `account_state_q("user__")` predicate (and a
+PUBLISHED status filter), with a positive control proving an active seller's favourited ad is
+unchanged.

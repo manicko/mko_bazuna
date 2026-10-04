@@ -16,6 +16,8 @@ from django.shortcuts import render
 
 from apps.ads.models import Ad
 from apps.ads.services.favorites import annotate_favorites
+from apps.core.enums import AdStatus
+from apps.users.services.account_state import account_state_q
 
 logger = logging.getLogger(__name__)
 
@@ -24,9 +26,23 @@ PER_PAGE = 24
 
 @login_required
 def favorites_list(request: HttpRequest) -> HttpResponse:
-    """Render the authenticated user's favorited ads."""
+    """Render the authenticated user's favorited ads.
+
+    Only PUBLISHED ads are shown, and only those whose seller still passes the
+    shared account-state predicate (``account_state_q("user__")``, 06-PII-104 /
+    08-SRCH-008). Without the account-state term a banned seller's ad stayed
+    visible in any buyer's favourites list with its title, price, thumbnail and
+    contact affordance — the fifth public surface O6's "every public surface"
+    covers. A banned seller's ad is hidden here exactly as it is on search,
+    category listings, ad detail and the media gate: the *same* one predicate,
+    not a second one.
+    """
     ads = (
-        Ad.objects.filter(favorites__user=request.user)
+        Ad.objects.filter(
+            favorites__user=request.user,
+            status=AdStatus.PUBLISHED,
+        )
+        .filter(account_state_q("user__"))
         .select_related("category", "city", "user")
         .prefetch_related("images", "features", "user__trust_score")
         .order_by("-favorites__created_at")
