@@ -120,6 +120,7 @@ async def handle_contact_start(
     Bot messages (contact_<ad_id> branch):
         - ad missing/not PUBLISHED -> "the ad is no longer available"
         - seller unavailable -> "the seller is no longer available for contact"
+        - either budget exhausted -> "too many contact requests"
     """
     if CONTACT_US_PATTERN.match(deep_link):
         return await handle_contact_us_start(message, bot)

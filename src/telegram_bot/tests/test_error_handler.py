@@ -27,6 +27,7 @@ import pytest
 from aiogram import Dispatcher
 from aiogram.exceptions import (
     TelegramBadRequest,
+    TelegramNetworkError,
     TelegramRetryAfter,
     TelegramServerError,
 )
@@ -39,8 +40,8 @@ from aiogram.types.error_event import ErrorEvent
 from telegram_bot.retry import (
     _DROPPED_OUTBOUND_CALLS,
     _MAX_BACKOFF_SECONDS,
+    _MAX_REPLAY_ATTEMPTS,
     _MAX_REPLAY_BUDGET_SECONDS,
-    _MAX_RETRIES,
     _TRANSIENT_EXCEPTIONS,
     retry_transient,
 )
@@ -58,7 +59,13 @@ def _make_dispatcher() -> Dispatcher:
 
 
 class _FakeBot:
-    """Minimal stand-in for the aiogram Bot outbound-call surface."""
+    """Minimal stand-in for the aiogram Bot outbound-call surface.
+
+    ``id`` is present because ``Dispatcher.feed_update`` / the FSM middleware read
+    ``bot.id`` for the storage key and the event log line.
+    """
+
+    id = 1
 
     def __init__(self, call: Callable[[Any], Awaitable[Any]]) -> None:
         self._call = call
@@ -109,9 +116,9 @@ def _ok_message() -> Message:
     )
 
 
-def _error_event(exc: Exception) -> ErrorEvent:
-    """Wrap ``exc`` in an ErrorEvent for direct handler invocation."""
-    return ErrorEvent(update=Update(update_id=1), exception=exc)
+async def _fake_sleep(seconds: float) -> None:
+    """No-op sleep used where the exact delay is not the subject of the test."""
+    return None
 
 
 @pytest.mark.asyncio
@@ -142,9 +149,8 @@ async def test_error_handler_backs_off_and_replays(monkeypatch) -> None:
     assert result is True
     # retry_after honored once (single successful replay).
     assert sleeps == [2.0]
-    # The re-issued call executed exactly once, bounded by _MAX_RETRIES.
+    # The re-issued call executed exactly once.
     assert bot_exec.await_count == 1
-    assert bot_exec.await_count <= _MAX_RETRIES
 
 
 @pytest.mark.asyncio
@@ -186,25 +192,37 @@ async def test_error_handler_marks_handled_after_exhausting_bound(monkeypatch) -
 
 
 @pytest.mark.asyncio
-async def test_error_handler_returns_false_for_unrelated_error() -> None:
-    """A persistent permanent error is not retried into the budget and is not counted.
+async def test_error_handler_returns_false_for_unrelated_error(monkeypatch) -> None:
+    """A transient error that becomes permanent on replay is not retried or counted.
 
-    The old test passed for the wrong reason: it handed the handler a bot whose
-    replay *succeeded*, so ``assert result is False`` only held because the
-    deleted ``isinstance`` guard short-circuited before any replay. With the
-    guard gone the handler must recognise the permanent failure from the replay
-    and return ``False`` **without** incrementing the dropped-outbound counter (a
-    permanent error is not a budget-exhausted drop).
+    The production-reachable shape is **transient in -> permanent on replay**: the
+    filter admits a transient sibling and the re-issued call fails permanently. The
+    test drives that shape — a first ``TelegramServerError`` followed by a
+    ``TelegramBadRequest`` on the replay — rather than a ``TelegramBadRequest`` as
+    the *initial* exception, which the production ``ExceptionTypeFilter`` excludes
+    entirely and which therefore never reaches the handler.
+
+    A fake clock is installed (like every sibling) so the single ``_BACKOFF_BASE``
+    sleep costs no real wall-clock time.
     """
     dp = _make_dispatcher()
     handler = dp.errors.handlers[0].callback
 
-    async def _permanent_call(method: Any) -> Any:
+    sleeps: list[float] = []
+    _install_fake_clock(monkeypatch, sleeps)
+
+    calls = 0
+
+    async def _permanent_on_replay(method: Any) -> Any:
+        nonlocal calls
+        calls += 1
         raise TelegramBadRequest(method=method, message="bad")
 
-    bot = _FakeBot(_permanent_call)
+    bot = _FakeBot(_permanent_on_replay)
 
-    exc = TelegramBadRequest(method=SendMessage(chat_id=1, text="hi"), message="bad")
+    exc = TelegramServerError(
+        method=SendMessage(chat_id=1, text="hi"), message="server exploded"
+    )
     event = ErrorEvent(update=Update(update_id=1), exception=exc)
 
     before = _dropped_count()
@@ -212,6 +230,9 @@ async def test_error_handler_returns_false_for_unrelated_error() -> None:
     after = _dropped_count()
 
     assert result is False
+    assert calls == 1
+    assert sleeps == [0.5]
+    # A permanent error is not a bound-exhausted drop: no counter increment.
     assert after == before
 
 
@@ -271,7 +292,11 @@ class TestBudgetBoundsTotalSleep:
 
 
 class TestSiblingTransientReplay:
-    """TelegramServerError / TelegramNetworkError enter the handler and replay."""
+    """Both transient siblings in ``_TRANSIENT_EXCEPTIONS`` replay.
+
+    Covers ``TelegramServerError`` and ``TelegramNetworkError`` — the two
+    non-429 members of the declared transient set.
+    """
 
     @pytest.mark.asyncio
     async def test_red2_server_error_reaches_handler_and_replays(
@@ -304,3 +329,152 @@ class TestSiblingTransientReplay:
         assert result is True
         assert bot_exec.await_count == 1
         assert sleeps == [0.5]
+
+    @pytest.mark.asyncio
+    async def test_red2_network_error_reaches_handler_and_replays(
+        self, monkeypatch
+    ) -> None:
+        """RED-2: a TelegramNetworkError is replayed with the base backoff.
+
+        The other half of ``_TRANSIENT_EXCEPTIONS``. A network error carries no
+        ``retry_after``, so the replay uses ``_BACKOFF_BASE`` exactly like the
+        server-error case.
+        """
+        dp = _make_dispatcher()
+        handler = dp.errors.handlers[0].callback
+
+        sleeps: list[float] = []
+        _install_fake_clock(monkeypatch, sleeps)
+
+        bot_exec = AsyncMock(return_value=_ok_message())
+        bot = _FakeBot(bot_exec)
+
+        exc = TelegramNetworkError(
+            method=SendMessage(chat_id=1, text="hi"),
+            message="connection reset",
+        )
+        event = ErrorEvent(update=Update(update_id=1), exception=exc)
+
+        result = await handler(event, bot=bot)
+
+        assert result is True
+        assert bot_exec.await_count == 1
+        assert sleeps == [0.5]
+
+
+# ---------------------------------------------------------------------------
+# The secondary attempt bound (09-API-004)
+# ---------------------------------------------------------------------------
+
+
+class TestAttemptBound:
+    """The attempt cap is a tighter ceiling than the budget on the attempt axis."""
+
+    @pytest.mark.asyncio
+    async def test_short_backoff_stops_at_attempt_cap(self, monkeypatch) -> None:
+        """A 0.5 s backoff loop stops at ``_MAX_REPLAY_ATTEMPTS``, far inside budget.
+
+        With only the wall-clock budget, the ``_BACKOFF_BASE`` path (a persistent
+        TelegramServerError) would replay up to 60 times in 30 s. The attempt cap
+        is what holds it to ``_MAX_REPLAY_ATTEMPTS``.
+        """
+        dp = _make_dispatcher()
+        handler = dp.errors.handlers[0].callback
+
+        sleeps: list[float] = []
+        _install_fake_clock(monkeypatch, sleeps)
+
+        async def _failing_call(method: Any) -> Any:
+            raise TelegramServerError(method=method, message="down")
+
+        bot = _FakeBot(_failing_call)
+
+        exc = TelegramServerError(method=SendMessage(chat_id=1, text="hi"), message="down")
+        event = ErrorEvent(update=Update(update_id=1), exception=exc)
+
+        result = await handler(event, bot=bot)
+
+        assert result is False
+        assert len(sleeps) == _MAX_REPLAY_ATTEMPTS
+        # Far below the budget: the attempt cap, not the clock, stopped it.
+        assert sum(sleeps) < _MAX_REPLAY_BUDGET_SECONDS
+
+    @pytest.mark.asyncio
+    async def test_attempt_cap_never_exceeds_budget(self, monkeypatch) -> None:
+        """A fresh 429 with a small retry_after also stops at the attempt cap."""
+        dp = _make_dispatcher()
+        handler = dp.errors.handlers[0].callback
+
+        sleeps: list[float] = []
+        _install_fake_clock(monkeypatch, sleeps)
+
+        async def _failing_call(method: Any) -> Any:
+            raise TelegramRetryAfter(method=method, message="too many", retry_after=1)
+
+        bot = _FakeBot(_failing_call)
+
+        exc = TelegramRetryAfter(
+            method=SendMessage(chat_id=1, text="hi"), message="too many", retry_after=1
+        )
+        event = ErrorEvent(update=Update(update_id=1), exception=exc)
+
+        result = await handler(event, bot=bot)
+
+        assert result is False
+        assert len(sleeps) == _MAX_REPLAY_ATTEMPTS
+        assert sum(sleeps) <= _MAX_REPLAY_BUDGET_SECONDS
+
+
+# ---------------------------------------------------------------------------
+# Return-value contract at the Dispatcher boundary (09-API-004)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_error_handler_contract_via_feed_update(monkeypatch) -> None:
+    """Pin the return-value contract by driving ``dp.feed_update``, not the callback.
+
+    Every other test in this module calls ``dp.errors.handlers[0].callback``
+    directly, bypassing ``ErrorsMiddleware``; the suite therefore cannot
+    distinguish ``True``, ``False`` and ``UNHANDLED``. This test drives the real
+    dispatch path with a handler that raises a transient error and asserts which
+    branch is reached: the exception is swallowed (``feed_update`` returns
+    normally rather than raising) because the error handler returned ``False``,
+    which ``ErrorsMiddleware`` treats as ``response is not UNHANDLED``.
+    """
+    dp = Dispatcher(storage=MemoryStorage())
+
+    async def _boom(message: Message) -> None:
+        raise TelegramRetryAfter(
+            method=SendMessage(chat_id=1, text="hi"),
+            message="too many",
+            retry_after=1,
+        )
+
+    dp.message.register(_boom)
+    dp.errors(ExceptionTypeFilter(_TRANSIENT_EXCEPTIONS))(retry_transient)
+
+    sleeps: list[float] = []
+    _install_fake_clock(monkeypatch, sleeps)
+
+    async def _failing_call(method: Any) -> Any:
+        raise TelegramRetryAfter(method=method, message="too many", retry_after=1)
+
+    bot = _FakeBot(_failing_call)
+
+    update = Update(
+        update_id=1,
+        message=Message(
+            message_id=1,
+            date=1,
+            chat=Chat(id=1, type="private"),
+            text="/anything",
+            from_user=User(id=1, is_bot=False, first_name="x"),
+        ),
+    )
+
+    # Must NOT raise: the error handler's False is consumed by ErrorsMiddleware
+    # (no aiogram path re-raises on a non-UNHANDLED value). This is the contract.
+    await dp.feed_update(bot, update)
+
+    assert len(sleeps) == _MAX_REPLAY_ATTEMPTS
