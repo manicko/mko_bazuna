@@ -8,20 +8,20 @@ autocomplete, login and bot rate limiters to
 """
 
 import logging
-from typing import Final
 
 from django.http import HttpRequest
 
+from apps.core.enums import RateLimitBudget
 from apps.core.utils.cache import bump_rate_limit_window
 from apps.core.utils.client_ip import get_client_ip
 
 logger = logging.getLogger(__name__)
 
-RATE_LIMIT_REQUESTS: Final[int] = 60
+RATE_LIMIT_REQUESTS: int = RateLimitBudget.DEEP_LINK_RENDER.requests
 
-RATE_LIMIT_PERIOD: Final[int] = 600  # 10 minutes
+RATE_LIMIT_PERIOD: int = RateLimitBudget.DEEP_LINK_RENDER.period  # 10 minutes
 
-_RATE_LIMIT_KEY_PATTERN: Final[str] = "telegram_dl_rl:{ip}"
+_RATE_LIMIT_KEY_PATTERN: str = "telegram_dl_rl:{ip}"
 
 
 def check_deep_link_render_rate_limit(request: HttpRequest) -> bool:

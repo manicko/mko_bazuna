@@ -30,12 +30,13 @@ from apps.ads.models import Ad, AdImage
 from apps.ads.services.listings_query import ListingsQuery, ListingsQueryParams
 from apps.categories.models import Category
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
-from apps.core.enums import AdSort, AdStatus, AnalyticsEventType
+from apps.core.enums import AdSort, AdStatus, AnalyticsEventType, RateLimitBudget
 from apps.core.services.analytics import record_event
 from apps.core.services.contact_rate_limit import check_deep_link_render_rate_limit
 from apps.core.services.site_config import get_bot_username
 from apps.core.utils.cache import bump_rate_limit_window
 from apps.core.utils.client_ip import get_client_ip
+from apps.core.utils.rate_limit_response import rate_limited_response
 from apps.locations.models import City
 from apps.locations.services.city_suggestions import suggest_city
 from apps.media.services.filesystem import assert_storage_key_contained
@@ -48,15 +49,12 @@ logger = logging.getLogger(__name__)
 # `.ai/plans/22-*` hold that exact directive as a deployed-stack measurement
 # basis. This limiter is the half that survives the proxy being bypassed.
 #
-# The budget mirrors the plan's `media_limit` shape (`rate=30r/s burst=60`),
-# reduced to the single additive window the shared helper exposes: a ceiling of
-# 60 requests inside 60 seconds per client IP. That is far tighter than the
-# proxy's catch-all cap (``browse_limit`` at 20 r/s), which is the point — the
-# finding protects the database, not the user, and `/media/` is the only
-# anonymous, DB-backed path that had no application-level control.
-MEDIA_RATE_LIMIT_REQUESTS: Final[int] = 60
+# The budget (60 requests / 60 s per client IP) now lives in the shared
+# ``RateLimitBudget.MEDIA_GATE`` table (08-SRCH-010); the module constants below
+# remain so existing callers and tests keep their import surface.
+MEDIA_RATE_LIMIT_REQUESTS: int = RateLimitBudget.MEDIA_GATE.requests
 
-MEDIA_RATE_LIMIT_PERIOD: Final[int] = 60  # 60 seconds
+MEDIA_RATE_LIMIT_PERIOD: int = RateLimitBudget.MEDIA_GATE.period
 
 _MEDIA_RATE_LIMIT_KEY_PATTERN: Final[str] = "media_gate_rl:{ip}"
 
@@ -77,7 +75,7 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
     if not check_deep_link_render_rate_limit(request):
         logger.warning("Deep-link render rate limit exceeded (ad_detail)")
-        return HttpResponse(status=429)
+        return rate_limited_response(json=False)
     try:
         ad = (
             Ad.objects.select_related("category", "city", "user")
@@ -185,7 +183,7 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponseBase:
         media_key, MEDIA_RATE_LIMIT_REQUESTS, MEDIA_RATE_LIMIT_PERIOD
     ):
         logger.warning("Media gate rate limit exceeded")
-        return HttpResponse(status=429)
+        return rate_limited_response(json=False)
 
     # Reject malformed storage keys early. A NUL byte (or other control
     # characters) can never occur in a valid key (``<uuid>.jpg`` or
@@ -263,7 +261,7 @@ def listings(
     # Rate limit (CR-10)
     if not request.headers.get("HX-Request") and not check_deep_link_render_rate_limit(request):
         logger.warning("Deep-link render rate limit exceeded (listings)")
-        return HttpResponse(status=429)
+        return rate_limited_response(json=False)
     # City: did-you-mean (F-6); service handles filtering
     effective_city = getattr(request, "current_city", None) or getattr(request, "preferred_city", None)
     suggested_city = suggest_city(effective_city) if effective_city and getattr(

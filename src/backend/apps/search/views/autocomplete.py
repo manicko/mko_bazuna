@@ -10,6 +10,7 @@ import logging
 from django.http import HttpRequest, JsonResponse
 
 from apps.core.enums import SearchSuggestionSource
+from apps.core.utils.rate_limit_response import rate_limited_response
 from apps.core.utils.sanitize import sanitize_autocomplete_query
 from apps.search.schemas import AutocompleteSuggestion
 from apps.search.services.entity_suggestions import get_entity_suggestions
@@ -55,7 +56,7 @@ def autocomplete(request: HttpRequest) -> JsonResponse:
         return JsonResponse({"suggestions": [], "query": ""})
 
     if not rate_limit_check(request):
-        return JsonResponse({"error": "rate_limit"}, status=429)
+        return rate_limited_response()
 
     suggestions: list[AutocompleteSuggestion] = []
 

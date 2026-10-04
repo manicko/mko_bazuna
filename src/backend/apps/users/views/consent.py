@@ -33,6 +33,7 @@ from apps.core.utils.preferred_city_cookie import (
     PREFERRED_CITY_COOKIE_NAME,
     expire_preferred_city_cookie,
 )
+from apps.core.utils.rate_limit_response import rate_limited_response
 from apps.core.utils.sanitize import mask_telegram_id
 from apps.locations.models import City
 from apps.users.models import User
@@ -358,11 +359,11 @@ def login_issue(request: HttpRequest) -> HttpResponse:
     """
     if not check_deep_link_render_rate_limit(request):
         logger.warning("Deep-link render rate limit exceeded (login_issue)")
-        return HttpResponse(status=429)
+        return rate_limited_response(json=False)
 
     if not login_rate_limit_check(request):
         logger.warning("Rate limit exceeded for login_issue")
-        return HttpResponse(status=429)
+        return rate_limited_response(json=False)
 
     issued = issue_token(browser_id=request.COOKIES.get(LOGIN_BROWSER_ID_COOKIE))
 

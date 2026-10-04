@@ -19,7 +19,6 @@ from django.http import (
     HttpRequest,
     HttpResponse,
     HttpResponseBadRequest,
-    JsonResponse,
 )
 from django.shortcuts import render
 from pydantic import ValidationError
@@ -28,6 +27,7 @@ from apps.ads.services.listings_query import ListingsQuery, ListingsQueryParams
 from apps.categories.models import Category
 from apps.core.enums import AdSort, AnalyticsEventType, LanguageLocale
 from apps.core.services.analytics import record_event
+from apps.core.utils.rate_limit_response import rate_limited_response
 from apps.core.utils.sanitize import (
     redact_search_query,
     sanitize_query_for_log,
@@ -72,7 +72,7 @@ def search(request: HttpRequest) -> HttpResponse:
         Rendered search results page (full or HTMX partial)
     """
     if not rate_limit_check(request, namespace="search"):
-        return JsonResponse({"error": "rate_limit"}, status=429)
+        return rate_limited_response()
 
     # Strip control characters (incl. NUL) at the input edge, trim surrounding
     # whitespace, then slice. Trimming is restored here: the 08-SRCH-006 rewrite

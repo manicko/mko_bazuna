@@ -20,6 +20,58 @@ class AdSort(StrEnum):
     PRICE_HIGH = "price_desc"
 
 
+class RateLimitBudget(StrEnum):
+    """Per-endpoint application rate-limit budgets and their rationale.
+
+    One declaration for every application-level limiter so the numbers cannot
+    drift again — the defect was two undocumented ``Final[int]`` pairs on
+    adjacent anonymous HTML routes (08-SRCH-010). Each member's value is the
+    stable budget name; the request count and window live in the two properties
+    below, read by each limiter's module.
+
+    Budgets:
+
+    SEARCH_PAGE: 30 requests / 60 s. Anonymous HTML search rendering — the
+        buyer-facing hot path that runs the FTS query, so it is the tightest.
+    AUTOCOMPLETE: 30 requests / 60 s. Same budget as SEARCH_PAGE but a distinct
+        key namespace, so the two keep independent counters.
+    DEEP_LINK_RENDER: 60 requests / 600 s. Anonymous browse pages that render
+        Telegram contact deep-links; a side effect, not a query cost.
+    LOGIN_ISSUE: 10 requests / 60 s. Issuing a login token is
+        security-sensitive, so it is the tightest budget.
+    MEDIA_GATE: 60 requests / 60 s. Anonymous DB-backed media serving; protects
+        the database from an over-budget client (09-API-005).
+    """
+
+    SEARCH_PAGE = "search_page"
+    AUTOCOMPLETE = "autocomplete"
+    DEEP_LINK_RENDER = "deep_link_render"
+    LOGIN_ISSUE = "login_issue"
+    MEDIA_GATE = "media_gate"
+
+    @property
+    def requests(self) -> int:
+        """Maximum requests allowed inside the window for this budget."""
+        return {
+            RateLimitBudget.SEARCH_PAGE: 30,
+            RateLimitBudget.AUTOCOMPLETE: 30,
+            RateLimitBudget.DEEP_LINK_RENDER: 60,
+            RateLimitBudget.LOGIN_ISSUE: 10,
+            RateLimitBudget.MEDIA_GATE: 60,
+        }[self]
+
+    @property
+    def period(self) -> int:
+        """Window length in seconds for this budget."""
+        return {
+            RateLimitBudget.SEARCH_PAGE: 60,
+            RateLimitBudget.AUTOCOMPLETE: 60,
+            RateLimitBudget.DEEP_LINK_RENDER: 600,
+            RateLimitBudget.LOGIN_ISSUE: 60,
+            RateLimitBudget.MEDIA_GATE: 60,
+        }[self]
+
+
 class AdvisoryLockId(IntEnum):
     """PostgreSQL advisory lock IDs for idempotent scheduled jobs."""
 
@@ -382,6 +434,7 @@ class SupportTicketStatus(StrEnum):
 
 __all__ = [
     "AdSort",
+    "RateLimitBudget",
     "AdvisoryLockId",
     "AdStatus",
     "SEEDABLE_AD_STATUSES",

@@ -8,23 +8,23 @@ tighter limits for the security-sensitive login endpoint.
 """
 
 import logging
-from typing import Final
 
 from django.http import HttpRequest
 
+from apps.core.enums import RateLimitBudget
 from apps.core.utils.cache import bump_rate_limit_window
 from apps.core.utils.client_ip import get_client_ip
 
 logger = logging.getLogger(__name__)
 
 # Maximum number of login token requests per IP within the time window.
-RATE_LIMIT_REQUESTS: Final[int] = 10
+RATE_LIMIT_REQUESTS: int = RateLimitBudget.LOGIN_ISSUE.requests
 
 # Time window in seconds.
-RATE_LIMIT_PERIOD: Final[int] = 60
+RATE_LIMIT_PERIOD: int = RateLimitBudget.LOGIN_ISSUE.period
 
 # Cache key pattern — {ip} is replaced with the client's IP address.
-_RATE_LIMIT_KEY_PATTERN: Final[str] = "login_rl:{ip}"
+_RATE_LIMIT_KEY_PATTERN: str = "login_rl:{ip}"
 
 
 def login_rate_limit_check(request: HttpRequest) -> bool:

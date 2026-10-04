@@ -9,24 +9,24 @@ The window bump is delegated to
 """
 
 import logging
-from typing import Final
 
 from django.http import HttpRequest
 
+from apps.core.enums import RateLimitBudget
 from apps.core.utils.cache import bump_rate_limit_window
 from apps.core.utils.client_ip import get_client_ip
 
 logger = logging.getLogger(__name__)
 
-# Maximum number of requests per IP within the time window.
-RATE_LIMIT_REQUESTS: Final[int] = 30
+# Maximum number of requests per IP within the time window (08-SRCH-010).
+RATE_LIMIT_REQUESTS: int = RateLimitBudget.AUTOCOMPLETE.requests
 
 # Time window in seconds.
-RATE_LIMIT_PERIOD: Final[int] = 60
+RATE_LIMIT_PERIOD: int = RateLimitBudget.AUTOCOMPLETE.period
 
 # Cache key pattern — {namespace} and {ip} are replaced with the rate-limit
 # namespace and the client's IP address respectively.
-_RATE_LIMIT_KEY_PATTERN: Final[str] = "{namespace}_rl:{ip}"
+_RATE_LIMIT_KEY_PATTERN: str = "{namespace}_rl:{ip}"
 
 
 def rate_limit_check(

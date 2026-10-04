@@ -77,10 +77,11 @@ def privacy_policy(request: HttpRequest) -> HttpResponse:
         Rendered ``templates/privacy.html`` page.
     """
     from apps.core.services.contact_rate_limit import check_deep_link_render_rate_limit
+    from apps.core.utils.rate_limit_response import rate_limited_response
 
     if not check_deep_link_render_rate_limit(request):
         logger.warning("Deep-link render rate limit exceeded (privacy)")
-        return HttpResponse(status=429)
+        return rate_limited_response(json=False)
 
     from apps.core.services.site_config import get_bot_username
 
