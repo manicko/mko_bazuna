@@ -7,6 +7,7 @@ HTMX-compatible MPA (no login required).
 
 import logging
 from difflib import get_close_matches
+from typing import Final
 
 from django.conf import settings
 from django.core.paginator import Paginator
@@ -31,11 +32,31 @@ from apps.core.enums import AdSort, AdStatus, AnalyticsEventType
 from apps.core.services.analytics import record_event
 from apps.core.services.contact_rate_limit import check_deep_link_render_rate_limit
 from apps.core.services.site_config import get_bot_username
+from apps.core.utils.cache import bump_rate_limit_window
+from apps.core.utils.client_ip import get_client_ip
 from apps.locations.models import City
 from apps.locations.services.city_suggestions import suggest_city
 from apps.media.services.filesystem import assert_storage_key_contained
 
 logger = logging.getLogger(__name__)
+
+# Application-level limiter for the media gate (09-API-005). The proxy half is
+# already shipped — nginx's `location /media/` carries `browse_limit burst=40`
+# in both sites — and is deliberately left unchanged: `.ai/plans/21-*` and
+# `.ai/plans/22-*` hold that exact directive as a deployed-stack measurement
+# basis. This limiter is the half that survives the proxy being bypassed.
+#
+# The budget mirrors the plan's `media_limit` shape (`rate=30r/s burst=60`),
+# reduced to the single additive window the shared helper exposes: a ceiling of
+# 60 requests inside 60 seconds per client IP. That is far tighter than the
+# proxy's catch-all cap (``browse_limit`` at 20 r/s), which is the point — the
+# finding protects the database, not the user, and `/media/` is the only
+# anonymous, DB-backed path that had no application-level control.
+MEDIA_RATE_LIMIT_REQUESTS: Final[int] = 60
+
+MEDIA_RATE_LIMIT_PERIOD: Final[int] = 60  # 60 seconds
+
+_MEDIA_RATE_LIMIT_KEY_PATTERN: Final[str] = "media_gate_rl:{ip}"
 
 
 def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
@@ -152,6 +173,18 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponseBase:
         FileResponse (dev) or empty 200 with X-Accel-Redirect header (prod),
         or 403/404
     """
+    # Rate limit (09-API-005). Runs before the AdImage lookup so an over-budget
+    # client never reaches the database — the same policy `listings` uses
+    # (client-IP via `get_client_ip`) and the same shared window bump. A cache
+    # outage fails open inside `bump_rate_limit_window`, so an unreachable
+    # cache never denies legitimate media.
+    media_key = _MEDIA_RATE_LIMIT_KEY_PATTERN.format(ip=get_client_ip(request))
+    if not bump_rate_limit_window(
+        media_key, MEDIA_RATE_LIMIT_REQUESTS, MEDIA_RATE_LIMIT_PERIOD
+    ):
+        logger.warning("Media gate rate limit exceeded")
+        return HttpResponse(status=429)
+
     # Reject malformed storage keys early. A NUL byte (or other control
     # characters) can never occur in a valid key (``<uuid>.jpg`` or
     # ``seed/<filename>.jpg``) and would otherwise be sent verbatim to

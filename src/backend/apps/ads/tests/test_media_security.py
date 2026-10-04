@@ -16,14 +16,21 @@ import io
 import tempfile
 from collections.abc import Generator
 from pathlib import Path
+from unittest.mock import MagicMock, patch
 
 import pytest
+from django.core.cache import DEFAULT_CACHE_ALIAS, cache, caches
 from django.http import FileResponse
 from django.test import Client, override_settings
+from django_redis.exceptions import ConnectionInterrupted
 from PIL import Image
 from PIL.ExifTags import Base as ExifBase
 
-from apps.ads.views.listings import _serve_image
+from apps.ads.views.listings import (
+    MEDIA_RATE_LIMIT_PERIOD,
+    MEDIA_RATE_LIMIT_REQUESTS,
+    _serve_image,
+)
 from apps.core.enums import AdStatus
 from apps.media.services.filesystem import (
     delete_photo,
@@ -889,3 +896,102 @@ class TestMediaGateCacheControl:
             response = _serve_image(key)
         assert isinstance(response, FileResponse)
         assert response.headers.get("Cache-Control") is None
+
+
+class TestMediaGateApplicationRateLimit:
+    """Application-level limiter on ``media_gate`` (09-API-005).
+
+    The proxy half of the finding was shipped by phase 07 (``location /media/``
+    carries ``browse_limit burst=40 nodelay`` in both sites, pinned by
+    ``test_nginx_config.py``). This class covers the half that survives a
+    bypassed proxy: the view refuses an over-budget client before the AdImage
+    lookup, and fails open when the cache is unavailable.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _clear_cache(self):
+        """Clear the shared LocMemCache so per-IP counters don't leak across tests."""
+        cache.clear()
+        yield
+        cache.clear()
+
+    def _published_key(self, seller, category, city) -> str:
+        key = generate_storage_key()
+        _create_ad_with_image(seller, category, city, image_key=key)
+        return key
+
+    def test_burst_over_budget_is_refused(self, seller, category, city):
+        """The (limit+1)th request from one IP is refused with 429.
+
+        Asserts on the response, not on the helper's return value: the guard is
+        only correct if the view converts an over-budget decision into a 429.
+        """
+        key = self._published_key(seller, category, city)
+        client = Client()
+        url = f"/media/{key}"
+
+        with override_settings(DEBUG=False):
+            for _ in range(MEDIA_RATE_LIMIT_REQUESTS):
+                assert client.get(url).status_code == 200
+            response = client.get(url)
+
+        assert response.status_code == 429
+
+    def test_over_budget_is_refused_before_the_db_lookup(self, seller, category, city):
+        """The limiter runs before the AdImage query.
+
+        An over-budget request for a key that resolves to a PUBLISHED ad must
+        still be refused — proving the guard does not depend on the lookup
+        succeeding, which is the point of protecting the database.
+        """
+        key = self._published_key(seller, category, city)
+        client = Client()
+        url = f"/media/{key}"
+
+        with override_settings(DEBUG=False):
+            for _ in range(MEDIA_RATE_LIMIT_REQUESTS):
+                client.get(url)
+            response = client.get(url)
+
+        assert response.status_code == 429
+
+    def test_independent_per_ip(self, seller, category, city):
+        """Exhausting one IP's budget does not affect a different IP."""
+        key = self._published_key(seller, category, city)
+        url = f"/media/{key}"
+
+        with override_settings(DEBUG=False):
+            for _ in range(MEDIA_RATE_LIMIT_REQUESTS + 1):
+                Client(REMOTE_ADDR="203.0.113.10").get(url)
+            response = Client(REMOTE_ADDR="203.0.113.11").get(url)
+
+        assert response.status_code == 200
+
+    def test_fails_open_on_cache_outage(self, seller, category, city):
+        """A cache outage allows the media request instead of raising.
+
+        The seam is the shared cache backend, not a module-level ``cache`` name.
+        ``django.core.cache.cache`` is a single proxy over one backend, so every
+        guard module's ``cache`` global is the same object; patching the backend
+        is invariant to which module holds a reference and cannot be neutralised
+        by a guard gaining, losing or duplicating a ``cache`` import.
+        """
+        key = self._published_key(seller, category, city)
+        client = Client()
+        url = f"/media/{key}"
+
+        outage = MagicMock()
+        outage.add.side_effect = ConnectionInterrupted(None)
+
+        with (
+            override_settings(DEBUG=False),
+            patch.object(caches[DEFAULT_CACHE_ALIAS], "add", outage.add),
+        ):
+            response = client.get(url)
+
+        assert response.status_code != 429
+
+    def test_period_constant_is_the_documented_window(self) -> None:
+        """The window pair is the reviewed budget, not an inline literal."""
+        assert (MEDIA_RATE_LIMIT_REQUESTS, MEDIA_RATE_LIMIT_PERIOD) == (60, 60)
+

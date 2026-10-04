@@ -378,6 +378,39 @@ def test_media_location_is_rate_limited(conf_path: Path) -> None:
     )
 
 
+@pytest.mark.parametrize("conf_path", _PROXIED_CONFS)
+def test_media_location_carries_browse_limit_burst_40(conf_path: Path) -> None:
+    """``/media/`` must keep the exact phase-07 proxy rating in both sites.
+
+    This pins the coordinator ruling on ``09-API-005``: the proxy half was
+    already shipped by phase 07 (``77c1653``) and is deliberately **not**
+    re-rated. ``.ai/plans/21-nginx-dev-media-gate.md`` and
+    ``.ai/plans/22-nginx-rate-limit-deployed-gate.md`` are open, human-gated
+    verification plans that hold this exact directive as a deployed-stack
+    measurement basis; adding a ``media_limit`` zone or changing these numbers
+    would invalidate their readings. The application-level limiter lives in
+    ``apps/ads/views/listings.py::media_gate`` instead.
+
+    Asserts the directive byte-for-byte: a re-rate (zone rename or a changed
+    ``burst``) fails here, by design.
+    """
+    text = conf_path.read_text()
+    media_blocks = [
+        block
+        for block in _iter_location_blocks(text)
+        if _location_uri(block).startswith("/media/")
+    ]
+    assert len(media_blocks) == 1, (
+        f"{conf_path.name}: expected exactly one `/media/` prefix location, "
+        f"found {len(media_blocks)}"
+    )
+    assert "limit_req zone=browse_limit burst=40 nodelay;" in media_blocks[0], (
+        f"{conf_path.name}: `location /media/` must keep the phase-07 rating "
+        "`limit_req zone=browse_limit burst=40 nodelay;` unchanged (09-API-005 "
+        "coordinator ruling; plans 21/22 depend on this exact line)"
+    )
+
+
 def test_media_deny_adds_no_collateral_change() -> None:
     """The media hardening must leave the pre-existing controls untouched.
 
