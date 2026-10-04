@@ -170,3 +170,113 @@ def test_post_invalid_csp_report_field_returns_422(
     data = json.loads(response.content)
     assert data["error"]
     assert "errors" in data
+
+
+def _info_message(caplog: pytest.LogCaptureFixture) -> str:
+    """Return the joined text of INFO records emitted by ``apps.core.views``."""
+    return "\n".join(
+        r.getMessage()
+        for r in caplog.records
+        if r.name == "apps.core.views" and r.levelno == logging.INFO
+    )
+
+
+def test_document_uri_query_string_never_reaches_the_log(
+    client: Client,
+    csp_url: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """``document-uri``'s query string is not logged (09-API-015).
+
+    A violation on a search-results page carries the buyer's own query in the
+    query string; the endpoint is unauthenticated, so that text must never reach
+    the log stream.
+    """
+    caplog.set_level(logging.INFO, logger="apps.core.views")
+    body = json.dumps(
+        {
+            "csp-report": {
+                "document-uri": "https://site.example/search/?q=buyer-secret-text",
+                "violated-directive": "script-src",
+            }
+        }
+    ).encode()
+    response = client.post(csp_url, data=body, content_type="application/json")
+    assert response.status_code == 200
+
+    message = _info_message(caplog)
+    assert message, "an INFO record must still be emitted"
+    assert "buyer-secret-text" not in message
+    assert "?" not in message
+
+
+def test_referrer_never_reaches_the_log(
+    client: Client,
+    csp_url: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """``referrer`` is not logged at all (09-API-015)."""
+    caplog.set_level(logging.INFO, logger="apps.core.views")
+    body = json.dumps(
+        {
+            "csp-report": {
+                "document-uri": "https://site.example/page",
+                "referrer": "https://site.example/search/?q=referrer-secret",
+                "violated-directive": "script-src",
+            }
+        }
+    ).encode()
+    response = client.post(csp_url, data=body, content_type="application/json")
+    assert response.status_code == 200
+
+    message = _info_message(caplog)
+    assert "referrer-secret" not in message
+    assert "referrer" not in message.lower()
+    # The whole-dict dump is gone: the old log line rendered the report mapping
+    # verbatim, which carried every field including ``referrer``.
+    assert "{'csp-report'" not in message
+
+
+def test_operator_actionable_fields_are_still_logged(
+    client: Client,
+    csp_url: str,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """The fields an operator acts on survive the narrowing (09-API-015 test 4).
+
+    A blanket "log nothing" passes the PII tests and destroys triage; this is
+    the control that keeps the sink useful. ``blocked-uri`` and ``document-uri``
+    are reduced to host + path, so their query strings are absent but their
+    hosts remain.
+    """
+    caplog.set_level(logging.INFO, logger="apps.core.views")
+    body = json.dumps(
+        {
+            "csp-report": {
+                "document-uri": "https://site.example/page?q=secret",
+                "violated-directive": "script-src 'self'",
+                "effective-directive": "script-src",
+                "disposition": "report",
+                "blocked-uri": "https://evil.example/x.js?v=1",
+                "sample": "alert(1)",
+            }
+        }
+    ).encode()
+    response = client.post(csp_url, data=body, content_type="application/json")
+    assert response.status_code == 200
+
+    message = _info_message(caplog)
+    assert "script-src 'self'" in message
+    assert "effective=script-src" in message
+    assert "disposition=report" in message
+    assert "https://evil.example/x.js" in message
+    assert "alert(1)" in message
+    assert "site.example/page" in message
+
+    warning_records = [
+        r
+        for r in caplog.records
+        if r.name == "apps.core.views" and r.levelno == logging.WARNING
+    ]
+    assert len(warning_records) == 0
+

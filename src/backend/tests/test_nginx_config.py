@@ -341,14 +341,15 @@ def test_media_location_is_rate_limited(conf_path: Path) -> None:
     """The proxying ``/media/`` location must use ``browse_limit`` with nodelay.
 
     ``browse_limit`` is already declared; ``/media/`` must reference it. The
-    zone census is a positive equality so it fails if a zone is deleted, if a
-    fourth is added, or if ``browse_limit`` is renamed.
+    zone census is a positive equality so it fails if a zone is deleted, if one
+    is added, or if ``browse_limit`` is renamed. The census is four zones since
+    ``09-API-015`` added ``csp_report_limit`` for the CSP-report sink.
     """
     text = conf_path.read_text()
 
     zones = _limit_req_zones(text)
-    assert len(zones) == 3, (
-        f"{conf_path.name}: expected exactly 3 limit_req zones, found {zones}"
+    assert len(zones) == 4, (
+        f"{conf_path.name}: expected exactly 4 limit_req zones, found {zones}"
     )
     assert zones.count("browse_limit") == 1, (
         f"{conf_path.name}: `browse_limit` must be defined exactly once; found "
@@ -524,4 +525,49 @@ def test_tls_posture_is_pinned_without_a_cipher_string(conf_path: Path) -> None:
         f"{conf_path.name}: no explicit `ssl_ciphers` string may be pinned; "
         f"found: {cipher_directives}"
     )
+
+
+# ---------------------------------------------------------------------------
+# 09-API-015 — the CSP-report sink zone
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("conf_path", _PROXIED_CONFS)
+def test_csp_report_location_uses_a_dedicated_tight_zone(conf_path: Path) -> None:
+    """``/csp-report/`` must use its own 1 r/s zone in BOTH sites (09-API-015).
+
+    Zones are declared per-``http{}`` and are not inherited across files, so the
+    declaration must appear in each file. ``nginx.dev.conf`` previously had no
+    ``/csp-report/`` location at all, so the dev path fell through to the
+    catch-all at 20 r/s — looser than production. Asserting the zone name here
+    (not ``login_limit``) pins the tightening against a silent revert.
+    """
+    text = conf_path.read_text()
+
+    assert "csp_report_limit" in _limit_req_zones(text), (
+        f"{conf_path.name}: must declare `zone=csp_report_limit` in its own "
+        "`http{}` block"
+    )
+
+    csp_blocks = [
+        block
+        for block in _iter_location_blocks(text)
+        if _location_uri(block).startswith("/csp-report/")
+    ]
+    assert len(csp_blocks) == 1, (
+        f"{conf_path.name}: expected exactly one `/csp-report/` location, "
+        f"found {len(csp_blocks)}"
+    )
+    block = csp_blocks[0]
+    assert "limit_req zone=csp_report_limit" in block, (
+        f"{conf_path.name}: `location /csp-report/` must carry "
+        "`limit_req zone=csp_report_limit` (not the shared `login_limit`)"
+    )
+    assert "nodelay" in block, (
+        f"{conf_path.name}: `location /csp-report/` must use `nodelay`"
+    )
+    assert "proxy_pass" in block, (
+        f"{conf_path.name}: `location /csp-report/` must still proxy to Django"
+    )
+
 

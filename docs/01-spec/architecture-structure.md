@@ -395,9 +395,10 @@ The production nginx configuration (`docker/nginx/nginx.conf`) implements:
 - **Script execution blocked:** `location ~* ^/media/.*\.(?:php|py|cgi|pl|sh)(?:/|$) { deny all; return 403; }` — a `~*` regex location, mandatory so the prefix `location /media/` proxy block is not replaced (07-MEDIA-006)
 - **MIME whitelist:** Only `image/jpeg` served for `/media/` uploads; default `application/octet-stream`
 - **Media behavior:** `Content-Disposition: inline` for all media responses
-- **Rate limiting:** three `limit_req_zone`s are declared in `http{}`, **all keyed on
-  `$binary_remote_addr`**: `login_limit` (10r/s), `search_limit` (20r/s) and `browse_limit`
-  (20r/s). nginx is the first hop, so the key is the real client address; setting
+- **Rate limiting:** four `limit_req_zone`s are declared in `http{}`, **all keyed on
+  `$binary_remote_addr`**: `login_limit` (10r/s), `search_limit` (20r/s), `browse_limit`
+  (20r/s) and `csp_report_limit` (1r/s). nginx is the first hop, so the key is the real
+  client address; setting
   `set_real_ip_from 0.0.0.0/0` would collapse every client into one bucket and destroy the
   limiting (see [Client IP Trust Model](../ops/docker-deployment.md#client-ip-trust-model)).
   `limit_req_status 429` is set once in `http{}` and therefore applies to every limited
@@ -410,8 +411,11 @@ The production nginx configuration (`docker/nginx/nginx.conf`) implements:
     `apps/ads/services/listings_query.py`), so a full grid of thumbnails fits the burst.
   - `/login/`: `limit_req zone=login_limit burst=20 nodelay`
   - `/search/`: `limit_req zone=search_limit burst=40 nodelay`
-  - `/csp-report/`: `limit_req zone=login_limit burst=10 nodelay` (report endpoint, sharing
-    `login_limit` with `/login/`)
+  - `/csp-report/`: `limit_req zone=csp_report_limit burst=5 nodelay` — a dedicated 1 r/s
+    sink budget (`09-API-015`); the endpoint previously shared `login_limit` (10 r/s),
+    an order of magnitude looser than a violation-report sink needs. The dev config now
+    carries a matching `/csp-report/` block; it previously fell through to the catch-all
+    at 20 r/s, i.e. looser than production.
   - **Unrated by design:** `/health/` (container healthcheck), `/static/` (immutable,
     `Cache-Control: public, immutable`), `/protected-media/` (nginx `internal` — reachable
     only after Django's access check grants an `X-Accel-Redirect`), the `~*` script-deny

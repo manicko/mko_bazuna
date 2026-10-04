@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from time import time as _time
+from urllib.parse import urlparse
 
 from django.conf import settings
 from django.core.cache import cache
@@ -13,9 +14,30 @@ from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import render
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from apps.core.utils.sanitize import pydantic_errors_json
+from apps.core.utils.sanitize import pydantic_errors_json, sanitize_query_for_log
 
 logger = logging.getLogger(__name__)
+
+
+def _host_and_path(raw_url: str | None) -> str:
+    """Reduce a URL to host + path, discarding the query string.
+
+    A page URL on a search-results page carries the buyer's own search text in
+    its query string, so the query string must never reach the log stream.
+    Falls back to the path alone when the value is not an absolute URL, and
+    routes the result through the shared log sanitiser for control-character
+    stripping and truncation (``sanitize_query_for_log`` — it truncates, it does
+    NOT mask PII; masking policy is phase 06's and this module must not grow a
+    second sanitiser).
+    """
+    if not raw_url:
+        return ""
+    parsed = urlparse(raw_url)
+    if parsed.scheme or parsed.netloc:
+        path = parsed._replace(query="", fragment="").geturl()
+    else:
+        path = raw_url.split("?", 1)[0]
+    return sanitize_query_for_log(path)
 
 
 class CSPReportPayload(BaseModel):
@@ -151,7 +173,18 @@ def csp_report(request: HttpRequest) -> JsonResponse:
     """Receive CSP violation reports from browsers.
 
     Report-Only mode: browsers send violation reports to this endpoint.
-    Reports are logged for monitoring. No CSP is enforced at this stage.
+    No CSP is enforced at this stage.
+
+    Only the fields an operator acts on are logged: the violated and effective
+    directives, the disposition, the blocked URI and the violating document's
+    host + path, and the script sample. ``document-uri``'s query string is
+    deliberately dropped and ``referrer`` is not logged at all — page URLs
+    routinely carry the buyer's own search text, and this endpoint is
+    unauthenticated.
+
+    Scope note: the PII-minimisation *policy* for log fields belongs to phase 06
+    (``06-PII-102``) and ``apps.core.utils.sanitize`` is phase 08's file. This
+    view composes with ``sanitize_query_for_log`` and must not grow it.
     """
     if request.method != "POST":
         return JsonResponse(
@@ -177,5 +210,15 @@ def csp_report(request: HttpRequest) -> JsonResponse:
             },
             status=422,
         )
-    logger.info("CSP violation report: %s", report)
+    payload = report["csp-report"]
+    logger.info(
+        "CSP violation report: violated=%s effective=%s disposition=%s "
+        "blocked_uri=%s document_uri=%s sample=%s",
+        sanitize_query_for_log(payload.get("violated-directive")),
+        sanitize_query_for_log(payload.get("effective-directive")),
+        sanitize_query_for_log(payload.get("disposition")),
+        _host_and_path(payload.get("blocked-uri")),
+        _host_and_path(payload.get("document-uri")),
+        sanitize_query_for_log(payload.get("sample")),
+    )
     return JsonResponse({"status": "ok"})
