@@ -1,5 +1,5 @@
 """
-Ad image service — creation with SHA-256 hashing and user-scope deduplication.
+Ad image service — creation with SHA-256 hashing and per-ad deduplication.
 
 Extracted from ``AdImage.save()`` (QLT-012) so the model no longer performs
 file I/O or silently skips saves for duplicate uploads.

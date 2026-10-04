@@ -20,8 +20,10 @@ path — so this module deliberately never imports or calls it.
 The single-row delete takes a ``select_for_update()`` lock in ``order_by("pk")``
 order, the established row-lock shape in ``apps.moderation.admin_actions``.  A
 single-row delete needs a row lock, not a process-wide ``AdvisoryLockId``, so no
-new lock id is allocated (``CONSENT_RECORD_SWEEP = 14`` was taken by phase 06;
-the next free id is 15 and is not this block's to allocate).
+new lock id is allocated (``CONSENT_RECORD_SWEEP = 14`` was taken by phase 06,
+and when this block shipped the next free id was 15 — since then a later block
+allocated it, so the id sequence has moved on and is not this service's to
+manage).
 """
 
 from __future__ import annotations

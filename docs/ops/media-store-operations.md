@@ -88,8 +88,10 @@ bytes and answers "Storage is temporarily full. Please try again later."
 - **No Prometheus gauge ships.** `PROMETHEUS_MULTIPROC_DIR` is set only on the `web` service,
   so a gauge written from the bot-side path is structurally unexportable. Watch the disk and
   `staging/` size directly.
-- `staging/` is the **sole** suppression in the orphan sweep; its files are reclaimed by mtime
-  TTL (`_STAGING_TTL_SECONDS`, 2 h), which is also what bounds the promote-before-commit gap.
+- For the read-only `--check` sweep, `staging/` is the **sole** suppression; its files are
+  reclaimed by mtime TTL (`_STAGING_TTL_SECONDS`, 2 h), which is also what bounds the
+  promote-before-commit gap. The destructive orphan sweep excludes **two** directories:
+  `seed/` (via `_walk_media_files`, `include_seed=False`) and `staging/`.
 
 ### Stored bytes are re-encoded, and the store is mixed-quality by design
 
