@@ -34,6 +34,7 @@ from apps.core.schemas import BaseInputModel
 from apps.locations.models import City
 from apps.lookups.enums import LookupGroupCode
 from apps.lookups.models import LookupItem
+from apps.users.services.account_state import account_state_q
 
 logger = logging.getLogger(__name__)
 
@@ -175,8 +176,13 @@ class ListingsQuery:
         """Return the filtered, sorted, favorite-annotated queryset.
 
         Steps (order preserved from the original inline implementation):
-        1. Base: ``PUBLISHED`` + not consent-declined + null-safe category active
-           filter.
+        1. Base: ``PUBLISHED`` + account-state eligible + null-safe category
+           active filter. The account-state term is the shared
+           ``account_state_q("user__")`` declaration (06-PII-104), so a banned
+           seller's ads are hidden here exactly as they are on the alert path —
+           the *same* one predicate, not a second one (Q7 / 08-SRCH-008). A ban
+           is a moderation sanction: removing the inventory is part of it, and
+           this term must be read as ban enforcement, never as a consent fix.
         2. ``select_related`` / ``prefetch_related`` for efficient rendering.
         3. Category subtree filter (if ``category_slug`` resolves).
         4. City filter (if ``city_slug`` resolves).
@@ -188,7 +194,8 @@ class ListingsQuery:
         9. ``annotate_favorites``.
         """
         ads = (
-            Ad.objects.filter(status=AdStatus.PUBLISHED, user__is_declined=False)
+            Ad.objects.filter(status=AdStatus.PUBLISHED)
+            .filter(account_state_q("user__"))
             .filter(Q(category__isnull=True) | Q(category__is_active=True))
             .select_related("category", "city", "user")
             .prefetch_related("features", "user__trust_score", "images")

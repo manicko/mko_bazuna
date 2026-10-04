@@ -40,6 +40,7 @@ from apps.core.utils.rate_limit_response import rate_limited_response
 from apps.locations.models import City
 from apps.locations.services.city_suggestions import suggest_city
 from apps.media.services.filesystem import assert_storage_key_contained
+from apps.users.services.account_state import account_state_q
 
 logger = logging.getLogger(__name__)
 
@@ -80,10 +81,10 @@ def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
         ad = (
             Ad.objects.select_related("category", "city", "user")
             .prefetch_related("images", "features", "user__trust_score")
+            .filter(account_state_q("user__"))
             .get(
                 id=ad_id,
                 status=AdStatus.PUBLISHED,
-                user__is_declined=False,
             )
         )
     except Ad.DoesNotExist:
@@ -226,14 +227,17 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponseBase:
         response["Cache-Control"] = "no-store"
         return response
 
-    # Non-staff users: only serve images referenced by a PUBLISHED ad owned by a
-    # non-declined user. A shared seed key can be attached to several ads, so
+    # Non-staff users: only serve images referenced by a PUBLISHED ad owned by
+    # an account-state eligible user (the shared ``account_state_q`` declaration,
+    # 06-PII-104 / Q7). A shared seed key can be attached to several ads, so
     # check existence across all of them rather than the status of a single
-    # (arbitrary) row.
+    # (arbitrary) row. This hides a banned seller's images: a ban is a moderation
+    # sanction and the media gate is one of the four public surfaces it covers
+    # (08-SRCH-008).
     if not AdImage.objects.filter(
+        account_state_q("ad__user__"),
         key_q,
         ad__status=AdStatus.PUBLISHED,
-        ad__user__is_declined=False,
     ).exists():
         return HttpResponseForbidden(_("Access denied"))
 
