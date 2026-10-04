@@ -161,7 +161,10 @@ def telegram_deep_link(
     # not the bot username (which is base64-encoded in data-bot-encoded).
     class_attr = f"js-telegram-link {classes}".strip()
     encoded = base64.b64encode(get_bot_username().encode("utf-8")).decode("ascii")
-    target_attr = mark_safe(f' target="{target}"') if target else ""
+    # `# nosec B308,B703`: `target` is one of this module's own fixed attribute
+    # strings and `_JS_IIFE` is a module constant; neither carries user input.
+    # `format_html` escapes every interpolated value below (12-OPS-001).
+    target_attr = mark_safe(f' target="{target}"') if target else ""  # nosec B308, B703
 
     return cast(
         str,
@@ -173,7 +176,7 @@ def telegram_deep_link(
             class_attr,
             label,
             label,
-            mark_safe(_JS_IIFE),
+            mark_safe(_JS_IIFE),  # nosec B308, B703
         ),
     )
 

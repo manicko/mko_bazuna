@@ -146,19 +146,147 @@ def test_ci_deploy_check_sets_valid_secret_key() -> None:
 
 
 # ---------------------------------------------------------------------------
-# SAST scanning (bandit) — finding 12-OPS-008
+# SAST scanning (bandit) — finding 12-OPS-001
 # ---------------------------------------------------------------------------
-# The security job runs bandit SAST against src/backend and src/telegram_bot
-# to catch common Python security issues (hardcoded passwords, subprocess
-# usage, weak crypto, etc.). Test directories are excluded via the
-# [tool.bandit] ``exclude_dirs`` config; B101 (assert) and B105 (hardcoded
-# password string) are skipped because they are pre-existing and mitigated.
+# The security job runs bandit SAST. The step previously ran with
+# ``working-directory: src/backend`` and repo-relative scan roots, so bandit
+# resolved ``src/backend/src/backend`` and ``src/backend/pyproject.toml`` — both
+# absent — and aborted with exit 2, scanning zero files. The guard below is a
+# contract, not a substring check: it parses the SAST step, proves the configured
+# config path and scan roots exist from the step's working directory, and runs
+# bandit to assert a non-zero scanned-file count. Test trees are excluded via
+# the [tool.bandit] ``exclude_dirs`` config.
+
+# The step's name in ci.yml, used to locate it in the parsed document.
+_SAST_STEP_NAME = "Run SAST (bandit)"
+
+# Minimum number of source files a correct scan must touch. The repository has
+# ~357 production Python files; a path-relativity regression collapses this to
+# zero, so any non-zero floor catches it. The floor is deliberately well below
+# the real count so ordinary file churn never trips it.
+_MIN_SCANNED_FILES = 250
+
+
+def _sast_step() -> dict:
+    """Return the parsed SAST step mapping from ci.yml, proving it was found."""
+    from ruamel.yaml import YAML
+
+    content = _read(".github", "workflows", "ci.yml")
+    document = YAML(typ="safe").load(content)
+    assert isinstance(document, dict), "ci.yml must parse to a mapping"
+    jobs = document.get("jobs")
+    assert isinstance(jobs, dict), "ci.yml 'jobs' must be a mapping"
+    security = jobs.get("security")
+    assert isinstance(security, dict), "ci.yml has no 'security' job"
+    steps = security.get("steps")
+    assert isinstance(steps, list), "ci.yml 'security.steps' must be a list"
+    for step in steps:
+        if isinstance(step, dict) and step.get("name") == _SAST_STEP_NAME:
+            return step
+    raise AssertionError(f"ci.yml security job has no step named {_SAST_STEP_NAME!r}")
+
+
+def _scan_roots_and_config(run: str) -> tuple[list[str], str]:
+    """Parse ``-r <roots> -c <config>`` out of a bandit ``run`` command."""
+    tokens = run.split()
+    assert "-r" in tokens, f"bandit run must pass -r; got: {run!r}"
+    assert "-c" in tokens, f"bandit run must pass -c; got: {run!r}"
+    r_idx = tokens.index("-r")
+    c_idx = tokens.index("-c")
+    roots = tokens[r_idx + 1 : c_idx]
+    config = tokens[c_idx + 1]
+    return roots, config
 
 
 def test_ci_yml_has_sast_job() -> None:
-    """ci.yml references a SAST tool (bandit or semgrep)."""
-    content = _read(".github", "workflows", "ci.yml")
-    assert "bandit" in content or "semgrep" in content
+    """ci.yml defines a bandit SAST step with resolvable roots and config.
+
+    This replaced a bare ``assert "bandit" in content``, which could not tell a
+    working step from one that scanned nothing (project rule 2: production code
+    is king — the old assertion let a permanently-red, no-op gate ship).
+    """
+    step = _sast_step()
+    run = str(step.get("run", ""))
+    assert "bandit" in run, f"SAST step must invoke bandit; got: {run!r}"
+    working_dir = str(step.get("working-directory", "."))
+    roots, config = _scan_roots_and_config(run)
+
+    base = _PROJECT_ROOT if working_dir in (".", "./") else _PROJECT_ROOT / working_dir
+    # The config path must resolve from the step's working directory — this is
+    # exactly what broke: src/backend/pyproject.toml does not exist.
+    config_path = base / config
+    assert config_path.is_file(), (
+        f"bandit config {config!r} does not resolve to {config_path} from "
+        f"working-directory {working_dir!r}; bandit aborts with exit 2"
+    )
+    # Every scan root must resolve from the step's working directory.
+    for root in roots:
+        root_path = base / root
+        assert root_path.is_dir(), (
+            f"bandit scan root {root!r} does not resolve to {root_path} from "
+            f"working-directory {working_dir!r}; bandit aborts with exit 2"
+        )
+
+
+def test_sast_step_actually_scans_files() -> None:
+    """Run bandit as configured and assert a non-zero scanned-file count.
+
+    A guard that only checks paths can still pass a step that scans nothing. This
+    executes the configured command and reads bandit's own file metric, so a
+    future path-relativity regression (or an over-broad ``exclude_dirs``) fails
+    here instead of silently passing.
+    """
+    import json
+    import shutil
+    import subprocess
+    import tempfile
+
+    step = _sast_step()
+    run = str(step.get("run", ""))
+    working_dir = str(step.get("working-directory", "."))
+    roots, config = _scan_roots_and_config(run)
+    base = _PROJECT_ROOT if working_dir in (".", "./") else _PROJECT_ROOT / working_dir
+
+    bandit = shutil.which("bandit")
+    if bandit is None:
+        # `uv run bandit` is the CI form; resolve it through uv if present.
+        uv = shutil.which("uv")
+        assert uv is not None, (
+            "neither bandit nor uv is on PATH; the SAST contract cannot be checked"
+        )
+        argv = [uv, "run", "bandit"]
+    else:
+        argv = [bandit]
+
+    with tempfile.NamedTemporaryFile(suffix=".json", delete=False) as fh:
+        report_path = fh.name
+    try:
+        argv += ["-r", *roots, "-c", config, "-f", "json", "-o", report_path]
+        result = subprocess.run(
+            argv,
+            cwd=base,
+            capture_output=True,
+            text=True,
+            timeout=600,
+            check=False,
+        )
+        assert result.returncode in (0, 1), (
+            f"bandit must exit 0 (clean) or 1 (findings), never 2 (abort): "
+            f"got {result.returncode}\n{result.stderr[-2000:]}"
+        )
+        with open(report_path, encoding="utf-8") as report:
+            payload = json.load(report)
+    finally:
+        import os
+
+        os.unlink(report_path)
+
+    metrics = payload.get("metrics", {})
+    scanned = len([key for key in metrics if key != "_totals"])
+    assert scanned >= _MIN_SCANNED_FILES, (
+        f"bandit scanned only {scanned} files (expected >= {_MIN_SCANNED_FILES}); "
+        f"the scan roots or exclude_dirs no longer cover the repository"
+    )
 
 
 def test_bandit_in_dev_deps() -> None:

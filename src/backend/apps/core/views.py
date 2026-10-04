@@ -140,7 +140,10 @@ def readiness_check(request: HttpRequest) -> JsonResponse:
         try:
             marker_ts = cache.get("bot:liveness")
         except Exception:
-            pass
+            # A cache read failure must not crash readiness; it degrades to the
+            # "stale" branch below (marker_ts stays None). Log it so the failure
+            # is observable rather than silently swallowed (12-OPS-001).
+            logger.debug("bot liveness cache read failed", exc_info=True)
 
         if marker_ts is None:
             checks["bot"] = "stale"

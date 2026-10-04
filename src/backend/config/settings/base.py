@@ -549,7 +549,11 @@ BOT_USERNAME = env("BOT_USERNAME", default="")
 # File-based liveness marker path for the bot container healthcheck.
 # Written on startup, touched on each inbound update, removed on shutdown.
 # See src/telegram_bot/lifecycle.py and docker/healthcheck-bot.sh (ENT-005).
-BOT_LIVENESS_FILE = env("BOT_LIVENESS_FILE", default="/tmp/mko_bazuna_bot_alive")
+# `# nosec B108`: this is a fixed private filename inside the container's tmpfs,
+# not a predictable-name temp file with an untrusted writer. The path is read by
+# docker/healthcheck-bot.sh, which ships the same `/tmp/...` default, so it must
+# not change here (12-OPS-001).
+BOT_LIVENESS_FILE = env("BOT_LIVENESS_FILE", default="/tmp/mko_bazuna_bot_alive")  # nosec B108
 
 # Redis-based bot liveness marker (shared cache key written by the bot process).
 # The web readiness probe reads this key to verify the bot is alive and fresh.
@@ -569,8 +573,9 @@ BOT_HEALTH_CHECK_ENABLED = env.bool("BOT_HEALTH_CHECK_ENABLED", default=False)
 # File-based liveness marker path for the scheduler container healthcheck.
 # Written after each successful hourly cycle, touched on each tick.
 # Read by docker/healthcheck-scheduler.sh (added in Block D).
-SCHEDULER_LIVENESS_FILE = env("SCHEDULER_LIVENESS_FILE",
-   default="/tmp/mko_bazuna_scheduler_alive")
+# `# nosec B108`: fixed private filename in tmpfs, not a predictable temp file;
+# docker/healthcheck-scheduler.sh ships the same default (12-OPS-001).
+SCHEDULER_LIVENESS_FILE = env("SCHEDULER_LIVENESS_FILE", default="/tmp/mko_bazuna_scheduler_alive")  # nosec B108
 
 # Per-command timeout (seconds) for the scheduler subprocess dispatch. Guards
 # against a hung management command stalling the whole cycle (ENT-001).

@@ -33,7 +33,11 @@ validation is satisfied.
 
 import logging
 import os
-import subprocess
+
+# `# nosec B404`: subprocess runs manage.py child processes built from a fixed
+# argv tuple of internal command names; shell=False and no external input
+# (12-OPS-001).
+import subprocess  # nosec B404
 import sys
 from pathlib import Path
 
@@ -91,7 +95,7 @@ def main() -> int:
             cmd = [sys.executable, str(manage_py), *argv]
             logger.info("Running %s", " ".join(cmd))
             try:
-                result = subprocess.run(cmd, check=False, timeout=command_timeout)
+                result = subprocess.run(cmd, check=False, timeout=command_timeout)  # nosec B603
             except subprocess.TimeoutExpired:
                 logger.error(
                     "manage.py %s timed out after %s seconds",

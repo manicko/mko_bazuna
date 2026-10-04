@@ -369,9 +369,15 @@ jobs:
           ./gitleaks detect --source . --exit-code 1 --report-format sarif --report-path gitleaks-results.sarif
 
       # --- SAST (static application security testing) ---
+      # Runs from the repository root: pyproject.toml (the only bandit config in
+      # the repo) and the scan roots are repo-relative. `working-directory:
+      # src/backend` resolved the roots to src/backend/src/backend (absent) and
+      # the config to src/backend/pyproject.toml (absent), so bandit aborted with
+      # exit 2 and scanned nothing (12-OPS-001). Test trees are excluded via
+      # [tool.bandit] exclude_dirs so the scan reports production code only.
       - name: Run SAST (bandit)
         run: uv run bandit -r src/backend src/telegram_bot -c pyproject.toml
-        working-directory: src/backend
+        working-directory: .
 
       # --- SARIF uploads (runs even if scans find issues) ---
       - name: Upload Trivy SARIF results

@@ -27,7 +27,10 @@ State machine per key:
 from __future__ import annotations
 
 import logging
-import pickle
+
+# `# nosec B403`: pickle round-trips values this process itself wrote to the
+# cache; no untrusted serialized data is ever loaded (12-OPS-001).
+import pickle  # nosec B403
 import time
 from collections.abc import Callable
 from typing import Any, Final

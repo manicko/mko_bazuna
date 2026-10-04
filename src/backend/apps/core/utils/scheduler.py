@@ -44,7 +44,10 @@ from __future__ import annotations
 import logging
 import os
 import signal
-import subprocess
+
+# `# nosec B404`: subprocess dispatches manage.py child processes by a fixed
+# command name; shell=False and no external input (12-OPS-001).
+import subprocess  # nosec B404
 import sys
 import threading
 from collections.abc import Callable
@@ -204,7 +207,7 @@ def _run_command_subprocess(name: str, manage_py: Path, python_executable: str) 
     cmd = [python_executable, str(manage_py), name]
     logger.info("Running management command: %s", name)
     try:
-        result = subprocess.run(cmd, check=False, timeout=timeout)
+        result = subprocess.run(cmd, check=False, timeout=timeout)  # nosec B603
     except subprocess.TimeoutExpired:
         logger.error("Command %s timed out after %s seconds", name, timeout)
         return 1

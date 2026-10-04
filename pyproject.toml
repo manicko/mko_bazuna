@@ -228,7 +228,28 @@ dev = [
 ]
 
 [tool.bandit]
-exclude_dirs = ["src/backend/apps/**/tests", "src/backend/tests", "docs"]
+# Test trees only — never a production directory. The patterns match FILES, not
+# directories: bandit matches each walked path with fnmatch.fnmatch(path, glob),
+# so a directory-shaped glob like `src/backend/apps/**/tests` (the previous form)
+# never matches `.../tests/test_x.py`. `**` also collapses to `*` under fnmatch
+# (it is not recursive), which is why the old pattern missed every nested tests/
+# directory. These four globs cover every test tree in the repository:
+#   src/backend/apps/*/tests/*        — per-app test packages (~14 apps)
+#   src/backend/config/settings/tests/* — settings-import tests (was missed)
+#   src/backend/tests/*                — top-level backend tests
+#   src/telegram_bot/tests/*           — bot tests (was missed)
+exclude_dirs = [
+    "src/backend/apps/*/tests/*",
+    "src/backend/config/settings/tests/*",
+    "src/backend/tests/*",
+    "src/telegram_bot/tests/*",
+]
+# Retained skips, each with a written per-class decision:
+#   B101 (assert_used) — `assert` is the pytest contract; the application is
+#     never run under `python -O`, so asserts are always live.
+#   B105 (hardcoded_password_string) — false-positive class: it fires on
+#     non-secret string literals (field names, sentinel values) with no
+#     credential content.
 skips = ["B101", "B105"]
 level = "low"
 

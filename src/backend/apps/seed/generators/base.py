@@ -38,7 +38,7 @@ class BaseGenerator:
         # sequences regardless of execution order or interleaving with other
         # generators. We intentionally do NOT seed the global ``random`` module,
         # as that would cause cross-generator interference.
-        self._rng = random.Random(config.get("faker_seed", 42))
+        self._rng = random.Random(config.get("faker_seed", 42))  # nosec B311
 
     def _random_choice(
         self,

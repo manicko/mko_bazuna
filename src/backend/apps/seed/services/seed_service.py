@@ -119,7 +119,7 @@ class SeedService:
                 # category-resolved feature set (F5). Uses a seeded RNG for
                 # deterministic, reproducible re-seeds.
                 t_start = time.time()
-                feature_rng = random.Random(self.config.get("faker_seed", 42) + 300)
+                feature_rng = random.Random(self.config.get("faker_seed", 42) + 300)  # nosec B311
                 feature_count = 0
                 for ad in db_ads:
                     if ad.category is None:
@@ -142,7 +142,7 @@ class SeedService:
                 # Categories without resolved conditions get condition=NULL.
                 # Uses a seeded RNG for deterministic, reproducible re-seeds.
                 t_start = time.time()
-                condition_rng = random.Random(self.config.get("faker_seed", 42) + 400)
+                condition_rng = random.Random(self.config.get("faker_seed", 42) + 400)  # nosec B311
                 condition_count = 0
                 for ad in db_ads:
                     if ad.category is None:
@@ -365,7 +365,7 @@ class SeedService:
             ):
                 written += 1
 
-        rng = random.Random(self.config.get("faker_seed", 42) + 200)
+        rng = random.Random(self.config.get("faker_seed", 42) + 200)  # nosec B311
         # Exclude config queries so they are not upserted twice. The key must
         # be derived the same way as the upsert above (06-PII-108).
         existing: set[str] = {

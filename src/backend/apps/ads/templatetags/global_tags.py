@@ -30,4 +30,7 @@ def component_tag(feature) -> SafeString:
         "components/feature_tag.html",
         {"feature": feature},
     )
-    return SafeString(html)
+    # `# nosec B703`: the rendered template interpolates only the feature's
+    # display name (escaped by Django's template engine); no user-supplied HTML
+    # reaches this string (12-OPS-001).
+    return SafeString(html)  # nosec B703

@@ -198,6 +198,19 @@ RETURNING_COLUMNS: Final[tuple[str, ...]] = (
     "browser_binding",
 )
 
+# Atomic single-winner claim of a login token. Only the fixed RETURNING_COLUMNS
+# module constant is interpolated; every value is bound with `%s` placeholders,
+# so no user input reaches the SQL text.
+_CLAIM_TOKEN_QUERY: Final[str] = (
+    "UPDATE login_tokens "  # nosec B608
+    "SET telegram_id = %s "
+    "WHERE token_hash = %s "
+    "AND telegram_id IS NULL "
+    "AND consumed_at IS NULL "
+    "AND expires_at > %s "
+    "RETURNING " + ", ".join(RETURNING_COLUMNS)
+)
+
 
 class ConsumeOutcome(StrEnum):
     """Outcome of a web-side token consume, used to map to an HTTP status."""
@@ -367,15 +380,7 @@ def claim_token(
     """
     with connection.cursor() as cursor:
         cursor.execute(
-            """
-            UPDATE login_tokens
-               SET telegram_id = %s
-             WHERE token_hash = %s
-               AND telegram_id IS NULL
-               AND consumed_at IS NULL
-               AND expires_at > %s
-            RETURNING """
-            + ", ".join(RETURNING_COLUMNS),
+            _CLAIM_TOKEN_QUERY,
             [telegram_id, token_hash, now],
         )
         row = cursor.fetchone()
