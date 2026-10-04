@@ -18,10 +18,12 @@ value, and keep two controls:
   deliberate: the getter is the seam that ``get_site_name`` /
   ``get_bot_username`` call, so a patch there exercises the highest layer of the
   read path while leaving every other cache consumer untouched. It is a choice,
-  not a constraint — each of the seven rate-limit guards does its own
-  ``from django.core.cache import cache``, so patching
-  ``apps.core.utils.cache.cache`` rebinds only that one module's global and
-  cannot reach them either.
+  not a constraint — patching ``apps.core.utils.cache.cache`` would now reach the
+  seven rate-limit guards too, because BLOCK 2 routed all of them through
+  ``apps.core.utils.cache.bump_rate_limit_window``, which reads that shared
+  proxy. At the time of 09-VAL-007 each guard did its own
+  ``from django.core.cache import cache``, so patching that one name rebinding
+  only its own module's global was accurate; it is no longer.
 """
 
 from __future__ import annotations

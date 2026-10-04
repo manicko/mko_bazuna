@@ -7,7 +7,7 @@ from __future__ import annotations
 from unittest.mock import MagicMock, patch
 
 import pytest
-from django.core.cache import cache
+from django.core.cache import DEFAULT_CACHE_ALIAS, cache, caches
 from django.http import HttpRequest
 from django.test import Client
 from django.urls import reverse
@@ -56,22 +56,16 @@ class TestDeepLinkRenderRateLimit:
     def test_fails_open_on_cache_outage(self) -> None:
         """A cache outage allows the render instead of raising.
 
-        The failing cache is applied at the guard module's own ``cache`` name
-        while it exists, and at ``apps.core.utils.cache.cache`` once the guard
-        delegates to the shared helper — so this single test is genuinely RED
-        before the fail-open change and GREEN after it.
+        The seam is the shared cache backend, not a module-level ``cache`` name.
+        ``django.core.cache.cache`` is a single proxy over one backend, so every
+        guard module's ``cache`` global is the same object; patching the backend
+        is invariant to which module holds a reference and cannot be neutralised
+        by a guard gaining, losing or duplicating a ``cache`` import.
         """
-        import apps.core.services.contact_rate_limit as guard_module
+        outage = MagicMock()
+        outage.add.side_effect = ConnectionInterrupted(None)
 
-        mock_cache = MagicMock()
-        mock_cache.add.side_effect = ConnectionInterrupted(None)
-
-        target = (
-            patch.object(guard_module, "cache", mock_cache)
-            if hasattr(guard_module, "cache")
-            else patch("apps.core.utils.cache.cache", mock_cache)
-        )
-        with target:
+        with patch.object(caches[DEFAULT_CACHE_ALIAS], "add", outage.add):
             assert check_deep_link_render_rate_limit(_make_request()) is True
 
     def test_untrusted_peer_ignores_x_forwarded_for(self) -> None:

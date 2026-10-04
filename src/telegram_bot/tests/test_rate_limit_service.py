@@ -13,10 +13,9 @@ from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
-from django.core.cache import cache
+from django.core.cache import DEFAULT_CACHE_ALIAS, cache, caches
 from django_redis.exceptions import ConnectionInterrupted
 
-import telegram_bot.services.rate_limit as bot_rate_limit
 from telegram_bot.services.rate_limit import (
     check_contact_start_rate_limit,
     check_support_message_rate_limit,
@@ -76,6 +75,7 @@ class TestSupportMessageRateLimit:
         """First 5 support messages within the window are allowed."""
         for _ in range(5):
             assert await check_support_message_rate_limit(222) is True
+
     @pytest.mark.asyncio
     async def test_blocks_after_threshold(self) -> None:
         """6th support message within the window is rate-limited."""
@@ -127,14 +127,13 @@ def test_rate_limit_functions_are_async_callable() -> None:
 class TestBotGuardsFailOpenOnCacheOutage:
     """Each bot guard allows the request when the shared cache is unreachable.
 
-    The failing cache is applied at the guard module's ``cache`` name when the
-    module still holds one (today), and at ``apps.core.utils.cache.cache`` — the
-    seam the shared helper reads — once the guard delegates and the module no
-    longer imports ``cache``. Resolving the seam this way keeps ONE test that is
-    genuinely RED before the fail-open change and GREEN after it; a test pinned
-    to the guard module's own name would raise ``AttributeError`` after the fix,
-    and one pinned only to ``apps.core.utils.cache.cache`` would pass vacuously
-    before it. The failing-cache shape is the same ``MagicMock`` as
+    The failing cache is applied at the shared cache **backend** seam
+    (``caches[DEFAULT_CACHE_ALIAS]``), never at a module-level ``cache`` name.
+    ``django.core.cache.cache`` is a single ``DefaultCacheProxy`` over one
+    backend, so every guard module's ``cache`` global is the same object;
+    patching the backend is invariant to which module holds a reference and
+    cannot be neutralised by a guard gaining, losing or duplicating a ``cache``
+    import. The failing-cache shape is the same ``MagicMock`` as
     ``src/telegram_bot/tests/test_update_id_dedup.py::test_redis_unavailable_fail_open``.
     """
 
@@ -158,9 +157,11 @@ class TestBotGuardsFailOpenOnCacheOutage:
 
 
 def _cache_outage() -> Any:
-    """Patch the cache the bot guards read through to raise on ``add``."""
-    mock_cache = MagicMock()
-    mock_cache.add.side_effect = ConnectionInterrupted(None)
-    if hasattr(bot_rate_limit, "cache"):
-        return patch.object(bot_rate_limit, "cache", mock_cache)
-    return patch("apps.core.utils.cache.cache", mock_cache)
+    """Patch the shared cache backend so ``add`` raises.
+
+    ``caches[DEFAULT_CACHE_ALIAS]`` is the one backend every guard reaches
+    through, so the patch lands on the object the guard actually calls.
+    """
+    outage = MagicMock()
+    outage.add.side_effect = ConnectionInterrupted(None)
+    return patch.object(caches[DEFAULT_CACHE_ALIAS], "add", outage.add)
