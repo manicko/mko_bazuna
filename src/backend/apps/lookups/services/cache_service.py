@@ -23,6 +23,7 @@ from typing import TYPE_CHECKING
 
 from django.core.cache import cache
 
+from apps.core.utils.cache import bump_version_key
 from apps.core.utils.swr_cache import get_with_stale_revalidate
 
 if TYPE_CHECKING:
@@ -67,16 +68,12 @@ def get_lookup_version() -> int:
 def bump_lookup_version() -> None:
     """Increment the lookup content version to invalidate cached entries.
 
-    Uses ``cache.incr`` (atomic on Redis, thread-safe on LocMemCache);
-    falls back to ``cache.set`` when the key does not exist yet.
-
-    Mirrors ``bump_tree_version`` in ``apps/categories/cache.py``.
+    Delegates to :func:`apps.core.utils.cache.bump_version_key`, which owns the
+    durability contract: the version key is written with ``timeout=None`` so it
+    outlives the lookup entries it retires.
     """
-    try:
-        cache.incr(LOOKUP_CONTENT_VERSION_KEY)
-    except ValueError:
-        cache.set(LOOKUP_CONTENT_VERSION_KEY, 1)
-        logger.debug("Initialized lookup content version to 1")
+    bump_version_key(LOOKUP_CONTENT_VERSION_KEY)
+    logger.debug("Bumped lookup content version")
 
 
 def all_groups_key() -> str:

@@ -14,6 +14,8 @@ import logging
 
 from django.core.cache import cache
 
+from apps.core.utils.cache import bump_version_key
+
 logger = logging.getLogger(__name__)
 
 # Cache key tracking the current category tree version (bumped on structural
@@ -35,11 +37,11 @@ def get_tree_version() -> int:
 def bump_tree_version() -> None:
     """Increment the category tree version to invalidate submenu fragments.
 
-    Uses ``cache.incr`` (atomic on Redis); falls back to a plain set when the
-    key does not exist yet (e.g. first change in a fresh backend).
+    Delegates to :func:`apps.core.utils.cache.bump_version_key`, which owns the
+    durability contract: the version key is written with ``timeout=None`` so it
+    outlives the submenu fragments it retires. A bounded TTL would let the
+    counter self-evict and re-issue ``1``, making a retired fragment key
+    reachable again with stale content.
     """
-    try:
-        cache.incr(TREE_VERSION_KEY)
-    except ValueError:
-        cache.set(TREE_VERSION_KEY, 1)
-        logger.debug("Initialized category tree version to 1")
+    bump_version_key(TREE_VERSION_KEY)
+    logger.debug("Bumped category tree version")

@@ -4,8 +4,9 @@ Django cache utilities for Mko Bazuna.
 Holds the project's call-shaped cache helpers: five getter/setter/invalidate
 triads (moderation criteria, site config, bot username, support contacts,
 anonymous language) plus :func:`cache_get_or_none`, the shared cache-read
-primitive, and :func:`bump_rate_limit_window`, the shared
-:func:`cache_get_or_none` sibling that guards a rate-limit window write.
+primitive, :func:`bump_rate_limit_window`, the shared
+:func:`cache_get_or_none` sibling that guards a rate-limit window write, and
+:func:`bump_version_key`, the shared durable cache-version counter write.
 
 Cache-failure policy (declared here, once). A request-path cache **read** must
 never raise into a request path: a cache outage degrades to "no cached value",
@@ -19,6 +20,13 @@ the key and reports "allowed". Other cache writes still raise; the caller that
 owns the value decides whether to guard them (see
 ``apps.core.services.site_config``), because the correct recovery differs per
 caller.
+
+Cache-version-key policy (declared here, once). A cache-version key is a
+**durability** mechanism, not a cache entry: it must outlive every entry that
+embeds it, so it is written with ``timeout=None``. Route every version-counter
+write through :func:`bump_version_key`, which owns the ``timeout=None``
+invariant and returns the new value so a caller cannot accidentally pass a TTL.
+See ``docs/architecture/cache-strategy.md``.
 """
 
 import logging
@@ -80,6 +88,44 @@ def bump_rate_limit_window(key: str, limit: int, period: int) -> bool:
         cache.set(key, 1, timeout=period)
         return True
     return current <= limit
+
+
+def bump_version_key(key: str) -> int:
+    """Increment a durable monotonic cache-version key and return the new value.
+
+    A version key is a correctness mechanism, not a cache entry: every entry
+    that embeds it (e.g. ``search:v1:{version}:...``) is retired by changing
+    the embedded segment, so the counter must **outlive** those entries. It is
+    therefore written with ``timeout=None`` and never expires. A bounded TTL
+    makes the counter self-evict, the next bump re-issue ``1``, and an old key
+    become byte-identical to a new one — silently resurrecting a stale entry.
+
+    The helper owns the ``timeout=None`` invariant, so no caller can pass a
+    TTL. Assumption: the shared Redis backend runs ``noeviction`` (no
+    ``maxmemory`` / ``maxmemory-policy`` is configured in any compose file), so
+    a TTL-less integer key is retained and not evicted under memory pressure.
+
+    Uses ``cache.incr`` (atomic on Redis, thread-safe on LocMemCache); on a
+    missing key (``ValueError`` — a fresh backend, or a legacy evictable key
+    that expired) it seeds the counter at ``1`` with ``timeout=None``.
+
+    Args:
+        key: The already-derived version key (the caller owns the key format).
+
+    Returns:
+        The new counter value.
+
+    Raises:
+        ``ConnectionInterrupted`` / ``redis.RedisError`` — a version bump is not
+        fail-open: the caller (a signal receiver or an invalidation path)
+        decides whether to guard it, because a missed bump is a correctness
+        failure, not a degraded read.
+    """
+    try:
+        return int(cache.incr(key))
+    except ValueError:
+        cache.set(key, 1, timeout=None)
+        return 1
 
 
 def get_cached_criteria(key: str = CRITERIA_CACHE_KEY) -> dict | None:

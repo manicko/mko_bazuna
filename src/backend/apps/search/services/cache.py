@@ -30,6 +30,7 @@ from django.core.cache import cache
 
 from apps.ads.services.listings_query import ListingsQueryParams
 from apps.core.enums import LanguageLocale
+from apps.core.utils.cache import bump_version_key
 from apps.core.utils.swr_cache import get_with_stale_revalidate
 
 logger = logging.getLogger(__name__)
@@ -84,16 +85,14 @@ def get_search_version() -> int:
 def bump_search_version() -> None:
     """Increment the search content version to invalidate cached search results.
 
-    Uses ``cache.incr`` (atomic on Redis, thread-safe on LocMemCache); falls
-    back to a plain ``cache.set`` when the key does not exist yet.
-
-    Mirrors the ``bump_tree_version`` pattern from ``apps.categories.cache``.
+    Delegates to :func:`apps.core.utils.cache.bump_version_key`, which owns the
+    durability contract: a version key is written with ``timeout=None`` so it
+    outlives every search cache entry it retires. Treating it as a cache entry
+    (a bounded TTL) would let the counter self-evict and re-issue ``1``,
+    resurrecting a stale result set.
     """
-    try:
-        cache.incr(SEARCH_CONTENT_VERSION_KEY)
-    except ValueError:
-        cache.set(SEARCH_CONTENT_VERSION_KEY, 1)
-        logger.debug("Initialized search content version to 1")
+    bump_version_key(SEARCH_CONTENT_VERSION_KEY)
+    logger.debug("Bumped search content version")
 
 
 def build_search_cache_key(

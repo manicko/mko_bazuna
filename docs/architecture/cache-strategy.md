@@ -42,13 +42,17 @@ All cache keys follow the format:
   (e.g. `search`, `category`, `lookup`).
 - **`v<N>`** — version segment immediately after the namespace. Bumped via
   `cache.incr` (atomic on Redis, thread-safe on LocMemCache) with a fallback
-  to `cache.set` when the key does not yet exist.
+  to `cache.set` when the key does not yet exist. The bump is performed by
+  `apps/core/utils/cache.py:bump_version_key()`, and the version key itself is
+  written with `timeout=None` (see [Version-Bump Mechanism](#version-bump-mechanism)).
 - **`<segments...>`** — the remaining key components: version counters, locale,
   hashed query/fILTER data, slugs, IDs, etc.
 
 The version segment is **never** a prefix-wipe trigger for hot-path caches.
 Instead, incrementing the version changes the key itself, making old entries
-unreachable. They expire via TTL in the background.
+unreachable. Those retired **entries** expire via TTL in the background — but
+the **version key** that retires them does not: it is written with
+`timeout=None` so it outlives every entry that embeds it.
 
 ## Invalidation Strategy Decision Matrix
 
@@ -126,30 +130,65 @@ query/content hashes:
 
 ## Version-Bump Mechanism
 
-Version-bump invalidation uses `cache.incr` with a `ValueError` fallback to
-`cache.set`:
+Version-bump invalidation increments a **durable** version counter embedded in
+every key of the namespace. All writers route through the single shared helper
+`apps/core/utils/cache.py:bump_version_key(key)`, which owns the contract:
 
 ```python
 try:
-    cache.incr(VERSION_KEY)
+    return int(cache.incr(VERSION_KEY))
 except ValueError:
-    cache.set(VERSION_KEY, 1)
+    cache.set(VERSION_KEY, 1, timeout=None)
+    return 1
 ```
+
+**A version key is durable, not a cache entry.** It is a correctness mechanism:
+the counter is embedded in every key it retires, so it must **outlive** every
+entry that depends on it. The invariant is `timeout=None` — a version key is
+never written with a TTL. The helper is the only writer, so no call site can
+accidentally pass a bounded timeout.
+
+Why the invariant is load-bearing: the entries a counter retires are written by
+the SWR helper with `timeout = ttl + stale_ttl` (search: `300 + 60 = 360` s). If
+the counter itself carried the default 300 s TTL it would self-evict **before**
+those entries; the next bump would then re-issue `1` and a key built after the
+reset would be **byte-identical** to one built an hour earlier — silently
+resurrecting a stale result set under an "already visited" key. A durable
+counter never resets to `1`, so a retired key can never become reachable again.
+
+**Precondition: Redis runs `noeviction`.** No `maxmemory` / `maxmemory-policy`
+is configured in any compose file, so Redis never evicts a key to reclaim
+memory. That is what makes `timeout=None` safe: a TTL-less integer key is
+retained. If the deployment ever raises `maxmemory` with an eviction policy,
+this contract must be revisited — the four version keys are tiny, but an
+evictable version key reintroduces the reset-to-`1` defect.
 
 - **`cache.incr` is atomic on Redis** (production) — true cross-process
   increment with no race window.
 - **`cache.incr` is thread-safe on LocMemCache** (dev/test) — Django's
   LocMemCache acquires a per-key lock around the increment operation.
 - The `ValueError` fallback handles the first increment when the key does not
-  yet exist (Redis `INCR` returns `NOTINT` which Django surfaces as `ValueError`).
+  yet exist (Redis `INCR` returns `NOTINT` which Django surfaces as `ValueError`),
+  **and** a legacy evictable key that expired. Both reseed with `timeout=None`.
 
 This mechanism **does not depend on `delete_pattern`** and works on both cache
-backends. It is the pattern used by:
+backends. It is the pattern used by all four version keys:
 
 - `apps/search/services/cache.py` — `bump_search_version()` /
-  `get_search_version()` (content version)
+  `get_search_version()` (`search:content_version`)
 - `apps/categories/cache.py` — `bump_tree_version()` / `get_tree_version()`
-  (tree structure version)
+  (`category:tree_version`)
+- `apps/lookups/services/cache_service.py` — `bump_lookup_version()` /
+  `get_lookup_version()` (`lookup:content_version`)
+- `apps/categories/services/lookup_resolution.py` —
+  `bump_lookup_resolve_version()` / `get_lookup_resolve_version()`
+  (`lookup:resolve_version`)
+
+`apps/search/services/category_fuzzy.py:get_active_category_names()` builds
+`category:fuzzy_names:{get_tree_version()}:{locale}` and therefore **inherits**
+`category:tree_version` without owning it: once the counter is durable it can
+never reset to `1`, so a retired fuzzy-name list can never become byte-identical
+to a live one.
 
 ## Pattern-Based Invalidation (`invalidate_by_prefix`)
 
@@ -176,7 +215,8 @@ isolation instead.
 | Module | `apps/search/services/cache.py` |
 | Key format | `search:v1:{content_version}:{locale}:{query_hash}:{filters_hash}` |
 | Version key | `search:content_version` |
-| Bump function | `bump_search_version()` (calls `bump_search_version`) |
+| Bump function | `bump_search_version()` (delegates to `bump_version_key()`; `bump_search_cache_version()` is the public alias) |
+| Version key write | durable — `bump_version_key()` writes `timeout=None` |
 | Read function | `get_search_version()` |
 | SWR wrapper | `get_cached_search_ids()` → `get_with_stale_revalidate()` |
 | `ttl` | 300 s (`SEARCH_CACHE_TTL`) |
@@ -206,6 +246,7 @@ isolation instead.
 | Key format | `category:submenu:{tree_version}:{slug}:{locale}` |
 | Version key | `category:tree_version` |
 | Bump function | `bump_tree_version()` (`apps/categories/cache.py`) |
+| Version key write | durable — `bump_version_key()` writes `timeout=None` (inherited by `category_fuzzy` name list) |
 | Read function | `get_tree_version()` (`apps/categories/cache.py`) |
 | SWR wrapper | `get_with_stale_revalidate()` |
 | `ttl` | 300 s (`SUBMENU_CACHE_TTL`) |
@@ -238,6 +279,7 @@ invalidation uses version-bump (``cache.incr``) — no prefix wipe.
 | Key format | `lookup:v1:{content_version}:all_groups`, `lookup:v1:{content_version}:items:{group_code}` |
 | Version key | `lookup:content_version` |
 | Bump function | `bump_lookup_version()` |
+| Version key write | durable — `bump_version_key()` writes `timeout=None` |
 | Read function | `get_lookup_version()` |
 | SWR wrapper | `get_with_stale_revalidate()` |
 | `ttl` | 3600 s |
@@ -259,6 +301,7 @@ LOOKUP_CONTENT_VERSION_KEY = "lookup:content_version"
 | Key format | `lookup:v1:resolve:{content_version}:{segment}:{category_id}` where `segment` ∈ `purposes`, `features`, `conditions` |
 | Version key | `lookup:resolve_version` |
 | Bump function | `bump_lookup_resolve_version()` |
+| Version key write | durable — `bump_version_key()` writes `timeout=None` |
 | Read function | `get_lookup_resolve_version()` |
 | SWR wrapper | `get_with_stale_revalidate()` |
 | `ttl` | 300 s |
