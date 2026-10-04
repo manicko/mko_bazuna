@@ -134,7 +134,7 @@ mechanisms, so a defect whose mechanism is not named here still lands by the con
 
 - Findings path: `.ai/audit/08-search-fts/findings.md`
 - Template: `.ai/audit/templates/audit-findings.md` — front matter, summary, findings, distribution, cross-finding analysis, roadmap, rollout safety, appendices
-- Finding-ID prefix: `SRH-`
+- Finding-ID prefix: `SRCH-` — **not** `SRH-`. The executed phase-08 cycle uses `SRCH-` (unambiguous, e.g. `SRCH-015`). `SRH-` is a *different*, unrelated in-code convention that already appears hard-coded in the shipped source (e.g. `SRH-001` … `SRH-007` in `srch` comments and docstrings); **no automation may grep `SRH-` in this repository** (08-VAL-005). The legacy in-source `SRH-` marker sweep is reserved to phase 03 and is not phase 08's to start.
 - Incremental append, ≤100 lines per pass
 - `problems-only: true` — findings only, omit passing checks; every finding needs runtime evidence and the exact consequence; empty state, exactly: `No problems found in this phase.`
 - A shipped test asserting current behaviour is a remediation blocker, not a gate

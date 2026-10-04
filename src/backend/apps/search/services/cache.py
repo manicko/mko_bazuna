@@ -148,8 +148,13 @@ def get_cached_search_ids(
 
     States and return values:
 
-    - **Fresh/stale cache hit**: return cached IDs (stale value is refreshed
-      in the background by the single-flight winner).
+    - **Fresh/stale cache hit**: return cached IDs. A *stale* hit is served
+      immediately to every caller; the single-flight winner then recomputes
+      ``producer()`` **synchronously** via
+      ``swr_cache._recompute_and_store`` and **blocks its own response** while
+      the losers return the stale value at once. There is no background worker
+      in this deployment, so a caller on the winning path must budget the
+      inline recompute; only the losing path is non-blocking (08-SRCH-014).
     - **Cold miss (winner)**: run *producer*, cache the result, return IDs.
     - **Cold miss (loser, lock held by another worker)**: return ``None``
       so the caller can fall back to a direct FTS query.
