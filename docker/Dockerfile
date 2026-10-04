@@ -149,6 +149,10 @@ RUN chmod +x /app/docker/healthcheck-bot.sh
 COPY --chown=app:app docker/healthcheck-scheduler.sh /app/docker/
 RUN chmod +x /app/docker/healthcheck-scheduler.sh
 
+# Copy backup healthcheck script
+COPY --chown=app:app docker/healthcheck-backup.sh /app/docker/
+RUN chmod +x /app/docker/healthcheck-backup.sh
+
 # Activate venv for all subsequent RUN/ENTRYPOINT
 ENV PATH="/opt/venv/bin:${PATH}"
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv

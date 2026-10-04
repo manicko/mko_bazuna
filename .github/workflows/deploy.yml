@@ -76,11 +76,15 @@ jobs:
             PREVIOUS_IMAGE_TAG=$(docker compose images --format '{{.Tag}}' web | head -1)
             echo "Previous image tag: ${PREVIOUS_IMAGE_TAG:-none}"
 
-            # a. Create a timestamped database backup (pre-deploy safety net)
+            # a. Create a timestamped database backup (pre-deploy safety net).
+            # The filename follows the ONE dump convention (dump_<timestamp>.dump,
+            # 12-OPS-021): the compose backup loop, the Makefile, Makefile.ps1 and
+            # every prune site match `dump_*.dump`, so a `backup-*.dump` name here
+            # was never pruned and accumulated until the disk filled.
             echo "=== Step 1: Pre-deploy database backup ==="
             mkdir -p /app/backups
             docker compose exec -T db pg_dump -U "${POSTGRES_USER}" "${POSTGRES_DB}" -F c \
-              > "/app/backups/backup-$(date +%Y%m%d-%H%M%S).dump"
+              > "/app/backups/dump_$(date +%Y%m%d_%H%M%S).dump"
             echo "Database backup created."
 
             # b. Pull the new image

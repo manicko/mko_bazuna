@@ -161,12 +161,28 @@ services:
     # Pinned identically to the base `db` service (09-API-016): the dump client
     # and the server must be the same patch. Rollback value: `postgres:18-alpine`.
     image: postgres:18.6-alpine
+    # NOTE (12-OPS-014, Q4 option c): no `user:` is declared. The correct uid
+    # depends on the host directory ownership of ./backups, which is not visible
+    # from this repository — the same "host filesystem not visible" reason that
+    # made phase 12 BLOCK 16's off-host half and phase 09's certificate path
+    # not-implementable here. Declaring a uid that cannot write the bind mount
+    # would break the daily dump silently, which is strictly worse than running
+    # as root. `user:` is recorded as a named follow-on: it needs a host-side
+    # directory-provisioning step (own ./backups by the chosen uid) before it can
+    # be declared safely. The command: override below bypasses postgres's
+    # entrypoint privilege drop, so the container runs as root today; the Q4
+    # probe (`id -u` in a throwaway run) returns 0. Both the pg_dump write and
+    # the find … -delete prune run as that same uid (one shell, one process tree).
     environment:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432
       POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
       POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
       PGPASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      # Dump-freshness window for docker/healthcheck-backup.sh. The loop cadence
+      # is 24h, so 2x that (172800s = 48h) flags a backup job that has stopped
+      # succeeding without flapping on a single slow cycle.
+      BACKUP_HEALTH_STALE_SECONDS: 172800
     volumes:
       - ./backups:/backups
     command:
@@ -176,14 +192,29 @@ services:
         set -e;
         until pg_isready -h $$POSTGRES_HOST -p $$POSTGRES_PORT; do sleep 5; done;
         while true; do
-          date=$$(date +%Y%m%d);
+          start=$$(date +%s);
+          ts=$$(date +%Y%m%d_%H%M%S);
           pg_dump --no-sync -h $$POSTGRES_HOST -p $$POSTGRES_PORT
             -U $$POSTGRES_USER -d $$POSTGRES_DB -F c
-            -f /backups/dump_$$date.dump;
-          echo "Backup completed: dump_$$date.dump";
+            -f /backups/dump_$$ts.dump;
+          echo "Backup completed: dump_$$ts.dump";
           find /backups -name 'dump_*.dump' -mtime +7 -delete 2>/dev/null || true;
-          sleep 86400;
+          elapsed=$$(( $$(date +%s) - start ));
+          remaining=$$(( 86400 - elapsed ));
+          if [ "$$remaining" -gt 0 ] && [ "$$remaining" -le 86400 ]; then
+            sleep "$$remaining";
+          else
+            sleep 86400;
+          fi;
         done
+    healthcheck:
+      test: ["CMD-SHELL", "/bin/sh /app/docker/healthcheck-backup.sh"]
+      interval: 1h
+      timeout: 10s
+      retries: 3
+      # The loop sleeps ~24h between dumps, so the probe runs hourly; the
+      # freshness window (48h) is what catches a broken job, not the cadence.
+      start_period: 30s
     depends_on:
       db:
         condition: service_healthy

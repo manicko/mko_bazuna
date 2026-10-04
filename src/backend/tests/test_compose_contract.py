@@ -12,6 +12,7 @@ and that no override contradicts it, plus the ``stop_grace_period`` and dev
 
 from __future__ import annotations
 
+import os
 import re
 from pathlib import Path
 
@@ -273,6 +274,7 @@ def test_is_parseable_duration_rejects_non_durations() -> None:
 
 def test_start_period_does_not_alter_probe_cadence() -> None:
     """The four amended healthchecks keep interval/timeout/retries byte-identical.
+
     This block adds ``start_period`` and nothing else; changing ``retries``
     alters cold-start recovery semantics and is a different decision.
     """
@@ -287,3 +289,125 @@ def test_start_period_does_not_alter_probe_cadence() -> None:
         assert healthcheck["interval"] == interval, f"{path.name} {service} interval"
         assert healthcheck["timeout"] == timeout, f"{path.name} {service} timeout"
         assert healthcheck["retries"] == retries, f"{path.name} {service} retries"
+
+
+# ---------------------------------------------------------------------------
+# prod service privilege boundary (12-OPS-014)
+# ---------------------------------------------------------------------------
+
+# Every production service either declares ``user:`` or is listed here with a
+# one-line reason. An entry with no reason is how the next service silently opts
+# out, so the guard rejects an empty or stub reason. ``backup`` is the exception
+# Q4 option (c) selected: no ``user:`` because the correct uid depends on the
+# host ownership of ``./backups``, which is not visible from this repository.
+_PROD_USER_EXCEPTIONS: dict[str, str] = {
+    "web": "project image; the Dockerfile sets USER app (uid 1000)",
+    "bot": "project image; the Dockerfile sets USER app (uid 1000)",
+    "scheduler": "project image; the Dockerfile sets USER app (uid 1000)",
+    "migrate": "project image; the Dockerfile sets USER app (uid 1000)",
+    "create_admin": "project image; the Dockerfile sets USER app (uid 1000)",
+    "seed": "project image; the Dockerfile sets USER app (uid 1000)",
+    "load_cities": "project image; the Dockerfile sets USER app (uid 1000)",
+    "load_catalog": "project image; the Dockerfile sets USER app (uid 1000)",
+    "nginx": "official image must bind 80/443 with cap_add; root by design",
+    "pgbouncer": "edoburu image runs its own unprivileged user from its entrypoint",
+    "backup": (
+        "Q4 option (c): no user: because the correct uid depends on the host "
+        "ownership of ./backups, which is not visible from this repository; a "
+        "wrong uid would silently break the daily dump (named follow-on)"
+    ),
+}
+
+
+def test_each_prod_service_declares_user_or_is_a_justified_exception() -> None:
+    """Every prod service declares ``user:`` or is excepted with a real reason.
+
+    Parses ``docker-compose.prod.yml`` independently (never merged with the
+    base), so the contract is asserted per file. A service that is neither
+    declaring ``user:`` nor excepted fails, and an exception with an empty
+    reason fails — an exception list with no reasons is how the next service
+    silently opts out (12-OPS-014).
+    """
+    data = _load_yaml(_PROD_COMPOSE)
+    services = data.get("services", {}) or {}
+    for name, service in services.items():
+        declares_user = "user" in (service or {})
+        if declares_user:
+            continue
+        reason = _PROD_USER_EXCEPTIONS.get(name, "")
+        assert reason.strip(), (
+            f"prod service {name!r} declares no user: and has no justified "
+            "exception (12-OPS-014)"
+        )
+    # No stale exceptions: a service that declares user: must not sit on the
+    # list, or the list would drift from reality.
+    for name in _PROD_USER_EXCEPTIONS:
+        assert name in services, (
+            f"exception list names {name!r}, which is not a prod service"
+        )
+        assert "user" not in services[name], (
+            f"{name!r} declares user: but is still in the exception list"
+        )
+
+
+def test_prod_command_override_without_user_is_excepted() -> None:
+    """A prod ``command:`` override that bypasses an entrypoint drop needs a reason.
+
+    The backup loop overrides ``command:`` on the postgres image, bypassing the
+    entrypoint's privilege drop; it therefore runs as root (Q4 probe: ``id -u``
+    = 0) and must be a justified exception, not an oversight (12-OPS-014).
+    """
+    data = _load_yaml(_PROD_COMPOSE)
+    services = data.get("services", {}) or {}
+    for name, service in services.items():
+        if "command" not in (service or {}):
+            continue
+        if "user" in (service or {}):
+            continue
+        assert name in _PROD_USER_EXCEPTIONS, (
+            f"prod service {name!r} overrides command: without declaring user: "
+            "and is not a justified exception (12-OPS-014)"
+        )
+    assert "backup" in _PROD_USER_EXCEPTIONS, (
+        "the backup service must be a justified exception (Q4 option c)"
+    )
+
+
+def test_prod_backup_declares_a_freshness_healthcheck() -> None:
+    """The backup service declares a healthcheck that runs the freshness script."""
+    healthcheck = _load_yaml(_PROD_COMPOSE)["services"]["backup"]["healthcheck"]
+    test_cmd = healthcheck["test"]
+    assert isinstance(test_cmd, list)
+    assert any("healthcheck-backup.sh" in str(part) for part in test_cmd), (
+        "backup healthcheck must run /app/docker/healthcheck-backup.sh (12-OPS-014)"
+    )
+    assert healthcheck.get("start_period"), (
+        "backup healthcheck must declare a start_period (12-OPS-019)"
+    )
+
+
+def test_backup_healthcheck_script_is_executable() -> None:
+    """docker/healthcheck-backup.sh exists and is marked executable.
+
+    Mirrors test_scheduler_entrypoint_is_executable (12-OPS-014).
+    """
+    path = _ROOT / "docker" / "healthcheck-backup.sh"
+    assert path.exists(), f"healthcheck script not found at {path}"
+    assert os.access(path, os.X_OK), f"{path} must be executable (chmod +x)"
+
+
+def test_backup_service_hardening_unchanged() -> None:
+    """The backup block keeps its privilege-narrowing directives byte-identical.
+
+    This block narrows privileges, never relaxes them: cap_drop, read_only,
+    tmpfs, security_opt, mem_limit and cpus must all remain.
+    """
+    block = _load_yaml(_PROD_COMPOSE)["services"]["backup"]
+    assert block.get("cap_drop") == ["ALL"], "backup must keep cap_drop: ['ALL']"
+    assert block.get("read_only") is True, "backup must keep read_only: true"
+    assert block.get("tmpfs") == ["/tmp"], "backup must keep tmpfs /tmp"
+    assert block.get("security_opt") == ["no-new-privileges:true"], (
+        "backup must keep no-new-privileges"
+    )
+    assert "mem_limit" in block, "backup must keep mem_limit"
+    assert "cpus" in block, "backup must keep cpus"
