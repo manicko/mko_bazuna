@@ -40,19 +40,23 @@ All cache keys follow the format:
 
 - **`<namespace>`** — dot-free identifier matching the domain owning the cache
   (e.g. `search`, `category`, `lookup`).
-- **`v<N>`** — version segment immediately after the namespace. Bumped via
-  `cache.incr` (atomic on Redis, thread-safe on LocMemCache) with a fallback
-  to `cache.set` when the key does not yet exist. The bump is performed by
-  `apps/core/utils/cache.py:bump_version_key()`, and the version key itself is
-  written with `timeout=None` (see [Version-Bump Mechanism](#version-bump-mechanism)).
-- **`<segments...>`** — the remaining key components: version counters, locale,
-  hashed query/fILTER data, slugs, IDs, etc.
+- **`v<N>`** — version segment immediately after the namespace. A **static
+  format version** (`SearchCacheKey.V1 = "search:v1"`), bumped by hand only when
+  the entry *format* changes, never at runtime and never a cache key itself.
+- **`<segments...>`** — the remaining key components: the runtime
+  `<version_counter>`, locale, hashed query/filter data, slugs, IDs, etc.
+
+The runtime `<version_counter>` is bumped via `cache.incr` (atomic on Redis,
+thread-safe on LocMemCache) with a fallback to `cache.set` when it does not yet
+exist. The bump is performed by
+`apps/core/utils/cache.py:bump_version_key()`, and the counter is written with
+`timeout=None` (see [Version-Bump Mechanism](#version-bump-mechanism)).
 
 The version segment is **never** a prefix-wipe trigger for hot-path caches.
-Instead, incrementing the version changes the key itself, making old entries
+Instead, incrementing the counter changes the key itself, making old entries
 unreachable. Those retired **entries** expire via TTL in the background — but
-the **version key** that retires them does not: it is written with
-`timeout=None` so it outlives every entry that embeds it.
+the **counter** that retires them does not: it is written with `timeout=None`
+so it outlives every entry that embeds it.
 
 ## Invalidation Strategy Decision Matrix
 
