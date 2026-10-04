@@ -289,7 +289,7 @@ with a 300ms delay; the JSON response is rendered by inline vanilla JS.
 |----------|-------|
 | URL name | `search:autocomplete` |
 | Method | `GET` |
-| Query param | `q` (sanitized: stripped, `;'"\` chars removed; rejected when < 2 or > 100 chars — empty result) |
+| Query param | `q` (sanitized in order: control characters stripped, then whitespace stripped, then `;'"\` chars removed; rejected when < 2 or > 100 chars after the control-character strip — empty result) |
 | Rate limit | 30 req/min per IP (cache-based); HTTP 429 on overflow |
 | Response | `application/json` |
 

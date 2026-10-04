@@ -180,11 +180,41 @@ def sanitize_query_for_log(query: str | None) -> str:
     return cleaned[:_MAX_QUERY_LENGTH]
 
 
-def sanitize_autocomplete_query(query: str) -> str:
-    """Sanitize autocomplete query — 2–100 chars, SQL injection safe."""
-    if not query or len(query) < 2 or len(query) > 100:
+def strip_control_chars(query: str | None) -> str:
+    """Remove control characters from a user query WITHOUT truncating.
+
+    A NUL byte (``0x00``) in a search query reaches psycopg unencoded and
+    raises ``DataError`` — PostgreSQL text values cannot contain NUL — so the
+    value must be cleaned before it reaches any parameterised sink
+    (08-SRCH-006). Unlike :func:`sanitize_query_for_log` this helper performs
+    **no truncation**: the view/column contract is 200 characters while the
+    log sanitiser caps at 100, and reusing the sanitiser wholesale would
+    silently shorten ``q`` (the Product Owner's 2026-10-03 constraint on Q4).
+
+    Args:
+        query: The raw user-supplied query string, or ``None``.
+
+    Returns:
+        The query with every character in ``_CONTROL_CHAR_PATTERN`` removed,
+        untruncated. Empty input returns an empty string.
+    """
+    if not query:
         return ""
-    return re.sub(r"[;'\"\\]", "", query.strip())
+    return _CONTROL_CHAR_PATTERN.sub("", query)
+
+
+def sanitize_autocomplete_query(query: str) -> str:
+    """Sanitize autocomplete query — control chars stripped, then 2–100 chars.
+
+    Control characters are stripped **before** the length window so the guard
+    measures the value that is actually searched (08-SRCH-006). The documented
+    contract order is strip-then-measure; ``[;'"\\]`` removal and the
+    empty-string return on a window miss are unchanged.
+    """
+    cleaned = strip_control_chars(query)
+    if len(cleaned) < 2 or len(cleaned) > 100:
+        return ""
+    return re.sub(r"[;'\"\\]", "", cleaned.strip())
 
 
 # Whether the empty-key warning has already been emitted for this process, so a

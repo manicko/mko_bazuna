@@ -28,7 +28,7 @@ from apps.ads.services.listings_query import ListingsQuery, ListingsQueryParams
 from apps.categories.models import Category
 from apps.core.enums import AdSort, AnalyticsEventType, LanguageLocale
 from apps.core.services.analytics import record_event
-from apps.core.utils.sanitize import sanitize_query_for_log
+from apps.core.utils.sanitize import sanitize_query_for_log, strip_control_chars
 from apps.locations.models import City
 from apps.locations.services.city_suggestions import suggest_city
 from apps.search.services.cache import (
@@ -70,7 +70,12 @@ def search(request: HttpRequest) -> HttpResponse:
     if not rate_limit_check(request, namespace="search"):
         return JsonResponse({"error": "rate_limit"}, status=429)
 
-    query = (request.GET.get("q") or "").strip()[:MAX_SEARCH_QUERY_LENGTH]
+    # Strip control characters (incl. NUL) at the input edge, then slice. The
+    # strip is non-truncating so the 200-char ``q`` contract is preserved; the
+    # cleaned value is what is searched, cached, analysed and rendered. Order is
+    # strip-then-slice so ``len(query) <= MAX_SEARCH_QUERY_LENGTH`` still holds
+    # (08-SRCH-006).
+    query = strip_control_chars(request.GET.get("q") or "")[:MAX_SEARCH_QUERY_LENGTH]
 
     # City filter (by slug). An explicit URL city (``request.current_city``,
     # resolved by CityResolutionMiddleware from ``/city/<slug>/`` or

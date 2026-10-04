@@ -267,6 +267,26 @@ class TestAutocompleteEndpoint:
         assert response.status_code == 200
         assert response.json()["suggestions"] == []
 
+    def test_autocomplete_nul_byte_query_returns_200(
+        self,
+    ) -> None:
+        """A NUL-bearing q returns 200 with a well-formed JSON body.
+
+        A literal 0x00 reaches psycopg unencoded and raised ``DataError`` on the
+        entity-suggestion prefix ``LIKE`` (08-SRCH-006). Control characters are
+        now stripped at the input edge, before the 2..100 length guard, so
+        ``ab\\x00cd`` is searched as ``abcd`` and returns a normal 200 JSON body.
+        The route has no trailing slash — use the exact path or the URL name.
+        """
+        client = Client()
+        response = client.get("/api/search/autocomplete", {"q": "ab\x00cd"})
+
+        assert response.status_code == 200
+        data = response.json()
+        assert "suggestions" in data
+        assert isinstance(data["suggestions"], list)
+        assert data["query"] == "abcd"
+
 
 # ---------------------------------------------------------------------------
 # Popular search service

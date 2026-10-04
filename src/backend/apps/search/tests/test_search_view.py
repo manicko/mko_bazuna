@@ -787,6 +787,100 @@ class TestSearchViewInputRobustness:
 
         assert response.status_code == 200
 
+    def test_nul_byte_query_returns_200_with_control_chars_stripped(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """A NUL-bearing q is stripped at the input edge and searched cleaned.
+
+        A literal 0x00 in ``q`` reaches psycopg unencoded and raises
+        ``DataError`` (PostgreSQL text values cannot contain NUL), so the
+        request was a hard 500 before 08-SRCH-006. The control character is
+        percent-encoded (a literal ``\u0000`` in a URL string is NOT decoded by
+        Django — the defect recorded as 08-NEW-03 and deliberately left alone in
+        ``test_homoglyph_and_control_chars_query_returns_200``).
+
+        Asserts 200 AND the literal context query with control characters
+        removed — the ruling is that the CLEANED query is searched.
+        """
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Транспорт",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/search/?q=ab%00cd&lang=ru")
+
+        assert response.status_code == 200
+        assert response.context["query"] == "abcd"
+
+    def test_control_char_0x07_query_returns_200(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """The control: 0x07 already returned 200 and must keep doing so."""
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Транспорт",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/search/?q=%07abc&lang=ru")
+
+        assert response.status_code == 200
+
+    def test_legal_query_result_ids_unchanged_by_control_char_strip(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """POSITIVE CONTROL (Product Owner ruling 2026-10-03).
+
+        A legal, control-character-free query must return the same ordered id
+        list as an equivalent query carrying a stripped control character. If
+        the two diverge, the strip is wrong and 08-SRCH-006 returns rather than
+        amending the ruling. The comparison is within-run and on the *ordered*
+        list, so it pins byte-identity without hard-coding a database sequence
+        value.
+        """
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Продам красный велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Синий велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        baseline = client.get("/search/?q=велосипед&lang=ru")
+        cleaned = client.get("/search/?q=%07велосипед%07&lang=ru")
+
+        assert baseline.status_code == 200
+        assert cleaned.status_code == 200
+        baseline_ids = [a.id for a in baseline.context["page_obj"]]
+        cleaned_ids = [a.id for a in cleaned.context["page_obj"]]
+        assert baseline_ids  # sanity: the legal query actually matched
+        assert cleaned_ids == baseline_ids
+        assert cleaned.context["query"] == "велосипед"
+
 
 class TestSearchViewTotalCount:
     """Regression tests for true total_count vs 1000-row cache cap (SRH-002).
