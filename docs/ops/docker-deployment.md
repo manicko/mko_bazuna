@@ -389,6 +389,8 @@ The production override file (`docker-compose.prod.yml`) includes:
 | `PROMETHEUS_MULTIPROC_DIR` | No (default: `/tmp/prometheus_multiproc`) | Directory for Prometheus multiprocess metrics mode (web service only). Required for accurate per-worker metric collection under gunicorn when `PROMETHEUS_MULTIPROC_DIR` is set; see [Prometheus Metrics](#prometheus-metrics) |
 | `SCHEDULER_COMMAND_TIMEOUT` | No (default: `1800`) | Per-command timeout (seconds) for `subprocess.run` dispatch in the scheduler (`apps.core.utils.scheduler`) and in `migrate_locked.main`. Bounds a hung management command so it cannot stall the hourly cycle or the migration bootstrap; a timed-out command is logged and skipped (ENT-001). The default sits safely under the scheduler healthcheck staleness window (`SCHEDULER_HEALTH_STALE_SECONDS` env var, `7200` in prod). |
 | `MEDIA_STAGING_BYTE_BUDGET` | No (default: `2147483648` = 2 GiB) | Global cap on bytes held in `MEDIA_ROOT/staging/`. A bot upload is refused **before** any byte is written when `staging_bytes_used()` is at or above this value. **Global, not per-seller** — staging keys are `uuid4()` and carry no owner, so per-seller attribution is infeasible and one seller can exhaust the shared budget. Lowering it protects disk at the cost of refusing legitimate sellers; see [`media-store-operations.md`](media-store-operations.md#staging-byte-budget). |
+| `DB_MEM_LIMIT` | No (compose default `1g`) | Memory cgroup limit for the `db` service (`mem_limit: ${DB_MEM_LIMIT:-1g}` in `docker-compose.yml`). **Deliberately not set by `.env.prod.example`**, so **1 GB is the shipped production profile**. It is a cgroup **hard limit**, not a hint: a query whose working set exceeds it is **OOM-killed** (SIGKILL on the backend), which takes the whole PostgreSQL cluster into **crash recovery** — it does not surface as a slow request. Changing it is a **capacity decision requiring review**, not a tuning knob; declare it in `.env.prod` only as part of that decision. (08-VAL-001) |
+| `DB_CPUS` | No (compose default `2.0`) | CPU quota for the `db` service (`cpus: ${DB_CPUS:-2.0}` in `docker-compose.yml`). **Deliberately not set by `.env.prod.example`**, so **2.0 CPU is the shipped production profile**. Like `DB_MEM_LIMIT` it is a cgroup **hard limit**, and changing it is a **capacity decision requiring review**. (08-VAL-001) |
 
 **Note:** `DATABASE_URL` is automatically constructed from `POSTGRES_*` variables in Docker
 containers. Do not set `DATABASE_URL` in `.env.prod` — the compose files build it from the
@@ -489,6 +491,14 @@ canceling statement due to lock timeout        # SQLSTATE 55P03
 A lock timeout means a **long transaction is holding the lock**, usually a
 queued `delete_sweep` / `purge_deleted_ads` run contending with an `Ad` row lock
 held by a web edit or bot action.
+
+A **`statement_timeout` remains unset** and is the other half of `03-DB-004`
+(owner: phase 03, the same finding that landed `LOCK_TIMEOUT_SECONDS`). It bounds
+statement **duration** (SQLSTATE 57014) and is deliberately **not** shipped here;
+`LOCK_TIMEOUT_SECONDS` bounds lock **waits** (SQLSTATE 55P03) only. Do not read
+the two as one policy — a statement that runs long without waiting on a lock is
+**not** bounded by `LOCK_TIMEOUT_SECONDS`, and until `statement_timeout` is set
+that residue is covered only by the `db` cgroup limits above.
 
 `archive_sweep` and `recompute_normalized_prices` batch in 500-row transactions
 (`03-DB-008`), so a batch transaction is bounded rather than tens of seconds.
