@@ -375,9 +375,10 @@ These are invoked by the Docker compose one-shot chain after `migrate` completes
 **Why this split?**
 
 - *External dependencies*: `load_catalog` imports live app modules (builder) and reads
-  `categories.yaml`; `load_cities` reads `cities.json`; `load_exchange_rates` makes HTTP
-  calls to ECB. These do not belong in migrations (rule: extract RunPython with external
-  deps to management commands — see above).
+  `categories.yaml`; `load_cities` reads `cities.json`; `load_exchange_rates` writes the
+  bootstrap exchange-rate defaults to the database (it makes **no** network call — there is
+  no rate feed in the project). These do not belong in migrations (rule: extract RunPython
+  with external deps to management commands — see above).
 - *Crash safety*: one-shots run as separate compose containers (`depends_on: condition:
   service_completed_successfully`). A failure in `load_catalog` does not roll back schema
   migrations, and vice-versa.

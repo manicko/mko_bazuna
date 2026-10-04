@@ -1,10 +1,15 @@
-"""Management command to seed and refresh the initial exchange rates.
+"""Management command to seed the initial exchange rates.
 
 After a migration squash that deletes and regenerates migration files via
 ``makemigrations``, ``RunPython`` data migrations such as ``seed_initial_rates``
 cannot be regenerated from model state. This command recreates the fixed
-initial rates idempotently, using the live ORM model directly (not
-``apps.get_model``) so it can also be used to refresh rates at any time.
+initial rates, using the live ORM model directly (not ``apps.get_model``) so it
+can also be used at any time.
+
+The constant below is a **bootstrap default**, not the authority. Operators are
+expected to correct a drifted rate; this command therefore creates a row only if
+the currency is absent and never rewrites an existing one. Idempotence here means
+"create it if absent", never "make the row equal the constant".
 
 Seeded rates (PO-05):
 
@@ -12,7 +17,9 @@ Seeded rates (PO-05):
     BAM: rate_to_eur=0.512, effective_date=2026-08-22, source="manual_seed"
     RSD: rate_to_eur=0.0105, effective_date=2026-08-22, source="manual_seed"
 
-Idempotent via ``update_or_create`` keyed on ``currency``.
+There is no exchange-rate feed: this command makes **no** HTTP call and reads no
+external provider. A live ECB (or other) rate feed is a new capability and is
+not implemented here.
 """
 
 import logging
@@ -39,16 +46,17 @@ class Command(BaseCommand):
     """Seed the fixed initial exchange rates (EUR base currency)."""
 
     help = (
-        "Seed or refresh the initial manual exchange rates "
-        "(EUR base, BAM and RSD) with source 'manual_seed'"
+        "Seed the initial manual exchange rates (EUR base, BAM and RSD) with "
+        "source 'manual_seed' when a currency row is absent; existing rows are "
+        "never rewritten"
     )
 
     def handle(self, *args, **options) -> None:
-        """Insert or update each initial rate row."""
+        """Create each absent initial rate row; preserve every existing one."""
         created = 0
-        updated = 0
+        preserved = 0
         for currency_code, rate_to_eur in INITIAL_RATES:
-            obj, was_created = ExchangeRate.objects.update_or_create(
+            obj, was_created = ExchangeRate.objects.get_or_create(
                 currency=currency_code,
                 defaults={
                     "rate_to_eur": rate_to_eur,
@@ -60,20 +68,20 @@ class Command(BaseCommand):
             if was_created:
                 created += 1
             else:
-                updated += 1
+                preserved += 1
+            provenance = "seeded" if was_created else "preserved existing"
             logger.info(
                 "ExchangeRate %s: rate_to_eur=%s (%s)",
                 obj.currency,
                 obj.rate_to_eur,
-                "created" if was_created else "updated",
+                provenance,
             )
             self.stdout.write(
-                f"{'Created' if was_created else 'Updated'} "
-                f"{obj.currency}: rate_to_eur={obj.rate_to_eur}"
+                f"Rate {obj.currency}: rate_to_eur={obj.rate_to_eur} ({provenance})"
             )
 
         self.stdout.write(
             self.style.SUCCESS(
-                f"Exchange rates loaded: {created} created, {updated} updated"
+                f"Exchange rates loaded: {created} created, {preserved} preserved"
             )
         )

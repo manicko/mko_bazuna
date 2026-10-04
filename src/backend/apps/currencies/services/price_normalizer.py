@@ -7,9 +7,12 @@ equivalent using the *current* ``ExchangeRate`` (the rate stored for
 the ``ModerationCriteria`` cache pattern in ``apps/core/utils/cache.py``.
 
 Both the web and bot processes share one database, so the short cache is
-acceptable. The cache is invalidated when a rate is updated (admin/recompute
-path). An explicit domain error is raised when no current rate exists for a
-currency — prices are never silently normalized with a missing rate.
+acceptable. The cache is invalidated by ``apps.currencies.signals``, whose
+``post_save`` / ``post_delete`` receivers on ``ExchangeRate`` call
+``PriceNormalizer.invalidate_rate_cache`` (guarded so a cache outage cannot roll
+back the rate write). An explicit domain error is raised when no current rate
+exists for a currency — prices are never silently normalized with a missing
+rate.
 """
 
 from __future__ import annotations
@@ -111,8 +114,9 @@ class PriceNormalizer:
     def invalidate_rate_cache(currency: CurrencyCode) -> None:
         """Invalidate the shared cached rate for ``currency`` after a change.
 
-        Called by the admin/recompute path so the next normalization reads the
-        updated current rate.
+        Called by the ``apps.currencies.signals`` receivers on
+        ``ExchangeRate`` ``post_save`` / ``post_delete`` so the next
+        normalization reads the updated current rate.
 
         Args:
             currency: The currency whose cached rate to invalidate.
