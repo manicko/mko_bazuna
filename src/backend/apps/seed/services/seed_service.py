@@ -349,17 +349,21 @@ class SeedService:
         colliding with the constraint.
 
         ``SeedService._clean`` removes all seed ``PopularSearch`` rows by
-        ``source=AdSource.SEED`` before this runs.
+        ``source=AdSource.SEED`` before this runs. Because ``_clean`` just
+        deleted the seed rows, a skip means the curated phrasing is **not**
+        restored for as long as the production row lives — so the return value
+        counts only rows actually written, and each skipped key is logged
+        (08-SRCH-003).
         """
-        count = 0
+        written = 0
         config_searches = self.config.get("popular_searches", [])
         for item in config_searches:
-            self._upsert_seed_popular_search(
+            if self._upsert_seed_popular_search(
                 search_query_key(item["query"]),
                 query=item["query"],
                 hit_count=item["hit_count"],
-            )
-            count += 1
+            ):
+                written += 1
 
         rng = random.Random(self.config.get("faker_seed", 42) + 200)
         # Exclude config queries so they are not upserted twice. The key must
@@ -378,36 +382,49 @@ class SeedService:
                     title_words.add(word)
 
         for word in sorted(title_words)[:limit]:
-            self._upsert_seed_popular_search(
+            if self._upsert_seed_popular_search(
                 search_query_key(word),
                 query=word,
                 hit_count=max(rng.randint(5, 30), 10),
-            )
-            count += 1
+            ):
+                written += 1
 
-        return count
+        return written
 
     def _upsert_seed_popular_search(
         self, key: str, *, query: str, hit_count: int
-    ) -> None:
+    ) -> bool:
         """Upsert one SEED-owned ``PopularSearch`` row, never touching production.
 
         The lookup is scoped to ``source=AdSource.SEED`` (08-SRCH-003). A row
         owned by any other source already holds the unique ``query_normalized``
         key, so the seed row is skipped instead of raising ``IntegrityError`` or
         stealing the production row's provenance.
+
+        Returns:
+            ``True`` when the seed row was created or updated, ``False`` when it
+            was skipped because another source owns the key. A ``False`` is
+            logged at WARNING so a skipped curated query is observable — the
+            caller counts only ``True`` results.
         """
         managed = PopularSearch.objects.filter(
             query_normalized=key, source=AdSource.SEED
         )
         if managed.exists():
             managed.update(query=query, hit_count=hit_count)
-            return
+            return True
         if PopularSearch.objects.filter(query_normalized=key).exists():
-            return
+            logger.warning(
+                "[seed] PopularSearch key %r already owned by another source — "
+                "seed row skipped; curated phrasing is not restored while the "
+                "production row lives",
+                key,
+            )
+            return False
         PopularSearch.objects.create(
             query_normalized=key,
             query=query,
             hit_count=hit_count,
             source=AdSource.SEED,
         )
+        return True

@@ -2010,3 +2010,44 @@ class TestSeedPopularSearchKeys:
         for fragment in ("иван", "петров", "+79001234567", "user@example.com"):
             assert fragment not in lowered_key
 
+    def test_skipped_seed_row_is_absent_and_observable(
+        self, db: None, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A curated key owned by another source is skipped, and the skip is logged.
+
+        ``_clean`` deletes all SEED rows immediately before this runs, so a skip
+        means the curated phrasing is never restored while the production row
+        lives. Before 08-SRCH-003 the skip returned silently and the caller
+        counted it as seeded; now the helper returns ``False``, the counter
+        excludes it, and a WARNING names the key.
+        """
+        import logging
+
+        from apps.core.utils.sanitize import search_query_key
+        from apps.search.models import PopularSearch
+
+        raw = "велосипед"
+        key = search_query_key(raw)
+        # A production row (source=None) owns the unique key.
+        PopularSearch.objects.create(
+            query_normalized=key, query=raw, hit_count=999
+        )
+
+        service = SeedService()
+        service.config = {
+            "popular_searches": [{"query": raw, "hit_count": 50}],
+            "faker_seed": 42,
+        }
+
+        with caplog.at_level(logging.WARNING, logger="apps.seed.services.seed_service"):
+            written = service._seed_popular_searches(limit=0)
+
+        # The seed row is absent and the production row is untouched.
+        assert not PopularSearch.objects.filter(
+            query_normalized=key, source=AdSource.SEED
+        ).exists()
+        assert PopularSearch.objects.get(query_normalized=key).hit_count == 999
+        # The skip is observable: not counted, and a warning names the key.
+        assert written == 0
+        assert any(key in record.getMessage() for record in caplog.records)
+
