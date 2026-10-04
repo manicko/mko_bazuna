@@ -1118,7 +1118,7 @@ backend (see [Environment Variable Resolution](#environment-variable-resolution)
 | Setting | base.py default | dev.py | test.py | prod.py |
 |---|---|---|---|---|
 | `EMAIL_BACKEND` | `smtp.EmailBackend` | `console.EmailBackend` | `locmem.EmailBackend` | `smtp.EmailBackend` — **pinned; the env var is ignored** |
-| `EMAIL_HOST` | `""` | — | — | **required** (fail-fast guard, skipped under `DJANGO_BUILD=1` at build or for dev one-shots via `config.settings.oneshot` + `DJANGO_ONESHOT=1`) |
+| `EMAIL_HOST` | `""` | — | — | **warned, not required** (a loud `WARNING` when empty; the import still succeeds — Product Owner ruling 2026-10-03, 09-API-009) |
 | `EMAIL_PORT` | `587` | — | — | — |
 | `EMAIL_HOST_USER` | `""` | — | — | — |
 | `EMAIL_HOST_PASSWORD` | `""` | — | — | — |

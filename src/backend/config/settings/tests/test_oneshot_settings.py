@@ -91,7 +91,10 @@ def test_django_build_flag_bypasses_all_prod_guards() -> None:
 
     BC-2's regression guard. The Docker image builder stage and Makefile's
     restore-test target run under config.settings.prod with no .env and must
-    have every guard skipped at once, including EMAIL_HOST and REDIS_URL.
+    have every guard skipped at once, including REDIS_URL and the other secret
+    guards. (EMAIL_HOST is not a guard since the Product Owner ruling of
+    2026-10-03 — it only warns — but it is emptied here alongside them so the
+    import profile is unchanged.)
     """
     env = _prod_env_overrides(
         DJANGO_SECRET_KEY=_DEV_DUMMY_SECRET,

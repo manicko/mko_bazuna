@@ -9,6 +9,10 @@ Asserts that:
   ImproperlyConfigured (the guard that fires when .env.prod omits the key,
   causing the migrate container's bootstrap_reference_data command to be
   undiscoverable — see KeyError → ImproperlyConfigured cascade).
+- EMAIL_HOST empty with DEBUG=False (production) does NOT raise: the import
+  succeeds and a WARNING names the setting and the lost support escalations
+  (Product Owner ruling 2026-10-03, Q1 / 09-API-009 — a loud warning, not a boot
+  gate).
 
 Settings are evaluated at import time and Django caches them on first access,
 so override_settings/monkeypatch cannot test import-time failure. These tests
@@ -195,24 +199,36 @@ def test_redis_url_required_in_production() -> None:
     assert "REDIS_URL" in result.stderr
 
 
-def test_prod_requires_email_host() -> None:
-    """EMAIL_HOST set present-but-empty with every other prod guard satisfied
-    raises ImproperlyConfigured naming EMAIL_HOST.
+def test_prod_email_host_missing_warns_but_imports() -> None:
+    """EMAIL_HOST present-but-empty with every other prod guard satisfied does
+    NOT raise: the prod settings import succeeds and emits a WARNING naming the
+    setting and the consequence it puts at risk.
 
-    This is the sole precondition for the shipped Telegram -> email support-ticket
-    notification path; the guard turns a misconfigured SMTP host into a boot-time
-    failure rather than a silent support black hole.
+    Product Owner ruling 2026-10-03 (Q1, 09-API-009): a missing EMAIL_HOST is a
+    loud warning at startup, NOT a boot gate. The sole send_mail path
+    (send_support_notification_email) already fails open, so a warning matches
+    the code's own behaviour. No test asserts that a missing EMAIL_HOST raises
+    ImproperlyConfigured — that shape is forbidden by the ruling.
 
-    The assertion must name EMAIL_HOST. A bare ``ImproperlyConfigured`` assertion
-    is satisfiable by any earlier guard (SITE_URL, REDIS_URL, ...), so it would
-    not prove this guard fired. Every other prod guard is therefore satisfied
-    explicitly, and EMAIL_HOST is presented-but-empty (rather than deleted) so
-    base.py's read_env() cannot restore it from the bind-mounted .env.test.
+    EMAIL_HOST is presented-but-empty (rather than deleted) so base.py's
+    read_env() cannot restore it from the bind-mounted .env.test.
     """
     env = _prod_env_overrides(EMAIL_HOST="")
-    stderr = _run_in_subprocess(env, "import django; django.setup()")
-    assert "ImproperlyConfigured" in stderr
-    assert "EMAIL_HOST" in stderr
+    env_with_path = {**env, "PYTHONPATH": os.pathsep.join(sys.path)}
+    result = subprocess.run(
+        [sys.executable, "-c", "import django; django.setup()"],
+        env=env_with_path,
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 0, result.stderr
+    combined = result.stderr + result.stdout
+    # The warning is emitted by logging.getLogger(__name__).warning; the default
+    # handler format prints the message, so assert the message's own text rather
+    # than the level name.
+    assert "EMAIL_HOST is not set" in combined
+    # The consequence the warning must name, so an operator can act on it.
+    assert "silently" in combined
 
 
 def test_secret_key_with_dollar_sign_preserved(

@@ -69,8 +69,9 @@ def _prod_env(**overrides: str) -> dict[str, str]:
     # REDIS_URL must be non-empty to pass the prod.py fail-fast guard
     # (see prod.py: REDIS_URL required in production).
     env["REDIS_URL"] = overrides.pop("REDIS_URL", "redis://redis:6379/0")
-    # EMAIL_* defaults — EMAIL_HOST must be non-empty to pass the prod.py
-    # fail-fast guard (see prod.py: EMAIL_HOST required in production).
+    # EMAIL_* defaults — EMAIL_HOST is not a guard: since the Product Owner
+    # ruling of 2026-10-03 a missing EMAIL_HOST only logs a warning
+    # (see prod.py and 09-API-009). A non-empty default keeps the fixture quiet.
     env["EMAIL_HOST"] = overrides.pop("EMAIL_HOST", "smtp.example.com")
     env["EMAIL_PORT"] = overrides.pop("EMAIL_PORT", "587")
     env["EMAIL_HOST_USER"] = overrides.pop("EMAIL_HOST_USER", "")

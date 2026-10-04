@@ -227,20 +227,29 @@ if not os.getenv("SITE_URL") and not _SKIP_SECRET_VALIDATION:  # noqa: F405
         "Provide it via the .env.prod runtime file."
     )
 
-# Fail fast: EMAIL_HOST is required in production so the one transactional
+# Loud warning, NOT a boot gate: EMAIL_HOST drives the one transactional
 # email the application actually sends — the Telegram support-ticket
-# notification — is deliverable. This is the sole send_mail path in the
-# codebase; there is no password-reset, alert-notification or seller-
-# confirmation email flow to name here. Without the guard a misconfigured SMTP
-# host turns the support inbox into a silent black hole rather than a boot
-# failure. Skipped during the Docker image build (DJANGO_BUILD=1) so
-# collectstatic succeeds. Dev bootstrap one-shots run config.settings.oneshot,
-# not this module. The real SMTP config is provided at runtime via .env.prod.
+# notification. This is the sole send_mail path in the codebase; there is no
+# password-reset, alert-notification or seller-confirmation email flow to name
+# here. The single consumer
+# (telegram_bot/services/support_delivery_email.py::send_support_notification_email)
+# already fails OPEN, so a warning matches the code's own behaviour: the site
+# boots and serves normally, and only the support-desk e-mail degrades.
+# Product Owner ruling 2026-10-03 (Q1, 09-API-009): a LOUD WARNING, not a boot
+# gate — the guard is REPLACED by this warning, not justified in place. The
+# accepted cost: a host that never notices the warning loses seller escalations
+# to the admin inbox silently, so the message must be loud and name the
+# consequence. Skipped during the Docker image build (DJANGO_BUILD=1) so
+# collectstatic does not warn on an intentionally-absent SMTP host; dev
+# bootstrap one-shots run config.settings.oneshot, not this module. The real
+# SMTP config is provided at runtime via .env.prod.
 if not _SKIP_SECRET_VALIDATION:
     if not EMAIL_HOST:  # noqa: F405
-        raise ImproperlyConfigured(
-            "EMAIL_HOST must be set in production. "
-            "Provide it via the .env.prod runtime file."
+        logging.getLogger(__name__).warning(
+            "EMAIL_HOST is not set. The Telegram support-ticket notification is "
+            "the only transactional e-mail this system sends; without a reachable "
+            "SMTP host, seller escalations to the admin inbox will be silently "
+            "lost. The site otherwise serves normally."
         )
 
 # TLS-ready settings

@@ -616,7 +616,8 @@ CACHES = {
 # ---------------------------------------------------------------------------
 # Email / SMTP configuration (classic Django EMAIL_* settings)
 # ---------------------------------------------------------------------------
-# Production (prod.py) enforces EMAIL_HOST via a fail-fast guard. Dev and test
+# Production (prod.py) warns loudly when EMAIL_HOST is empty, then boots and
+# serves normally — the support-desk e-mail path fails open. Dev and test
 # environments override EMAIL_BACKEND to console/locmem backends that do not
 # require SMTP connectivity (see dev.py and test.py).
 # The mail path serves exactly one purpose: the Telegram support-ticket
