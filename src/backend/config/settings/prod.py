@@ -67,22 +67,33 @@ LOGGING = {
 }
 
 # Error tracking via Sentry (optional — only if SENTRY_DSN is configured).
-# Guarded with try/except ImportError so a missing sentry-sdk dependency
-# does not crash the application boot.
+# A monitoring integration must never be a boot dependency: a malformed DSN
+# raises sentry_sdk.utils.BadDsn at import, which would take every process that
+# imports config.settings.prod offline (web, bot, migrate, the one-shots and the
+# CI deploy-check job). Handle BadDsn explicitly and keep booting (12-OPS-013).
+# The log message names the variable, never any part of its value.
 if SENTRY_DSN and not DEBUG:  # noqa: F405 (SENTRY_DSN from base via *)
     try:
         import sentry_sdk
-
-        sentry_sdk.init(
-            dsn=SENTRY_DSN,  # noqa: F405
-            send_default_pii=False,
-            traces_sample_rate=0.1,
-        )
-        logging.getLogger(__name__).info("Sentry error tracking initialized")
+        from sentry_sdk.utils import BadDsn
     except ImportError:
         logging.getLogger(__name__).warning(
             "sentry-sdk not installed — error tracking disabled"
         )
+    else:
+        try:
+            sentry_sdk.init(
+                dsn=SENTRY_DSN,  # noqa: F405
+                send_default_pii=False,
+                traces_sample_rate=0.1,
+            )
+        except BadDsn:
+            logging.getLogger(__name__).error(
+                "SENTRY_DSN is malformed — error tracking disabled; "
+                "the process continues to boot"
+            )
+        else:
+            logging.getLogger(__name__).info("Sentry error tracking initialized")
 
 # ---------------------------------------------------------------------------
 # Secret-validation bypass

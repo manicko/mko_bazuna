@@ -128,6 +128,34 @@ def test_sentry_not_initialized_without_dsn() -> None:
     assert "NO_CLIENT" in result.stdout
 
 
+def test_sentry_malformed_dsn_degrades_without_crashing() -> None:
+    """A malformed SENTRY_DSN leaves config.settings.prod importable and booting.
+
+    sentry_sdk.init raises BadDsn for an unrecognised scheme, and that exception
+    escaped the settings-module import, taking every process that imports
+    config.settings.prod offline (12-OPS-013). The guard handles BadDsn
+    explicitly so the process still boots with error tracking disabled. The live
+    trigger is a malformed scheme — a trailing space or newline is handled by
+    sentry-sdk 2.69.2 and would assert nothing.
+    """
+    env = _prod_env_overrides(SENTRY_DSN="not-a-valid-dsn")
+    env["PYTHONPATH"] = os.pathsep.join(sys.path)
+    import_code = (
+        "import django; django.setup(); "
+        "import sentry_sdk; "
+        "client = sentry_sdk.get_client(); "
+        "print('BOOTED'); "
+        "print('DISABLED' if client.dsn is None else 'HAS_CLIENT')"
+    )
+    result = _run_in_subprocess(env, import_code)
+    assert result.returncode == 0, result.stderr
+    assert "BOOTED" in result.stdout
+    assert "DISABLED" in result.stdout
+    # The DSN value must never appear in the emitted output.
+    assert "not-a-valid-dsn" not in result.stdout
+    assert "not-a-valid-dsn" not in result.stderr
+
+
 def test_prod_logging_uses_json_formatter() -> None:
     """prod settings LOGGING dict configures RedactingJsonFormatter."""
     env = _prod_env_overrides()
