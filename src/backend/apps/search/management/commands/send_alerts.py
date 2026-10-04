@@ -35,6 +35,7 @@ from django.conf import settings
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
+from django.utils.html import escape
 from django.utils.translation import gettext as _, override as translation_override
 
 from apps.ads.models import Ad
@@ -51,6 +52,14 @@ logger = logging.getLogger(__name__)
 
 # Capped backoff base (seconds) for transient retries (429/network/5xx).
 _BACKOFF_BASE: Final[float] = 0.5
+
+# Q8 single-sleep ceiling (seconds) for this path's one retry (09-VAL-009). There
+# is exactly one retry and no loop here, so this is a ceiling on ONE sleep, not a
+# total budget. It clamps the ``float(exc.retry_after)`` the bot mandates so the
+# daily digest cannot be parked on an arbitrarily large Telegram ``retry_after``.
+# 30.0 keeps the pinned ``retry_after=2`` fixture green and leaves ``_BACKOFF_BASE``
+# (0.5) below the ceiling unchanged.
+RETRY_AFTER_CEILING: Final[float] = 30.0
 
 # Maximum unique ads rendered in a single user's daily digest. Applied at
 # collection time so the notification set and the rendered set are the same set.
@@ -351,7 +360,7 @@ class Command(BaseCommand):
                 ) as e:
                     # Transient — retry once with capped backoff.
                     if isinstance(e, TelegramRetryAfter) and e.retry_after:
-                        backoff: float = float(e.retry_after)
+                        backoff: float = min(float(e.retry_after), RETRY_AFTER_CEILING)
                     else:
                         backoff = _BACKOFF_BASE
                     await asyncio.sleep(backoff)
@@ -381,7 +390,15 @@ class Command(BaseCommand):
         return sent_users
 
     def _format_digest(self, ads: list, locale: str = LanguageLocale.RUSSIAN.value) -> str:
-        """Format digest message for a user in their preferred locale."""
+        """Format digest message for a user in their preferred locale.
+
+        The message is sent with ``parse_mode="HTML"``, so the seller-controlled
+        title is escaped with ``django.utils.html.escape`` (NOT the stdlib ``html``
+        module, whose ``unescape`` in apps/core/services/translation.py *decodes*).
+        Escaping is applied to the truncated title, after the 50-character slice,
+        so the visible prefix length is unchanged for ordinary titles. The header
+        and price are not seller-controlled and stay unescaped.
+        """
         with translation_override(locale):
             lines = [
                 _("New ads matching your saved searches ({count} found):\n").format(
@@ -394,6 +411,7 @@ class Command(BaseCommand):
                     if ad.price_amount is not None
                     else ""
                 )
-                lines.append(f"• {ad.get_title(locale)[:50]}\n  {price_str}\n")
+                title = escape(ad.get_title(locale)[:50])
+                lines.append(f"• {title}\n  {price_str}\n")
 
             return "\n".join(lines)

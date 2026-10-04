@@ -198,6 +198,99 @@ class TestTransientErrorHandling:
             assert mock_bot.send_message.await_count == 1
             assert mock_bot.session.close.await_count == 1
 
+    @pytest.mark.asyncio
+    async def test_429_retry_after_is_capped(self) -> None:
+        """A huge Telegram retry_after is clamped to RETRY_AFTER_CEILING (Q8)."""
+        from apps.search.management.commands.send_alerts import (
+            RETRY_AFTER_CEILING,
+            Command,
+        )
+
+        retry_exc = TelegramRetryAfter(
+            message="too many requests",
+            method=MagicMock(),
+            retry_after=300,
+        )
+        mock_user_obj = _make_mock_user()
+
+        with patch(f"{_MODULE}.Bot") as mock_bot_cls:
+            mock_bot = mock_bot_cls.return_value
+            mock_bot.send_message = AsyncMock(side_effect=[retry_exc, None])
+            mock_bot.session.close = AsyncMock()
+
+            cmd = Command()
+            cmd._format_digest = MagicMock(return_value="test message")
+
+            user_ads = {123: [MagicMock(id=1)]}
+
+            with patch.object(
+                User.objects, "aget", new=AsyncMock(return_value=mock_user_obj)
+            ):
+
+                with patch(
+                    f"{_MODULE}.asyncio.sleep", new=AsyncMock()
+                ) as mock_sleep:
+                    await cmd._send_user_digests("test-token", user_ads)
+
+            # The mandated 300 s is clamped to the 30 s ceiling.
+            mock_sleep.assert_awaited_once_with(30.0)
+            assert RETRY_AFTER_CEILING == 30.0
+            # Retry still attempted: two send_message calls.
+            assert mock_bot.send_message.await_count == 2
+            assert mock_bot.session.close.await_count == 1
+
+
+# ---------------------------------------------------------------------------
+# Hostile seller markup in the digest (09-API-006)
+# ---------------------------------------------------------------------------
+
+
+class TestHostileMarkupEscaped:
+    """The digest escapes seller text on the truncated prefix (09-API-006).
+
+    The RED evidence against the unfixed tree was:
+    ``'New ads matching your saved searches (1 found):\\n\\n• Selling <b>bold</b> &
+    <a href="http://evil.example\\n   - Free\\n'`` — the seller's ``<b>`` was live
+    inside the 50-character prefix. The assertion is on ``_format_digest``'s output
+    line (not ``send_message``'s text) so it survives the ``[:50]`` truncation: a
+    full-substring check returns ``False`` against the defective code for a reason
+    unrelated to escaping.
+    """
+
+    def test_digest_escapes_seller_markup_in_prefix(self) -> None:
+        """The truncated title in the digest carries no live seller markup."""
+        from apps.search.management.commands.send_alerts import Command
+
+        ad = MagicMock()
+        ad.get_title.return_value = (
+            'Selling <b>bold</b> & <a href="http://evil.example">x</a>'
+        )
+        ad.price_amount = 0
+        ad.price_currency = "EUR"
+
+        cmd = Command()
+        message = cmd._format_digest([ad], locale="en")
+
+        # The seller's markup is escaped, not live, inside the 50-char prefix.
+        assert "<b>bold</b>" not in message
+        assert '<a href="http://evil.example">' not in message
+        assert "&lt;b&gt;bold&lt;/b&gt;" in message
+        assert "&amp;" in message
+
+    def test_digest_ordinary_title_unchanged(self) -> None:
+        """Escaping is a no-op on an ordinary title (the control)."""
+        from apps.search.management.commands.send_alerts import Command
+
+        ad = MagicMock()
+        ad.get_title.return_value = "Selling bicycle"
+        ad.price_amount = None
+        ad.price_currency = "EUR"
+
+        cmd = Command()
+        message = cmd._format_digest([ad], locale="en")
+
+        assert "• Selling bicycle" in message
+
 
 # ---------------------------------------------------------------------------
 # Bot session safety — session.close always called once

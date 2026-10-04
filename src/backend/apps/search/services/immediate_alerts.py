@@ -34,6 +34,7 @@ from aiogram.exceptions import (
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from django.conf import settings
 from django.utils import timezone
+from django.utils.html import escape
 from django.utils.translation import gettext as _, override as translation_override
 
 from apps.ads.models import Ad
@@ -54,6 +55,14 @@ _SEND_CONCURRENCY: Final[int] = 10
 
 # Capped backoff base (seconds) for transient retries (429/network/5xx).
 _BACKOFF_BASE: Final[float] = 0.5
+
+# Q8 single-sleep ceiling (seconds) for this alert path's one retry (09-VAL-009).
+# There is exactly one retry and no loop here, so this is a ceiling on ONE sleep,
+# not a total budget. It clamps the ``float(exc.retry_after)`` the bot mandates:
+# Telegram can return a large ``retry_after`` and the daily sender must not park a
+# scheduler tick for it. 30.0 keeps the pinned ``retry_after=2`` fixture green and
+# leaves ``_BACKOFF_BASE`` (0.5) below the ceiling unchanged.
+RETRY_AFTER_CEILING: Final[float] = 30.0
 
 # Bounded thread pool: caps concurrent delivery daemon threads globally.
 # Replaces unbounded threading.Thread (one per published ad burst).
@@ -177,20 +186,27 @@ def build_alert_message(
         A tuple of (message_text, reply_markup).
     """
     with translation_override(locale):
-        title = ad.get_title(locale) or _("Ad")
-        city_name = ad.city.get_name(locale) if ad.city else "—"
+        title = escape(ad.get_title(locale) or _("Ad"))
+        city_name = escape(ad.city.get_name(locale)) if ad.city else "—"
         price_str = format_price_value(ad.price_amount, ad.price_currency) or _(
             "Price not specified"
         )
         view_ad_label = _("View ad")
         disable_search_label = _("🔕 Disable this search")
 
+        # The message is sent with ``parse_mode="HTML"``, so every seller- or
+        # data-controlled value that occupies a value position is escaped with
+        # ``django.utils.html.escape`` (NOT the stdlib ``html`` module, whose
+        # ``unescape`` in apps/core/services/translation.py *decodes*). Only the
+        # gettext-wrapped labels and the structural tags are left unescaped: the
+        # labels are not seller-controlled and escaping them would change the
+        # visible message.
         lines = [
             f"<b>{title}</b>",
             f"📍 {city_name}",
             f"💰 {price_str}",
             "",
-            f'<a href="{ad.get_absolute_url()}">{view_ad_label}</a>',
+            f'<a href="{escape(ad.get_absolute_url())}">{view_ad_label}</a>',
         ]
 
         keyboard = InlineKeyboardMarkup(
@@ -269,7 +285,9 @@ async def _send_payloads(bot_token: str, payloads: list[dict]) -> None:
                 ) as exc:
                     # Transient failures — retry once with capped backoff.
                     if isinstance(exc, TelegramRetryAfter) and exc.retry_after:
-                        backoff: float = float(exc.retry_after)
+                        backoff: float = min(
+                            float(exc.retry_after), RETRY_AFTER_CEILING
+                        )
                     else:
                         backoff = _BACKOFF_BASE
                     await asyncio.sleep(backoff)

@@ -267,11 +267,138 @@ class TestRetryAfterBackoff:
             assert mock_bot.send_message.await_count == 2
             assert mock_bot.session.close.await_count == 1
 
+    @pytest.mark.asyncio
+    async def test_429_retry_after_is_capped(self) -> None:
+        """A huge Telegram retry_after is clamped to RETRY_AFTER_CEILING (Q8)."""
+        payloads = [_payload(42)]
+
+        retry_exc = TelegramRetryAfter(
+            message="too many requests",
+            method=MagicMock(),
+            retry_after=300,
+        )
+
+        with patch(
+            "apps.search.services.immediate_alerts.Bot"
+        ) as mock_bot_cls:
+            mock_bot = mock_bot_cls.return_value
+            mock_bot.send_message = AsyncMock(side_effect=[retry_exc, None])
+            mock_bot.session.close = AsyncMock()
+
+            from apps.search.services.immediate_alerts import (
+                RETRY_AFTER_CEILING,
+                _send_payloads,
+            )
+
+            with patch(
+                "apps.search.services.immediate_alerts.asyncio.sleep",
+                new=AsyncMock(),
+            ) as mock_sleep:
+                await _send_payloads("test-token", payloads)
+
+            # The mandated 300 s is clamped to the 30 s ceiling.
+            mock_sleep.assert_awaited_once_with(30.0)
+            assert RETRY_AFTER_CEILING == 30.0
+            # Retry still attempted: two send_message calls.
+            assert mock_bot.send_message.await_count == 2
+
+
+# ---------------------------------------------------------------------------
+# Hostile seller markup (09-API-006)
+# ---------------------------------------------------------------------------
+
+
+_HOSTILE_TITLE = 'Selling <b>bold</b> & <a href="http://evil.example">x</a>'
+_HOSTILE_EVIL = "<a href=\"http://evil.example\">"
+
+
+class TestHostileMarkupEscaped:
+    """Seller-authored text is escaped in the immediate-alert body (09-API-006).
+
+    Built from a MagicMock ad so the test is pure (``build_alert_message`` needs no
+    database). The RED evidence against the unfixed tree was: the raw
+    ``<b>bold</b>`` and the injected ``<a href="http://evil.example">`` were present
+    verbatim in the body — one seller's markup becomes live in every subscriber's
+    chat and Telegram rejects an unparseable entity set as a permanent
+    ``TelegramBadRequest`` with no retry.
+    """
+
+    def _hostile_ad(self) -> MagicMock:
+        ad = MagicMock()
+        ad.get_title.return_value = _HOSTILE_TITLE
+        ad.city.get_name.return_value = "Testgrad"
+        ad.price_amount = 0
+        ad.price_currency = "EUR"
+        ad.get_absolute_url.return_value = "https://example.com/ads/1/"
+        return ad
+
+    def test_builder_escapes_seller_markup(self) -> None:
+        """A hostile title produces no live seller markup in the message body."""
+        from apps.search.services.immediate_alerts import build_alert_message
+
+        saved_search = MagicMock()
+        saved_search.unsubscribe_token = "tok"
+
+        text, _keyboard = build_alert_message(self._hostile_ad(), saved_search, locale="en")
+
+        # The seller's tags are escaped, so none of their markup is live.
+        assert "<b>bold</b>" not in text
+        assert _HOSTILE_EVIL not in text
+        assert "&lt;b&gt;bold&lt;/b&gt;" in text
+        assert "&amp;" in text
+        # The structural tags the builder owns are still live.
+        assert text.startswith("<b>")
+        assert 'href="https://example.com/ads/1/"' in text
+
+    @pytest.mark.asyncio
+    async def test_retry_send_site_carries_escaped_text(self) -> None:
+        """The escaped text reaches send_message on BOTH the initial and retry sends."""
+        from apps.search.services.immediate_alerts import (
+            _send_payloads,
+            build_alert_message,
+        )
+
+        saved_search = MagicMock()
+        saved_search.unsubscribe_token = "tok"
+        text, keyboard = build_alert_message(
+            self._hostile_ad(), saved_search, locale="en"
+        )
+        payloads = [{"chat_id": 1, "text": text, "reply_markup": keyboard}]
+
+        retry_exc = TelegramRetryAfter(
+            message="too many requests",
+            method=MagicMock(),
+            retry_after=1,
+        )
+
+        with patch(
+            "apps.search.services.immediate_alerts.Bot"
+        ) as mock_bot_cls:
+            mock_bot = mock_bot_cls.return_value
+            mock_bot.send_message = AsyncMock(side_effect=[retry_exc, None])
+            mock_bot.session.close = AsyncMock()
+
+            with patch(
+                "apps.search.services.immediate_alerts.asyncio.sleep",
+                new=AsyncMock(),
+            ):
+                await _send_payloads("test-token", payloads)
+
+        assert mock_bot.send_message.await_count == 2
+        # Both the initial and the retry send carried the escaped text.
+        sent_texts = [
+            call.kwargs["text"]
+            for call in mock_bot.send_message.await_args_list
+        ]
+        assert len(sent_texts) == 2
+        for sent in sent_texts:
+            assert "<b>bold</b>" not in sent
+            assert _HOSTILE_EVIL not in sent
+
 
 # ---------------------------------------------------------------------------
 # _run_send exception narrowing
 # ---------------------------------------------------------------------------
-
 
 class TestRunSendExceptionNarrowing:
     """_run_send catches AiogramError, not bare Exception."""
