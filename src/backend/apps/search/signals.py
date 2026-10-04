@@ -30,15 +30,28 @@ fire after commit: both ``Ad`` receivers call ``bump_search_version()``
 synchronously inside the transaction. Only the ``User`` receiver defers via
 ``on_commit``.
 
-Best-effort: a cache backend failure is caught and logged for the inline
-``Ad`` bumps — the DB save has already committed.
+**Best-effort (all three receivers).** A cache backend failure is caught and
+logged — the DB save has already committed, so a Redis outage must never turn
+into a failed ``User.save()`` (which would also abort bot registration) or an
+aborted ad write. The ``User`` receiver catches the deferred failure inside the
+``on_commit`` callback so a connection error there cannot escape either.
+
+**Eager on full saves (deliberate).** When ``update_fields`` is ``None`` — a
+full ``User.save()`` or ``User.objects.create()`` — the receiver bumps
+unconditionally, because the row *may* carry an ``is_declined`` change it cannot
+see. This is correct but eager: every full user write invalidates the whole
+search cache. The targeted-save branch is the fast path; full saves are rare and
+the invalidation is monotonic, so the eagerness is accepted rather than
+optimised away (08-SRCH-005).
 """
 
 import logging
 
+import redis
 from django.db import transaction
 from django.db.models.signals import m2m_changed, post_save
 from django.dispatch import receiver
+from django_redis.exceptions import ConnectionInterrupted
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
@@ -181,6 +194,9 @@ def bump_search_cache_on_account_state_change(
     A full save (``update_fields`` is None) may change ``is_declined`` and so
     bumps; a targeted save bumps only when ``is_declined`` is among the updated
     fields.
+
+    Best-effort: the deferred bump is wrapped so a cache backend failure is
+    logged, not raised — a Redis outage must never abort the committed save.
     """
     update_fields = kwargs.get("update_fields")
 
@@ -189,10 +205,23 @@ def bump_search_cache_on_account_state_change(
     ):
         return
 
-    transaction.on_commit(bump_search_cache_version)
-    logger.debug(
-        "Deferred search content version bump for User %s account state change "
-        "(update_fields=%s)",
-        instance.pk,
-        update_fields,
-    )
+    def _bump() -> None:
+        """Bump the version, swallowing a cache outage (best-effort)."""
+        try:
+            bump_search_cache_version()
+        except ConnectionInterrupted, redis.RedisError:
+            logger.warning(
+                "Cache backend unavailable — search content version not bumped "
+                "after User %s account state change; cache will refresh on next "
+                "read",
+                instance.pk,
+            )
+        else:
+            logger.debug(
+                "Deferred search content version bump for User %s account state "
+                "change (update_fields=%s)",
+                instance.pk,
+                update_fields,
+            )
+
+    transaction.on_commit(_bump)

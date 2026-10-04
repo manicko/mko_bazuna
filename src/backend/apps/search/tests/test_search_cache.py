@@ -13,11 +13,14 @@ Covers:
 from __future__ import annotations
 
 import time
+from unittest.mock import patch
 
 import pytest
+import redis
 from django.core.cache import cache
 from django.test import Client
 from django.utils import timezone
+from django_redis.exceptions import ConnectionInterrupted
 
 from apps.ads.services.listings_query import ListingsQueryParams
 from apps.core.enums import AdSort, AdStatus, LanguageLocale
@@ -34,6 +37,7 @@ from apps.search.services.cache import (
     get_search_version,
     invalidate_search_cache,
 )
+from apps.users.models import User
 
 # ---------------------------------------------------------------------------
 # Test helpers
@@ -1001,13 +1005,15 @@ class TestSearchCacheInvalidationOnWithdrawal:
 class TestSearchCacheInvalidationOnAccountState:
     """A user's ``is_declined`` change invalidates the search cache (08-SRCH-005)."""
 
-    def test_give_consent_bumps_cache_version(self, seller, category, city):
+    def test_give_consent_service_call_bumps_cache_version(self, seller, category, city):
         """``give_consent`` increases the search content version.
 
-        The bump is delivered by the ``User`` ``post_save`` receiver in
-        ``apps/search/signals.py`` (deferred through ``transaction.on_commit``),
-        not by a manual call in the test: the receiver is the declared
-        invariant that closes the defect.
+        This pins the **service call site**, not the receiver: ``give_consent``
+        calls ``transaction.on_commit(bump_search_cache_version)`` directly
+        (pre-existing since phase 06), so this test passes even with the
+        ``User`` receiver unregistered. The receiver's own contract is pinned
+        separately by
+        ``test_raw_is_declined_save_bumps_cache_version`` below.
         """
         from apps.users.services.deletion import give_consent
         from conftest import create_test_ad
@@ -1028,6 +1034,23 @@ class TestSearchCacheInvalidationOnAccountState:
 
         assert version_after > version_before
 
+    def test_raw_is_declined_save_bumps_cache_version(self, seller):
+        """A raw ``save(update_fields=["is_declined"])`` bumps the version.
+
+        This is the receiver's contract, and it deliberately routes through
+        **no service call**: the earlier tests go via ``give_consent``, which
+        bumps on its own, so they stay green with the receiver removed. This
+        test fails (``0 -> 0``) with ``@receiver(post_save, sender=User)``
+        removed from ``apps/search/signals.py`` and passes with it present.
+
+        ``transaction=True`` runs in autocommit so the receiver's
+        ``transaction.on_commit`` callback fires within the test.
+        """
+        version_before = get_search_version()
+        seller.is_declined = True
+        seller.save(update_fields=["is_declined"])
+        assert get_search_version() > version_before
+
     def test_unrelated_user_save_does_not_bump_cache(self, seller):
         """A targeted save on a field unrelated to visibility does not bump.
 
@@ -1039,3 +1062,47 @@ class TestSearchCacheInvalidationOnAccountState:
         version_after = get_search_version()
 
         assert version_after == version_before
+
+
+# ---------------------------------------------------------------------------
+# Cache-outage safety — a failed bump must not abort the User save (08-SRCH-005)
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.integration
+class TestCacheOutageDoesNotAbortUserSave:
+    """The account-state receiver's bump is best-effort (08-SRCH-005).
+
+    The defect this pins: ``bump_search_cache_on_account_state_change`` was the
+    only receiver in ``apps/search/signals.py`` that did not guard its bump, so
+    a Redis outage raised out of the deferred ``on_commit`` callback and turned
+    a cache failure into a failed ``User.save()`` — a strictly wider blast
+    radius than the already-guarded ``Ad`` siblings, and one that would abort
+    bot registration. Mirrors
+    ``categories.tests.test_categories.TestCacheOutageDoesNotAbortCategorySave``.
+    """
+
+    def test_cache_outage_does_not_roll_back_save(self, seller) -> None:
+        """A User save commits even when the version bump raises."""
+        with patch(
+            "apps.search.signals.bump_search_cache_version",
+            side_effect=ConnectionInterrupted("Simulated Redis outage"),
+        ):
+            seller.is_declined = True
+            seller.save(update_fields=["is_declined"])
+
+        # The save committed (the row is visible on a fresh query) and the
+        # receiver's on_commit callback did not re-raise out of post_save.
+        assert User.objects.filter(pk=seller.pk, is_declined=True).exists()
+
+    def test_bare_redis_error_does_not_roll_back_save(self, seller) -> None:
+        """A bare ``redis.RedisError`` from the bump also leaves the save intact."""
+        with patch(
+            "apps.search.signals.bump_search_cache_version",
+            side_effect=redis.RedisError("redis down"),
+        ):
+            seller.is_declined = True
+            seller.save(update_fields=["is_declined"])
+
+        assert User.objects.filter(pk=seller.pk, is_declined=True).exists()
