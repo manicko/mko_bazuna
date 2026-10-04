@@ -22,7 +22,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
-from apps.core.enums import AdStatus, ConsentChoice
+from apps.core.enums import AdStatus, ConsentActionSource, ConsentChoice
 from apps.core.models import SupportTicket
 from apps.search.models import SavedSearch, SearchHistory
 from apps.search.services.cache import bump_search_cache_version
@@ -94,6 +94,8 @@ def withdraw_consent(
     ip_address: str | None = None,
     user_agent: str | None = None,
     session_key: str | None = None,
+    action_source: ConsentActionSource = ConsentActionSource.SELF_SERVICE,
+    initiated_by: User | None = None,
 ) -> list[str]:
     """
     Withdraw consent and trigger immediate soft-delete (decision F).
@@ -132,11 +134,12 @@ def withdraw_consent(
     signal's ``on_commit`` callback, following the TX-then-FS pattern. A
     rollback must never remove files for rows that remain in the DB.
 
-    Limitation (``06-NEW-02``): ``ConsentRecord`` has **no actor column**, so a
-    staff-initiated revocation (the admin action) is evidenced as "the subject
-    withdrew", indistinguishable from a self-service withdrawal. The admin row
-    also carries no IP and no user agent (the action supplies neither). No
-    column is invented and no migration is added here.
+    Limitation (``06-NEW-02``): ``ConsentRecord`` now records the actor and the
+    mechanism. A bare ``withdraw_consent(user)`` call means **"the subject
+    withdrew"** (``action_source`` defaults to ``SELF_SERVICE``); **any
+    third-party initiator MUST pass ``ADMIN_STAFF`` and ``initiated_by``** — the
+    admin action does exactly that. The admin-initiated row still carries no IP
+    and no user agent (recorded residual, BLOCK 10's shipped behaviour).
 
     Idempotency: if the user is already soft-deleted (``is_deleted=True``),
     the call is a no-op returning ``[]`` and writes no audit row.
@@ -152,6 +155,10 @@ def withdraw_consent(
         session_key: Session key that authenticated the action, or ``None``.
             The view supplies it so the row commits before ``logout()`` flushes
             the session, identifying the session that actually acted.
+        action_source: Mechanism that initiated the withdrawal. Defaults to
+            ``SELF_SERVICE``; a staff/admin initiator MUST pass ``ADMIN_STAFF``.
+        initiated_by: The acting account, or ``None``. Recorded only when it is
+            not the subject (normalised in the recording service).
 
     Returns:
 
@@ -232,6 +239,8 @@ def withdraw_consent(
             ip_address=ip_address,
             user_agent=user_agent,
             session_key=session_key,
+            action_source=action_source,
+            initiated_by=initiated_by,
         )
 
     # Storage keys returned for the caller's logging/inspection; physical

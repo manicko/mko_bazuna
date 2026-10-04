@@ -453,6 +453,34 @@ def test_ad_text_entries_are_delete_row() -> None:
         )
 
 
+def test_consent_record_actor_is_declared_retain_citing_06_new_02() -> None:
+    """``ConsentRecord.initiated_by`` is a declared RETAIN naming BLOCK 18.
+
+    The positive pin matters: ``test_listed_models_have_no_unreviewed_column``
+    fails if the reviewed decision is *missing*, but nothing stops a later hand
+    from deleting the entry. This asserts the retention decision (and that
+    ``action_source`` is in the reviewed set) survives.
+
+    ``initiated_by`` is relational, so the guard's field filter skips it — it is
+    declared here precisely to record a staff-identifier retention decision that
+    would otherwise be an invisible omission.
+    """
+    lookup = _entry_lookup()
+
+    entry = lookup.get(("users.ConsentRecord", "initiated_by"))
+    assert entry is not None, "ConsentRecord.initiated_by must be a declared entry"
+    _label, _column, action, reason = entry
+    assert action == ErasureAction.RETAIN, (
+        "ConsentRecord.initiated_by must be RETAIN — no erasure path nulls it"
+    )
+    assert "BLOCK 18" in reason, "the reason must name its owning block"
+    assert "06-NEW-02" in reason, "the reason must cite 06-NEW-02"
+
+    assert "action_source" in REVIEWED_NON_IDENTITY_COLUMNS["users.ConsentRecord"], (
+        "ConsentRecord.action_source must be a reviewed non-identity decision"
+    )
+
+
 def test_declared_entries_are_unique() -> None:
     """No duplicate ``(model_label, column)`` in the declaration."""
     keys = [(model_label, column) for model_label, column, _a, _r in PII_ERASURE_ENTRIES]

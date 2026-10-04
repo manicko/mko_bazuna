@@ -109,11 +109,62 @@ shipped behaviour, and mirrored in the three places a reader reaches:
 | [`architecture.md` § Bot Support Intake Flow](../99-agent/architecture.md#bot-support-intake-flow) | The bot-tier behaviour, including which deep-links a declined user may use |
 | `privacy.html` §7 (template, user-facing) | The data-subject's wording: a decline is reversible, accept again to restore posting |
 
+## BLOCK 18 — the consent actor and mechanism (`06-NEW-02`)
+
+**Finding this closes.** `06-NEW-02` — reopened as an owned phase-06 follow-up by **owner ruling
+2026-10-04**. BLOCKS 12 and 15 were **not** reopened; the finding had been routed to "BLOCK 12/15"
+and both closed without it, leaving it orphaned.
+
+**Why it was a data-model and accountability defect, not cosmetics.** `ConsentRecord` could not
+distinguish *subject withdrew / staff revoked / system revoked*, so the **audit meaning** of the
+Art. 7(1) ledger was incomplete. A staff revocation in the admin was evidenced identically to a
+self-service withdrawal — the row read *"the subject withdrew"*.
+
+**What shipped.** Two columns on `ConsentRecord` (`users/models.py`, migration
+`0005_consentrecord_initiated_by_action_source`): `initiated_by` (FK → `users.User`, `SET_NULL`,
+`related_name="+"`) names the acting account, and `action_source` (closed
+`ConsentActionSource` StrEnum, default `unknown`, indexed) states the mechanism.
+
+**The actor definition.** The actor is the account that performed the action, recorded **only when
+it is not the subject**. `user` already names the subject, so a self-action would store the same
+account twice. Invariant: `initiated_by IS NOT NULL` only when it is a different row from `user`.
+Read the pair, never one column alone — `action_source` is authoritative for which case the row
+is, `initiated_by` names the account when one exists. A null `initiated_by` means "no acting
+account distinct from the subject", covering a self-service action, an anonymous visitor and a
+system action; `action_source` tells those three apart. Leaving the self-action null is
+load-bearing: a subject-populated copy would survive BLOCK 15's 90-day `user_id` clear and become
+the only remaining link from an anonymous decision to a live account.
+
+**No data migration and no backfill.** The ledger never recorded the actor or the mechanism, so
+nothing is derivable. `AddField` wrote the default, so every pre-existing row reads
+`action_source = "unknown"` with `initiated_by = NULL`: *"written before the actor was recorded;
+the mechanism was never captured and is not recoverable"*. A null `initiated_by` on such a row
+carries **no inference** about who acted, including for rows that were in fact staff revocations.
+
+**Retention — implement, do not settle (open owner/DPO question).** The acting account is retained
+to the **decision bound (5 years)**, not cleared at the 90-day fingerprint window; clearing it
+would destroy the accountability the change exists to record. `purge_consent_records` is
+**unmodified** — its one-statement `.update(...)` never names `initiated_by`, and the column never
+holds a link to the subject, so BLOCK 15's invariant survives with no code change. The
+counter-argument is real and deliberately unresolved: a superuser identifier held for 5 years on a
+row whose subject is anonymous is employee personal data with no erasure path, yielding a
+per-operator behavioural record — an owner/DPO proportionality decision. The reversal is one line
+in `purge_consent_records` plus the `RETAIN` inventory entry's action.
+
+**`ConsentActionSource.SYSTEM` has no production writer today, and that is expected.** It exists
+because the owner named "system revoked" as one of the three cases, and a closed vocabulary is what
+stops a future writer inventing a fourth spelling. It is proven storable and distinguishable by
+driving the real recording service.
+
+**Documented residuals (recorded, not fixed).** The admin-initiated row still carries **no
+`ip_address` and no `user_agent`** (BLOCK 10's shipped behaviour and its test). And
+`record_consent_action`'s `request is None` branch drops `consent_version` when delegating — a
+pre-existing defect, out of scope, but the line was edited to forward `action_source`.
+
 ## Open work
 
 | Item | Question | State |
 |---|---|---|
-| **`06-NEW-02` — `ConsentRecord` has no actor column** | Who performed a consent action is not recorded. A staff-initiated revocation in the admin is evidenced as *"the subject withdrew"*, with nothing recording that a staff member did it, and the admin-initiated row carries **no IP address and no user agent**. | **Open and unowned.** The retention sweep that shipped under Q-D4 does **not** close it: it bounds and anonymises the ledger, it does not add provenance. Recorded as a known limitation in [`db-schema.md`](../02-database/db-schema.md#consent_records-zone-f--plan-21) — it is **not** assigned to any block, and no block in this pass is still to come |
 | **`06-PII-113` audit rubric (coordinator-owned)** | The phase-06 audit handbook's block 1 (*Consent states*) tells the auditor that "where sources disagree … **pick no winner**". That instruction is correct for an undecided question and **wrong for a decided one**: because DECLINE reversibility is now decided here, a future run would re-derive the same source disagreement and re-file it as a finding rather than recognise it as settled. | **Open, coordinator-owned.** `.ai/audit/**` and `.kilo/commands/audit/**` are audit inputs, not product documentation, and were **not** edited by this pass. Correcting the rubric is a coordinator deliverable, not this phase's |
 
 ## Boundaries deliberately left untouched
@@ -134,7 +185,7 @@ shipped behaviour, and mirrored in the three places a reader reaches:
 | `can_login` / `can_publish_ad` / `can_store_personal_data` / `can_create_ad` composition | [`architecture.md`](../99-agent/architecture.md) |
 | Bot-tier carve-outs (`is_contact_link`, `login_<token>`, plan-19 support) | [`architecture.md` § Bot Support Intake Flow](../99-agent/architecture.md#bot-support-intake-flow) |
 | `purge_consent_records`: 90-day fingerprint / 5-year decision, anonymise-never-delete, advisory lock 14 | [`db-retention.md`](../02-database/db-retention.md) |
-| `consent_records` columns, `IX_consent_records_sweep`, and the missing-actor-column limitation | [`db-schema.md`](../02-database/db-schema.md#consent_records-zone-f--plan-21) |
+| `consent_records` columns, `IX_consent_records_sweep`, and the actor/mechanism definition and retention decision | [`db-schema.md`](../02-database/db-schema.md#consent_records-zone-f--plan-21) |
 | `LOG_MASK_KEY`: the env-var contract, the guard chain, and the rotation trade-off | [`docker-deployment.md`](../ops/docker-deployment.md#environment-variables) |
 | `mask_telegram_id()` keyed-HMAC construction and why the value is pseudonymised, not anonymised | [`technical-specification.md` §F](../01-spec/technical-specification.md) |
 | `ModeratorActionLog.reason` redaction at write time | [`technical-specification.md` §A](../01-spec/technical-specification.md) |

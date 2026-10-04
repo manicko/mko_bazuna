@@ -318,6 +318,23 @@ class ConsentChoice(StrEnum):
     WITHDRAWN = "withdrawn"
 
 
+class ConsentActionSource(StrEnum):
+    """Mechanism by which a consent action was initiated (06-NEW-02).
+
+    Answers "by what mechanism", never "who" — that is ``initiated_by``. Read the
+    two together: ``action_source`` is authoritative for which case a row is, and
+    ``initiated_by`` names the acting account when one exists and is not the
+    subject. The vocabulary is closed on purpose so a future writer cannot invent
+    a fourth spelling.
+    """
+
+    SELF_SERVICE = "self_service"  # the subject acted, from their own session
+    ANONYMOUS_WEB = "anonymous_web"  # an unidentified visitor acted; no account
+    ADMIN_STAFF = "admin_staff"  # a staff account acted via the Django admin
+    SYSTEM = "system"  # no human actor; an automated process acted
+    UNKNOWN = "unknown"  # DEFAULT — row predates 06-NEW-02; not recoverable
+
+
 class CookieCategory(StrEnum):
     """Granular cookie categories (ePrivacy Art. 5(3) prior consent)."""
 
@@ -385,6 +402,7 @@ __all__ = [
     "PriceStep",
     "TimeRange",
     "ConsentChoice",
+    "ConsentActionSource",
     "CookieCategory",
     "ConsentVersion",
     "UserRole",

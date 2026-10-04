@@ -20,10 +20,11 @@ from django.core.management import call_command
 from django.test import RequestFactory
 from django.utils import timezone
 
-from apps.core.enums import ConsentChoice, ConsentVersion
+from apps.core.enums import ConsentActionSource, ConsentChoice, ConsentVersion
 from apps.search.models import SavedSearch
 from apps.users.context_processors import CONSENT_REPROMPT_DAYS, consent_state
-from apps.users.models import ConsentRecord
+from apps.users.models import ConsentRecord, User
+from apps.users.services.deletion import withdraw_consent
 from conftest import make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -262,6 +263,42 @@ class TestIdempotence:
         )
 
         assert after_first == after_second == (None, None, None, "")
+
+
+class TestStaffActorRetention:
+    """The sweep retains the acting staff account to the decision bound (06-NEW-02)."""
+
+    def test_sweep_clears_fingerprint_but_keeps_the_staff_actor(self, user) -> None:
+        """An aged staff-revocation row keeps its actor, which the sweep never names.
+
+        The sweep's one-statement ``.update(...)`` names ``user``,
+        ``session_key``, ``ip_address`` and ``user_agent`` only — never
+        ``initiated_by`` — so the accountability the owner asked for survives the
+        90-day fingerprint window. This is the behavioural pin for that decision;
+        the production command is unchanged.
+        """
+        staff = make_user(900000098, is_staff=True)
+        withdraw_consent(
+            user,
+            action_source=ConsentActionSource.ADMIN_STAFF,
+            initiated_by=staff,
+        )
+        row = ConsentRecord.objects.get(user=user)
+        assert row.initiated_by_id == staff.pk
+        ConsentRecord.objects.filter(pk=row.pk).update(
+            consent_given_at=timezone.now() - timedelta(days=_FINGERPRINT_DAYS + 1)
+        )
+
+        call_command("purge_consent_records")
+
+        row.refresh_from_db()
+        assert row.user_id is None
+        assert row.session_key is None
+        assert row.ip_address is None
+        assert row.user_agent == ""
+        # The staff actor survives; the acting account is still readable.
+        assert row.initiated_by_id == staff.pk
+        assert User.objects.filter(pk=staff.pk).exists()
 
 
 class TestNoInteractionWithTeardown:

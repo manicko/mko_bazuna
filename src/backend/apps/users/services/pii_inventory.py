@@ -27,6 +27,10 @@ they are *not* identity material on this product:
 - ``core.SupportContact.telegram_id`` — a **support channel's** public
   destination (a bot/channel id), never a subject's identity; it is not the
   ``SupportTicket.telegram_id`` denormalised copy that 06-PII-101 concerns.
+- ``ConsentRecord.action_source`` — a closed mechanism vocabulary
+  (``self_service`` / ``anonymous_web`` / ``admin_staff`` / ``system`` /
+  ``unknown``) carrying no personal data; it is the discriminator that makes the
+  audit ledger's meaning complete (06-NEW-02).
 
 Promotion path to a real registry: the consuming block (BLOCK 9 first) may
 write a single accessor function over the *same* tuples — resolving each
@@ -130,9 +134,11 @@ PII_ERASURE_ENTRIES: tuple[tuple[str, str, ErasureAction, str], ...] = (
         "Implemented today: cleared to NULL by decline_consent and by "
         "withdraw_consent inside its existing transaction.atomic(). The clear "
         "is durable because all four restore paths are closed: the decline "
-        "response expires the preferred_city cookie with a hand-rolled secure "
-        "Set-Cookie (delete_cookie cannot clear a Secure cookie over HTTPS), "
-        "set_preferred_city gates its DB write on not is_declined, and the "
+        "response expires the preferred_city cookie with a hand-rolled "
+        "Set-Cookie built from set_cookie (delete_cookie cannot carry the "
+        "cookie's own Secure flag, so the deletion would not take effect on the "
+        "origin it was written on), set_preferred_city gates its DB write on "
+        "not is_declined, and the "
         "login reconcile returns early for a declined user. Re-acceptance via "
         "give_consent clears is_declined and is a new consent (06-PII-110).",
     ),
@@ -163,6 +169,22 @@ PII_ERASURE_ENTRIES: tuple[tuple[str, str, ErasureAction, str], ...] = (
         "Implemented by BLOCK 15's purge_consent_records (lock 14) at R2, the "
         "ratified 90-day fingerprint window (06-PII-116). Nullable, already "
         "masked at write by _client_ip_mask, and not required for the proof.",
+    ),
+    (
+        "users.ConsentRecord",
+        "initiated_by",
+        ErasureAction.RETAIN,
+        "NOT implemented as an erasure (retention) — BLOCK 18 (06-NEW-02). The "
+        "acting-account FK never holds the subject: the recording service "
+        "records an actor only when it is a different row from user, so a "
+        "self-service action leaves it NULL. It is retained to the DECISION "
+        "bound (5 years), not the 90-day fingerprint bound, because clearing the "
+        "staff actor at 90 days would destroy the accountability the owner "
+        "asked for. It is emptied only by SET_NULL when the ACTING ACCOUNT's own "
+        "row is hard-deleted (consent_hard_delete / seed_service); no erasure "
+        "path nulls it. RETAIN, not NULL — declaring NULL would describe a scrub "
+        "that does not happen. The 5-year retention of a superuser identifier on "
+        "an anonymous-subject row is an open owner/DPO proportionality question.",
     ),
     (
         "users.LoginToken",
@@ -297,8 +319,11 @@ PII_ERASURE_ENTRIES: tuple[tuple[str, str, ErasureAction, str], ...] = (
 #: (never hand-typed), so the guard can prove every such column on a listed
 #: model was reviewed: a column is either declared in ``PII_ERASURE_ENTRIES``
 #: or listed here. Relational fields, the implicit ``id`` primary key and
-#: timestamp columns are excluded by the guard's own field filter and are not
-#: recorded here.
+#: timestamp columns are skipped *by the guard's own field filter* — they are
+#: never required to carry a reviewed decision here, but a relational field
+#: **may** still be declared in ``PII_ERASURE_ENTRIES`` when an
+#: accountability-retention decision needs recording (``ConsentRecord.initiated_by``,
+#: 06-NEW-02).
 REVIEWED_NON_IDENTITY_COLUMNS: dict[str, frozenset[str]] = {
     "users.User": frozenset(
         {
@@ -321,6 +346,7 @@ REVIEWED_NON_IDENTITY_COLUMNS: dict[str, frozenset[str]] = {
             "consent_version",
             "choice",
             "categories",
+            "action_source",
         }
     ),
     "users.LoginToken": frozenset(

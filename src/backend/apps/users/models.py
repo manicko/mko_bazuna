@@ -9,6 +9,7 @@ from django.db import models
 
 from apps.core.enums import (
     AdSource,
+    ConsentActionSource,
     ConsentChoice,
     ConsentVersion,
     LanguageLocale,
@@ -234,6 +235,17 @@ class ConsentRecord(models.Model):
 
     ``user`` is nullable: anonymous visitors record consent via cookies only and
     are identified by ``session_key`` instead of a user account.
+
+    Actor definition (``06-NEW-02``): the actor is the account that performed the
+    action, and it is recorded **only when that account is not the subject**.
+    ``user`` already names the subject, so a self-action would store the same
+    account twice. Invariant: ``initiated_by IS NOT NULL`` only when it is a
+    different row from ``user``. Read the pair, never one column alone —
+    ``action_source`` is authoritative for *which case* the row is, and
+    ``initiated_by`` names the account when one exists. A null ``initiated_by``
+    means "no acting account distinct from the subject", covering a self-service
+    action, an anonymous visitor and a system action; ``action_source`` tells
+    those three apart.
     """
 
     user = models.ForeignKey(
@@ -242,7 +254,11 @@ class ConsentRecord(models.Model):
         blank=True,
         on_delete=models.SET_NULL,
         related_name="consent_records",
-        help_text="User who acted (null for anonymous cookie-based consent)",
+        help_text=(
+            "The subject of the consent action (null for anonymous "
+            "cookie-based consent). This is NOT the actor — a third-party "
+            "actor is recorded only in initiated_by (06-NEW-02)."
+        ),
     )
     session_key = models.CharField(
         max_length=40,
@@ -277,6 +293,35 @@ class ConsentRecord(models.Model):
         blank=True,
         max_length=500,
         help_text="Truncated User-Agent header from the consent request",
+    )
+    initiated_by = models.ForeignKey(
+        "users.User",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="+",
+        help_text=(
+            "Acting account, recorded ONLY when it is not the subject "
+            "(06-NEW-02). NULL means no acting account distinct from the "
+            "subject — a self-service action, an anonymous visitor, or a system "
+            "action; action_source tells those apart. Never CASCADE: "
+            "consent_hard_delete deletes User rows and a cascade would destroy "
+            "the Art. 7(1) ledger. Retained to the decision bound (5 years), not "
+            "the 90-day fingerprint bound — see the open owner/DPO question."
+        ),
+    )
+    action_source = models.CharField(
+        max_length=20,
+        choices=[(s.value, s.value) for s in ConsentActionSource],
+        default=ConsentActionSource.UNKNOWN.value,
+        blank=True,
+        db_index=True,
+        help_text=(
+            "Mechanism that initiated the action (06-NEW-02). UNKNOWN is the "
+            "default and means the row predates this column: the mechanism was "
+            "never captured and is not recoverable. No row written through the "
+            "recording service carries UNKNOWN."
+        ),
     )
 
     class Meta:

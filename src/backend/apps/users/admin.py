@@ -7,6 +7,7 @@ Custom admin with restricted access and consents visibility.
 from django.contrib import admin
 from django.contrib.auth.forms import UserChangeForm, UserCreationForm
 
+from apps.core.enums import ConsentActionSource
 from apps.core.utils.sanitize import mask_telegram_id
 from apps.users.models import ConsentRecord, LoginToken, User
 from apps.users.services import withdraw_consent
@@ -329,11 +330,12 @@ class UserAdmin(admin.ModelAdmin):
         the user and their ads, nullifies PII, and writes the WITHDRAWN
         ``ConsentRecord`` audit row inside the same per-user transaction.
 
-        Limitation (``06-NEW-02``): ``ConsentRecord`` has **no actor column**, so
-        a staff-initiated revocation is evidenced as "the subject withdrew" —
-        indistinguishable from a self-service withdrawal. The admin-initiated
-        row also carries **no IP and no user agent** (the action supplies
-        neither). No column is invented and no migration is added.
+        This is the staff revocation path (``06-NEW-02``): it passes
+        ``action_source=ADMIN_STAFF`` and ``initiated_by=request.user`` so the
+        audit row names the acting staff account. Without them the row would be
+        evidenced as "the subject withdrew". The admin-initiated row still
+        carries **no IP and no user agent** (recorded residual, BLOCK 10's
+        shipped behaviour — the action supplies neither).
 
         A row already soft-deleted (``is_deleted=True``) is a no-op and is
         reported as skipped rather than counted as a withdrawal.
@@ -345,7 +347,11 @@ class UserAdmin(admin.ModelAdmin):
             if user.is_deleted:
                 skipped += 1
                 continue
-            withdraw_consent(user)
+            withdraw_consent(
+                user,
+                action_source=ConsentActionSource.ADMIN_STAFF,
+                initiated_by=request.user,
+            )
             withdrawn += 1
         message = f"Withdrew consent for {withdrawn} user(s)."
         if skipped:
@@ -368,7 +374,7 @@ class ConsentRecordAdmin(admin.ModelAdmin):
         "choice",
         "consent_version",
     ]
-    list_filter = ["choice", "consent_version", "consent_given_at"]
+    list_filter = ["choice", "consent_version", "consent_given_at", "action_source"]
     search_fields = ["session_key"]
     readonly_fields = [
         "user",
@@ -379,6 +385,12 @@ class ConsentRecordAdmin(admin.ModelAdmin):
         "categories",
         "ip_address",
         "user_agent",
+        # MANDATORY (06-NEW-02): this class declares no fieldsets, so the change
+        # form is auto-built from the editable fields. Without these two the actor
+        # and the mechanism would be writable by a superuser — forgeable
+        # accountability evidence.
+        "initiated_by",
+        "action_source",
     ]
 
     def has_add_permission(self, request) -> bool:

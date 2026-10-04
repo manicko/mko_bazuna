@@ -39,7 +39,7 @@ import pytest
 from django.test import Client
 from django.urls import reverse
 
-from apps.core.enums import ConsentChoice
+from apps.core.enums import ConsentActionSource, ConsentChoice
 from apps.users.admin import UserAdmin
 from apps.users.models import ConsentRecord, User
 
@@ -195,9 +195,14 @@ def test_forged_post_as_superuser_withdraws_and_writes_one_record(
     assert len(records) == 1
     assert records[0].choice == ConsentChoice.WITHDRAWN.value
     assert records[0].categories == {"analytics": False, "preferences": False}
-    # The admin supplies no HTTP context (06-NEW-02).
+    # The admin supplies no HTTP context (BLOCK 10's shipped behaviour; retained
+    # as a recorded residual by BLOCK 18).
     assert records[0].ip_address is None
     assert records[0].user_agent == ""
+    # The staff actor and the admin mechanism are recorded (06-NEW-02): the row
+    # no longer reads as "the subject withdrew".
+    assert records[0].initiated_by_id == superuser.pk
+    assert records[0].action_source == ConsentActionSource.ADMIN_STAFF.value
 
 
 # ---------------------------------------------------------------------------

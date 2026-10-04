@@ -107,7 +107,7 @@ record to their `users` row (SET NULL on erasure keeps the audit trail after acc
 JSONB carries granular flags (`{"analytics": bool, "preferences": bool}`).
 ```
 id (PK)
-user_id (FK → users.id, nullable, SET_NULL)   # NULL for anonymous/guest consent (cookie-only sessions)
+user_id (FK → users.id, nullable, SET_NULL)   # NULL for anonymous/guest consent (cookie-only sessions); the SUBJECT, not the actor
 session_key (VARCHAR(40), nullable)            # sole identifier of an ANONYMOUS record; also the admin search_fields key
 choice (StrEnum — ConsentChoice)              # see db-enums.md
 categories (JSONB)                            # {"analytics": bool, "preferences": bool}
@@ -115,6 +115,8 @@ consent_version (VARCHAR(20), default "1.0")       # ConsentVersion StrEnum; ban
 consent_given_at (TIMESTAMP, auto_now_add)     # sweep anchor for purge_consent_records; Meta.ordering = ["-consent_given_at"]
 ip_address (INET, nullable)                   # anonymised CLIENT address, masked /24 (IPv4) or /64 (IPv6) — see the note below
 user_agent (TEXT, blank=True, NOT nullable)   # cleared to "" (not NULLed) by the retention sweep
+initiated_by_id (FK → users.id, nullable, SET_NULL)  # the ACTING account, only when it is not the subject (06-NEW-02); NULL covers self-service / anonymous / system
+action_source (StrEnum — ConsentActionSource, default "unknown", indexed)  # BY WHAT MECHANISM the action was initiated; see db-enums.md
 db_table: consent_records
 ```
 There is **no `consented_at` and no `revoked_at` column**: the action timestamp is
@@ -142,26 +144,53 @@ retention sweep, which **anonymises** (never deletes) rows older than the ratifi
 fingerprint window. `Meta.ordering = ["-consent_given_at"]` does not create an index, so the
 sweep column leads this real index.
 
-**Known limitation — no actor column (`06-NEW-02`, open and unowned).** `consent_records` records
-**what** was decided, never **who decided it**. There is no `actor` / `performed_by` column and
-no `via` discriminator:
+**Actor and mechanism (`06-NEW-02`, closed by BLOCK 18).** `consent_records` records
+both **who acted** (`initiated_by`) and **by what mechanism** (`action_source`). The
+**actor definition**: the actor is the account that performed the action, and it is
+recorded **only when that account is not the subject**. `user` already names the
+subject, so a self-action would store the same account twice. **Invariant:
+`initiated_by IS NOT NULL` only when it is a different row from `user`.** Read the
+pair, never one column alone — `action_source` is authoritative for *which case* the
+row is, and `initiated_by` names the account when one exists. A null `initiated_by`
+means "no acting account distinct from the subject", covering a self-service action,
+an anonymous visitor and a system action; `action_source` tells those three apart.
+The self-action stays null on purpose: a subject-populated copy would survive the
+90-day `user_id` clear and become the only remaining link from an anonymous decision
+to a live account — re-opening the sweep's own re-identification path.
 
-- A **staff-initiated** revocation (the admin's *Withdraw consent* action,
-  `UserAdmin.withdraw_consent_action`) is evidenced identically to a self-service withdrawal —
-  the row reads *"the subject withdrew"*, and nothing in the ledger records that a staff member
-  did it. The staff identity survives only in the Django admin's own log of who submitted the
-  changelist action, not in the consent evidence itself.
-- The admin-initiated row carries **no `ip_address` and no `user_agent`**: those are written from
-  the *request* on the `consent_accept` / `consent_decline` / `consent_withdraw` web views, and
-  the admin action has no consent request behind it.
-- Consequently, `session_key` is not merely "the anonymous identifier" — for **every** row it is
-  the only field that ties a decision to the client that made it, and
-  `purge_consent_records` clears it at 90 days along with the rest of the fingerprint set.
+| Case | `user` | `initiated_by` | `action_source` |
+|---|---|---|---|
+| subject acted | the subject | NULL | `self_service` |
+| anonymous visitor | NULL | NULL | `anonymous_web` (+ non-null `session_key`) |
+| staff revoked (admin action) | the target | the staff account | `admin_staff` |
+| system (no production writer today) | the subject | NULL | `system` |
+| row predating this change | unchanged | NULL | `unknown` |
 
-The retention sweep that shipped for `06-PII-116` bounds and anonymises the ledger; it does
-**not** add provenance. **This is not assigned to any block, and no block in the phase that
-raised it is still to come** — it needs an owner. See
-[`pii-consent-remediation-record.md`](../99-agent/pii-consent-remediation-record.md#open-work).
+**`SET_NULL`, never `CASCADE`.** `consent_hard_delete` runs a real `User.objects….delete()`
+collector; a cascade would delete the `ConsentRecord` rows through it and destroy the
+Art. 7(1) ledger. `related_name="+"` avoids a second reverse accessor on `User`.
+
+**Retention decision (BLOCK 18 recommendation, open owner/DPO question).** The acting
+account is retained to the **decision bound (5 years)** and is **not** cleared at the
+90-day fingerprint window: clearing the staff actor at 90 days would destroy the
+accountability the change exists to record. `purge_consent_records` is unmodified — its
+one-statement `.update(...)` never names `initiated_by`, so the column is untouched.
+`initiated_by` is emptied **only** by `SET_NULL` when the *acting account's* own row is
+hard-deleted. The counter-argument is real and deliberately unresolved: a superuser
+identifier held for 5 years on a row whose subject is anonymous is employee personal
+data with no erasure path, yielding a per-operator behavioural record — a
+proportionality judgement, not a technical one. The reversal is one line in
+`purge_consent_records` plus the `RETAIN` inventory entry's action.
+
+**Reading convention for pre-existing rows.** This change shipped no data migration and
+no backfill: the ledger never recorded the actor or the mechanism, so nothing is
+derivable (inferring *"no IP and no user agent therefore staff"* would be wrong for
+every bot- or command-written row). `AddField` wrote the default, so every pre-existing
+row reads `action_source = "unknown"` with `initiated_by = NULL`. `unknown` means
+*"written before the actor was recorded; the mechanism was never captured and is not
+recoverable"*, and a null `initiated_by` on such a row carries **no inference** about
+who acted — including for rows that were in fact staff revocations. No row written
+through the recording service carries `unknown`.
 
 ---
 

@@ -242,6 +242,27 @@ Backs the GDPR/ePrivacy accept/decline/withdraw flow (decision F, zone R3).
 | `DECLINED` | user declined non-essential cookies (browse-only; no erasure). **Reversible** — re-consenting clears it and restores publishing and listing visibility; it does **not** block login (decision Q-D1, see [`pii-consent-remediation-record.md`](../99-agent/pii-consent-remediation-record.md#decline-1-q-d1--a-decline-is-reversible)) |
 | `WITHDRAWN` | user withdrew consent (sets `consent_revoked_at`; triggers soft-delete + 30-day PII erasure). **Terminal** — `consent_accept` / `consent_decline` return `403` for a soft-deleted user |
 
+## ConsentActionSource
+Mechanism by which a consent action was initiated, recorded in
+`consent_records.action_source` (see [db-schema.md](db-schema.md)). Backs the
+audit-meaning requirement of GDPR Art. 7(1): a `ConsentRecord` must distinguish
+subject-initiated, anonymous, staff-initiated and system-initiated actions.
+
+`ConsentActionSource` answers **"by what mechanism"**, never **"who"** — that is
+`consent_records.initiated_by`, the acting-account FK. Read the two together:
+`action_source` is authoritative for which case a row is, and `initiated_by`
+names the acting account when one exists and is not the subject. A null
+`initiated_by` covers a self-service action, an anonymous visitor and a system
+action, which `action_source` tells apart.
+
+| Value | Meaning |
+|-------|---------|
+| `self_service` | the subject acted, from their own session (`initiated_by` is NULL — the subject is already `user`) |
+| `anonymous_web` | an unidentified visitor acted; no account at all; `session_key` is non-null |
+| `admin_staff` | a staff account acted via the Django admin; `initiated_by` names the acting staff account |
+| `system` | no human actor; an automated process acted. **No production writer today** — the member exists because the owner named "system revoked" as a required case and a closed vocabulary is what stops a future writer inventing a fourth spelling |
+| `unknown` | **default** — the row predates the `action_source` column; the mechanism was never captured and is not recoverable. `AddField` wrote this default to every pre-existing row; no row written through the recording service carries it |
+
 ## CookieCategory
 Non-essential cookie categories offered by the consent banner (Plan 21 D-9). Used as the
 vocabulary for the `consent_analytics` / `consent_preferences` cookies and the
