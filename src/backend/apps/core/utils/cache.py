@@ -1,15 +1,48 @@
 """
 Django cache utilities for Mko Bazuna.
 
-Provides cached singleton access for ModerationCriteria with TTL support.
+Holds the project's call-shaped cache helpers: five getter/setter/invalidate
+triads (moderation criteria, site config, bot username, support contacts,
+anonymous language) plus :func:`cache_get_or_none`, the shared cache-read
+primitive.
+
+Cache-failure policy (declared here, once). A cache **read** must never raise
+into a request path: a cache outage degrades to "no cached value", never to a
+5xx. Route every request-path read through :func:`cache_get_or_none`, which
+swallows ``ConnectionInterrupted`` and ``redis.RedisError``, logs, and returns
+``None``. This is the same exception tuple and the same fail-open intent as
+``telegram_bot.middlewares.update_id_dedup.UpdateIdDedupMiddleware.__call__``.
+A cache **write** may still raise; the caller that owns the value decides
+whether to guard it (see ``apps.core.services.site_config``), because the
+correct recovery differs per caller.
 """
 
-from typing import Final
+import logging
+from typing import Final, cast
 
+import redis
 from django.core.cache import cache
+from django_redis.exceptions import ConnectionInterrupted
+
+logger = logging.getLogger(__name__)
 
 CRITERIA_CACHE_KEY: Final[str] = "moderation_criteria:v1"
 CRITERIA_CACHE_TTL: Final[int] = 300  # 5 minutes
+
+
+def cache_get_or_none(key: str) -> object | None:
+    """Read ``key`` from the shared cache, returning ``None`` when unreachable.
+
+    The project-wide policy (see the module docstring): a cache read never
+    raises into a request path. A cache outage degrades to "no cached value",
+    never to a 5xx. Same exception tuple and fail-open intent as
+    ``telegram_bot.middlewares.update_id_dedup.UpdateIdDedupMiddleware.__call__``.
+    """
+    try:
+        return cache.get(key)
+    except (ConnectionInterrupted, redis.RedisError):
+        logger.warning("Cache read failed for %s; treating as a cache miss", key)
+        return None
 
 
 def get_cached_criteria(key: str = CRITERIA_CACHE_KEY) -> dict | None:
@@ -61,13 +94,15 @@ def get_cached_site_config(key: str = SITE_CONFIG_CACHE_KEY) -> str | None:
     """
     Get cached site name.
 
+    Fail-open: a cache outage degrades to a miss (``None``), never a 5xx.
+
     Args:
         key: Cache key (defaults to site_config:v1)
 
     Returns:
-        Site name string or None if not cached
+        Site name string or None if not cached or the cache is unreachable
     """
-    return cache.get(key)
+    return cast("str | None", cache_get_or_none(key))
 
 
 def set_cached_site_config(
@@ -105,13 +140,15 @@ def get_cached_bot_username(key: str = BOT_USERNAME_CACHE_KEY) -> str | None:
     """
     Get cached bot username.
 
+    Fail-open: a cache outage degrades to a miss (``None``), never a 5xx.
+
     Args:
         key: Cache key (defaults to site_config:bot_username:v1)
 
     Returns:
-        Bot username string or None if not cached
+        Bot username string or None if not cached or the cache is unreachable
     """
-    return cache.get(key)
+    return cast("str | None", cache_get_or_none(key))
 
 
 def set_cached_bot_username(
