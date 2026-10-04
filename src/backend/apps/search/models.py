@@ -76,12 +76,15 @@ class SavedSearch(models.Model):
         related_name="saved_searches",
         help_text="User who saved this search",
     )
-    query = models.TextField(
+    query = models.CharField(
+        max_length=200,
         blank=True,
         null=True,
         help_text=(
             "FTS query string stored in the user's language; matched against "
-            "the per-language search vector (no query-time translation)"
+            "the per-language search vector (no query-time translation). "
+            "Bounded at the model so the scheduler, bot, admin and management "
+            "commands cannot persist an unbounded value (08-SRCH-011)."
         ),
     )
     city = models.ForeignKey(

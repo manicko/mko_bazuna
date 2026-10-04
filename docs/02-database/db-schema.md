@@ -754,7 +754,7 @@ Buyers save search queries with filters for ongoing monitoring.
 ```
 id (PK)
 user_id (FK → users.id, CASCADE)
-query (TEXT, nullable)
+query (VARCHAR(200), nullable)  # PII-redacted at write via redact_search_query() (one rule for all query-persistence paths); model bounded so the bot, admin and management commands cannot persist an unbounded value fed to websearch_to_tsquery on every alert evaluation (08-SRCH-011)
 city_id (FK → cities.id, SET_NULL, nullable)
 category_id (FK → categories.id, SET_NULL, nullable)
 min_price (POSITIVE INT, nullable)
