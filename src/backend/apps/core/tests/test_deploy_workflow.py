@@ -48,3 +48,26 @@ def test_deploy_path_names_the_profile_gated_services() -> None:
         assert service in text, (
             f"deploy.yml must name the long-lived service {service!r} (12-OPS-007)"
         )
+
+
+def test_deploy_verifies_the_dispatched_sha_before_ssh() -> None:
+    """The deploy derives from a verified green build, before the SSH step.
+
+    Thin companion to the guard in src/backend/tests/test_deploy_workflow.py.
+    The dispatched SHA is asserted to be on `main` with a green CI run, the
+    manual environment approval is retained, and the previous image is captured
+    by digest (12-OPS-002, 12-OPS-008).
+    """
+    text = _read(".github", "workflows", "deploy.yml")
+    assert "Assert dispatched SHA is on main with a green CI run" in text, (
+        "deploy.yml must assert the dispatched SHA is a gated build (12-OPS-002)"
+    )
+    assert text.index("Assert dispatched SHA is on main") < text.index(
+        "appleboy/ssh-action"
+    ), "the provenance assertion must run before the SSH step (12-OPS-002)"
+    assert "environment: production" in text, (
+        "the manual environment approval must be retained (12-OPS-002)"
+    )
+    assert "PREVIOUS_IMAGE_DIGEST" in text, (
+        "deploy.yml rollback must target the running image's digest (12-OPS-008)"
+    )

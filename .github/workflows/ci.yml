@@ -3,6 +3,11 @@ name: CI
 on:
   push:
     branches: [main, develop]
+  # Pre-merge gate (12-OPS-002). `push` alone makes every CI check a post-merge
+  # one, so an ungated PR can merge and only then show red. The `deploy` job in
+  # deploy.yml asserts on a *green CI run for the dispatched SHA*, which
+  # presupposes this workflow runs for that SHA — including on a PR head.
+  pull_request:
 
 # Do NOT cancel in progress (12-OPS-009): a cancelled run reports `cancelled`,
 # never `success`, so it can never be mistaken for a green gate — but a required

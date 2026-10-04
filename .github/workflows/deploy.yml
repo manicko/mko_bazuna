@@ -4,18 +4,41 @@ name: Deploy
 # `docker compose up -d` with a gated, backup-then-pull-then-health-check
 # procedure. Triggered manually via workflow_dispatch with GitHub Environments
 # manual approval (environment: production).
+#
+# Deploy provenance (12-OPS-002): the dispatched SHA must be on `main` and carry
+# a green `CI` run before the SSH step executes. This is option (a) of the
+# 2026-10-03 Product Owner ruling (Q11). The manual environment approval
+# (`environment: production`) is RETAINED in front of the assertion; the
+# declined alternatives — a `workflow_run` chain and branch protection as the
+# enforcement point — are deliberately NOT used.
 
 on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: "Git SHA from the CI build to deploy. Defaults to the current commit SHA."
-        required: false
+        # REQUIRED (12-OPS-002): an empty default silently deployed the current
+        # commit SHA — which, on a scheduled or default-branch dispatch, may have
+        # no pushed image and no green CI run. A required full commit SHA forces
+        # the dispatcher to name the artefact being shipped, and the assertion
+        # step below verifies it rather than trusting it.
+        description: "Full 40-character Git SHA from the CI build to deploy. Must be on main with a green CI run."
+        required: true
         default: ""
 
 permissions:
   contents: read
   packages: read
+  # Deploy-provenance assertion (12-OPS-002 / Q11 option (a), 2026-10-03).
+  # `actions: read` lets `gh api repos/{owner}/{repo}/actions/runs` list workflow
+  # runs so the dispatched SHA's `CI` run can be located.
+  # `statuses: read` lets the assertion read commit status/check state for that
+  # SHA so a run that never registered a status is distinguished from one that
+  # registered success. If either scope is missing the `gh api` call returns an
+  # error and the assertion below FAILS CLOSED (exit 1) — an under-scoped token
+  # halts the deploy rather than admitting an ungated SHA. This is the accepted
+  # failure mode of the chosen mechanism (Q11, 2026-10-03).
+  actions: read
+  statuses: read
 
 # Do NOT cancel in progress (12-OPS-009): two manual dispatches would otherwise
 # interleave `pull` and `up -d` against one production host, and a half-applied
@@ -49,6 +72,65 @@ jobs:
           # same coordinate is resolved by compose from .env.prod's
           # REGISTRY/REPOSITORY (docker-compose.prod.yml default matches).
           echo "Deploying coordinate: ghcr.io/mko-bazuna/mko_bazuna:$TAG"
+
+      # Q11 option (a), 2026-10-03 (12-OPS-002): the deploy is derived from a
+      # *verified* build, not from a free-text input plus a human checkbox. The
+      # assertion runs BEFORE the SSH step so an ungated SHA never reaches the
+      # production host. It fails closed: any gh/API error (including an
+      # insufficient token scope) aborts the deploy.
+      - name: Assert dispatched SHA is on main with a green CI run
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ steps.set_tag.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          echo "Verifying deploy provenance for ${SHA}"
+
+          # 1. The SHA must be a full 40-hex commit SHA — a short SHA, a branch
+          #    name or `latest` is not an identity and cannot be verified.
+          if ! printf '%s' "$SHA" | grep -Eq '^[0-9a-f]{40}$'; then
+            echo "::error::image_tag must be a full 40-character commit SHA; got '${SHA}'."
+            exit 1
+          fi
+
+          # 2. The SHA must be reachable from `main` (it is on the branch, or an
+          #    ancestor of its tip). `compare` returns 404 when it is not.
+          if ! gh api "repos/${GITHUB_REPOSITORY}/compare/main...${SHA}" >/dev/null 2>&1; then
+            echo "::error::${SHA} is not on main. Only a SHA reachable from main may be deployed (12-OPS-002)."
+            exit 1
+          fi
+
+          # 3. A CI run for this exact SHA must exist and have concluded success.
+          #    `gh run list` exits non-zero on API failure, which fails the step
+          #    closed (the accepted mode when the token lacks `actions: read`).
+          RUN_LIST=$(gh run list \
+            --repo "${GITHUB_REPOSITORY}" \
+            --workflow ci.yml \
+            --commit "${SHA}" \
+            --limit 20 \
+            --json databaseId,headSha,status,conclusion)
+          RUN_ID=$(printf '%s' "$RUN_LIST" | python3 -c '
+          import json, sys
+          runs = json.load(sys.stdin)
+          for run in runs:
+              if run.get("headSha") == sys.argv[1] and run.get("status") == "completed" and run.get("conclusion") == "success":
+                  print(run["databaseId"])
+                  break
+          ' "$SHA")
+          if [ -z "${RUN_ID}" ]; then
+            echo "::error::No successful CI run found for ${SHA} on main. Deploy aborted (12-OPS-002, fails closed)."
+            exit 1
+          fi
+
+          # 4. Confirm the commit status for the SHA is success. Reads
+          #    `statuses: read`; fails closed if the scope is insufficient.
+          STATE=$(gh api "repos/${GITHUB_REPOSITORY}/commits/${SHA}/status" --jq '.state')
+          if [ "${STATE}" != "success" ]; then
+            echo "::error::Commit status for ${SHA} is '${STATE}', not 'success'. Deploy aborted (12-OPS-002)."
+            exit 1
+          fi
+
+          echo "Provenance verified: ${SHA} is on main with a green CI run (${RUN_ID})."
 
       - name: Deploy to production via SSH
         id: deploy
@@ -94,11 +176,24 @@ jobs:
 
             echo "=== Starting deployment of IMAGE_TAG=${IMAGE_TAG} ==="
 
-            # Capture the currently running image tag before pulling/recreating.
-            # Must be captured while old containers still run (before pull/up),
-            # so it reflects the last-known-good IMAGE_TAG for potential rollback.
-            PREVIOUS_IMAGE_TAG=$(docker compose images --format '{{.Tag}}' web | head -1)
-            echo "Previous image tag: ${PREVIOUS_IMAGE_TAG:-none}"
+            # Capture the identity of the currently running web image BEFORE
+            # pulling or recreating (12-OPS-008). A tag is a mutable label, not
+            # an identity: it can be retagged or force-pushed under the rollback.
+            # The digest is read from the running container's image via
+            # `docker inspect --format='{{index .Image}}'` against the container
+            # id resolved from `docker compose ps -q web`, which yields the
+            # `sha256:...` image ID actually running. Capturing it here (before
+            # pull/up) records the last-known-good image, not the one about to
+            # be deployed.
+            WEB_CID=$(docker compose ${COMPOSE_PROFILES} -f docker-compose.yml -f docker-compose.prod.yml ps -q web)
+            PREVIOUS_IMAGE_TAG=$(docker compose ${COMPOSE_PROFILES} -f docker-compose.yml -f docker-compose.prod.yml images --format '{{.Tag}}' web | head -1)
+            if [ -n "${WEB_CID}" ]; then
+              PREVIOUS_IMAGE_DIGEST=$(docker inspect --format='{{index .Image}}' "${WEB_CID}")
+            else
+              PREVIOUS_IMAGE_DIGEST=""
+            fi
+            echo "Previous image tag:    ${PREVIOUS_IMAGE_TAG:-none}"
+            echo "Previous image digest: ${PREVIOUS_IMAGE_DIGEST:-none}"
 
             # a. Create a timestamped database backup (pre-deploy safety net).
             # The filename follows the ONE dump convention (dump_<timestamp>.dump,
@@ -131,24 +226,44 @@ jobs:
               echo "ERROR: Health check FAILED after 60s timeout."
               echo "=== Attempting automated rollback ==="
 
-              # No previous tag available — cannot roll back automatically.
-              if [ -z "${PREVIOUS_IMAGE_TAG}" ] || [ "${PREVIOUS_IMAGE_TAG}" = "<none>" ]; then
-                echo "ERROR: No previous image tag available for rollback (PREVIOUS_IMAGE_TAG is empty or '<none>')."
+              # Roll back by DIGEST, not by tag (12-OPS-008). A tag is a mutable
+              # label; the digest is the identity of the image the healthy
+              # deployment was running. The two failure branches below are
+              # distinct so an operator can tell "we never had a target" from
+              # "the target is no longer in the registry".
+              if [ -z "${PREVIOUS_IMAGE_DIGEST}" ] || [ "${PREVIOUS_IMAGE_DIGEST}" = "<none>" ]; then
+                # Branch 1: no previous digest was captured at all — the web
+                # service was not running when the deploy began (first ever
+                # deploy on this host, or the container was down).
+                echo "ERROR: No previous image digest available for rollback — PREVIOUS_IMAGE_DIGEST is empty."
+                echo "No automatic rollback is possible; this looks like the first deploy on this host."
                 echo "Manual rollback required. Runbook: https://github.com/manicko/mko_bazuna/blob/main/docs/ops/rollback.md"
                 exit 1
               fi
 
-              echo "Rolling back to previous image: ${PREVIOUS_IMAGE_TAG}"
+              echo "Rolling back to previous image digest: ${PREVIOUS_IMAGE_DIGEST}"
 
-              # Revert IMAGE_TAG to the previous known-good tag and pull it.
-              IMAGE_TAG="${PREVIOUS_IMAGE_TAG}" docker compose ${COMPOSE_PROFILES} -f docker-compose.yml -f docker-compose.prod.yml pull
+              # Branch 2: the digest is recorded but may no longer be present in
+              # the registry (garbage-collected, or built on another host). A
+              # pull by digest fails loudly rather than silently reusing a
+              # mutable tag.
+              if ! docker image inspect "${PREVIOUS_IMAGE_DIGEST}" >/dev/null 2>&1; then
+                if ! docker pull "${PREVIOUS_IMAGE_DIGEST}"; then
+                  echo "ERROR: Rollback target digest ${PREVIOUS_IMAGE_DIGEST} is absent from the registry and could not be pulled."
+                  echo "The last-known-good image is unreachable; manual intervention required."
+                  echo "Runbook: https://github.com/manicko/mko_bazuna/blob/main/docs/ops/rollback.md"
+                  exit 1
+                fi
+              fi
 
-              # Recreate every service with the previous image (force-recreate so
-              # Docker does not reuse containers keyed on the old image digest).
+              # Recreate every service against the digest. `IMAGE_TAG` is
+              # overridden with the digest so compose resolves the exact image
+              # identity rather than the mutable tag. Force-recreate so Docker
+              # does not reuse containers keyed on the old image digest.
               # No service filter: a rollback that leaves the scheduler on the
               # image just judged faulty is not a rollback.
-              echo "=== Step 4b: Recreate services with previous image ==="
-              IMAGE_TAG="${PREVIOUS_IMAGE_TAG}" docker compose ${COMPOSE_PROFILES} -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
+              echo "=== Step 4b: Recreate services with previous image digest ==="
+              IMAGE_TAG="${PREVIOUS_IMAGE_DIGEST}" docker compose ${COMPOSE_PROFILES} -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate --remove-orphans
 
               # Re-poll /health/ready/ with a 30-second timeout to confirm rollback
               # restored a healthy state (curl runs inside the web container —
@@ -156,7 +271,7 @@ jobs:
               echo "=== Re-running health check for rollback validation (30s timeout) ==="
               if timeout 30 bash -c 'while ! docker compose exec -T web curl -sf http://localhost:8000/health/ready/ > /dev/null 2>&1; do sleep 2; done'; then
                 echo "Rollback health check passed — /health/ready/ returned 200."
-                echo "=== Rollback complete: reverted to IMAGE_TAG=${PREVIOUS_IMAGE_TAG} ==="
+                echo "=== Rollback complete: reverted to digest ${PREVIOUS_IMAGE_DIGEST} ==="
               else
                 echo "ERROR: Rollback health check ALSO FAILED after 30s timeout."
                 echo "Manual intervention required. Runbook: https://github.com/manicko/mko_bazuna/blob/main/docs/ops/rollback.md"

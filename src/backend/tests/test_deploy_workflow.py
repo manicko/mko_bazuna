@@ -30,6 +30,8 @@ while not (_ROOT / "pyproject.toml").exists():
     _ROOT = _ROOT.parent
 
 _DEPLOY_YML = _ROOT / ".github" / "workflows" / "deploy.yml"
+_CI_YML = _ROOT / ".github" / "workflows" / "ci.yml"
+_ENV_PROD_EXAMPLE = _ROOT / ".env.prod.example"
 _PROD_COMPOSE = _ROOT / "docker-compose.prod.yml"
 
 
@@ -138,6 +140,168 @@ def test_deploy_workflow_has_automated_rollback_step() -> None:
     assert "timeout 30" in text, (
         "deploy.yml rollback must re-poll /health/ready/ with a 30-second timeout"
     )
+
+
+# --- deploy provenance: a green build, an identity rollback (12-OPS-002, 12-OPS-008)
+# ---------------------------------------------------------------------------
+# `deploy.yml` is triggered by workflow_dispatch with a free-text image_tag and
+# has no dependency on the CI workflow, so any SHA can be typed in and deployed.
+# Q11 (Product Owner, 2026-10-03) chose option (a): assert IN-WORKFLOW that the
+# dispatched SHA is on `main` with a green CI run, before the SSH step; the
+# manual environment approval is RETAINED. Separately, an automated rollback that
+# targets a mutable tag is not a rollback to an identity (12-OPS-008), so the
+# previous running image is captured by digest.
+
+
+def test_ci_declares_pull_request_trigger() -> None:
+    """ci.yml declares a `pull_request` trigger so changes are gated pre-merge.
+
+    Without it, `push: branches: [main, develop]` makes every CI check a
+    post-merge one: an ungated PR can merge and only then show red — and the
+    deploy gate's "green CI run for the SHA" contract has no PR-side run
+    (12-OPS-002).
+    """
+    from ruamel.yaml import YAML
+
+    document = YAML(typ="safe").load(_CI_YML.read_text(encoding="utf-8"))
+    triggers = document.get("on")
+    assert isinstance(triggers, dict), "ci.yml must declare an `on:` mapping"
+    assert "pull_request" in triggers, (
+        "ci.yml must declare a pull_request trigger (12-OPS-002)"
+    )
+
+
+def test_deploy_asserts_dispatched_sha_is_a_gated_build() -> None:
+    """deploy.yml asserts the dispatched SHA is on main with a green CI run.
+
+    The assertion is option (a) of the 2026-10-03 Q11 ruling (12-OPS-002). It
+    must run BEFORE the SSH step (so an ungated SHA never reaches the host) and
+    must fail closed. The assertion reads workflow runs and commit status, so it
+    needs `actions: read` and `statuses: read`; those permissions are asserted.
+    """
+    text = _DEPLOY_YML.read_text(encoding="utf-8")
+    assert "Assert dispatched SHA is on main with a green CI run" in text, (
+        "deploy.yml must carry the deploy-provenance assertion (12-OPS-002)"
+    )
+    # The assertion must precede the SSH deploy — an ungated SHA must not reach
+    # the production host.
+    assertion_idx = text.index("Assert dispatched SHA is on main with a green CI run")
+    ssh_idx = text.index("appleboy/ssh-action")
+    assert assertion_idx < ssh_idx, (
+        "the deploy-provenance assertion must run before the SSH step (12-OPS-002)"
+    )
+    # Token scope: the assertion reads workflow runs and commit statuses.
+    assert "actions: read" in text, (
+        "deploy.yml must grant `actions: read` for the provenance assertion (12-OPS-002)"
+    )
+    assert "statuses: read" in text, (
+        "deploy.yml must grant `statuses: read` for the provenance assertion (12-OPS-002)"
+    )
+    # It fails closed rather than open.
+    assert "exit 1" in text, (
+        "the provenance assertion must fail closed when it cannot verify (12-OPS-002)"
+    )
+
+
+def test_deploy_retains_manual_environment_approval() -> None:
+    """The manual production approval is retained (12-OPS-002, Q11 option (a)).
+
+    Option (b) (a `workflow_run` chain, which removes the human approval) was
+    DECLINED on 2026-10-03. `environment: production` must stay, and no
+    `workflow_run` trigger may appear.
+    """
+    text = _DEPLOY_YML.read_text(encoding="utf-8")
+    assert "environment: production" in text, (
+        "the manual environment approval must be retained (12-OPS-002)"
+    )
+    # The declined `workflow_run` chain must not appear as a *trigger*. It may
+    # only appear as prose recording that it was declined, so the check is
+    # scoped to the trigger block, not the whole file.
+    from ruamel.yaml import YAML
+
+    document = YAML(typ="safe").load(text)
+    triggers = document.get("on")
+    assert isinstance(triggers, dict), "deploy.yml must declare an `on:` mapping"
+    assert "workflow_run" not in triggers, (
+        "the declined workflow_run chain must not be a deploy.yml trigger (12-OPS-002)"
+    )
+
+
+def test_deploy_captures_previous_image_digest_before_pull() -> None:
+    """The previous image is captured by digest, before pull/up (12-OPS-008).
+
+    A tag is a mutable label, so a rollback targeting the previous tag can
+    reproduce a different image. The running image's digest is captured with
+    `docker inspect --format='{{index .Image}}'` while the old containers still
+    run — before `pull` and before `up` — so it is the last-known-good identity.
+    """
+    text = _DEPLOY_YML.read_text(encoding="utf-8")
+    assert "PREVIOUS_IMAGE_DIGEST" in text, (
+        "deploy.yml must capture PREVIOUS_IMAGE_DIGEST (12-OPS-008)"
+    )
+    assert "{{index .Image}}" in text, (
+        "the capture must read the running image's id via `docker inspect` (12-OPS-008)"
+    )
+    digest_idx = text.index("PREVIOUS_IMAGE_DIGEST=")
+    pull_idx = text.index("pull\n")
+    assert digest_idx < pull_idx, (
+        "the digest must be captured before the image pull (12-OPS-008)"
+    )
+
+
+def test_deploy_rollback_branches_have_distinct_messages() -> None:
+    """No-digest and digest-absent branches each have their own message.
+
+    A generic failure cannot tell an operator "there was never a rollback
+    target" from "the rollback target is no longer in the registry". Both
+    branches must be present and distinct (12-OPS-008).
+    """
+    text = _DEPLOY_YML.read_text(encoding="utf-8")
+    assert "No previous image digest available for rollback" in text, (
+        "deploy.yml must have a distinct no-previous-digest message (12-OPS-008)"
+    )
+    assert "absent from the registry and could not be pulled" in text, (
+        "deploy.yml must have a distinct digest-absent-from-registry message (12-OPS-008)"
+    )
+
+
+def test_deploy_does_not_build() -> None:
+    """deploy.yml must never build an image — it deploys a verified artefact.
+
+    This is the invariant (12-OPS-002 / OPS-008): the deploy path consumes an
+    image produced by `ci.yml`, so neither `docker build` nor `docker compose …
+    build` may appear anywhere in the workflow.
+    """
+    text = _DEPLOY_YML.read_text(encoding="utf-8")
+    assert "docker build" not in text, (
+        "deploy.yml must not build images; it deploys a CI-built artefact"
+    )
+    for line in text.splitlines():
+        if "docker compose" in line and " build" in line:
+            raise AssertionError(
+                f"deploy.yml must not run `docker compose build`: {line.strip()!r}"
+            )
+
+
+def test_env_prod_example_forbids_latest_image_tag() -> None:
+    """`.env.prod.example` must not ship `IMAGE_TAG=latest` (12-OPS-008).
+
+    `latest` is a mutable label, not an identity: two hosts reading the same
+    file with `latest` can run different code, and a rollback to `latest`
+    reproduces whatever the tag points at now. The example carries a concrete
+    pinned value instead.
+    """
+    text = _ENV_PROD_EXAMPLE.read_text(encoding="utf-8")
+    image_tag_lines = [
+        line.strip()
+        for line in text.splitlines()
+        if line.strip().startswith("IMAGE_TAG=")
+    ]
+    assert image_tag_lines, ".env.prod.example must declare IMAGE_TAG"
+    for line in image_tag_lines:
+        assert line != "IMAGE_TAG=latest", (
+            ".env.prod.example must not ship IMAGE_TAG=latest (12-OPS-008)"
+        )
 
 
 # --- docker-compose.prod.yml structural test -------------------------------
