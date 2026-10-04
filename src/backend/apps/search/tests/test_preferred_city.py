@@ -16,7 +16,7 @@ from django.test import Client
 
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
-from apps.core.middleware.preferred_city import PREFERRED_CITY_COOKIE_MAX_AGE
+from apps.core.utils.preferred_city_cookie import PREFERRED_CITY_COOKIE_MAX_AGE
 from apps.locations.models import City
 from apps.users.models import User
 from conftest import create_test_ad
@@ -178,7 +178,7 @@ class TestReset:
         response = client.post("/api/preferred-city/", {"action": "clear"})
         assert response.status_code == 200
         assert response.json() == {"ok": True}
-        # delete_cookie schedules the cookie for deletion (R-3 observable here).
+        # The clear branch emits an already-expired Set-Cookie (R-3 observable here).
         assert response.cookies["preferred_city"].value == ""
 
         # A fresh request sees no preference -> all-cities results + country badge.
@@ -237,9 +237,13 @@ class TestReset:
         assert response.cookies["preferred_city"].value == ""
 
     def test_clear_deletion_cookie_mirrors_attributes_on_https(self) -> None:
-        """T3/D5: the deletion Set-Cookie mirrors set_cookie's security
-        attributes (Secure on HTTPS, SameSite=Lax, HttpOnly) so browsers
-        actually remove the Secure cookie that set_cookie wrote over HTTPS.
+        """T3/D5: the deletion Set-Cookie mirrors the write's security attributes
+        (Secure on HTTPS, SameSite=Lax, HttpOnly) so the erasure matches the
+        cookie ``set_cookie`` wrote over HTTPS.
+
+        ``delete_cookie()`` has no ``secure`` parameter in Django 5.2, so
+        ``set_cookie`` is used; the only one-flag ``delete_cookie`` route
+        (``samesite="none"``) would make the cookie cross-site capable.
 
         The Django test client's ``secure=True`` flag makes
         ``request.is_secure()`` return True, mirroring the production nginx

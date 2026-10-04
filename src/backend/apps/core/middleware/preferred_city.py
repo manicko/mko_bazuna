@@ -13,6 +13,7 @@ as ``None`` and deleted during ``process_response``.
 
 Writes never happen here — the cookie/DB is written only by the explicit
 selection endpoint (``apps.search.views.preferred_city.set_preferred_city``).
+The cookie name/attributes live in :mod:`apps.core.utils.preferred_city_cookie`.
 """
 
 from __future__ import annotations
@@ -22,12 +23,13 @@ import logging
 from django.http import HttpRequest, HttpResponse
 from django.utils.deprecation import MiddlewareMixin
 
+from apps.core.utils.preferred_city_cookie import (
+    PREFERRED_CITY_COOKIE_NAME,
+    expire_preferred_city_cookie,
+)
 from apps.locations.models import City
 
 logger = logging.getLogger(__name__)
-
-PREFERRED_CITY_COOKIE_NAME = "preferred_city"
-PREFERRED_CITY_COOKIE_MAX_AGE = 365 * 24 * 60 * 60  # 1 year
 
 
 class PreferredCityMiddleware(MiddlewareMixin):
@@ -75,5 +77,14 @@ class PreferredCityMiddleware(MiddlewareMixin):
     def process_response(self, request: HttpRequest, response: HttpResponse) -> HttpResponse:
         """Delete a stale ``preferred_city`` cookie, if one was detected."""
         if getattr(request, "_preferred_city_stale_cookie", False):
-            response.delete_cookie(PREFERRED_CITY_COOKIE_NAME)
+            # Mirror the write's flags so the deletion matches the cookie the
+            # selection endpoint set. This is not a correctness fix for a broken
+            # deletion: the previous ``delete_cookie()`` produced a well-formed,
+            # correctly-targeted header (matching name, host-only domain, ``Path=/``,
+            # ``Max-Age=0`` + past ``expires``), and the middleware re-detects a
+            # stale slug on every request, so the application is correct either
+            # way. ``set_cookie`` is used because ``delete_cookie()`` has no
+            # ``secure`` parameter in Django 5.2 and the only one-flag route
+            # (``samesite="none"``) would make the cookie cross-site capable.
+            expire_preferred_city_cookie(response, secure=request.is_secure())
         return response

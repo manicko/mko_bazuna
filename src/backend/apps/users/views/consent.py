@@ -27,9 +27,12 @@ from django.views.decorators.http import require_POST
 from pydantic import ValidationError
 
 from apps.core.enums import ConsentChoice, ConsentVersion, CookieCategory
-from apps.core.middleware.preferred_city import PREFERRED_CITY_COOKIE_NAME
 from apps.core.services.contact_rate_limit import check_deep_link_render_rate_limit
 from apps.core.services.site_config import get_bot_username
+from apps.core.utils.preferred_city_cookie import (
+    PREFERRED_CITY_COOKIE_NAME,
+    expire_preferred_city_cookie,
+)
 from apps.core.utils.sanitize import mask_telegram_id
 from apps.locations.models import City
 from apps.users.models import User
@@ -78,25 +81,25 @@ def _set_consent_cookie(
     )
 
 
-def _expire_preferred_city_cookie(response: HttpResponse) -> None:
+def _expire_preferred_city_cookie(response: HttpResponse, *, secure: bool) -> None:
     """Delete the ``preferred_city`` cookie by emitting an expired Set-Cookie.
 
-    ``response.delete_cookie()`` cannot clear a ``Secure`` cookie over HTTPS in
-    Django 5.2: it emits ``Secure`` only for ``__Host-``/``__Secure-`` names or
-    ``samesite="none"``, and ``preferred_city`` is neither. Mirror the *write's*
-    attributes (``_set_consent_cookie`` uses ``secure=True`` unconditionally,
-    D-COOKIES) rather than ``request.is_secure()`` — over plain HTTP the cookie
-    was never stored, so there is nothing to delete (06-PII-110).
+    ``response.delete_cookie()`` has no ``secure`` parameter in Django 5.2, so it
+    cannot mirror the ``Secure`` flag the cookie was written with; the only
+    one-flag route back through it is ``samesite="none"``, which would make this
+    buyer-scoped cookie cross-site capable. Emit an already-expired cookie via
+    ``set_cookie`` instead.
+
+    The mirrored attributes come from the ``preferred_city`` *write*
+    (``apps.search.views.preferred_city.set_preferred_city``), which uses
+    ``secure=request.is_secure()`` — NOT from ``_set_consent_cookie``'s
+    unconditional ``secure=True``. Passing the request's scheme matters on a
+    plain-HTTP origin (``dev``, ``test``): the cookie is stored without
+    ``Secure``, and a ``Set-Cookie`` carrying ``Secure`` is rejected outright on
+    a non-secure origin, so a hard-coded ``secure=True`` deletion could not take
+    effect at all.
     """
-    response.set_cookie(
-        PREFERRED_CITY_COOKIE_NAME,
-        max_age=0,
-        expires="Thu, 01 Jan 1970 00:00:00 GMT",
-        path="/",
-        httponly=True,
-        samesite="Lax",
-        secure=True,
-    )
+    expire_preferred_city_cookie(response, secure=secure)
 
 
 def _set_consent_cookies(
@@ -104,11 +107,15 @@ def _set_consent_cookies(
     choice: ConsentChoice,
     analytics: bool,
     preferences: bool,
+    *,
+    secure: bool,
 ) -> None:
     """Persist consent state + granular categories + timestamp cookies.
 
     All consent cookies use ``max_age=12 months``, ``httponly=True``,
-    ``samesite="Lax"`` and ``secure=True`` (D-COOKIES).
+    ``samesite="Lax"`` and ``secure=True`` (D-COOKIES). ``secure`` is the
+    origin scheme (``request.is_secure()``) and is forwarded to the
+    ``preferred_city`` deletion so it mirrors that cookie's own ``Secure`` flag.
     """
     _set_consent_cookie(response, CONSENT_COOKIE_NAME, choice.value)
     _set_consent_cookie(
@@ -128,7 +135,7 @@ def _set_consent_cookies(
     # decline still records the preferences category as true (PO-02), but the
     # durable city preference is cleared (06-PII-110).
     if choice is ConsentChoice.DECLINED or not preferences:
-        _expire_preferred_city_cookie(response)
+        _expire_preferred_city_cookie(response, secure=secure)
 
 
 def _parse_submission(request: HttpRequest) -> ConsentSubmission | None:
@@ -193,6 +200,7 @@ def consent_accept(request: HttpRequest) -> HttpResponse:
         ConsentChoice.ACCEPTED,
         analytics,
         preferences,
+        secure=request.is_secure(),
     )
     record_consent_action(
         user=user,
@@ -246,6 +254,7 @@ def consent_decline(request: HttpRequest) -> HttpResponse:
         ConsentChoice.DECLINED,
         analytics,
         preferences,
+        secure=request.is_secure(),
     )
     record_consent_action(
         user=user,
@@ -303,6 +312,7 @@ def consent_withdraw(request: HttpRequest) -> HttpResponse:
         ConsentChoice.WITHDRAWN,
         analytics=False,
         preferences=False,
+        secure=request.is_secure(),
     )
     logger.info("User %s withdrew consent via web - soft-delete triggered", user.id)
     return response

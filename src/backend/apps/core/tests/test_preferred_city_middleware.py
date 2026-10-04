@@ -22,10 +22,8 @@ import pytest
 from django.contrib.auth.models import AnonymousUser
 from django.http import HttpRequest, HttpResponse
 
-from apps.core.middleware.preferred_city import (
-    PREFERRED_CITY_COOKIE_NAME,
-    PreferredCityMiddleware,
-)
+from apps.core.middleware.preferred_city import PreferredCityMiddleware
+from apps.core.utils.preferred_city_cookie import PREFERRED_CITY_COOKIE_NAME
 
 pytestmark = [pytest.mark.unit]
 
@@ -33,12 +31,15 @@ pytestmark = [pytest.mark.unit]
 def _make_request(
     cookies: dict | None = None,
     user: object | None = None,
+    *,
+    secure: bool = False,
 ) -> HttpRequest:
     """Create a minimal HttpRequest with the given attributes."""
     request = HttpRequest()
     request.COOKIES = cookies or {}
     # ``user`` defaults to an anonymous user (mimics AuthenticationMiddleware).
     request.user = user if user is not None else AnonymousUser()
+    request.is_secure = lambda: secure  # type: ignore[method-assign]
     return request
 
 
@@ -123,7 +124,45 @@ def test_anonymous_stale_cookie_is_none(middleware: PreferredCityMiddleware) -> 
 
 
 def test_stale_cookie_deleted_in_response(middleware: PreferredCityMiddleware) -> None:
-    """A stale cookie is deleted in ``process_response`` (AC-4)."""
+    """A stale cookie is deleted in ``process_response`` with the write's flags.
+
+    Over HTTPS the deletion must mirror the ``preferred_city`` write's
+    attributes (Secure on HTTPS, SameSite=Lax, HttpOnly, Path=/) so the erasure
+    matches the cookie ``set_cookie`` wrote.
+    """
+    stale_city = MagicMock()
+    stale_city.exists.return_value = False
+    request = _make_request(
+        cookies={PREFERRED_CITY_COOKIE_NAME: "old-city"}, secure=True
+    )
+    response = HttpResponse()
+    with patch(
+        "apps.core.middleware.preferred_city.City.objects.filter",
+        return_value=stale_city,
+    ):
+        middleware.process_request(request)
+        middleware.process_response(request, response)
+    # The expiry is reflected in response.cookies (max-age 0, empty value).
+    assert PREFERRED_CITY_COOKIE_NAME in response.cookies
+    cookie = response.cookies[PREFERRED_CITY_COOKIE_NAME]
+    assert cookie.value == ""
+    assert int(cookie["max-age"]) == 0
+    assert cookie["secure"] is True
+    assert cookie["samesite"] == "Lax"
+    assert cookie["httponly"] is True
+    assert cookie["path"] == "/"
+
+
+def test_stale_cookie_deletion_omits_secure_on_plain_http(
+    middleware: PreferredCityMiddleware,
+) -> None:
+    """On plain HTTP the deletion omits ``Secure`` to match the write (dev/test).
+
+    The ``preferred_city`` write uses ``secure=request.is_secure()``, so the
+    stored cookie has no ``Secure`` on a non-secure origin; a ``Set-Cookie``
+    carrying ``Secure`` is rejected there. The middleware must therefore mirror
+    the scheme or its clearing could not take effect on ``dev``/``test``.
+    """
     stale_city = MagicMock()
     stale_city.exists.return_value = False
     request = _make_request(cookies={PREFERRED_CITY_COOKIE_NAME: "old-city"})
@@ -134,9 +173,13 @@ def test_stale_cookie_deleted_in_response(middleware: PreferredCityMiddleware) -
     ):
         middleware.process_request(request)
         middleware.process_response(request, response)
-    # ``delete_cookie`` is reflected in response.cookies (max-age 0).
-    assert PREFERRED_CITY_COOKIE_NAME in response.cookies
-    assert response.cookies[PREFERRED_CITY_COOKIE_NAME].value == ""
+    cookie = response.cookies[PREFERRED_CITY_COOKIE_NAME]
+    assert cookie.value == ""
+    assert int(cookie["max-age"]) == 0
+    assert cookie["secure"] == ""
+    assert cookie["samesite"] == "Lax"
+    assert cookie["httponly"] is True
+    assert cookie["path"] == "/"
 
 
 def test_valid_cookie_not_deleted(middleware: PreferredCityMiddleware) -> None:

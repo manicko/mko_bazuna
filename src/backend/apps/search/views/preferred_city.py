@@ -13,9 +13,9 @@ from django.http import HttpRequest, JsonResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
-from apps.core.middleware.preferred_city import (
-    PREFERRED_CITY_COOKIE_MAX_AGE,
-    PREFERRED_CITY_COOKIE_NAME,
+from apps.core.utils.preferred_city_cookie import (
+    expire_preferred_city_cookie,
+    set_preferred_city_cookie,
 )
 from apps.locations.models import City
 
@@ -48,20 +48,12 @@ def set_preferred_city(request: HttpRequest) -> JsonResponse:
     )
     if clear_action or slug_present_empty:
         response = JsonResponse({"ok": True})
-        # Mirror set_cookie's attributes on the deletion Set-Cookie. Django's
-        # delete_cookie() (5.2) only emits ``Secure`` for ``__Host-``/``__Secure-``
-        # prefixed names or ``samesite="none"``; ``preferred_city`` is neither, so a
-        # plain delete_cookie() would emit a non-Secure header and browsers would not
-        # drop the Secure cookie over HTTPS. Emit an expired cookie directly instead.
-        response.set_cookie(
-            PREFERRED_CITY_COOKIE_NAME,
-            max_age=0,
-            expires="Thu, 01 Jan 1970 00:00:00 GMT",
-            path="/",
-            httponly=True,
-            samesite="Lax",
-            secure=request.is_secure(),
-        )
+        # Mirror the write's attributes on the deletion Set-Cookie. Django's
+        # delete_cookie() (5.2) exposes no ``secure`` parameter, so it cannot
+        # emit ``Secure`` to match the HTTPS write; the only one-flag route back
+        # through it is ``samesite="none"``, which would make this buyer-scoped
+        # cookie cross-site capable. Emit an already-expired cookie directly.
+        expire_preferred_city_cookie(response, secure=request.is_secure())
         if request.user.is_authenticated:
             request.user.preferred_city = None
             request.user.save(update_fields=["preferred_city"])
@@ -92,13 +84,6 @@ def set_preferred_city(request: HttpRequest) -> JsonResponse:
     # Gate the preference cookie behind preferences consent (T-06c / ePrivacy).
     # The authenticated user's DB preference still applies without the cookie.
     if request.COOKIES.get("consent_preferences") == "true":
-        response.set_cookie(
-            PREFERRED_CITY_COOKIE_NAME,
-            slug,
-            max_age=PREFERRED_CITY_COOKIE_MAX_AGE,
-            httponly=True,
-            samesite="Lax",
-            secure=request.is_secure(),
-        )
+        set_preferred_city_cookie(response, slug, secure=request.is_secure())
     logger.info("Set preferred_city to %s", slug)
     return response
