@@ -8461,6 +8461,874 @@ trust tests must pass **unchanged**.
 
 ---
 
+### BLOCK 18 — Record **who** acted: the actor column and the mechanism on `ConsentRecord` (`06-NEW-02`)
+
+| | |
+|---|---|
+| **Findings owned** | `06-NEW-02` |
+| **Depends on** | **nothing in this plan.** BLOCKS 10, 12 and 15 are all landed and are **read**, not reopened |
+| **Blocks** | nothing |
+| **Priority** | P2 — an owned follow-up to a record that was orphaned, not a new remediation |
+| **Risk level** | **MEDIUM** — a schema change on the audit ledger, plus a fifth edit to `withdraw_consent` |
+| **Required agents** | **Implementor · Validator.** §1.6 requires a Validator for any block whose acceptance turns on a decision the Implementor was told not to make, and the actor-retention bound below is exactly that |
+
+**The owner ruling (2026-10-04) — implement against this; do not reopen it.** `06-NEW-02` is
+reopened as an owned Phase-06 follow-up. **BLOCKS 12 and 15 are NOT reopened.** It was previously
+routed to "BLOCK 12/15" and both closed without it, leaving it orphaned.
+
+**The reason it is not cosmetic.** `ConsentRecord` cannot distinguish *subject withdrew / staff
+revoked / system revoked*. The **audit meaning** of the record is incomplete. That is a data-model
+and accountability defect, so it needs its own owner and follow-up. The shape the owner named: an
+**actor / `revoked_by`** plus a **clear definition of who counts as the actor of the action**.
+
+**What already exists — verified against the tree at planning time, not assumed.**
+
+- `ConsentRecord` (`src/backend/apps/users/models.py`) fields: `user` (FK `users.User`, `SET_NULL`,
+  nullable — the **subject**), `session_key`, `consent_given_at`, `consent_version`, `choice`
+  (`ConsentChoice` StrEnum), `categories` (JSONField), `ip_address`, `user_agent`.
+  **No actor column.**
+- `apps/users/migrations/` is at **`0004_consentrecord_sweep_index`** → this block's migration is
+  **`0005`**. `apps/core/migrations/` is at `0006_supportticket_user_cascade` (untouched here).
+- BLOCK 10 (`749bbfc`) added `record_consent_action_with_context(user, choice, categories, *,
+  ip_address, user_agent, session_key, consent_version)` — **no `HttpRequest`** — and it is the
+  function `withdraw_consent` calls inside its existing `atomic()`.
+  `record_consent_action(user, choice, categories, request=None, consent_version=…)` keeps its
+  signature and delegates.
+- `withdraw_consent` in `apps/users/services/deletion.py` has **four** landed writers — BLOCK 9
+  `474a68d` (body + `atomic()`), BLOCK 13 `6631ff3` (`SupportTicket` deletion), BLOCK 8 `8dba351`,
+  BLOCK 10 `749bbfc` (the audit write, **last** inside the block) — and now takes three
+  keyword-only params. **This block is the FIFTH writer.** Re-read `deletion.py` immediately
+  before editing; the ordering rule is in §BLOCK 18 below.
+- `UserAdmin.withdraw_consent_action` (`apps/users/admin.py`) is the **superuser-gated** admin
+  action (BLOCK 10), `@admin.action(permissions=["delete"])`, iterating a `queryset` of `User`s and
+  calling `withdraw_consent(account)` **bare**. **This is the path that currently produces a
+  "subject withdrew" record for what is actually a staff revocation** — the exact ambiguity.
+- BLOCK 15 (`fd5201d`) added `apps/core/management/commands/purge_consent_records.py` under
+  **advisory lock 14**, anonymising — **never deleting** — rows past the 90-day fingerprint window:
+  `user=NULL`, `session_key=NULL`, `ip_address=NULL`, `user_agent=""` in **one** statement. The
+  decision fields are retained for **5 years** (owner-ratified R1/R2).
+  **Verified: the sweep writes no `ConsentRecord`.** It only `.update()`s existing rows
+  (`purge_consent_records.py` is the only command that names `ConsentRecord`; `consent_hard_delete`
+  names `User`, `AnalyticsEvent`, `ModeratorActionLog`, `SupportTicket`).
+- **Verified: there is no Telegram-bot caller.** A repo-wide search for `record_consent_action`
+  returns hits only in `apps/users/views/consent.py` (2), `apps/users/services/deletion.py` (1),
+  `apps/users/services/consent_record.py` (definitions) and three test files. The module docstring's
+  *"e.g. from the Telegram bot /start entry point"* is **aspirational** — that path does not exist.
+  Do not build a writer for it.
+- `apps/users/services/pii_inventory.py` declares `users.ConsentRecord` entries; its guard
+  (`apps/users/tests/test_pii_inventory.py::test_listed_models_have_no_unreviewed_column`) walks each
+  listed model's **concrete, non-relational, non-timestamp** columns and fails if one has neither an
+  erasure entry nor a reviewed decision. **What the new columns do to that guard is worked out
+  below, exactly.**
+
+#### 1. The column design, and the actor definition — which is the substance
+
+**Decision: BOTH columns.** They answer different questions and neither substitutes for the other.
+
+| Column | Answers | Type |
+|---|---|---|
+| `initiated_by` | **Who** — the account that performed the action | FK → `users.User`, `null=True`, `blank=True`, `on_delete=SET_NULL`, `related_name="+"` |
+| `action_source` | **By what mechanism** — the closed vocabulary of *how* the action was initiated | `CharField(max_length=20, choices=[…ConsentActionSource…], default=ConsentActionSource.UNKNOWN.value, blank=True, db_index=True)` |
+
+**A system-initiated action has no `User` actor, so the FK alone cannot express "system revoked" —
+one of the three cases the owner named.** That is the whole argument for the enum, and it is the
+reason the two columns are not interchangeable.
+
+**The actor definition, stated once so it can be cited from three places** (the model docstring, the
+writer docstring and `docs/02-database/db-schema.md`):
+
+> **The actor is the account that performed the action, and it is recorded only when that account is
+> NOT the subject.** `user` already names the subject, so a self-action would store the same account
+> twice. `initiated_by` therefore holds an account **only** for a third-party action; the invariant
+> is `initiated_by IS NOT NULL ⟹ initiated_by is a different row from user`. Read the pair, never
+> one column alone: `action_source` is authoritative for *which case* the row is, `initiated_by`
+> names the account when one exists. A null `initiated_by` means **"no acting account distinct from
+> the subject"** — which covers a self-service action, an anonymous visitor and a system action, and
+> `action_source` is what tells those three apart.
+
+**Why the subject's own action leaves `initiated_by` null rather than populating it with the
+subject.** Two reasons, the second is decisive:
+
+1. *Semantics.* Populating it would make the column uniform, at the cost of storing the subject's
+   link twice. Uniformity is bought with a redundant copy of the very link the ledger is supposed to
+   bound.
+2. *The sweep.* BLOCK 15 clears `user_id` at 90 days precisely so an aged decision cannot be walked
+   back to a person. If a self-service row also carried `initiated_by = <subject>`, that copy would
+   **survive the clear** and become the only remaining link from an anonymous decision to a live
+   account — re-opening, from inside this block, the exact re-identification path BLOCK 15 exists to
+   close. Populating the subject would force a second, conditional statement into BLOCK 15's sweep.
+   Leaving it null makes the design need **zero** change to BLOCK 15's command and **zero** change
+   to BLOCK 15's tests.
+
+**All four cases, as stored.** `U` = subject, `S` = acting staff account, `—` = `NULL`.
+
+| Case | `user` (subject) | `initiated_by` | `action_source` | How it is written |
+|---|---|---|---|---|
+| **Subject withdrew / accepted / declined** (authenticated web) | `U` | `—` | `self_service` | `record_consent_action` derives it from `user is None`; `withdraw_consent`'s default |
+| **Anonymous visitor accepted / declined** (no account at all) | `—` | `—` | `anonymous_web` | derived from `user is None` in `record_consent_action` |
+| **Staff revoked** (admin changelist action) | `V` (target) | **`S`** | `admin_staff` | `UserAdmin.withdraw_consent_action` passes `initiated_by=request.user` |
+| **System** (automated, non-human) | `V` | `—` | `system` | **no live writer today** — see the residual note below |
+| **Row predating this block** | unchanged | `—` | `unknown` | the `AddField` default |
+
+**The `system` member is required by the ruling, not by a caller.** No production path writes it
+today (verified above: no bot caller, no system writer; the sweep writes no rows). It exists because
+the owner named "system revoked" as one of the three cases that must be distinguishable, and because a
+**closed** vocabulary is what stops a future writer from inventing a fourth spelling. The
+audit-meaning test must prove the case is **storable and distinguishable** by driving the real writer
+with an explicit `ConsentActionSource.SYSTEM`, while recording plainly that no production path emits
+it.
+
+**The anonymous case — the awkward one, and how it is represented.** An anonymous visitor has no
+account, so there is nothing to put in an actor column and nothing to infer. It is represented
+**positively, not by a null**: `action_source = anonymous_web` states the mechanism outright, and the
+row is still attributable through `session_key`, which BLOCK 8's guard already guarantees is
+non-null on this path. So "no account acted" is a **recorded fact**, not a gap a reader has to infer
+from three nulls. The anonymous row is distinguishable from a system row with no subject
+(`anonymous_web` vs `system`) and from a self-service row (`user` null vs set) with no join.
+
+**Retention interaction — the hard part. Recommendation, and it needs owner/DPO sign-off.**
+
+- The **self-attributed** case records **nothing** in `initiated_by`, so there is no subject-side
+  actor to bound. BLOCK 15 needs **no change**: the actor column is never named in the sweep's
+  `.update(...)`, so it is untouched, and it holds nothing that points at the subject.
+- The **staff-attributed** case is accountability data about a **third party** — an employee — not
+  about the subject. **Recommendation: retain it to the decision bound (5 years); do NOT clear it at
+  the 90-day fingerprint window.** The reasoning: the row exists for 5 years *because* it is
+  Art. 7(1) evidence, and the owner's complaint is that the evidence is incomplete. Stripping *who*
+  at 90 days while keeping *what* for 5 years re-creates the incompleteness for four fifths of the
+  row's life, and a staff revocation is rare enough that losing the actor after 90 days usually
+  means losing it forever. It is also **not** a re-identification path for the subject: the surviving
+  link points at the operator, not at the erased data subject, and a reader who knows "S revoked V"
+  already knows V.
+- **The counter-argument, stated because it is real:** a superuser identifier retained for 5 years on
+  consent rows is itself personal data about an employee, and it yields a durable per-operator
+  behavioural record (*which operator revoked whose consent, and how often*) that the product does not
+  otherwise have and has not declared, with **no erasure path** — an employee who leaves cannot have
+  it cleared, because clearing it is exactly what destroys the accountability. Data minimisation
+  (Art. 5(1)(c)) and accountability pull in opposite directions here.
+- **This block therefore implements the retention recommendation and flags the bound as an
+  owner/DPO decision.** It is a proportionality judgement between two legal obligations, not a
+  technical one, and the Implementor is **not** to settle it. The reversal is one line in
+  `purge_consent_records` plus the `RETAIN` entry's action, so if the owner rules for 90-day
+  clearing, the change is cheap and lands as a follow-up. **State this in the commit body.**
+  *Constraint that makes the recommendation safe to ship now:* the population is bounded to
+  superusers (`permissions=["delete"]` dispatches to `UserAdmin.has_delete_permission`, which is
+  `request.user.is_superuser`) and the event is rare, so the exposure is small while the decision is
+  open.
+
+**`SET_NULL`, never `CASCADE`.** Verified what `User` deletion does today: `consent_hard_delete`
+runs `User.objects.filter(consent_revoked_at__lt=cutoff).delete()` (a real collector delete, 30 days
+after withdrawal) and `apps/seed/services/seed_service.py` runs
+`User.objects.filter(source=AdSource.SEED).delete()`. A `CASCADE` actor FK would therefore **delete
+`ConsentRecord` rows** through the collector when a staff account is removed — destroying Art. 7(1)
+evidence. `SET_NULL` nulls the pointer and leaves the row, which is the behaviour
+`ConsentRecord.user` already relies on. `related_name="+"` avoids adding a second reverse accessor on
+`User` alongside `consent_records`.
+
+#### 2. The write paths that must populate it — established from the code, not assumed
+
+| Caller (verified) | Case | `user` (subject) | `initiated_by` | `action_source` | Change needed |
+|---|---|---|---|---|---|
+| `consent_accept`, authenticated (`views/consent.py`) | self-service | `U` | `—` | `self_service` | **none** — derived |
+| `consent_accept`, anonymous | anonymous visitor | `—` | `—` | `anonymous_web` | **none** — derived |
+| `consent_decline`, authenticated | self-service | `U` | `—` | `self_service` | **none** — derived |
+| `consent_decline`, anonymous | anonymous visitor | `—` | `—` | `anonymous_web` | **none** — derived |
+| `consent_withdraw` → `withdraw_consent` | self-service | `U` | `—` | `self_service` | **none** — `withdraw_consent`'s default |
+| `UserAdmin.withdraw_consent_action` | **staff** | `V` | **`S`** | **`admin_staff`** | **THE FIX** — pass both |
+| `purge_consent_records` (BLOCK 15) | **writes no records** | — | — | — | **none** (verified) |
+| `consent_hard_delete` | **writes no records** | — | — | — | **none** (verified) |
+| Telegram bot `/start` | **no caller exists** | — | — | — | **none** (verified) |
+| any future automated path | system | `V` | `—` | `system` | pass `action_source` explicitly |
+
+**Signature changes — three, in dependency order.**
+
+1. **`record_consent_action_with_context(user, choice, categories, *, ip_address=None,
+   user_agent=None, session_key=None, consent_version=…, action_source: ConsentActionSource,
+   initiated_by: User | None = None)`** — `action_source` is **required keyword-only, no default**,
+   so a new caller cannot forget to classify itself. `initiated_by` defaults to `None`. The actor
+   normalisation described in §1 lives **here**, in the one insertion path, next to the existing
+   `_anonymize_ip` sanitisation, so a future writer cannot bypass it.
+2. **`record_consent_action(user, choice, categories, request=None, consent_version=…,
+   *, action_source: ConsentActionSource | None = None)`** — one **optional** keyword-only
+   parameter, defaulting to `None`, which resolves to `ANONYMOUS_WEB` when `user is None` and
+   `SELF_SERVICE` otherwise. **The frozen signature is preserved**: the four-argument positional
+   shape, the `request=None` default, the `consent_version` default and the delegation all stand, so
+   **every existing call site keeps working byte-for-byte** — `consent_accept`, `consent_decline`
+   (BLOCK 8's surface, deliberately **not** edited), and the three test modules. The derivation is
+   correct *because* the only callers of this function are the two self-service web views; it is
+   documented in the docstring, and the explicit override exists for the first caller that is not
+   one. **BLOCK 8 and BLOCK 10 both relied on that freeze — it is not broken here.**
+3. **`withdraw_consent(user, *, ip_address=None, user_agent=None, session_key=None,
+   action_source=ConsentActionSource.SELF_SERVICE, initiated_by: User | None = None)`** — two
+   keyword-only params **appended after `session_key`**. Both are defaulted, so the six existing bare
+   `withdraw_consent(user)` call sites in `apps/users/tests/test_deletion.py` keep working and keep
+   meaning *"the subject withdrew"*, which is the correct reading of a bare domain call. The default
+   is stated in the docstring as a **contract with a warning**: the default is `SELF_SERVICE` because
+   the only non-staff caller is the subject's own web withdrawal; **any third-party initiator MUST
+   pass `ADMIN_STAFF`.**
+
+**Ordering rule for `withdraw_consent` — this block is the FIFTH writer. Re-read
+`apps/users/services/deletion.py` immediately before editing and assert this before writing:**
+
+1. Do **not** reorder, move or remove the existing `record_consent_action_with_context(...)` call.
+   It stays **last** inside `transaction.atomic()`, after `SupportTicket.objects.filter(...).delete()`
+   and `soft_delete_user_ads(user)`. BLOCK 10's rollback guarantee is load-bearing: a raise from
+   `soft_delete_user_ads` (exercised by `test_withdraw_is_atomic_rollback`) must roll the audit row
+   back, and that only holds because the write is last.
+2. Do **not** open, move or close the `atomic()` block, and do **not** add a second transaction.
+3. Extend the **signature only** — append the two keyword-only parameters after `session_key` — and
+   forward them on the existing call, adding **no** statement to the body.
+4. If the file's docstring no longer matches the code you found (another writer landed between
+   planning and execution), **stop and report** rather than layering on top.
+
+**Documented residual, NOT actioned here.** Two pre-existing facts this block touches but must not
+change: (a) the admin-initiated row still carries **no** `ip_address` and **no** `user_agent` — the
+admin request *is* available and could supply them, but that is BLOCK 10's shipped behaviour and its
+test, and the ruling scoped this block to actor/mechanism; (b) `record_consent_action`'s
+`request is None` branch drops `consent_version` when delegating — a pre-existing defect, out of
+scope here, but that line **must** be edited to forward `action_source`, so record it in the commit
+body rather than fixing it silently. Both residuals go in the new docstrings.
+
+#### 3. The audit-meaning test
+
+The owner's complaint is that the record's **meaning** is incomplete, so the test asserts on values
+**re-read from the database**, never on a settings or source check, and never on a symbol's presence.
+
+1. **Self-service vs staff are distinguishable from stored values alone.** Drive a subject's own
+   withdrawal and a superuser's changelist revocation of a *different* subject. Re-read both rows:
+   the self-service row names the subject and records the self-service mechanism with **no separate
+   acting account**; the staff row names the target as the subject, names the **superuser** as the
+   acting account, and records the staff mechanism. The staff row must **not** read as a subject
+   withdrawal.
+2. **System is distinguishable.** Drive the real recording service with an explicit
+   `ConsentActionSource.SYSTEM`; the re-read row carries no acting account and the system mechanism,
+   and differs from both rows above on stored values with no join.
+3. **The anonymous case is positively represented.** POST the consent form with no authenticated
+   user; the re-read row has no subject, no acting account, the anonymous mechanism, **and a
+   non-null session key** — so "an unidentified visitor acted" is recorded, and the row remains
+   attributable without an account. Add the control: that row differs from the system row and from
+   the authenticated rows on stored values.
+4. **No live writer leaves the unknown mechanism.** Assert the mechanism of a row written through
+   each of the three real write paths is a *specific* member, never the unknown default. This is the
+   tripwire that keeps a future fourth writer from silently landing in the legacy bucket.
+5. **The ledger survives the actor's account deletion.** Create a staff-revocation row, delete the
+   acting staff user's row the way `consent_hard_delete` does, and assert the `ConsentRecord` still
+   exists, its subject and decision fields are intact, and only the acting-account pointer reads
+   empty. Add the control: a self-attributed subject's own hard delete leaves its consent rows too.
+6. **The sweep behaves per the retention decision.** Age a staff-revocation row past the fingerprint
+   window and run the real command: subject, session key, IP and user agent are cleared, **the row
+   still exists**, and **the acting staff account is still readable on it**. Add the control: an aged
+   self-service row has no acting account to preserve.
+7. **A superuser cannot forge accountability.** Through the admin change form, an attempt to alter an
+   existing row's acting account or mechanism does not change either value on re-read, and the
+   changelist can be filtered by mechanism.
+8. **Legacy rows read honestly.** A row that predates this change carries the unknown mechanism and
+   no acting account, and is therefore distinguishable from every row written after it — while
+   **no** row written through the recording service carries the unknown mechanism.
+
+#### 4. The migration
+
+`apps/users/migrations/` is at `0004_consentrecord_sweep_index` → this migration is
+**`0005_consentrecord_initiated_by_action_source.py`**. Generate with `makemigrations` (no
+hand-written DDL); verify the directory immediately before generating — other blocks have landed
+migrations in this app.
+
+- `AddField` `ConsentRecord.initiated_by`: `null=True`, `blank=True`,
+  `on_delete=models.SET_NULL`, `related_name="+"`.
+- `AddField` `ConsentRecord.action_source`: the choices list, the `ConsentActionSource.UNKNOWN.value`
+  default, `blank=True`, `db_index=True`.
+- **No data migration, no `RunPython`, no backfill.** There is nothing to backfill: the ledger never
+  recorded the actor or the mechanism, so no value can be *derived* for an existing row. Inferring
+  "no IP and no user agent therefore staff" would be a guess, and it would be **wrong** for every
+  bot- or command-written row. **Record the gap honestly instead.**
+- **What existing rows then mean.** `AddField` writes the field default to every existing row, so
+  every pre-existing row reads `action_source = "unknown"` with `initiated_by = NULL`.
+  **The reading convention, to be written into the field `help_text`, the model docstring and
+  `db-schema.md`:** the unknown mechanism means *"this row was written before the actor was recorded;
+  the mechanism was never captured and is not recoverable"*. On such a row a null `initiated_by`
+  carries **no** inference at all about who acted — including for rows that were in fact staff
+  revocations, which is precisely the ambiguity this block stops creating from the day it lands and
+  cannot repair retroactively.
+- **Reversibility: yes.** Both operations are `AddField` on nullable/defaulted columns, so
+  `migrate users 0004` reverses cleanly. The reversal is **lossy**: it destroys every actor and
+  mechanism value the block wrote, and re-applying re-stamps pre-existing rows as unknown. Say so in
+  the commit body.
+
+**`ConsentRecordAdmin`, respecting the two owners.** BLOCK 12 owns `list_display` and `search_fields`;
+BLOCK 15 owns the TTL and the `session_key` scope. Therefore:
+
+- **`readonly_fields`: both new fields MUST be added.** `ConsentRecordAdmin` declares no `fieldsets`,
+  so Django auto-builds the change form from the editable fields — adding the two columns without
+  adding them here would make the **actor and the mechanism writable by a superuser**, i.e. forgeable
+  accountability evidence. This is the one admin edit that is mandatory rather than discretionary.
+- **`list_filter`: add `action_source`.** Low-cardinality closed vocabulary, exposes no identity, and
+  it is how an auditor separates the three cases on the changelist. `list_filter` is owned by neither
+  BLOCK 12 nor BLOCK 15.
+- **`list_display` and `search_fields`: leave byte-identical.** They are BLOCK 12's, and BLOCK 15's
+  residual note about `session_key` still living in `search_fields` is BLOCK 15's to close.
+
+#### 5. The inventory interaction
+
+**Must change in `apps/users/services/pii_inventory.py`:**
+
+- **One new erasure entry** for `("users.ConsentRecord", "initiated_by", ErasureAction.RETAIN, …)`.
+  `RETAIN`, not `NULL`: no erasure path nulls it, and declaring `NULL` would describe a scrub that
+  does not happen. The **reason string names BLOCK 18 and cites `06-NEW-02`**, and must state the
+  three facts a reader needs: the column never holds the subject (the `user` link is the subject's);
+  it is retained to the decision bound, not the fingerprint bound, because clearing it would destroy
+  the accountability the owner asked for; and it is emptied only by `SET_NULL` when the **acting
+  account's own** row is hard-deleted. Declaring it at all is the point — a staff-identifier
+  retention decision with no declaration is exactly the invisible omission this inventory exists to
+  prevent (cf. the `User.password` entry).
+- **One reviewed-non-identity decision:** add `"action_source"` to
+  `REVIEWED_NON_IDENTITY_COLUMNS["users.ConsentRecord"]`. The guard's `_is_review_candidate` skips
+  relational fields, so a **non-relational** column like this one is **not** skipped and turns the
+  guard red until it is decided. It is a closed mechanism vocabulary carrying no personal data.
+  A `REVIEWED_NON_IDENTITY_COLUMNS` entry is a bare name with **no reason field**, so the reason goes
+  in the module docstring — extend its "look-alike columns are deliberately excluded" list with
+  `ConsentRecord.action_source` and the `06-NEW-02` citation.
+- **One minimal docstring amendment.** The module docstring currently states that relational fields
+  "are excluded by the guard's own field filter and are **not recorded here**". A declared relational
+  entry contradicts that sentence. Amend **only that clause** to say relational fields are skipped
+  *by the guard* but **may** be declared to record an accountability-retention decision. Change
+  nothing else in the docstring.
+
+**What must NOT change in the inventory:** `ErasureAction`, the 4-tuple shape, all existing entries,
+`REVIEWED_NON_IDENTITY_COLUMNS` for every other model, the lazy-string import boundary, and the
+stdlib-only import rule — `test_importing_the_declaration_pulls_in_no_apps_model` wraps
+`builtins.__import__` and fails on **any** `apps.*` request, so importing `ConsentActionSource` at
+module scope from `apps.core.enums` would be a violation. Import the enum **inside the reason-string
+construction path only if unavoidable**; the clean answer is to write the reason as a plain string and
+not import the enum at all.
+
+**Must change in `apps/users/tests/test_pii_inventory.py`:** one new test asserting the actor entry is
+declared, is `RETAIN`, and its reason cites `06-NEW-02` and names BLOCK 18; and that
+`action_source` is in the reviewed set for `users.ConsentRecord`. The **positive** pin matters:
+`test_listed_models_have_no_unreviewed_column` already fails if the reviewed decision is *missing*,
+but nothing stops a later hand from deleting it.
+
+**File surface (semantic units)**
+
+| File | Symbol / target | Notes |
+|---|---|---|
+| `src/backend/apps/core/enums.py` | new `ConsentActionSource` StrEnum next to `ConsentChoice`; add to `__all__` | Rule 10. Five members, `UNKNOWN` is the default |
+| `src/backend/apps/users/models.py` | `ConsentRecord` — add the two fields + rewrite the docstring's actor definition | `user`'s existing `help_text` says "User who acted" — correct it to name the **subject** |
+| `src/backend/apps/users/migrations/0005_consentrecord_initiated_by_action_source.py` | **new** — two `AddField`s | Verify the directory immediately before generating |
+| `src/backend/apps/users/services/consent_record.py` | `record_consent_action`, `record_consent_action_with_context` | Actor normalisation goes in the `_with_context` writer |
+| `src/backend/apps/users/services/deletion.py` | `withdraw_consent` — signature only | **Fifth writer.** Re-read first; audit write stays last in the block |
+| `src/backend/apps/users/admin.py` | `UserAdmin.withdraw_consent_action`; `ConsentRecordAdmin.readonly_fields` / `list_filter` | Fix the staff path; rewrite the two stale "Limitation (`06-NEW-02`)" docstring paragraphs |
+| `src/backend/apps/users/services/pii_inventory.py` | `PII_ERASURE_ENTRIES`, `REVIEWED_NON_IDENTITY_COLUMNS`, module docstring | See §5 |
+| `src/backend/apps/users/tests/test_consent_actor.py` | **new** | The eight behavioural assertions of §3 |
+| `src/backend/apps/users/tests/test_admin_consent_action.py` | `test_forged_post_as_superuser_withdraws_and_writes_one_record` | **Add** actor/mechanism assertions. **Keep** the existing "no HTTP context" assertions — still true |
+| `src/backend/apps/users/tests/test_purge_consent_records.py` | new test for the actor-retention decision | **Production command unchanged** |
+| `src/backend/apps/users/tests/test_pii_inventory.py` | one new declaration test | Existing tests unchanged |
+| `docs/02-database/db-schema.md` | the `consent_records` column list; the "Known limitation — no actor column" paragraph | Rule 14 |
+| `docs/02-database/db-enums.md` | new `ConsentActionSource` section | Rule 14 |
+| `docs/99-agent/pii-consent-remediation-record.md` | the `06-NEW-02` "Open and unowned" row | Reassigned to BLOCK 18 by the ruling |
+
+**Binding constraints**
+
+1. **Re-read `apps/users/services/deletion.py` immediately before editing** and follow the fifth-writer
+   ordering rule above. The `atomic()` boundary, the position of the audit write, and
+   `test_withdraw_is_atomic_rollback`'s guarantee are all load-bearing and **unchanged**.
+2. **`record_consent_action`'s frozen signature is preserved.** The new parameter is optional and
+   keyword-only; `consent_accept`, `consent_decline` and every existing test call site keep working
+   unchanged. **Do not edit `apps/users/views/consent.py`** — BLOCK 8 owns it and the derivation makes
+   the edit unnecessary.
+3. **`apps/core/management/commands/purge_consent_records.py` is NOT modified.** Not its windows, not
+   its lock 14, not its one-statement clear, not its never-delete invariant, not its dry-run.
+4. **`ConsentRecordAdmin.list_display` and `search_fields` are not touched** (BLOCK 12). BLOCK 15's
+   `session_key` residual is BLOCK 15's to close.
+5. **The actor-retention bound is not the Implementor's to settle.** Implement the 5-year
+   recommendation, record the DPO question in the commit body, and do not silently choose 90 days.
+6. **No `CASCADE`, ever.** `SET_NULL` on the actor FK; `consent_hard_delete`'s collector delete and
+   `seed_service`'s bulk delete both pass through it.
+7. **No data migration and no backfill.** The unknown mechanism is the honest reading of a
+   pre-existing row.
+8. **No `.po` / i18n change.** Model `help_text` and enum values are not a translatable surface (the
+   gate scans templates; every other field on this model already carries English `help_text`), and no
+   new user-visible string is introduced.
+9. **`--create-db` is mandatory** — a migration lands (§1.1).
+10. **`VAL-010` artefacts are contention, not defects.** Re-run a red gate serially before reporting it.
+
+**Risk and rollback**
+
+- *Risk:* the actor FK invites a future author to null-means-*nothing* reading. Mitigation: the
+  invariant is written in three places (model docstring, writer docstring, `db-schema.md`) and pinned
+  by the audit-meaning tests.
+- *Risk:* a superuser forges accountability by editing the changelist row. Mitigation: both new
+  fields in `readonly_fields`, pinned by acceptance criterion 7.
+- *Rollback:* the migration reverses (lossy — actor and mechanism values are destroyed). Reverting
+  the code without reversing the migration is also safe: the columns become unused.
+- *Escalate, do not improvise,* if: the migration directory is not at `0004` when you generate;
+  `deletion.py` no longer matches the shape this block was planned against; or a **new** writer of
+  `record_consent_action*` or `withdraw_consent` appears that is not in the §2 table.
+
+**Implementor task**
+
+```yaml
+id: task_06_b18_consent_actor
+title: "Record who initiated each consent action and by what mechanism (06-NEW-02)"
+priority: medium
+depends_on: []
+source_reference: ".ai/plans/06-pii-consent-remediation.md"
+source_section: "BLOCK 18 - Record who acted: the actor column and the mechanism on ConsentRecord"
+source_blocks: ["BLOCK 18"]
+description: >
+  ConsentRecord cannot distinguish "subject withdrew" from "staff revoked" from "system
+  revoked", so the audit meaning of the ledger is incomplete (06-NEW-02, reopened by owner
+  ruling 2026-10-04 as an owned follow-up; BLOCKS 12 and 15 are NOT reopened). Add a
+  relational actor column plus a non-relational mechanism column, and populate them from
+  every existing write path so the three cases are distinguishable in stored data.
+goals:
+  - "make subject-initiated, staff-initiated and system-initiated consent actions distinguishable from stored values alone"
+  - "stop the admin revocation from reading as a subject withdrawal"
+  - "keep the actor column out of BLOCK 15's fingerprint clear so the 90-day sweep's invariant is untouched"
+  - "record the actor-retention bound honestly, including the open DPO question"
+files:
+  - path: "src/backend/apps/core/enums.py"
+    targets:
+      - type: class
+        name: ConsentActionSource
+      - type: module_attribute
+        name: __all__
+    semantic_anchors:
+      insert_after:
+        type: class
+        value: ConsentChoice
+  - path: "src/backend/apps/users/models.py"
+    targets:
+      - type: class
+        name: ConsentRecord
+    semantic_anchors:
+      insert_after:
+        type: field
+        value: user_agent
+  - path: "src/backend/apps/users/migrations/0005_consentrecord_initiated_by_action_source.py"
+    targets:
+      - type: migration
+        name: "AddField initiated_by / AddField action_source"
+  - path: "src/backend/apps/users/services/consent_record.py"
+    targets:
+      - type: function
+        name: record_consent_action
+      - type: function
+        name: record_consent_action_with_context
+    semantic_anchors:
+      insert_before:
+        type: return_statement
+        value: "ConsentRecord.objects.create"
+  - path: "src/backend/apps/users/services/deletion.py"
+    targets:
+      - type: function
+        name: withdraw_consent
+    semantic_anchors:
+      insert_after:
+        type: function_call
+        value: record_consent_action_with_context
+  - path: "src/backend/apps/users/admin.py"
+    targets:
+      - type: method
+        name: UserAdmin.withdraw_consent_action
+      - type: class
+        name: ConsentRecordAdmin
+    semantic_anchors:
+      insert_after:
+        type: function_call
+        value: withdraw_consent
+  - path: "src/backend/apps/users/services/pii_inventory.py"
+    targets:
+      - type: module_attribute
+        name: PII_ERASURE_ENTRIES
+      - type: module_attribute
+        name: REVIEWED_NON_IDENTITY_COLUMNS
+  - path: "src/backend/apps/users/tests/test_consent_actor.py"
+    targets:
+      - type: module
+        name: test_consent_actor
+  - path: "src/backend/apps/users/tests/test_admin_consent_action.py"
+    targets:
+      - type: function
+        name: test_forged_post_as_superuser_withdraws_and_writes_one_record
+  - path: "src/backend/apps/users/tests/test_purge_consent_records.py"
+    targets:
+      - type: module
+        name: test_purge_consent_records
+  - path: "src/backend/apps/users/tests/test_pii_inventory.py"
+    targets:
+      - type: module
+        name: test_pii_inventory
+  - path: "docs/02-database/db-schema.md"
+    targets:
+      - type: document_section
+        name: "consent_records (zone F / Plan 21)"
+  - path: "docs/02-database/db-enums.md"
+    targets:
+      - type: document_section
+        name: ConsentActionSource
+  - path: "docs/99-agent/pii-consent-remediation-record.md"
+    targets:
+      - type: document_section
+        name: "Open work"
+changes:
+  - action: add_code
+    description: >
+      Add the ConsentActionSource StrEnum (rule 10) to apps/core/enums.py next to
+      ConsentChoice, and add the name to __all__. Five members, and the mechanism vocabulary
+      is closed on purpose so a future writer cannot invent a fourth spelling.
+    code_hint: |
+      class ConsentActionSource(StrEnum):
+          """Mechanism by which a consent action was initiated (06-NEW-02).
+
+          Answers "by what mechanism", never "who" - that is initiated_by. Read the two
+          together: action_source is authoritative for which case a row is, and
+          initiated_by names the acting account when one exists and is not the subject.
+          """
+
+          SELF_SERVICE = "self_service"      # the subject acted, from their own session
+          ANONYMOUS_WEB = "anonymous_web"    # an unidentified visitor acted; no account at all
+          ADMIN_STAFF = "admin_staff"        # a staff account acted via the Django admin
+          SYSTEM = "system"                  # no human actor; an automated process acted
+          UNKNOWN = "unknown"                # DEFAULT - row predates 06-NEW-02; not recoverable
+  - action: add_code
+    description: >
+      Add two columns to ConsentRecord and rewrite the class docstring to carry the actor
+      definition. Correct ConsentRecord.user's help_text, which currently says "User who
+      acted" - it names the SUBJECT, which is the ambiguity this block removes.
+    code_hint: |
+      initiated_by = models.ForeignKey(
+          "users.User",
+          null=True,
+          blank=True,
+          on_delete=models.SET_NULL,
+          related_name="+",
+          help_text=(
+              "Acting account, recorded ONLY when it is not the subject (06-NEW-02). NULL "
+              "means no acting account distinct from the subject - a self-service action, "
+              "an anonymous visitor, or a system action; action_source tells those apart. "
+              "Never CASCADE: consent_hard_delete deletes User rows and a cascade would "
+              "destroy the Art. 7(1) ledger. Retained to the decision bound (5 years), not "
+              "the 90-day fingerprint bound - see the open owner/DPO question."
+          ),
+      )
+      action_source = models.CharField(
+          max_length=20,
+          choices=[(s.value, s.value) for s in ConsentActionSource],
+          default=ConsentActionSource.UNKNOWN.value,
+          blank=True,
+          db_index=True,
+          help_text=(
+              "Mechanism that initiated the action (06-NEW-02). UNKNOWN is the default and "
+              "means the row predates this column: the mechanism was never captured and is "
+              "not recoverable. No row written through the recording service carries UNKNOWN."
+          ),
+      )
+  - action: add_migration
+    description: >
+      Two AddField operations in the users app. Verify the directory is still at
+      0004_consentrecord_sweep_index immediately before generating. No RunPython, no
+      backfill: the ledger never recorded the actor, so nothing is derivable.
+  - action: modify_code
+    description: >
+      record_consent_action_with_context gains a REQUIRED keyword-only action_source and an
+      optional keyword-only initiated_by. Put the actor normalisation in this one insertion
+      path, beside the existing _anonymize_ip sanitisation, so no future writer bypasses it.
+    code_hint: |
+      # Actor normalisation (06-NEW-02): the actor is recorded only when it is NOT the
+      # subject. Storing the subject twice would duplicate the very link BLOCK 15 clears at
+      # 90 days, and that surviving copy would be the only remaining link from an anonymous
+      # decision to a live account. Invariant: initiated_by is not null only when it is a
+      # different row from user.
+      actor = (
+          initiated_by
+          if initiated_by is not None
+          and (user is None or initiated_by.pk != user.pk)
+          else None
+      )
+      return ConsentRecord.objects.create(
+          user=user if user is not None and user.is_authenticated else None,
+          ...,
+          action_source=action_source,
+          initiated_by=actor,
+      )
+  - action: modify_code
+    description: >
+      record_consent_action gains ONE optional keyword-only action_source parameter that
+      resolves to ANONYMOUS_WEB when user is None and SELF_SERVICE otherwise, and forwards it
+      on BOTH delegation paths. This is what preserves the frozen signature: the
+      four-argument positional shape, the request=None default, the consent_version default
+      and the delegation all stand, so consent_accept, consent_decline and every existing test
+      call site keep working unchanged. Document the derivation and the explicit override.
+    code_hint: |
+      resolved_source = action_source or (
+          ConsentActionSource.ANONYMOUS_WEB
+          if user is None
+          else ConsentActionSource.SELF_SERVICE
+      )
+  - action: modify_code
+    description: >
+      withdraw_consent: signature only. Append two keyword-only parameters after
+      session_key - action_source defaulting to SELF_SERVICE and initiated_by defaulting to
+      None - and forward them on the existing record_consent_action_with_context call. Add NO
+      statement to the body, do NOT move the audit write, do NOT touch the atomic() block.
+      Re-read the file immediately before editing: this is the FIFTH writer.
+  - action: modify_code
+    description: >
+      UserAdmin.withdraw_consent_action passes action_source=ADMIN_STAFF and
+      initiated_by=request.user. This is the path that currently produces a "subject
+      withdrew" record for what is actually a staff revocation. Do NOT add ip_address or
+      user_agent - BLOCK 10's shipped behaviour and its test stay as they are.
+    code_hint: |
+      withdraw_consent(
+          user,
+          action_source=ConsentActionSource.ADMIN_STAFF,
+          initiated_by=request.user,
+      )
+  - action: modify_code
+    description: >
+      ConsentRecordAdmin: add both new fields to readonly_fields (MANDATORY - the class
+      declares no fieldsets, so without them a superuser could edit the actor and the
+      mechanism, forging accountability evidence) and add action_source to list_filter.
+      Leave list_display and search_fields byte-identical - BLOCK 12 owns them, and BLOCK
+      15's session_key residual is BLOCK 15's to close.
+  - action: modify_code
+    description: >
+      pii_inventory: one new erasure entry ("users.ConsentRecord", "initiated_by",
+      ErasureAction.RETAIN, reason) whose reason names BLOCK 18 and cites 06-NEW-02; add
+      "action_source" to REVIEWED_NON_IDENTITY_COLUMNS["users.ConsentRecord"]; and amend
+      ONLY the module docstring's clause about relational fields so a declared relational
+      entry is permitted. Do NOT import ConsentActionSource at module scope - the
+      no-apps-import probe wraps builtins.__import__ and fails on any apps.* request.
+  - action: add_test
+    description: >
+      New test_consent_actor.py carrying the eight behavioural assertions: the three cases
+      distinguishable from stored values; the staff admin revocation no longer reading as a
+      subject withdrawal; the anonymous row positively marked and still carrying its session
+      key; no live writer emitting the unknown mechanism; the ledger surviving the actor
+      account's deletion; the sweep leaving a staff actor readable; the admin refusing to
+      forge actor or mechanism; and the legacy row's honest reading.
+  - action: modify_test
+    description: >
+      Extend test_forged_post_as_superuser_withdraws_and_writes_one_record with the actor and
+      mechanism assertions (additive only - keep the existing no-IP / no-user-agent
+      assertions, they remain true). Add the staff-actor retention test to
+      test_purge_consent_records.py (production command unchanged). Add one declaration test
+      to test_pii_inventory.py.
+  - action: modify_docs
+    description: >
+      db-schema.md: add the two columns to the consent_records list and REPLACE the "Known
+      limitation - no actor column (06-NEW-02, open and unowned)" paragraph with the actor
+      definition and the retention decision. db-enums.md: add a ConsentActionSource section.
+      pii-consent-remediation-record.md: move the 06-NEW-02 row out of "Open work" to BLOCK 18.
+acceptance_criteria:
+  - "a subject's own web withdrawal and a superuser's admin revocation of a different subject, re-read from the database, differ on stored values alone: the first names the subject and carries no separate acting account, the second names the target as subject, names the superuser as the acting account, and records a different mechanism - so the staff revocation no longer reads as a subject withdrawal"
+  - "an action recorded with the system mechanism carries no acting account and is distinguishable from both the self-service and the staff rows from stored values, with no join"
+  - "a consent row written by an anonymous visitor carries no subject, no acting account, the anonymous mechanism, and a non-null session key, and is distinguishable from the system row and from the authenticated rows on stored values"
+  - "deleting the acting staff account's user row the way consent_hard_delete does leaves every consent row it acted on in place with its subject and decision fields intact, and only the acting-account pointer reads empty"
+  - "a consent row that predates this change carries the unknown mechanism and no acting account and is distinguishable from every row written after it, while no row written through the consent-recording service carries the unknown mechanism"
+  - "running the consent-record retention sweep over an aged staff-revocation row clears the subject, session key, IP address and user agent, leaves the row itself in place, and leaves the acting staff account readable on it"
+  - "a superuser cannot alter the acting account or the mechanism of an existing consent row through the admin change form, and the consent changelist can be filtered by mechanism"
+  - "the consent withdrawal, admin consent action, retention sweep, consent recording service and erasure inventory suites pass with no assertion removed other than the ones this block deliberately replaces"
+  - "the fresh-schema run with --create-db passes and makemigrations --check is clean"
+tests_required:
+  - "src/backend/apps/users/tests/test_consent_actor.py (new - all eight assertions)"
+  - "src/backend/apps/users/tests/test_admin_consent_action.py (extended staff-case assertions, existing ones kept)"
+  - "src/backend/apps/users/tests/test_purge_consent_records.py (new staff-actor retention test; command unchanged)"
+  - "src/backend/apps/users/tests/test_pii_inventory.py (new declaration test)"
+tests_to_run:
+  - "src/backend/apps/users/tests/test_consent_actor.py"
+  - "src/backend/apps/users/tests/test_admin_consent_action.py"
+  - "src/backend/apps/users/tests/test_purge_consent_records.py"
+  - "src/backend/apps/users/tests/test_pii_inventory.py"
+  - "src/backend/apps/users/tests/test_consent_records.py"
+  - "src/backend/apps/users/tests/test_consent.py"
+  - "src/backend/apps/users/tests/test_deletion.py"
+  - "src/backend/apps/users/tests/test_admin_pii_containment.py"
+  - "src/backend/apps/core/tests/test_client_ip.py"
+commands:
+  - "docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS=\"src/backend/apps/users/tests src/backend/apps/users/tests/test_purge_consent_records.py --tb=short\" test"
+  - "docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS=\"--create-db --tb=short -n auto --maxprocesses=4 --dist loadgroup\" test"
+  - "docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --env PYTEST_SKIP_MARKERS=seed test"
+  - "uv run ruff check src/backend/apps/users/"
+  - "uv run basedpyright src/backend/apps/users/services/consent_record.py src/backend/apps/users/models.py"
+command_notes: |
+  Copy the alias once per session:
+    $dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'
+  and run the container commands as `$dc run --rm ... test`.
+  --env-file .env.test is REQUIRED (compose aborts on ${POSTGRES_*?} without it). Never use
+  the mko-bazuna-dev project name. A migration lands, so the --create-db run is MANDATORY.
+  PYTEST_OPTS is unquoted in docker/entrypoint-test.sh and REPLACES the defaults, so a
+  targeted run loses xdist and --reuse-db. Never --override-ini=addopts= (it strips
+  --import-mode=importlib). Never run uv run pytest on the host - there is no local
+  PostgreSQL. VAL-010 teardown races are contention, not defects: re-run a red gate serially.
+  CORRECTION to the brief: the retention-sweep suite lives at
+  src/backend/apps/users/tests/test_purge_consent_records.py, NOT under apps/core/tests/ -
+  verified. apps/core/tests/test_sweep_consent.py covers consent_hard_delete and is
+  unaffected. src/backend/apps/users/tests/test_purge_consent_records.py is already inside
+  the users/tests directory target above; listing it separately is harmless but redundant.
+commit:
+  message: "feat(users): record who initiated each consent action (06-NEW-02)"
+  stage_only:
+    - "src/backend/apps/core/enums.py"
+    - "src/backend/apps/users/models.py"
+    - "src/backend/apps/users/migrations/0005_consentrecord_initiated_by_action_source.py"
+    - "src/backend/apps/users/services/consent_record.py"
+    - "src/backend/apps/users/services/deletion.py"
+    - "src/backend/apps/users/admin.py"
+    - "src/backend/apps/users/services/pii_inventory.py"
+    - "src/backend/apps/users/tests/test_consent_actor.py"
+    - "src/backend/apps/users/tests/test_admin_consent_action.py"
+    - "src/backend/apps/users/tests/test_purge_consent_records.py"
+    - "src/backend/apps/users/tests/test_pii_inventory.py"
+    - "docs/02-database/db-schema.md"
+    - "docs/02-database/db-enums.md"
+    - "docs/99-agent/pii-consent-remediation-record.md"
+extra_context: |
+  OWNER RULING (2026-10-04) - implement against it, do not reopen. 06-NEW-02 is reopened as
+  an owned Phase-06 follow-up. BLOCKS 12 and 15 are NOT reopened. It was previously routed to
+  "BLOCK 12/15" and both closed without it, leaving it orphaned. Reason it is not cosmetic:
+  ConsentRecord cannot distinguish subject withdrew / staff revoked / system revoked, so the
+  AUDIT MEANING of the record is incomplete - a data-model and accountability defect. Shape the
+  owner named: an actor / revoked_by with a clear definition of who counts as the actor.
+
+  1. ACTOR DEFINITION (write this down where a reader will find it - model docstring, field
+     help_text, writer docstring, db-schema.md):
+     The actor is the account that performed the action, and it is recorded ONLY when that
+     account is NOT the subject. user already names the subject, so a self-action would store
+     the same account twice. Invariant: initiated_by IS NOT NULL only when initiated_by is a
+     different row from user. Read the pair, never one column alone - action_source is
+     authoritative for which case the row is; initiated_by names the account when one exists.
+     A null initiated_by means "no acting account distinct from the subject", covering a
+     self-service action, an anonymous visitor and a system action; action_source tells those
+     three apart.
+     Both columns are required. A system action has NO User actor, so the FK alone cannot
+     express "system revoked" - one of the three cases the owner named.
+
+  2. THE THREE CASES AS STORED (U = subject, S = acting staff, "-" = NULL):
+     subject acted        -> user=U, initiated_by=-, action_source=self_service
+     anonymous visitor    -> user=-, initiated_by=-, action_source=anonymous_web  (+ non-null session_key)
+     staff revoked        -> user=V, initiated_by=S, action_source=admin_staff
+     system               -> user=V, initiated_by=-, action_source=system
+     predates this block  -> unchanged, initiated_by=-, action_source=unknown
+
+  3. RETENTION ANSWER - IMPLEMENT IT, DO NOT SETTLE IT. Retain the staff actor to the DECISION
+     bound (5 years); do NOT clear it at the 90-day fingerprint window. Clearing it destroys
+     the accountability the owner asked for; retaining a superuser identifier for 5 years on a
+     row whose subject is anonymous is itself a privacy question and yields a per-operator
+     behavioural record with no erasure path. This is an owner/DPO proportionality decision.
+     Implement the recommendation, record the open question in the COMMIT BODY, and do not
+     silently choose 90 days. The reversal is one line plus the RETAIN entry's action.
+     Consequence: apps/core/management/commands/purge_consent_records.py is NOT MODIFIED. The
+     actor column is never named in its .update(...), so it is untouched, and it never holds a
+     link to the subject, so BLOCK 15's invariant is preserved without a code change.
+
+  4. FIFTH-WRITER ORDERING RULE for withdraw_consent (apps/users/services/deletion.py).
+     Re-read the file immediately before editing and assert this. Landed writers so far:
+     BLOCK 9 474a68d (body + atomic), BLOCK 13 6631ff3 (SupportTicket deletion),
+     BLOCK 8 8dba351, BLOCK 10 749bbfc (audit write, LAST inside the block). This block is the
+     FIFTH. (a) Do not reorder, move or remove the existing
+     record_consent_action_with_context call - it stays last inside transaction.atomic(),
+     after the SupportTicket delete and soft_delete_user_ads, because
+     test_withdraw_is_atomic_rollback depends on that raise rolling the audit row back.
+     (b) Do not open, move or close the atomic() block; add no second transaction.
+     (c) Extend the SIGNATURE only - append the two keyword-only parameters after session_key -
+     and forward them on the existing call, adding no statement to the body.
+     (d) If the file no longer matches this shape, STOP AND REPORT rather than layering on top.
+
+  5. FROZEN SIGNATURE. record_consent_action(user, choice, categories, request=None,
+     consent_version=...) keeps its four-argument positional shape, its request=None default,
+     its consent_version default and its delegation. The new action_source parameter is OPTIONAL
+     and KEYWORD-ONLY, so every existing call site keeps working unchanged - BLOCK 8 and
+     BLOCK 10 both relied on that freeze and it is NOT broken here. record_consent_action's
+     action_source resolves to ANONYMOUS_WEB when user is None and SELF_SERVICE otherwise; the
+     derivation is correct because the only callers are the two self-service web views, and it
+     is documented with an explicit override for the first caller that is not one.
+     record_consent_action_with_context's action_source is REQUIRED keyword-only with NO
+     default, so a new caller cannot forget to classify itself.
+     DO NOT EDIT apps/users/views/consent.py - BLOCK 8 owns it and the derivation makes the edit
+     unnecessary.
+
+  6. MIGRATION. apps/users/migrations/ was verified at 0004_consentrecord_sweep_index, so this
+     is 0005_consentrecord_initiated_by_action_source.py with two AddFields (initiated_by:
+     null=True, blank=True, on_delete=SET_NULL, related_name="+"; action_source: choices,
+     default=ConsentActionSource.UNKNOWN.value, blank=True, db_index=True). Verify the
+     directory immediately before generating - other blocks have landed migrations in this app.
+     NO data migration, NO RunPython, NO backfill: the ledger never recorded the actor, so
+     nothing is derivable, and inferring "no IP and no user agent therefore staff" would be
+     wrong for every bot- or command-written row. AddField writes the default to existing rows,
+     so every pre-existing row reads action_source="unknown". Reading convention: unknown means
+     "written before the actor was recorded; the mechanism was never captured and is not
+     recoverable", and a null initiated_by on such a row carries NO inference about who acted,
+     including for rows that were in fact staff revocations. Record that gap honestly.
+     Reversible: yes (AddField on nullable/defaulted columns). The reversal is LOSSY - it
+     destroys every actor and mechanism value written, and re-applying re-stamps pre-existing
+     rows as unknown. Say so in the commit body.
+
+  7. INVENTORY. In apps/users/services/pii_inventory.py: add ONE erasure entry
+     ("users.ConsentRecord", "initiated_by", ErasureAction.RETAIN, reason) whose reason names
+     BLOCK 18 and cites 06-NEW-02, and states that the column never holds the subject, is
+     retained to the decision bound rather than the fingerprint bound, and is emptied only by
+     SET_NULL when the ACTING ACCOUNT's own row is hard-deleted. RETAIN, not NULL - no erasure
+     path nulls it. Add "action_source" to REVIEWED_NON_IDENTITY_COLUMNS["users.ConsentRecord"]:
+     the guard's _is_review_candidate skips relational fields, so a non-relational column like
+     this one is NOT skipped and turns the guard red until it is decided. That reviewed set is a
+     bare frozenset with NO reason field, so the reason goes in the module docstring's
+     look-alike list, citing 06-NEW-02. Amend ONLY the docstring clause that says relational
+     fields "are not recorded here", because a declared relational entry contradicts it.
+     MUST NOT change: ErasureAction, the 4-tuple shape, every existing entry,
+     REVIEWED_NON_IDENTITY_COLUMNS for every other model, the lazy-string import boundary, and
+     the stdlib-only rule. Do NOT import ConsentActionSource at module scope -
+     test_importing_the_declaration_pulls_in_no_apps_model wraps builtins.__import__ and fails
+     on ANY apps.* request. Write the reason as a plain string.
+
+  8. ConsentRecordAdmin - RESPECT BLOCK 12's AND BLOCK 15's OWNERSHIP. readonly_fields: add
+     BOTH new fields, MANDATORY - the class declares no fieldsets, so Django auto-builds the
+     form from editable fields and a superuser would otherwise be able to edit the actor and
+     the mechanism, forging accountability evidence. list_filter: add action_source (low
+     cardinality, no identity exposure, and it is how the three cases are separated on the
+     changelist; unowned by both blocks). list_display and search_fields: leave BYTE-IDENTICAL -
+     BLOCK 12 owns them, and BLOCK 15's session_key residual is BLOCK 15's to close.
+
+  9. VERIFIED FACTS THIS BLOCK RELIES ON (re-verify before editing; do not assume).
+     - No Telegram-bot caller of record_consent_action exists. A repo-wide search returns hits
+       only in apps/users/views/consent.py (2 call sites), apps/users/services/deletion.py (1),
+       consent_record.py (definitions) and three test modules. The module docstring's "e.g.
+       from the Telegram bot /start entry point" is ASPIRATIONAL - that path does not exist. Do
+       not build a writer for it.
+     - purge_consent_records writes NO ConsentRecord rows; it only .update()s existing ones. It
+       is the only command naming ConsentRecord. consent_hard_delete names User,
+       AnalyticsEvent, ModeratorActionLog and SupportTicket only.
+     - User deletion today: consent_hard_delete runs
+       User.objects.filter(consent_revoked_at__lt=cutoff).delete() (a real collector delete, 30
+       days after withdrawal) and apps/seed/services/seed_service.py runs
+       User.objects.filter(source=AdSource.SEED).delete(). A CASCADE actor FK would therefore
+       DELETE ConsentRecord rows through the collector and destroy Art. 7(1) evidence.
+       SET_NULL only.
+     - ConsentActionSource.SYSTEM has no production writer today and that is expected. It exists
+       because the owner named "system revoked" as one of the three cases and because a closed
+       vocabulary is what stops a future writer inventing a fourth spelling. The
+       audit-meaning test proves it is STORABLE and distinguishable by driving the real writer;
+       record plainly in the commit body that no production path emits it.
+
+  10. DOCUMENTED RESIDUALS - record, do NOT fix. (a) The admin-initiated row still carries NO
+      ip_address and NO user_agent. The admin request IS available and could supply them, but
+      that is BLOCK 10's shipped behaviour and its test, and the ruling scoped this block to
+      actor and mechanism. (b) record_consent_action's "request is None" branch drops
+      consent_version when delegating - a pre-existing defect, out of scope, but that line MUST
+      be edited to forward action_source, so note it in the commit body rather than fixing it
+      silently.
+
+  11. NO i18n / .po CHANGE. Model help_text and enum values are not a translatable surface (the
+      gate scans templates; every other field on this model already carries English help_text),
+      and no new user-visible string is introduced.
+
+  12. MANDATORY --create-db run (a migration lands). VAL-010 artefacts are contention, not
+      defects - re-run a red gate serially before reporting it. One Implementor at a time, one
+      commit per block, stage_only list only, never git add -A.
+```
+
+---
+
 ## 4. Dependency graph
 
 ### 4.1 Execution order (the safe serial order)
