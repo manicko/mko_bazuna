@@ -11,6 +11,7 @@ related:
   - db-indexes
   - packages-list
   - local-https-mkcert
+  - media-store-operations
 ---
 
 ## Purpose
@@ -215,7 +216,7 @@ Volumes: `postgres_data`, `media_volume`. Static files baked into image via whit
 - **nginx is REQUIRED in phase 1:** whitenoise does NOT serve user-uploaded media; local MEDIA_ROOT needs nginx. Plus TLS termination (HTTPS mandatory: login deep-link tokens, Secure cookies). Web service is not exposed.
 - **Dockerfile:** `python:3.14-slim` + `uv` (pin `uv>=0.11.28`); non-root user; `RUN uv run python manage.py collectstatic --noinput`.
 - **Django settings:** `USE_X_FORWARDED_HOST=True`, `SECURE_PROXY_SSL_HEADER=('HTTP_X_FORWARDED_PROTO','https')`, `SECURE_SSL_REDIRECT=True`.
-- **/media/ security:** nginx blocks script execution with a `~*` regex location — `location ~* ^/media/.*\.(?:php|py|cgi|pl|sh)(?:/|$) { deny all; return 403; }` (07-MEDIA-006) — and rate-limits the whole `/media/` location with `limit_req zone=browse_limit burst=40 nodelay`, reusing the existing `browse_limit` zone (no new `limit_req_zone`). The `~*` form is mandatory: a prefix `location /media/` block would replace the proxying block and 403 every genuine photo. `X-Content-Type-Options: nosniff`; whitelist `image/jpeg`, default `application/octet-stream`, `Content-Disposition: inline`; media keys are unguessable `<uuid4>.jpg` with **no `ad_id`** (zone R6: URL anonymity — see [db-schema.md](../02-database/db-schema.md#ad_images)).
+- **/media/ security:** nginx blocks script execution with a `~*` regex location — `location ~* ^/media/.*\.(?:php|py|cgi|pl|sh)(?:/|$) { deny all; return 403; }` (07-MEDIA-006) — and rate-limits the whole `/media/` location with `limit_req zone=browse_limit burst=40 nodelay`, reusing the existing `browse_limit` zone (no new `limit_req_zone`). The `~*` form is mandatory: a prefix `location /media/` block would replace the proxying block and 403 every genuine photo. `X-Content-Type-Options: nosniff`; whitelist `image/jpeg`, default `application/octet-stream`, `Content-Disposition: inline`; media keys are unguessable `<uuid4>.jpg` with **no `ad_id`** (zone R6: URL anonymity — see [db-schema.md](../02-database/db-schema.md#ad_images)). Storage-key ownership, the `staging/` byte budget, thumbnail publication and the store/database reconciliation commands are operator concerns documented in [`media-store-operations.md`](../ops/media-store-operations.md).
   - **`media_gate` cache security:** the Django `/media/<key>` view sets `Cache-Control: no-store` on 200 responses in production (`DEBUG=False`), so ad photos are never cached by browser or CDN; `Vary: Cookie` (via `@vary_on_headers`) ensures shared caches never merge auth-state-dependent responses; 403/404 carry no `Cache-Control`. Prevents stale cached photos of deleted/withdrawn ads after status transitions (spec §6/§7).
 - **PgBouncer (recommended):** shared external pool in transaction mode between web+bot; each process holds `CONN_MAX_AGE=0`. With psycopg3 + PgBouncer tx mode set `OPTIONS={"prepare_threshold": None, "options": "-c lock_timeout=10s"}` — `prepare_threshold=None` for async safety, `options` for the connection-level lock bound (03-DB-004). **Prerequisite (two parts):** the `options` startup parameter is only *accepted* when the pooler lists it in `ignore_startup_parameters` (unprefixed `IGNORE_STARTUP_PARAMETERS=options,extra_float_digits` in `docker-compose.prod.yml` — the entrypoint reads the bare name, not `PGBOUNCER_*`), otherwise PgBouncer refuses every client. But listing it is not enough: the pooler then **discards** the whole `options` parameter, so pooled `SHOW lock_timeout` returns `0` (unbounded) and the bound is silently void; `track_extra_parameters` does not substitute on 1.25.2. The bound survives a pooler only via a **server-side** default (`ALTER DATABASE mko_bazuna SET lock_timeout = '10s'` / `postgresql.conf`), which is **not shipped here** — it is phase 12's decision. Enabling the profile before that default is in place is therefore **blocked**: it trades a loud refusal for silent unbounded lock waits. Latent today (the profile is not in the deployed path).
 - **Migrations (zone C5/D7):** run exactly ONCE before web and bot start (dedicated step / ordering guard) so the two processes don't migrate concurrently. Domain writes (`ads`/`LoginToken`) go in ONE Django transaction.
@@ -231,12 +232,16 @@ Volumes: `postgres_data`, `media_volume`. Static files baked into image via whit
 docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile scheduler up -d
 ```
 
-The scheduler runs 9 hourly sweep commands (`archive_sweep`, `delete_sweep`,
+The scheduler runs 10 hourly sweep commands (`archive_sweep`, `delete_sweep`,
 `consent_hard_delete`, `sweep_drafts`, `sweep_orphaned_media`, `cleanup_login_tokens`,
-`purge_failed_ads`, `purge_rejected_ads`, `purge_deleted_ads`) plus 3 daily commands
+`purge_failed_ads`, `purge_rejected_ads`, `purge_deleted_ads`,
+`purge_media_deletion_errors`) plus 3 daily commands
 (`send_alerts`, `rollup_daily_metrics`, `purge_consent_records` — all fire at 08:00 UTC on the
 first hourly tick at or after that hour) via the extracted module `apps.core.utils.scheduler`
 (`python -m apps.core.utils.scheduler`), invoked by `entrypoint-scheduler.sh`.
+The list is the module constant `apps.core.utils.scheduler.HOURLY_COMMANDS`; `purge_media_deletion_errors`
+is **hourly, not daily**, because a daily command's non-zero exit gates the durable daily marker
+and would re-dispatch the alert set on every tick (07-MEDIA-010).
 The scheduler depends on `load_catalog` completing successfully (via `depends_on: condition: service_completed_successfully` in `docker-compose.yml`/`docker-compose.prod.yml`). Each dispatched command is bounded by `SCHEDULER_COMMAND_TIMEOUT` (default `1800s`); a command that times out is logged and skipped so the cycle continues (ENT-001).
 
 The three daily commands are gated on a **durable** marker, not process memory. The date lives
@@ -291,6 +296,10 @@ WantedBy=multi-user.target
 30 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py purge_failed_ads
 35 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py purge_rejected_ads
 40 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py purge_deleted_ads
+45 * * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py purge_media_deletion_errors
+# `sweep_orphaned_media` above is the DESTRUCTIVE default (deletes unreferenced files).
+# Add `--check` to a separate, more frequent cron line for the read-only
+# store/database reconciliation report — it exits non-zero on any mismatch (07-MEDIA-012).
 # Daily commands at 08:00 UTC
 0 8  * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py send_alerts
 5 8  * * * www-data cd /opt/mko-bazuna && /opt/venv/bin/python manage.py rollup_daily_metrics
@@ -319,7 +328,7 @@ signal** that the concurrent case is real.
 
 ### Scheduled-job concurrency (advisory locks)
 
-All nine hourly sweep commands (plus the two daily commands and the once-only `migrate`
+All ten hourly sweep commands (plus the three daily commands and the once-only `migrate`
 step) — run against the same shared PostgreSQL database as the live web and bot
 processes. To prevent concurrent sweeps (or a sweep and a migration) from colliding on
 the same rows, every command acquires a PostgreSQL advisory lock
@@ -361,6 +370,7 @@ Lock IDs are fixed and allocated centrally in the `AdvisoryLockId` IntEnum
 | 12 | `recompute_normalized_prices` (session-scoped, per-batch commits) |
 | 13 | `repair_bot_username` (one-shot repair of `SiteConfig.bot_username`; see [`contact-us.md`](contact-us.md)) |
 | 14 | `purge_consent_records` (daily `ConsentRecord` retention sweep — **anonymises, never deletes**; see [`db-retention.md`](../02-database/db-retention.md#purge_consent_records-06-pii-116)) |
+| 15 | `purge_media_deletion_errors` (hourly `MediaDeletionError` diagnostic-table retention; see [`db-retention.md`](../02-database/db-retention.md#purge_media_deletion_errors-07-media-010)) |
 | 100 | `migrate_locked.main` (session-scoped, runs migrate + setup_search_triggers + load_exchange_rates; optional `backfill_translations` when `RUN_TRANSLATION_BACKFILL=true`) |
 | 101 | `create_admin_user` (session-scoped, for idempotent admin creation) |
 | 102 | `backfill_thumbnails` |
@@ -369,7 +379,7 @@ Lock IDs are fixed and allocated centrally in the `AdvisoryLockId` IntEnum
 | 110 | `seed` (session-scoped, prevents concurrent seed operations) |
 | 111 | `test_schema_setup` (xdist fixture, resets test DB) |
 
-> **Note:** Lock ID 10 is intentionally unused/reserved; it was formerly `QUEUE_PROCESSING` and was removed in DB-007. **IDs below 100 are reserved for scheduled jobs** and IDs 15–99 remain free for future ones; take the next free id and re-read `src/backend/apps/core/enums.py` immediately before editing, because nothing in the suite catches an id collision across two phases.
+> **Note:** Lock ID 10 is intentionally unused/reserved; it was formerly `QUEUE_PROCESSING` and was removed in DB-007. **IDs below 100 are reserved for scheduled jobs** and IDs 16–99 remain free for future ones (15 is `purge_media_deletion_errors`); take the next free id and re-read `src/backend/apps/core/enums.py` immediately before editing, because nothing in the suite catches an id collision across two phases.
 
 Every command is idempotent, supports `--dry-run`, and logs via `logger` (no
 `print`). The scheduler service is gated by `profiles: ["scheduler"]` so it does not
@@ -385,13 +395,31 @@ The production nginx configuration (`docker/nginx/nginx.conf`) implements:
 - **Script execution blocked:** `location ~* ^/media/.*\.(?:php|py|cgi|pl|sh)(?:/|$) { deny all; return 403; }` — a `~*` regex location, mandatory so the prefix `location /media/` proxy block is not replaced (07-MEDIA-006)
 - **MIME whitelist:** Only `image/jpeg` served for `/media/` uploads; default `application/octet-stream`
 - **Media behavior:** `Content-Disposition: inline` for all media responses
-- **Rate limiting:**
-  - `/media/`: `limit_req zone=browse_limit burst=40 nodelay` (reuses the existing `browse_limit` zone — no new `limit_req_zone`; 07-MEDIA-006)
-  - `/login/`: 10 req/s burst 20 (`login_limit` zone)
-  - `/search/`: 20 req/s burst 40 (`search_limit` zone)
+- **Rate limiting:** three `limit_req_zone`s are declared in `http{}`, **all keyed on
+  `$binary_remote_addr`**: `login_limit` (10r/s), `search_limit` (20r/s) and `browse_limit`
+  (20r/s). nginx is the first hop, so the key is the real client address; setting
+  `set_real_ip_from 0.0.0.0/0` would collapse every client into one bucket and destroy the
+  limiting (see [Client IP Trust Model](../ops/docker-deployment.md#client-ip-trust-model)).
+  `limit_req_status 429` is set once in `http{}` and therefore applies to every limited
+  location — the client sees **429**, not nginx's default 503.
+  - **`browse_limit` is ONE shared per-IP bucket**, consumed by three locations, not three
+    independent budgets: `/media/` (`burst=40 nodelay`, 07-MEDIA-006), `/moderation/`
+    (`burst=40 nodelay`) and the catch-all `/` (`burst=40 nodelay`). An operator reading one
+    row of the table must know that page navigation and image fetches compete for the same
+    20r/s; `burst=40` on `/media/` is sized for one listing page (`PER_PAGE = 24` ads in
+    `apps/ads/services/listings_query.py`), so a full grid of thumbnails fits the burst.
+  - `/login/`: `limit_req zone=login_limit burst=20 nodelay`
+  - `/search/`: `limit_req zone=search_limit burst=40 nodelay`
+  - `/csp-report/`: `limit_req zone=login_limit burst=10 nodelay` (report endpoint, sharing
+    `login_limit` with `/login/`)
+  - **Unrated by design:** `/health/` (container healthcheck), `/static/` (immutable,
+    `Cache-Control: public, immutable`), `/protected-media/` (nginx `internal` — reachable
+    only after Django's access check grants an `X-Accel-Redirect`), the `~*` script-deny
+    regex (rejected with 403 before any limit applies), and `= /metrics` (localhost-only via
+    `allow 127.0.0.1; deny all`).
   - `/contact/` (deep-link page render, Spec 18): per-IP cap of 5 renders per 10 min — see [contact-us.md](../01-spec/contact-us.md#rate-limiting-dual-layer) for the full dual-layer table including bot-side limits.
   - **Bot-side** (`/start contact_us`): per-Telegram-user rate limit of 5 per 10 min via `check_contact_start_rate_limit` in `telegram_bot/services/rate_limit.py`; excess returns a cooldown message (Spec 18 CR-10).
-  - **Bot-side** (photo upload): per-seller rate limit of 10 uploads per 60 s via `check_upload_rate_limit` in `telegram_bot/services/rate_limit.py`; excess returns a "Uploading too fast, please wait a moment." cooldown message.
+  - **Bot-side** (photo upload): per-seller rate limit of 10 uploads per 60 s via `check_upload_rate_limit` in `telegram_bot/services/rate_limit.py`; excess returns a "Uploading too fast, please wait a moment." cooldown message. This per-seller cap is independent of the **global** staging byte budget in [`media-store-operations.md`](../ops/media-store-operations.md#staging-byte-budget) — the budget can be exhausted by one seller's uploads hitting a store already near the cap.
 - **TLS termination:** Certificates mounted at `/etc/nginx/certs/` (configurable via `TLS_CERT_PATH` env var). For local development with HTTPS, see [Local HTTPS with mkcert](../../ops/local-https-mkcert.md).
 
 ## Audit Zone References

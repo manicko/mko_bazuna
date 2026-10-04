@@ -159,7 +159,9 @@ CREATE TRIGGER ads_search_vector_update
 ```
 
 Bosnian uses `simple` config because PostgreSQL 18 has no native Bosnian text search configuration.
-The `ad_images` table also includes thumbnail fields for future phase:
+The `ad_images` table also carries the three thumbnail storage keys, generated in phase 1 by
+`ThumbnailService` and served through `AdImage.thumbnail_small_url` / `thumbnail_medium_url` /
+`thumbnail_large_url` (each falls back to the full-size original):
 ```
 thumbnail_small (storage key for 240x180 thumbnail)
 thumbnail_medium (storage key for 640x480 thumbnail)

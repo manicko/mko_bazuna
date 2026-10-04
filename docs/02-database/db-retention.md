@@ -12,6 +12,7 @@ related:
   - db-indexes
   - db-enums
   - docker-deployment
+  - media-store-operations
   - pii-consent-remediation-record
 ---
 
@@ -150,7 +151,7 @@ therefore bounded by the same connection-level `lock_timeout` as every other swe
 was taken rather than reusing an existing one: this is a distinct destructive operation on a
 distinct table and nothing in the suite catches an id collision. Ids are allocated from the
 `AdvisoryLockId` table in `src/backend/apps/core/utils/advisory_lock.py`, which reserves **ids below
-100 for scheduled jobs** (`1`–`14` transaction-scoped sweeps, `100`–`111` session-scoped
+100 for scheduled jobs** (`1`–`15` transaction-scoped sweeps, `100`–`111` session-scoped
 bootstrap jobs); re-read that table immediately before taking a new id, because id reuse across
 two phases is a silent, collision-prone failure.
 
@@ -177,8 +178,14 @@ python src/backend/manage.py purge_media_deletion_errors --older-than 90
 - **Hourly**, advisory lock **15** (`AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS`). The command is
   hourly rather than daily because a daily command's non-zero exit is load-bearing for the durable
   daily marker; an hourly command only gates the liveness marker.
-- The admin reader (`apps.media.admin.MediaDeletionErrorAdmin`) is **read-only** — no add, change or
-  delete permission and no editable field.
+- The admin reader (`apps.media.admin.MediaDeletionErrorAdmin`) is **read-only for writes**:
+  `has_add_permission` and `has_change_permission` both return `False`, there is no editable
+  field, and rows are only ever written by `delete_photo`. `has_delete_permission` is
+  deliberately **not** overridden, so Django's default applies and the changelist's
+  `delete_selected` action is gated by the `media.delete_mediadeletionerror` model permission
+  rather than by the admin class — grant that permission only to staff who should be able to
+  discard diagnostic rows by hand. Deleting a row here frees no bytes (no `pre_delete`
+  receiver is registered on `MediaDeletionError`); it only drops the record of a failure.
 
 ### sweep_orphaned_media --check (07-MEDIA-012)
 
@@ -189,6 +196,14 @@ monitoring observes the condition. The report scope **includes `seed/`** and pro
 key verbatim; `staging/` is the sole suppression (its files are bounded by the mtime TTL). `--check`
 is mutually exclusive with `--dry-run`, and the deletion counter now counts only files actually
 removed.
+
+> **No alerting ships for `MediaDeletionError` rows.** Nothing polls the table, and no Prometheus
+> gauge is exported for it (`PROMETHEUS_MULTIPROC_DIR` is set only on the `web` service, so a gauge
+> written by the bot-side write path is structurally unexportable). Phase 12 owns the alert; its
+> predicate is `MediaDeletionError.objects.filter(created_at__gt=now() - 1h).exists()`. Until then
+> the table is read by the admin reader above and by `--check`-style reconciliation only.
+> The rest of the media store — key scheme, staging budget, thumbnail publication — is in
+> [`media-store-operations.md`](../ops/media-store-operations.md).
 
 ### Other sweeps
 

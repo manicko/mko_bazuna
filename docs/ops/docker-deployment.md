@@ -12,6 +12,7 @@ related:
   - technical-specification
   - migration-workflow
   - seed-workflow
+  - media-store-operations
   - rollback
 ---
 
@@ -377,6 +378,7 @@ The production override file (`docker-compose.prod.yml`) includes:
 | `SEED_ADS` | No (default: `30`) | Number of demo ads to generate (seed service) |
 | `PROMETHEUS_MULTIPROC_DIR` | No (default: `/tmp/prometheus_multiproc`) | Directory for Prometheus multiprocess metrics mode (web service only). Required for accurate per-worker metric collection under gunicorn when `PROMETHEUS_MULTIPROC_DIR` is set; see [Prometheus Metrics](#prometheus-metrics) |
 | `SCHEDULER_COMMAND_TIMEOUT` | No (default: `1800`) | Per-command timeout (seconds) for `subprocess.run` dispatch in the scheduler (`apps.core.utils.scheduler`) and in `migrate_locked.main`. Bounds a hung management command so it cannot stall the hourly cycle or the migration bootstrap; a timed-out command is logged and skipped (ENT-001). The default sits safely under the scheduler healthcheck staleness window (`SCHEDULER_HEALTH_STALE_SECONDS` env var, `7200` in prod). |
+| `MEDIA_STAGING_BYTE_BUDGET` | No (default: `2147483648` = 2 GiB) | Global cap on bytes held in `MEDIA_ROOT/staging/`. A bot upload is refused **before** any byte is written when `staging_bytes_used()` is at or above this value. **Global, not per-seller** — staging keys are `uuid4()` and carry no owner, so per-seller attribution is infeasible and one seller can exhaust the shared budget. Lowering it protects disk at the cost of refusing legitimate sellers; see [`media-store-operations.md`](media-store-operations.md#staging-byte-budget). |
 
 **Note:** `DATABASE_URL` is automatically constructed from `POSTGRES_*` variables in Docker
 containers. Do not set `DATABASE_URL` in `.env.prod` — the compose files build it from the
@@ -764,8 +766,8 @@ make test-db    # recreates test DB under mko-bazuna-test
 ### Scheduler Service (Production)
 
 The scheduler is a production service (`--profile scheduler`) defined in
-`docker-compose.yml` and `docker-compose.prod.yml`. It runs **9 hourly sweep
-commands + 2 daily commands** in a loop. The dispatch logic is implemented by the
+`docker-compose.yml` and `docker-compose.prod.yml`. It runs **10 hourly sweep
+commands + 3 daily commands** in a loop. The dispatch logic is implemented by the
 extracted module `apps.core.utils.scheduler` (`src/backend/apps/core/utils/scheduler.py`),
 invoked via `python -m apps.core.utils.scheduler` from
 `docker/entrypoint-scheduler.sh` (which delegates to `main()`). The scheduler depends on `load_catalog`
@@ -820,11 +822,12 @@ service is restarted immediately after a graceful stop (ENT-002).
 | `delete_sweep` | Hard-delete ads older than 4 months | Hourly |
 | `consent_hard_delete` | Erase PII after 30-day withdrawal | Hourly |
 | `sweep_drafts` | Delete abandoned DRAFT ads | Hourly |
-| `sweep_orphaned_media` | Reclaim orphaned files in MEDIA_ROOT | Hourly |
+| `sweep_orphaned_media` | Reclaim orphaned files in MEDIA_ROOT. Bare invocation is the **destructive** default; `--check` is the read-only store/database reconciliation report and exits non-zero on any mismatch (07-MEDIA-012). Advisory lock 103 | Hourly |
 | `cleanup_login_tokens` | Remove expired login tokens | Hourly |
 | `purge_failed_ads` | Delete failed moderation ads (7 days) | Hourly |
 | `purge_rejected_ads` | Delete rejected ads (90 days) | Hourly |
 | `purge_deleted_ads` | Purge soft-deleted ads (120 days) | Hourly |
+| `purge_media_deletion_errors` | Delete `MediaDeletionError` rows older than `--older-than` days (default 30 — the one operator-overridable retention window). **Irreversible**: run `--dry-run` first. Advisory lock 15. See [`db-retention.md`](../02-database/db-retention.md#purge_media_deletion_errors-07-media-010) | Hourly |
 | `send_alerts` | Deliver pending search alerts | Daily at 08:00 UTC (first hourly tick ≥ 08:00 UTC; only if not already completed today) — one digest per user per day, max 10 ads |
 | `rollup_daily_metrics` | Roll up daily analytics metrics | Daily at 08:00 UTC |
 | `purge_consent_records` | Anonymise aged `ConsentRecord` fingerprint fields (90 d); retain the decision record (5 y). **Never deletes rows** — advisory lock 14. See [`db-retention.md`](../02-database/db-retention.md#purge_consent_records-06-pii-116) | Daily at 08:00 UTC |
@@ -907,10 +910,28 @@ The nginx configuration (`docker/nginx/nginx.conf`) includes:
 
 ### Rate Limiting
 
-| Endpoint | Rate Limit | Burst |
-|----------|------------|-------|
-| `/login/` | 10 req/s | 20 |
-| `/search/` | 20 req/s | 40 |
+Three `limit_req_zone`s are declared in `http{}`, all keyed on `$binary_remote_addr`
+(see [Client IP Trust Model](#client-ip-trust-model)): `login_limit` 10r/s, `search_limit`
+20r/s, `browse_limit` 20r/s. `limit_req_status 429` is set once in `http{}`, so every
+limited location answers **429**, not nginx's default 503.
+
+| Location | Zone | Rate | Burst |
+|----------|------|------|-------|
+| `/login/` | `login_limit` | 10 req/s | 20 |
+| `/csp-report/` | `login_limit` | 10 req/s | 10 |
+| `/search/` | `search_limit` | 20 req/s | 40 |
+| `/` (catch-all) | `browse_limit` | 20 req/s | 40 |
+| `/media/` | `browse_limit` | 20 req/s | 40 |
+| `/moderation/` | `browse_limit` | 20 req/s | 40 |
+
+**`browse_limit` is ONE shared per-IP bucket, not three separate budgets** — page navigation
+and image fetches compete for the same 20r/s. `/media/` uses `burst=40` because one listing
+page renders `PER_PAGE = 24` ads (`apps/ads/services/listings_query.py`), so a full grid of
+thumbnails fits the burst without a 429 (07-MEDIA-006).
+
+Unrated by design: `/health/`, `/static/`, `/protected-media/` (nginx `internal`; reachable
+only after Django's access check issues an `X-Accel-Redirect`), the `~*` script-deny regex
+(403 before any limit applies) and `= /metrics` (localhost-only via `allow 127.0.0.1; deny all`).
 
 ### Security Headers
 
@@ -939,9 +960,9 @@ location /protected-media/ {
 - Script execution blocked: `.php`, `.py`, `.cgi`, `.pl`, `.sh` files return 403 — a `~*` regex location `location ~* ^/media/.*\.(?:php|py|cgi|pl|sh)(?:/|$) { deny all; return 403; }` (07-MEDIA-006). The `~*` form is mandatory: a prefix `location /media/` block would replace the proxying block and 403 every genuine photo.
 - Only `image/jpeg` served for uploads
 - `Content-Disposition: inline` for all media
-- `/media/` is rate-limited with `limit_req zone=browse_limit burst=40 nodelay`, reusing the existing `browse_limit` zone (no new `limit_req_zone`; 07-MEDIA-006)
-- Storage keys are unguessable `<uuid4>.jpg` and contain **no `ad_id`** (zone R6: URL anonymity — an ad-scoped key would expose the ad id). In-flight uploads live at `staging/<uuid4>.jpg` (bounded by a global `MEDIA_STAGING_BYTE_BUDGET`, default 2 GiB) and generated demo photos at `seed/<filename>.jpg`.
-- **Storage-key ownership:** a key may be referenced by **N ≥ 1** `AdImage` rows (`copy_ad` shares keys rather than copying files), and its bytes are freed only when the last referencing row goes away. The check covers all four key columns (`image` + the three thumbnails) in `apps.media.services.references.unreferenced_keys`, evaluated after commit. The stored original is re-encoded at `STORED_JPEG_QUALITY` (75) to strip EXIF/ICC and thumbnails are derived at `ThumbnailService.QUALITY` (85) — the served photo is **not** the raw Telegram upload.
+- `/media/` is rate-limited — see [Rate Limiting](#rate-limiting) above; it reuses the existing `browse_limit` zone (no new `limit_req_zone`, 07-MEDIA-006)
+- Storage keys are unguessable `<uuid4>.jpg` with **no `ad_id`** (zone R6: URL anonymity). Three key families exist: `<uuid4>.jpg` for a stored original, `staging/<uuid4>.jpg` in flight, `seed/<filename>.jpg` for generated demo data. Full scheme, the **N ≥ 1 storage-key ownership rule**, the `staging/` byte budget, atomic thumbnail publication and the store/database reconciliation commands: [`media-store-operations.md`](media-store-operations.md)
+- The stored original is re-encoded at `STORED_JPEG_QUALITY` (75) to strip EXIF/ICC and thumbnails are derived at `ThumbnailService.QUALITY` (85) — the served photo is **not** the raw Telegram upload. The store is mixed-quality by design and nothing re-derives already-stored bytes
 
 ### Client IP Trust Model
 
@@ -1465,6 +1486,12 @@ docker compose --env-file .env.dev \
 make logs | grep nginx
 ```
 
+A **403 on every image** (not 404) usually means a file-mode problem, not a missing file —
+nginx serves `/media/` as a different uid from the app, so a `0600` file is unreadable. See
+[`media-store-operations.md`](media-store-operations.md#thumbnail-publication-is-atomic-per-file)
+for why published thumbnails are written at `0o666`-and-umask rather than via `mkstemp`, and
+check with `ls -l /app/media/*.jpg`.
+
 ### Migration Conflicts
 
 ```bash
@@ -1490,6 +1517,7 @@ Environment section.
 - [Database Restore Runbook](restore.md)
 - [Deployment Rollback Runbook](rollback.md) - Image, config, and schema rollback procedures
 - [Migration Workflow](migration-workflow.md) - Dev migration workflow, consolidation, and rules
+- [Media Store Operations](media-store-operations.md) - Storage keys, staging budget, thumbnails, store/database reconciliation
 - [Seed Data Workflow](seed-workflow.md) - Seed data generation, fixtures, and photo pipeline
 - [Architecture Structure](../01-spec/architecture-structure.md)
 - [Technical Specification](../01-spec/technical-specification.md)
