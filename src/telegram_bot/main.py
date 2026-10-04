@@ -84,16 +84,17 @@ def configure_dispatcher(storage: BaseStorage) -> Dispatcher:
     dp.include_router(contact_router)
     dp.include_router(support_router)
 
-    # EXT-002: replay-capable 429 (flood control) backoff for outbound calls.
-    # Only TelegramRetryAfter is intercepted; all other errors still flow to
-    # the generic catch-all. Must be registered before run_polling. Imports are
-    # lazy to avoid pulling Django models before django.setup().
-    from aiogram.exceptions import TelegramRetryAfter
+    # EXT-002 / 09-API-004: bounded replay budget for transient outbound-call
+    # failures. The whole declared transient set (TelegramRetryAfter,
+    # TelegramNetworkError, TelegramServerError) is intercepted; every other
+    # error still flows to the generic catch-all. Must be registered before
+    # run_polling. Imports are lazy to avoid pulling Django models before
+    # django.setup().
     from aiogram.filters import ExceptionTypeFilter
 
-    from telegram_bot.retry import retry_transient
+    from telegram_bot.retry import _TRANSIENT_EXCEPTIONS, retry_transient
 
-    dp.errors(ExceptionTypeFilter(TelegramRetryAfter))(retry_transient)
+    dp.errors(ExceptionTypeFilter(_TRANSIENT_EXCEPTIONS))(retry_transient)
 
     return dp
 
