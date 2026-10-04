@@ -2,8 +2,8 @@
   "dashboard": {
     "id": null,
     "uid": "mko-bazuna-slo",
-    "title": "Mko Bazuna — Performance SLO Dashboard",
-    "description": "Service-level objective monitoring for the Mko Bazuna classifieds platform. Thresholds reference the PerformanceSLO IntEnum from src/benchmark/constants.py (Block B1 deliverable).",
+    "title": "Mko Bazuna — Performance SLO Dashboard (PLANNED — NOT DEPLOYED)",
+    "description": "PLANNED — NOT DEPLOYED (12-OPS-003). No Grafana service exists in any of the four compose files; this dashboard is a reviewable artefact for a monitoring stack a later change would deploy, and nothing consumes it today. Service-level objective monitoring for the Mko Bazuna classifieds platform. Thresholds reference the PerformanceSLO IntEnum from src/benchmark/constants.py (Block B1 deliverable).",
     "tags": ["slo", "performance", "django-prometheus", "mko-bazuna"],
     "schemaVersion": 39,
     "version": 1,
@@ -60,7 +60,7 @@
         "id": "search-p95-latency",
         "type": "graph",
         "title": "Search p95 Latency (ms)",
-        "description": "95th-percentile response time for the /search/ endpoint, derived from the django_http_response_duration_seconds histogram (django-prometheus). Threshold: PerformanceSLO.P95_SLO_MS = 500ms (src/benchmark/constants.py).",
+          "description": "95th-percentile response time for the /search/ endpoint, derived from the django_http_requests_latency_including_middlewares_seconds histogram (django-prometheus). Threshold: PerformanceSLO.P95_SLO_MS = 500ms (src/benchmark/constants.py).",
         "gridPos": {
           "h": 8,
           "w": 12,
@@ -78,7 +78,7 @@
               "type": "prometheus",
               "uid": "prometheus"
             },
-            "expr": "histogram_quantile(0.95, sum by (le) (rate(django_http_response_duration_seconds_bucket{handler=\"search:search\"}[$__interval]))) * 1000",
+              "expr": "histogram_quantile(0.95, sum by (le) (rate(django_http_requests_latency_including_middlewares_seconds_bucket{view=\"search:search\"}[$__interval]))) * 1000",
             "legendFormat": "p95 latency",
             "range": true
           }
@@ -121,7 +121,7 @@
         "id": "search-p99-latency",
         "type": "graph",
         "title": "Search p99 Latency (ms)",
-        "description": "99th-percentile response time for the /search/ endpoint, derived from the django_http_response_duration_seconds histogram (django-prometheus). Threshold: PerformanceSLO.SEARCH_SLO_MS = 2000ms (src/benchmark/constants.py; docs/01-spec/search-patterns.md:360).",
+          "description": "99th-percentile response time for the /search/ endpoint, derived from the django_http_requests_latency_including_middlewares_seconds histogram (django-prometheus). Threshold: PerformanceSLO.SEARCH_SLO_MS = 2000ms (src/benchmark/constants.py; docs/01-spec/search-patterns.md:360).",
         "gridPos": {
           "h": 8,
           "w": 12,
@@ -139,7 +139,7 @@
               "type": "prometheus",
               "uid": "prometheus"
             },
-            "expr": "histogram_quantile(0.99, sum by (le) (rate(django_http_response_duration_seconds_bucket{handler=\"search:search\"}[$__interval]))) * 1000",
+              "expr": "histogram_quantile(0.99, sum by (le) (rate(django_http_requests_latency_including_middlewares_seconds_bucket{view=\"search:search\"}[$__interval]))) * 1000",
             "legendFormat": "p99 latency",
             "range": true
           }
@@ -185,8 +185,8 @@
       {
         "id": "redis-cache-hit-rate",
         "type": "gauge",
-        "title": "Redis Cache Hit Rate (%)",
-        "description": "Rolling cache hit rate from Redis keyspace hits/misses (Redis exporter). Threshold: PerformanceSLO.CACHE_HIT_RATE_THRESHOLD = 85% (src/benchmark/constants.py; docs/99-agent/rules.md:221).",
+        "title": "Redis Cache Hit Rate (%) — NOT AVAILABLE",
+        "description": "NOT AVAILABLE (12-OPS-003): this panel reads Redis keyspace hits/misses from a redis_exporter. No redis_exporter exists in any of the four compose files, so the series is never exposed. The panel is retained only as a placeholder and does not read as an active control. Threshold when a exporter is deployed: PerformanceSLO.CACHE_HIT_RATE_THRESHOLD = 85% (src/benchmark/constants.py; docs/99-agent/rules.md:221).",
         "gridPos": {
           "h": 8,
           "w": 8,
@@ -247,7 +247,7 @@
         "id": "error-rate-5xx",
         "type": "graph",
         "title": "Error Rate (5xx) — Burn Rate",
-        "description": "Rate of 5xx HTTP responses from the Django application (django-prometheus django_http_responses_total counter). A sustained burn rate above 1.0 indicates the error budget is being consumed faster than allowed by the SLO.",
+          "description": "NOTE (12-OPS-003): the default django-prometheus exposition exposes NO status-code-labelled counter, so a true 5xx panel is not expressible without a custom metric. This panel shows the total response rate (django_http_responses_before_middlewares_total) as a proxy and is a placeholder for a stack a later change would deploy.",
         "gridPos": {
           "h": 8,
           "w": 8,
@@ -265,8 +265,8 @@
               "type": "prometheus",
               "uid": "prometheus"
             },
-            "expr": "sum by (status_code) (rate(django_http_responses_total{status_code=~\"5..\"}[5m]))",
-            "legendFormat": "{{status_code}}",
+            "expr": "sum by (method) (rate(django_http_responses_before_middlewares_total[5m]))",
+            "legendFormat": "{{method}}",
             "range": true
           }
         ],
@@ -326,7 +326,7 @@
               "type": "prometheus",
               "uid": "prometheus"
             },
-            "expr": "100 * (1 - (1 - rate(django_http_response_duration_seconds_bucket{le=\"2.000\", handler=\"search:search\"}[1h]) / rate(django_http_response_duration_seconds_count{handler=\"search:search\"}[1h])) / 0.01)",
+            "expr": "100 * (1 - (1 - rate(django_http_requests_latency_including_middlewares_seconds_bucket{le=\"2.5\", view=\"search:search\"}[1h]) / rate(django_http_requests_latency_including_middlewares_seconds_count{view=\"search:search\"}[1h])) / 0.01)",
             "legendFormat": "budget remaining",
             "range": true
           }
@@ -366,7 +366,7 @@
       {
         "id": "known-limitation-panel",
         "type": "text",
-        "title": "Known Limitation — Gunicorn Multi-Worker Metrics",
+        "title": "Metrics Mode — Multiprocess Aggregation",
         "gridPos": {
           "h": 4,
           "w": 24,
@@ -382,7 +382,7 @@
           "defaults": {}
         },
         "options": {
-          "content": "<div style=\"color: #c4171d; font-weight: bold;\">\n<h3>\u26a0 Known Limitation — Multi-worker Metrics Aggregation</h3>\n<p>\nThe application runs gunicorn with <code>workers=3</code> and <code>preload_app=True</code>\n(<code>docker/gunicorn.conf.py</code>). The default <code>prometheus_client.REGISTRY</code>\n(in-process, not multiprocess mode) means each worker gets a copy-on-write clone of the\nPrometheus metrics at fork time.\n</p>\n<p>\nConsequence: each <code>/metrics</code> scrape returns <strong>only one worker's</strong>\nmetrics (whichever worker handles the request) \u2014 values are inconsistent across scrapes.\nThis affects all panels that read counters from <code>django_http_responses_total</code>\nor <code>django_http_response_duration_seconds</code>.\n</p>\n<p>\n<strong>Not a blocker</strong> for initial SLO dashboarding \u2014 the panels are deployable and\nwill render. This is a Phase 2 hardening item:\n</p>\n<ul>\n  <li>Set <code>PROMETHEUS_MULTIPROC_DIR</code> to a tmpfs directory</li>\n  <li>Add a <code>child_exit(server, worker)</code> gunicorn hook calling\n      <code>prometheus_client.multiprocess.mark_process_dead(worker.pid)</code></li>\n  <li>See <code>.ai/contexts/context_r_d2_django_prometheus.md \u00a7Q6</code></li>\n</ul>\n<p>\nThe <code>/metrics</code> endpoint is restricted to localhost via nginx\n(<code>allow 127.0.0.1; deny all;</code> at <code>docker/nginx/nginx.conf:156</code>),\nso Prometheus must scrape from the same host or a trusted network.\n</p>\n</div>",
+          "content": "<div style=\"color: #0b6e4f; font-weight: bold;\">\n<h3>Multiprocess Metrics Mode (12-OPS-003)</h3>\n<p>\nThe application runs gunicorn with <code>preload_app=True</code>, but the web service sets\n<code>PROMETHEUS_MULTIPROC_DIR</code> (with a paired tmpfs) and <code>gunicorn.conf.py</code>\ndefines the <code>child_exit</code> hook calling\n<code>prometheus_client.multiprocess.mark_process_dead(worker.pid)</code>, so\n<code>prometheus_client</code> runs in <strong>multiprocess mode</strong> and a single\n<code>/metrics</code> scrape aggregates every worker's metrics. The earlier caveat that one\nscrape returned only one worker's metrics no longer holds.\n</p>\n<p>\nThe <code>/metrics</code> endpoint is restricted to loopback via nginx\n(<code>allow 127.0.0.1; deny all;</code>) and again in Django\n(<code>config/urls.py</code>), so a scraper must run on the same host or behind a proxy that\nis deliberately widened. No Prometheus or Grafana service is deployed today.\n</p>\n</div>",
           "mode": "html"
         }
       }

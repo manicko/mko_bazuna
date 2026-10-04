@@ -11,6 +11,7 @@ Verifies that ``django-prometheus`` is properly wired into the application:
 from __future__ import annotations
 
 import importlib.util
+import re
 from types import ModuleType, SimpleNamespace
 from unittest.mock import Mock
 
@@ -63,6 +64,260 @@ def test_metrics_endpoint(client: Client) -> None:
     assert response.status_code == 200
     content = response.content.decode("utf-8")
     assert "# HELP" in content or "# TYPE" in content
+
+
+# ---------------------------------------------------------------------------
+# SLO alert scrape contract (12-OPS-003)
+# ---------------------------------------------------------------------------
+# The alert file docs/ops/prometheus-slo-alerts.yaml names series in its `expr`
+# selectors. Three of them previously named series the exposition never emits
+# (`django_http_response_duration_seconds` with a `handler` label, and
+# `redis_db_keyspace_hits_total` from an exporter that is not deployed), so the
+# rules could never fire. This guard parses every `expr` in the file, extracts
+# the series each one selects, and resolves them against a RENDERED `/metrics` —
+# never against remembered library source (VAL-003). Adding a selector naming a
+# series the exposition does not contain turns the test red.
+
+_SLO_ALERTS_YAML = _PROJECT_ROOT / "docs" / "ops" / "prometheus-slo-alerts.yaml"
+
+# A PromQL series selector is a metric name followed by an optional `{...}`.
+# Metric names may carry `:` (recording rules) and `_`/digits.
+_PROMQL_SERIES_RE = re.compile(r"\b([a-zA-Z_:][a-zA-Z0-9_:]*)\s*(?:\{[^}]*\})?")
+
+# PromQL keywords and functions that look like identifiers but are not series.
+_PROMQL_KEYWORDS = frozenset(
+    {
+        "rate",
+        "sum",
+        "by",
+        "avg",
+        "min",
+        "max",
+        "count",
+        "histogram_quantile",
+        "le",
+        "instance",
+        "job",
+        "without",
+        "on",
+        "ignoring",
+        "group_left",
+        "group_right",
+        "and",
+        "or",
+        "unless",
+        "offset",
+    }
+)
+
+
+def _exposed_series_names(exposition: str) -> set[str]:
+    """Return the set of metric family names present in a `/metrics` exposition."""
+    names: set[str] = set()
+    for line in exposition.splitlines():
+        if not line or line.startswith("#"):
+            continue
+        match = re.match(r"^([a-zA-Z_:][a-zA-Z0-9_:]*)", line)
+        if match:
+            names.add(match.group(1))
+    return names
+
+
+def _alert_exprs(rules_text: str) -> list[str]:
+    """Return every non-empty `expr:` value across all rules in the alert file.
+
+    Parses the YAML structurally (ruamel) rather than slicing text, so a
+    multi-line block scalar and an inline expression are both captured exactly.
+    """
+    from ruamel.yaml import YAML
+
+    document = YAML(typ="safe").load(rules_text)
+    exprs: list[str] = []
+    for group in (document or {}).get("groups", []) or []:
+        for rule in (group or {}).get("rules", []) or []:
+            expr = (rule or {}).get("expr")
+            if isinstance(expr, str) and expr.strip():
+                exprs.append(expr)
+    return exprs
+
+
+def _series_in_expr(expr: str) -> set[str]:
+    """Return the candidate metric names referenced by a PromQL expression.
+
+    Label matchers inside `{...}` (names AND quoted values) are removed first,
+    so only metric-name positions are scanned. PromQL function names and
+    keywords are filtered out.
+    """
+    without_matchers = re.sub(r"\{[^}]*\}", "", expr)
+    found: set[str] = set()
+    for match in _PROMQL_SERIES_RE.finditer(without_matchers):
+        name = match.group(1)
+        if name in _PROMQL_KEYWORDS:
+            continue
+        found.add(name)
+    return found
+
+
+@pytest.mark.django_db
+def test_slo_alert_selectors_resolve_against_rendered_metrics(
+    client: Client,
+) -> None:
+    """Every series named by the SLO alert file exists in a rendered `/metrics`.
+
+    The alert file is a contract (12-OPS-003): each `expr` must select a series
+    the exporter actually exposes. This guard renders `/metrics` and fails if
+    any alert names a series the exposition does not contain — which is exactly
+    how the three dead rules shipped.
+    """
+    exposition = client.get("/metrics").content.decode("utf-8")
+    exposed = _exposed_series_names(exposition)
+    assert exposed, "the /metrics exposition contained no metric families"
+
+    rules_text = _SLO_ALERTS_YAML.read_text(encoding="utf-8")
+    exprs = _alert_exprs(rules_text)
+    assert exprs, f"no `expr:` selectors found in {_SLO_ALERTS_YAML.name}"
+
+    unknown: list[str] = []
+    for expr in exprs:
+        for series in _series_in_expr(expr):
+            # A `_bucket`/`_count`/`_sum` selector resolves to its family base.
+            base = series
+            for suffix in ("_bucket", "_count", "_sum", "_created"):
+                if base.endswith(suffix):
+                    base = base[: -len(suffix)]
+                    break
+            if series in exposed or base in exposed:
+                continue
+            unknown.append(series)
+
+    assert not unknown, (
+        "the SLO alert file names series the /metrics exposition does not "
+        "expose (12-OPS-003): " + ", ".join(sorted(set(unknown)))
+    )
+
+
+def test_scrape_contract_rejects_a_selector_naming_an_absent_series() -> None:
+    """The scrape-contract detector fails on a selector naming an absent series.
+
+    A guard that only passes today's three rules is not a contract. This feeds
+    the detector a rule naming a series that does not exist and asserts it is
+    reported — so adding such a selector turns
+    ``test_slo_alert_selectors_resolve_against_rendered_metrics`` red.
+    """
+    exposed = {
+        "django_http_requests_latency_including_middlewares_seconds_bucket",
+        "django_http_requests_latency_including_middlewares_seconds_count",
+    }
+    bad_expr = (
+        'rate(django_http_response_duration_seconds_bucket{le="2.000", '
+        'handler="search:search"}[14.4m])'
+    )
+    unknown = set()
+    for expr in [bad_expr]:
+        for series in _series_in_expr(expr):
+            base = series
+            for suffix in ("_bucket", "_count", "_sum", "_created"):
+                if base.endswith(suffix):
+                    base = base[: -len(suffix)]
+                    break
+            if series not in exposed and base not in exposed:
+                unknown.add(series)
+    assert unknown, (
+        "the detector must report a selector naming a series the exposition "
+        "does not contain (12-OPS-003)"
+    )
+    # And it must NOT report a selector naming a real series.
+    good_expr = (
+        'rate(django_http_requests_latency_including_middlewares_seconds_bucket'
+        '{le="2.5", view="search:search"}[14.4m])'
+    )
+    good_unknown = {
+        s
+        for s in _series_in_expr(good_expr)
+        if s not in exposed and s.removesuffix("_bucket") not in exposed
+    }
+    assert not good_unknown, f"false positive on a valid selector: {good_unknown}"
+
+
+def test_slo_alert_file_is_not_a_kubernetes_crd() -> None:
+    """The alert file is a plain rules file, not a PrometheusRule CRD (12-OPS-003).
+
+    The project runs Compose, not Kubernetes, and the previous CRD form
+    (`apiVersion: monitoring.coreos.com/v1`, `kind: PrometheusRule`) was
+    consumed by nothing. The file survives as a reviewable rules contract and is
+    explicitly labelled "planned — not deployed".
+    """
+    text = _SLO_ALERTS_YAML.read_text(encoding="utf-8")
+    assert "kind: PrometheusRule" not in text, (
+        "the alert file must not be a Kubernetes PrometheusRule CRD (12-OPS-003)"
+    )
+    assert "monitoring.coreos.com" not in text, (
+        "the alert file must not carry a Kubernetes apiVersion (12-OPS-003)"
+    )
+    assert "PLANNED" in text.upper(), (
+        "the alert file must state that it is planned, not deployed (12-OPS-003)"
+    )
+
+
+def test_slo_alert_file_lints_as_loadable_rules() -> None:
+    """A promtool-style lint: the file parses and every rule has the schema.
+
+    `promtool` is not in the test image, so this is the pure-Python equivalent:
+    it loads the YAML, checks each group has a `name` and a non-empty `rules`
+    list, and that every rule carries `alert`, a non-empty `expr` and `labels`.
+    A malformed rule turns it red — demonstrated by
+    ``test_slo_alert_lint_detects_a_malformed_rule``.
+    """
+    from ruamel.yaml import YAML
+
+    document = YAML(typ="safe").load(_SLO_ALERTS_YAML.read_text(encoding="utf-8"))
+    _assert_rules_document_is_well_formed(document)
+
+
+def _assert_rules_document_is_well_formed(document: object) -> None:
+    """Assert a Prometheus rules document has the `promtool check rules` shape."""
+    assert isinstance(document, dict), "rules file must parse to a mapping"
+    groups = document.get("groups")
+    assert isinstance(groups, list) and groups, "rules file must declare `groups`"
+    seen_alerts: list[str] = []
+    for group in groups:
+        assert isinstance(group, dict), "each group must be a mapping"
+        assert group.get("name"), "each rule group must declare a `name`"
+        rules = group.get("rules")
+        assert isinstance(rules, list) and rules, (
+            "each rule group must declare a non-empty `rules` list"
+        )
+        for rule in rules:
+            assert isinstance(rule, dict), "each rule must be a mapping"
+            assert rule.get("alert"), "each rule must declare an `alert` name"
+            expr = rule.get("expr")
+            assert isinstance(expr, str) and expr.strip(), (
+                "each rule must declare a non-empty `expr`"
+            )
+            assert isinstance(rule.get("labels"), dict), (
+                "each rule must declare `labels`"
+            )
+            seen_alerts.append(rule["alert"])
+    assert seen_alerts, "the rules file declared no alerts"
+
+
+def test_slo_alert_lint_detects_a_malformed_rule() -> None:
+    """The promtool-style lint fails on a malformed rule (12-OPS-003).
+
+    A lint that has never been seen red is not a lint. This feeds the lint a
+    document whose rule has no `expr` and asserts it raises.
+    """
+    malformed = {
+        "groups": [
+            {
+                "name": "slo.broken",
+                "rules": [{"alert": "broken_alert", "labels": {"severity": "page"}}],
+            }
+        ]
+    }
+    with pytest.raises(AssertionError):
+        _assert_rules_document_is_well_formed(malformed)
+
 
 
 @pytest.mark.django_db
