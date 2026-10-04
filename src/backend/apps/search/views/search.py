@@ -226,7 +226,24 @@ def search(request: HttpRequest) -> HttpResponse:
     if not query:
         total_count = int(paginator.count)
         results_truncated = False
-    has_results = total_count > 0
+    # Derive ``has_results`` from the same evaluation as the rendered rows
+    # (08-SRCH-015): the empty state must describe the page that is actually
+    # rendered, not a count taken from the cache. On a cache hit the rendered
+    # page is the cached id list re-filtered against the live predicate, so an
+    # ad that stopped matching between the cache write and the read drops out of
+    # ``page_obj`` while ``total_count`` still counts it — which, with
+    # ``has_results`` derived from ``total_count``, rendered neither cards nor
+    # the empty state (a blank results area at HTTP 200).
+    #
+    # The page contents are the authority, read once here and iterated by the
+    # template. A page number past the end is a distinct case that must NOT
+    # render the "no results" empty state: ``Paginator.get_page`` clamps it to
+    # the last page, so an out-of-range page of a non-empty result set carries
+    # rows and stays "has results". Only a genuinely empty result set — no
+    # matches, or a warm cache whose every id stopped matching — yields an empty
+    # page. This does not touch ``total_count`` or ``results_truncated``: they
+    # remain the authoritative count and truncation flag for their consumers.
+    has_results = len(page_obj.object_list) > 0
     if query and not has_results:
         # Redact PII (phone, e-mail, multi-word capitalised name) before the value
         # reaches the production JSONL sink. RedactingJsonFormatter cannot rescue

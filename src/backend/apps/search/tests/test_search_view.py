@@ -1476,6 +1476,127 @@ class TestSearchViewTotalCount:
         assert response.context["results_truncated"] is True
 
 
+class TestSearchViewHasResultsMatchesRenderedRows:
+    """``has_results`` comes from the same evaluation as the rendered rows.
+
+    08-SRCH-015: on a warm cache, ``has_results`` was ``total_count > 0`` and
+    ``total_count`` was ``len(cached_ids)`` — the cached id count, not the rows
+    actually rendered. The rendered page is that id list re-filtered against the
+    **live** predicate, so an ad that stopped matching between the cache write
+    and the read drops out of ``page_obj`` while the count still includes it.
+    With ``has_results`` derived from the count, ``ad_list.html`` rendered
+    neither the cards branch nor the empty state: a blank results area at 200.
+    These tests pin the derivation and the page-out-of-range control it must not
+    confuse with a genuine empty result set.
+    """
+
+    def test_stale_cache_ad_mismatch_renders_empty_state(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """A warm cache whose ad no longer matches renders the empty state at 200.
+
+        This is the exact stale-cache window BLOCKS 6/7 create: the ad is
+        published (so the FTS producer matches it and the id list is cached),
+        then a signal-free bulk ``.update()`` deactivates its category — taking
+        it out of the live predicate **without** bumping the cache version — so
+        the cached id list is served but the re-filtered query no longer returns
+        the row. RED before the fix: the response rendered neither cards nor the
+        empty state.
+        """
+        ad = create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Продам красный велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        # Warm the cache with the matching (non-empty) result set.
+        first = client.get("/search/?q=велосипед&lang=ru")
+        assert ad.id in {a.id for a in first.context["page_obj"]}
+        assert first.context["has_results"] is True
+
+        # Change the live predicate without a version bump. ``.update()`` fires
+        # no signal, so the search content version stays put and the warmed id
+        # list is served on the next read while the re-filtered page is empty.
+        Category.objects.filter(pk=root_category.pk).update(is_active=False)
+
+        second = client.get("/search/?q=велосипед&lang=ru")
+
+        assert second.status_code == 200
+        # The cached count still reports the stale hit...
+        assert second.context["total_count"] == 1
+        # ...but the page renders no rows, so the empty state must fire.
+        assert list(second.context["page_obj"]) == []
+        assert second.context["has_results"] is False
+        # The request is ``?lang=ru``, so the empty-state copy renders in
+        # Russian. Assert the stable msgid fragment (the query itself is
+        # HTML-escaped in the copy).
+        assert "Результаты не найдены" in second.content.decode()
+
+    def test_healthy_warm_cache_renders_cards_and_same_total_count(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """A normal warm-cache search still renders cards and reports the count.
+
+        The derivation must not suppress a legitimate result set: after warming
+        the cache the second (cache-hit) request still renders the ad and
+        ``total_count`` is unchanged.
+        """
+        ad = create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Продам красный велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        first = client.get("/search/?q=велосипед&lang=ru")
+        second = client.get("/search/?q=велосипед&lang=ru")
+
+        assert first.context["total_count"] == 1
+        assert second.context["total_count"] == 1
+        assert ad.id in {a.id for a in second.context["page_obj"]}
+        assert second.context["has_results"] is True
+        assert "Результаты не найдены" not in second.content.decode()
+
+    def test_page_out_of_range_does_not_render_empty_state(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """Page 2 of a 1-page result set renders the ad, not the empty state.
+
+        ``Paginator.get_page`` resolves an out-of-range page to the last page,
+        so ``page_obj`` is non-empty and the "no results at all" empty state
+        must NOT fire. This is the control that keeps an out-of-range page from
+        being mistaken for an empty result set.
+        """
+        ad = create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Продам красный велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/search/?q=велосипед&lang=ru&page=2")
+        assert response.status_code == 200
+        assert ad.id in {a.id for a in response.context["page_obj"]}
+        assert response.context["has_results"] is True
+        assert "Результаты не найдены" not in response.content.decode()
+
+
 class TestSearchViewRateLimit:
     """The /search/ endpoint is rate-limited per-IP (SRH-006)."""
 
