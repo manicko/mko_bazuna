@@ -22,11 +22,26 @@ logger = logging.getLogger(__name__)
 @receiver(post_save, sender="categories.CategoryPath")
 @receiver(post_delete, sender="categories.CategoryPath")
 def bump_tree_version_on_structure_change(sender, instance, **kwargs):  # type: ignore[no-untyped-def]
-    """Invalidate header submenu fragments when the category tree changes."""
+    """Invalidate header submenu fragments when the category tree changes.
+
+    Cache invalidation is best-effort: a cache backend failure must never
+    prevent the originating DB save from committing. A stale cache will simply
+    be refreshed on the next read.
+    """
     from apps.categories.cache import bump_tree_version
 
-    bump_tree_version()
-    logger.debug("Bumped category tree version due to %s change", sender.__name__)
+    try:
+        bump_tree_version()
+    except ConnectionInterrupted, redis.RedisError:
+        logger.warning(
+            "Cache backend unavailable — category tree version not bumped "
+            "after %s change; cache will refresh on next read",
+            sender.__name__,
+        )
+    else:
+        logger.debug(
+            "Bumped category tree version due to %s change", sender.__name__
+        )
 
 
 @receiver(post_save, sender="categories.CategoryListingPurpose")

@@ -6,11 +6,17 @@ Covers the tree-version fragment cache in ``apps.categories.cache``:
 - bump_tree_version() increments monotonically (cache.incr with set fallback)
 - Category post_save fires bump_tree_version (structural change invalidates)
 - Category post_delete fires bump_tree_version
+- a cache outage during a structural change does not abort the save
+  (best-effort bump, 08-SRCH-007)
 """
 
 from __future__ import annotations
 
+from unittest.mock import patch
+
 import pytest
+import redis
+from django_redis.exceptions import ConnectionInterrupted
 
 from apps.categories.cache import bump_tree_version, get_tree_version
 from apps.categories.models import Category
@@ -73,3 +79,46 @@ class TestCategoryStructureInvalidatesTreeVersion:
         category.delete()
 
         assert get_tree_version() == 2
+
+
+# ---------------------------------------------------------------------------
+# Cache-outage safety — a failed bump must not abort the DB write (08-SRCH-007)
+# ---------------------------------------------------------------------------
+
+
+class TestCacheOutageDoesNotAbortCategorySave:
+    """The tree-version bump is best-effort (08-SRCH-007).
+
+    The defect this pins: ``bump_tree_version_on_structure_change`` called
+    ``bump_tree_version()`` unguarded, so a Redis outage raised out of the
+    ``post_save`` receiver and aborted the Category save — turning a cache
+    outage into a write failure. The three sibling receivers already catch
+    ``ConnectionInterrupted`` / ``redis.RedisError``; this receiver now does
+    the same.
+    """
+
+    def test_cache_outage_does_not_roll_back_save(self) -> None:
+        """A Category save commits even when the version bump raises."""
+        with patch(
+            "apps.categories.cache.bump_tree_version",
+            side_effect=ConnectionInterrupted("Simulated Redis outage"),
+        ):
+            category = Category.objects.create(
+                name="Тест-аутэйдж", slug="test-outage-cache"
+            )
+
+        # The save committed (the row is visible on a fresh query) and the
+        # receiver did not re-raise out of post_save.
+        assert Category.objects.filter(pk=category.pk).exists()
+
+    def test_bare_redis_error_does_not_roll_back_save(self) -> None:
+        """A bare ``redis.RedisError`` from the bump also leaves the save intact."""
+        with patch(
+            "apps.categories.cache.bump_tree_version",
+            side_effect=redis.RedisError("redis down"),
+        ):
+            category = Category.objects.create(
+                name="Тест-ошибка", slug="test-redis-error-cache"
+            )
+
+        assert Category.objects.filter(pk=category.pk).exists()
