@@ -22,10 +22,10 @@ import logging
 from decimal import Decimal
 from typing import Any
 
-from django.db.models import F, Q, QuerySet
+from django.db.models import Count, F, Q, QuerySet
 from pydantic import Field, field_validator
 
-from apps.ads.models import Ad
+from apps.ads.models import Ad, AdFeature
 from apps.ads.services.favorites import annotate_favorites
 from apps.categories.models import Category
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
@@ -127,7 +127,8 @@ class ListingsQuery:
         4. City filter (if ``city_slug`` resolves).
         5. Price range filters.
         6. Purpose / condition single-select filters.
-        7. Features multi-select (AND semantics) + ``distinct()``.
+        7. Features multi-select (AND semantics, single correlated subquery over
+           ``AdFeature`` — O(1) in N, 08-SRCH-001).
         8. Sort mapping.
         9. ``annotate_favorites``.
         """
@@ -177,13 +178,30 @@ class ListingsQuery:
         if params.condition_slug:
             ads = ads.filter(listing_condition__slug=params.condition_slug)
 
-        # Features filter (F5) — multi-select AND semantics.
-        # Each ``features__slug=<slug>`` call adds a JOIN constraint requiring
-        # that specific feature; ``distinct()`` prevents duplicate rows.
+        # Features filter (F5) — multi-select AND semantics, O(1) in the number
+        # of selected slugs (08-SRCH-001). The spec
+        # (docs/01-spec/search-patterns.md) prescribes a single correlated
+        # subquery over ``AdFeature`` with an ``IN`` clause, NOT a chaining
+        # ``.filter(features__slug=...)`` per feature. The previous per-slug
+        # chain emitted one JOIN per slug (2N+3 joins); N=60 cost 19.90 s and
+        # OOM-killed the PostgreSQL backend.
+        #
+        # AND semantics are preserved by counting the distinct features an ad
+        # carries from the selected set and requiring that count to equal the
+        # number of distinct selected slugs. ``AdFeature.Meta.unique_together
+        # = [("ad", "feature")]`` makes ``Count("feature_id")`` already
+        # distinct. Unknown slugs match nothing for free: they are absent from
+        # ``AdFeature``, so ``COUNT < N`` holds without any catalogue query.
         if params.feature_slugs:
-            for slug in params.feature_slugs:
-                ads = ads.filter(features__slug=slug)
-            ads = ads.distinct()
+            selected_slugs = set(params.feature_slugs)
+            matched_ad_ids = (
+                AdFeature.objects.filter(feature__slug__in=selected_slugs)
+                .values("ad_id")
+                .annotate(matched=Count("feature_id"))
+                .filter(matched=len(selected_slugs))
+                .values("ad_id")
+            )
+            ads = ads.filter(pk__in=matched_ad_ids)
 
         # Sort mapping (same semantics as the original inline if/elif)
         ads = cls._apply_sort(ads, params.sort)
