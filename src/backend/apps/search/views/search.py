@@ -400,6 +400,51 @@ def _is_single_word(text: str) -> bool:
     return len(words) == 1
 
 
+def _ids_for_exact_name(name: str, locale: LanguageLocale) -> list[int]:
+    """Every active category id whose localised display name equals *name*.
+
+    Ambiguity is expected: ``Category.name`` carries no uniqueness constraint
+    and ``name_i18n`` is free-form, so two active categories can share a
+    localised display name. Returning the first hit would scope the search to
+    an arbitrary branch that may hold no matching ads at all (08-VAL-003).
+
+    The lookup is computed from ``get_active_category_names(locale)``, so a
+    warm cache performs zero category SELECTs.
+
+    Args:
+        name: The display name to match (case-insensitive).
+        locale: The active search locale.
+
+    Returns:
+        The ids of every active category whose localised name matches.
+    """
+    target = name.casefold()
+    return [
+        int(entry["id"])
+        for entry in get_active_category_names(locale)
+        if str(entry["name"]).casefold() == target
+    ]
+
+
+def _resolve_unique_category(ids: list[int]) -> Category | None:
+    """Resolve a matched-name id set, refusing an ambiguous match.
+
+    A single id is unambiguous and resolves to its ``Category``. Zero or more
+    than one id means no guess: the caller applies no category narrowing, so a
+    search is never silently scoped to an arbitrary branch (08-VAL-003).
+
+    Args:
+        ids: The candidate category ids that matched a display name.
+
+    Returns:
+        The unique matching ``Category``, or ``None`` when the match is absent
+        or ambiguous.
+    """
+    if len(ids) == 1:
+        return Category.objects.get(id=ids[0])
+    return None
+
+
 def _fuzzy_category_match(query: str, locale: LanguageLocale) -> Category | None:
     """
     Find category matching the query using the locale-appropriate name.
@@ -414,15 +459,18 @@ def _fuzzy_category_match(query: str, locale: LanguageLocale) -> Category | None
     Returns:
         Matching Category or None
     """
-    # Try slug match first (slug is unique so first() is safe)
+    # Try slug match first (slug is unique so first() is safe and a slug match
+    # stays unambiguous regardless of the display-name ambiguity rule).
     by_slug = Category.objects.filter(slug__iexact=query, is_active=True).first()
     if by_slug:
         return by_slug
     # Exact match against the locale-appropriate display name (case-insensitive).
     # Iterates the cached name list rather than loading all active categories.
-    for entry in get_active_category_names(locale):
-        if str(entry["name"]).lower() == query.lower():
-            return Category.objects.get(id=entry["id"])
+    # Two or more matching ids means an ambiguous display name: return no guess
+    # so the search is not scoped to an arbitrary branch (08-VAL-003).
+    exact_ids = _ids_for_exact_name(query, locale)
+    if exact_ids:
+        return _resolve_unique_category(exact_ids)
     return _fuzzy_match_by_name(query, locale)
 
 
@@ -432,6 +480,9 @@ def _fuzzy_match_by_name(query: str, locale: LanguageLocale) -> Category | None:
     Uses the cached active-category name list (versioned + locale-aware), so
     a warm cache runs the fuzzy match with zero category SELECTs. The
     ``difflib.get_close_matches`` algorithm and cutoff are unchanged.
+
+    An ambiguous display name (two or more matching ids) returns no guess so
+    the search is not scoped to an arbitrary branch (08-VAL-003).
 
     Args:
         query: The single-word search query
@@ -444,8 +495,7 @@ def _fuzzy_match_by_name(query: str, locale: LanguageLocale) -> Category | None:
     all_names = [str(entry["name"]) for entry in entries]
     matches = get_close_matches(query, all_names, n=1, cutoff=0.8)
     if matches:
-        matched_name = matches[0]
-        for entry in entries:
-            if str(entry["name"]) == matched_name:
-                return Category.objects.get(id=entry["id"])
+        return _resolve_unique_category(
+            _ids_for_exact_name(matches[0], locale)
+        )
     return None

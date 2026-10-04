@@ -593,6 +593,161 @@ class TestSearchViewDescendantCategories:
         assert len(result_ids) == 2  # other_category ad excluded by category filter
 
 
+class TestSearchViewAmbiguousCategoryName:
+    """An ambiguous localised category display name scopes to no branch (08-VAL-003).
+
+    ``Category.name`` has no uniqueness constraint and ``name_i18n`` is
+    free-form, so two active categories can share a localised display name.
+    Both resolution paths (``_fuzzy_category_match`` exact-name, and
+    ``_fuzzy_match_by_name`` fuzzy) previously returned the first hit, scoping
+    a single-word search to an arbitrary branch that may hold no matching ads.
+    The fix returns no guess when two or more ids match, so the search covers
+    the whole tree instead of an arbitrary subtree.
+
+    The reproduction needs a clean schema and an asserted
+    ``ads_search_vector_update`` trigger (08-VAL-003 method note): the autouse
+    fixture re-asserts the trigger and clears stale rows before each test, so a
+    leftover-row artefact cannot make a correct fix look broken.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _ensure_clean_fts_schema(self) -> None:
+        """Wipe ads and re-assert the FTS trigger before the test body."""
+        from django.core.management import call_command
+
+        Ad.objects.all().delete()
+        call_command("setup_search_triggers")
+
+    def _ambiguous_categories(self) -> tuple[Category, Category]:
+        """Two active root categories sharing the ru display name "Велосипеды"."""
+        first = Category.objects.create(
+            name="Велосипеды",
+            slug="bicycles-alpha",
+            name_i18n={"ru": "Велосипеды", "bs": "Bicikli", "en": "Bicycles"},
+        )
+        second = Category.objects.create(
+            name="Детские велосипеды",
+            slug="bicycles-beta",
+            name_i18n={"ru": "Велосипеды", "bs": "Dječiji bicikli", "en": "Kids bikes"},
+        )
+        return first, second
+
+    def test_ambiguous_exact_name_returns_whole_tree(
+        self,
+        seller: User,
+        city: City,
+    ) -> None:
+        """Exact path: an ambiguous ru name does not narrow the search.
+
+        Both ads are returned (no narrowing), not one and not zero.
+        """
+        first, second = self._ambiguous_categories()
+        ad_first = create_test_ad(
+            seller,
+            first,
+            city,
+            title="Велосипеды объявление первое",
+            status=AdStatus.PUBLISHED,
+        )
+        ad_second = create_test_ad(
+            seller,
+            second,
+            city,
+            title="Велосипеды объявление второе",
+            status=AdStatus.PUBLISHED,
+        )
+
+        # "Велосипеды" is an EXACT localised-name match for both categories,
+        # so this exercises the exact-name resolution path.
+        response = Client().get("/search/?q=Велосипеды&lang=ru")
+
+        assert response.status_code == 200
+        result_ids = {a.id for a in response.context["page_obj"]}
+        assert ad_first.id in result_ids
+        assert ad_second.id in result_ids
+        assert len(result_ids) == 2
+
+    def test_ambiguous_fuzzy_name_returns_whole_tree(
+        self,
+        seller: User,
+        city: City,
+    ) -> None:
+        """Fuzzy path: an ambiguous name reached by difflib does not narrow.
+
+        The typo "Велосипед" does not equal either display name, so the exact
+        path finds nothing and resolution falls to ``difflib`` — which matches
+        the ambiguous "Велосипеды". The fix must return no guess there too.
+        """
+        first, second = self._ambiguous_categories()
+        ad_first = create_test_ad(
+            seller,
+            first,
+            city,
+            title="Велосипеды объявление первое",
+            status=AdStatus.PUBLISHED,
+        )
+        ad_second = create_test_ad(
+            seller,
+            second,
+            city,
+            title="Велосипеды объявление второе",
+            status=AdStatus.PUBLISHED,
+        )
+
+        # "Велосипед" is a near-miss typo of the ambiguous "Велосипеды".
+        response = Client().get("/search/?q=Велосипед&lang=ru")
+
+        assert response.status_code == 200
+        result_ids = {a.id for a in response.context["page_obj"]}
+        assert ad_first.id in result_ids
+        assert ad_second.id in result_ids
+        assert len(result_ids) == 2
+
+    def test_unambiguous_name_still_narrows(
+        self,
+        seller: User,
+        city: City,
+    ) -> None:
+        """Control: distinct display names still narrow to the matching subtree.
+
+        This is the assertion that stops an over-correction ("always no guess")
+        from passing the ambiguity tests above.
+        """
+        bicycles = Category.objects.create(
+            name="Велосипеды",
+            slug="bicycles",
+            name_i18n={"ru": "Велосипеды", "bs": "Bicikli", "en": "Bicycles"},
+        )
+        electronics = Category.objects.create(
+            name="Электроника",
+            slug="electronics",
+            name_i18n={"ru": "Электроника", "bs": "Elektronika", "en": "Electronics"},
+        )
+        ad_bicycles = create_test_ad(
+            seller,
+            bicycles,
+            city,
+            title="Велосипеды объявление",
+            status=AdStatus.PUBLISHED,
+        )
+        ad_electronics = create_test_ad(
+            seller,
+            electronics,
+            city,
+            title="Велосипеды объявление прочее",
+            status=AdStatus.PUBLISHED,
+        )
+
+        response = Client().get("/search/?q=Велосипеды&lang=ru")
+
+        assert response.status_code == 200
+        result_ids = {a.id for a in response.context["page_obj"]}
+        # The unambiguous name narrows to the bicycles subtree ...
+        assert ad_bicycles.id in result_ids
+        # ... so an ad in a different branch is excluded by the filter.
+        assert ad_electronics.id not in result_ids
+
+
 class TestSearchViewCitySuggestion:
     """Search view provides did-you-mean city suggestions (Block 8 V5)."""
 
