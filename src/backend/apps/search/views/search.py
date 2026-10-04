@@ -15,8 +15,14 @@ from typing import Final
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.core.paginator import Paginator
 from django.db.models import Case, F, IntegerField, QuerySet, When
-from django.http import HttpRequest, HttpResponse, JsonResponse
+from django.http import (
+    HttpRequest,
+    HttpResponse,
+    HttpResponseBadRequest,
+    JsonResponse,
+)
 from django.shortcuts import render
+from pydantic import ValidationError
 
 from apps.ads.services.listings_query import ListingsQuery, ListingsQueryParams
 from apps.categories.models import Category
@@ -99,19 +105,26 @@ def search(request: HttpRequest) -> HttpResponse:
     listing_purpose_slug = request.GET.get("listing_purpose")
     condition_slug = request.GET.get("condition")
     feature_slugs = request.GET.getlist("features")
-    params = ListingsQueryParams(
-        category_slug=current_category,
-        city_slug=current_city,
-        min_price=min_price,
-        max_price=max_price,
-        purpose_slug=listing_purpose_slug,
-        condition_slug=condition_slug,
-        feature_slugs=feature_slugs,
-        sort=request.GET.get("sort", AdSort.DATE_NEW),
-        user_id=request.user.id if request.user.is_authenticated else None,
-        page=request.GET.get("page", 1),
-        per_page=ListingsQuery.PER_PAGE,
-    )
+    try:
+        params = ListingsQueryParams(
+            category_slug=current_category,
+            city_slug=current_city,
+            min_price=min_price,
+            max_price=max_price,
+            purpose_slug=listing_purpose_slug,
+            condition_slug=condition_slug,
+            feature_slugs=feature_slugs,
+            sort=request.GET.get("sort", AdSort.DATE_NEW),
+            user_id=request.user.id if request.user.is_authenticated else None,
+            page=request.GET.get("page", 1),
+            per_page=ListingsQuery.PER_PAGE,
+        )
+    except ValidationError:
+        # The only bounded field is ``feature_slugs`` (08-SRCH-001): a list over
+        # MAX_FEATURE_FILTER_SLUGS is rejected at the DTO boundary. A bare 400
+        # carries no body, so no new i18n surface is introduced; it is not a
+        # coercion or truncation, which would silently change result semantics.
+        return HttpResponseBadRequest()
     ads = ListingsQuery.build_queryset(params)
 
     # Defaults for the no-query path; overridden by the FTS COUNT(*) path when

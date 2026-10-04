@@ -17,12 +17,14 @@ from django.http import (
     Http404,
     HttpRequest,
     HttpResponse,
+    HttpResponseBadRequest,
     HttpResponseBase,
     HttpResponseForbidden,
 )
 from django.shortcuts import render
 from django.utils.translation import gettext as _
 from django.views.decorators.vary import vary_on_headers
+from pydantic import ValidationError
 
 from apps.ads.models import Ad, AdImage
 from apps.ads.services.listings_query import ListingsQuery, ListingsQueryParams
@@ -276,14 +278,20 @@ def listings(
     elif request.GET.get("category"):
         suggested_category = _suggest_category(request.GET.get("category", ""))
     # Params DTO + shared queryset
-    params = ListingsQueryParams(
-        category_slug=category_slug, city_slug=effective_city,
-        min_price=request.GET.get("min_price"), max_price=request.GET.get("max_price"),
-        purpose_slug=request.GET.get("listing_purpose"), condition_slug=request.GET.get("condition"),
-        feature_slugs=request.GET.getlist("features"), sort=request.GET.get("sort", AdSort.DATE_NEW),
-        user_id=request.user.id if request.user.is_authenticated else None,
-        page=request.GET.get("page", 1), per_page=ListingsQuery.PER_PAGE,
-    )
+    try:
+        params = ListingsQueryParams(
+            category_slug=category_slug, city_slug=effective_city,
+            min_price=request.GET.get("min_price"), max_price=request.GET.get("max_price"),
+            purpose_slug=request.GET.get("listing_purpose"), condition_slug=request.GET.get("condition"),
+            feature_slugs=request.GET.getlist("features"), sort=request.GET.get("sort", AdSort.DATE_NEW),
+            user_id=request.user.id if request.user.is_authenticated else None,
+            page=request.GET.get("page", 1), per_page=ListingsQuery.PER_PAGE,
+        )
+    except ValidationError:
+        # A ?features= list over MAX_FEATURE_FILTER_SLUGS is rejected at the DTO
+        # boundary (08-SRCH-001). A bare 400 has no body, so no i18n surface is
+        # added; it is not a coercion or truncation.
+        return HttpResponseBadRequest()
     ads = ListingsQuery.build_queryset(params)
     # Filter options (F4/F5)
     resolved_purposes, resolved_features, resolved_conditions = ListingsQuery.resolve_filter_options(breadcrumb_category)

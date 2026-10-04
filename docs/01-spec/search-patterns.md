@@ -224,9 +224,23 @@ sorting/FTS ranking:
 - **`listing_purpose`** — single-select exact match on `Ad.listing_purpose__slug`.
 - **`listing_condition`** — single-select exact match on `Ad.listing_condition__slug`.
 - **`features`** — multi-select with **AND** semantics: an ad must match *all*
-  of the selected `features__slug` values (correlated `EXISTS` subquery over the
-  `AdFeature` through model with an `IN` clause — not a chaining `.filter()` per
-  feature). Unrecognized slugs match nothing (empty result set).
+  of the selected `features__slug` values (a single correlated subquery over the
+  `AdFeature` through model that groups by ad and requires
+  `COUNT(feature_id) = <number of distinct selected slugs>` — not a chaining
+  `.filter()` per feature). Unrecognized slugs match nothing (empty result set).
+
+  **Cardinality bound (08-SRCH-001).** The number of selected feature slugs is
+  bounded at the DTO (`ListingsQueryParams`), not per view, so no endpoint can
+  reintroduce an unbounded path. The bound is a **catalogue invariant**, not a
+  magic number: *the resolved feature set for any category*, measured at seed
+  volume, **plus headroom**. At seed volume the maximum resolved feature set is
+  **13** (category `goods`, across all 205 categories in
+  `apps/categories/catalog/categories.yaml`); the stated headroom is **4**, so
+  the ceiling is **17**. A request with more distinct slugs than the ceiling is
+  rejected with HTTP 400. The ceiling is kept honest by a guard test that fails
+  in CI if any category ever resolves more features than the invariant allows;
+  raising the ceiling is a deliberate, reviewed edit to the measured maximum.
+
 
 Options are category-constrained: when a category is active, the dropdown/checkboxes resolve via
 `CategoryLookupResolver.get_resolved_purposes()` / `get_resolved_conditions()` /

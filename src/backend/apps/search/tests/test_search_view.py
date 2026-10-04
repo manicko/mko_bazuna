@@ -19,15 +19,38 @@ from django.core.cache import cache
 from django.test import Client
 
 from apps.ads.models import Ad
-from apps.ads.services.listings_query import ListingsQuery, ListingsQueryParams
+from apps.ads.services.listings_query import (
+    MAX_FEATURE_FILTER_SLUGS,
+    ListingsQuery,
+    ListingsQueryParams,
+)
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
+from apps.lookups.models import LookupGroup, LookupItem
 from apps.search.services.cache import SEARCH_CACHE_MAX_HITS
 from apps.users.models import User
 from conftest import create_test_ad, create_test_ads_bulk
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
+
+
+def _create_feature_group(count: int) -> dict[str, LookupItem]:
+    """Create a ``listing_feature`` group of *count* items, keyed by slug.
+
+    Local to this module — ``feature_lookup`` lives in the ads tests conftest
+    and cannot be imported here. The count is chosen to exceed the DTO cap so
+    the at-cap positive control is meaningful.
+    """
+    group = LookupGroup.objects.create(code="listing_feature", is_system=True)
+    result: dict[str, LookupItem] = {}
+    for i in range(count):
+        slug = f"feat-{i}"
+        result[slug] = LookupItem.objects.create(
+            group=group, slug=slug, name_i18n={"ru": slug, "en": slug}, is_active=True
+        )
+    return result
+
 
 
 # ---------------------------------------------------------------------------
@@ -248,6 +271,59 @@ class TestSearchViewPublishesFilter:
         assert response.status_code == 200
         ads_in_page = list(response.context["page_obj"])
         assert any(a.id == ad.id for a in ads_in_page)
+
+    def test_features_over_cap_rejected_at_dto(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """A ``?features=`` list over the catalogue invariant is rejected (08-SRCH-001).
+
+        The bound is enforced by ``ListingsQueryParams`` (the DTO), so the
+        rejection happens before any queryset is built and surfaces as a 4xx —
+        not a 500 and not an unbounded query.
+        """
+        over_cap = MAX_FEATURE_FILTER_SLUGS + 1
+        query = "&".join(f"features=f{i}" for i in range(over_cap))
+
+        client = Client()
+        response = client.get(f"/search/?{query}")
+
+        assert response.status_code == 400
+
+    def test_features_at_cap_accepted_and_and_semantics_hold(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """A legal list at exactly the cap is accepted; AND-semantics hold.
+
+        Selecting N distinct features requires an ad to carry all N. The list is
+        built at exactly ``MAX_FEATURE_FILTER_SLUGS`` (not one over), so this is
+        the positive control that the bound does not reject a legal set.
+        """
+        group = _create_feature_group(MAX_FEATURE_FILTER_SLUGS + 1)
+        selected = [f"feat-{i}" for i in range(MAX_FEATURE_FILTER_SLUGS)]
+
+        ad_all = create_test_ad(
+            seller, root_category, city, title="All selected", status=AdStatus.PUBLISHED
+        )
+        ad_all.features.set([group[slug] for slug in selected])
+        ad_partial = create_test_ad(
+            seller, root_category, city, title="Partial", status=AdStatus.PUBLISHED
+        )
+        ad_partial.features.set([group[selected[0]]])
+
+        query = "&".join(f"features={slug}" for slug in selected)
+        client = Client()
+        response = client.get(f"/search/?{query}")
+
+        assert response.status_code == 200
+        ids = {a.id for a in response.context["page_obj"]}
+        assert ad_all.id in ids
+        assert ad_partial.id not in ids
 
 
 class TestSearchViewDeclinedConsent:

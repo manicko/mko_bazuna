@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
-from typing import Any
+from typing import Annotated, Any, Final
 
 from django.db.models import Count, F, Q, QuerySet
 from pydantic import Field, field_validator
@@ -36,6 +36,32 @@ from apps.lookups.enums import LookupGroupCode
 from apps.lookups.models import LookupItem
 
 logger = logging.getLogger(__name__)
+
+
+# --- ?features= cardinality bound (08-SRCH-001) ----------------------------
+#
+# The bound is a CATALOGUE INVARIANT, not a magic number (Q2 RESOLVED
+# 2026-10-03, option (b)): "the resolved feature set for any category",
+# measured at seed volume, plus stated headroom. It is a secondary
+# parameter-list guard — the real cost control is the single correlated
+# subquery in ``build_queryset`` (BLOCK 1a), which makes the join count O(1)
+# in N. This cap only stops an unauthenticated caller declaring an
+# arbitrarily long parameter list at the DTO boundary.
+#
+# Measured maximum at seed volume: 13 resolved features (category ``goods``),
+# over all 205 categories in ``apps/categories/catalog/categories.yaml``
+# (``MAX_FEATURE_FILTER_SLUGS == MEASURED_MAX + MAX_FEATURE_FEATURES_HEADROOM``,
+# i.e. 17 == 13 + 4).
+#
+# The guard test ``test_feature_catalogue_invariant.py`` re-measures every
+# category's resolved feature set at seed volume and fails if any category ever
+# resolves more than the invariant allows, so the ceiling cannot drift silently
+# as the catalogue grows.
+FEATURE_CATALOGUE_MAX_AT_SEED: Final[int] = 13
+MAX_FEATURE_FEATURES_HEADROOM: Final[int] = 4
+MAX_FEATURE_FILTER_SLUGS: Final[int] = (
+    FEATURE_CATALOGUE_MAX_AT_SEED + MAX_FEATURE_FEATURES_HEADROOM
+)
 
 
 class ListingsQueryParams(BaseInputModel):
@@ -54,11 +80,40 @@ class ListingsQueryParams(BaseInputModel):
     max_price: int | None = None
     purpose_slug: str | None = None
     condition_slug: str | None = None
-    feature_slugs: list[str] = Field(default_factory=list)
+    feature_slugs: Annotated[
+        list[str],
+        Field(max_length=MAX_FEATURE_FILTER_SLUGS),
+    ] = Field(default_factory=list)
     sort: AdSort = AdSort.DATE_NEW
     user_id: int | None = None
     page: int = 1
     per_page: int = 24
+
+    @field_validator("feature_slugs", mode="before")
+    @classmethod
+    def _clean_feature_slugs(cls, v: Any) -> list[str]:
+        """Strip empty strings and dedupe ``feature_slugs`` (order-preserving).
+
+        Runs before the ``max_length`` cardinality bound, so a bare ``?features=``
+        (which ``request.GET.getlist`` yields as ``[""]``) and duplicated
+        ``?features=a&features=a`` collapse first and cannot inflate the count
+        or the AND-semantics threshold in ``build_queryset``. Cleaning only —
+        never filtering to a catalogue whitelist, which would change the search
+        cache key and the "unknown slug matches nothing" contract (08-SRCH-001).
+        """
+        if v is None:
+            return []
+        if isinstance(v, str):
+            v = [v]
+        seen: set[str] = set()
+        cleaned: list[str] = []
+        for item in v:
+            slug = str(item).strip()
+            if not slug or slug in seen:
+                continue
+            seen.add(slug)
+            cleaned.append(slug)
+        return cleaned
 
     @field_validator("min_price", "max_price", mode="before")
     @classmethod
