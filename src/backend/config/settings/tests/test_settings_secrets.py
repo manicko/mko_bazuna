@@ -428,3 +428,126 @@ def test_django_oneshot_does_not_bypass_prod_secrets() -> None:
     assert "ImproperlyConfigured" in result.stderr
     assert "DJANGO_SECRET_KEY" in result.stderr
     assert "DJANGO_ONESHOT is set but ignored" in result.stderr
+
+
+
+# ---------------------------------------------------------------------------
+# BOT_TOKEN role signal (09-API-011)
+# ---------------------------------------------------------------------------
+# BOT_TOKEN_REQUIRED gates the BOT_TOKEN guard and nothing else. Fail-closed:
+# only an explicit "0"/"false" opts out; absent/empty/unknown keep the
+# requirement. The five one-shot services set it false via Compose, and Compose
+# withholds BOT_TOKEN from them at the same time.
+
+
+def _prod_env_without_bot_token(**overrides: str) -> dict[str, str]:
+    """A prod env where BOT_TOKEN is absent and every other guard is satisfied.
+
+    Returns the base environment for the role-signal tests. Callers add
+    BOT_TOKEN_REQUIRED (or perturb one other guard) to exercise a specific path.
+    """
+    env = {k: v for k, v in os.environ.items() if k != "BOT_TOKEN"}
+    env["BOT_TOKEN"] = ""
+    env["GOOGLE_TRANSLATE_API_KEY"] = "test-translate-key-for-testing-only"
+    env["DJANGO_SECRET_KEY"] = TEST_SECRET_KEY
+    env["SITE_URL"] = "https://example.com"
+    env["REDIS_URL"] = "redis://localhost:6379/0"
+    env["ALLOWED_HOSTS"] = "example.com"
+    env["CSRF_TRUSTED_ORIGINS"] = "https://example.com"
+    env["EMAIL_HOST"] = "smtp.example.com"
+    env["BOT_USERNAME"] = "mko_test_bot"
+    env["LOG_MASK_KEY"] = "test-log-mask-key-for-testing-only-not-a-secret"
+    env["DJANGO_SETTINGS_MODULE"] = "config.settings.prod"
+    env["PYTHONPATH"] = os.pathsep.join(sys.path)
+    env.update(overrides)
+    return env
+
+
+def _run_settings_import(env: dict[str, str]) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [sys.executable, "-c", "import django; django.setup()"],
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+
+
+def test_bot_token_required_when_role_flag_absent() -> None:
+    """Absent BOT_TOKEN_REQUIRED still requires BOT_TOKEN (fail-closed)."""
+    env = _prod_env_without_bot_token()
+    result = _run_settings_import(env)
+    assert result.returncode != 0, result.stderr
+    assert "ImproperlyConfigured" in result.stderr
+    assert "BOT_TOKEN" in result.stderr
+
+
+def test_bot_token_required_when_role_flag_empty() -> None:
+    """An empty BOT_TOKEN_REQUIRED still requires BOT_TOKEN (fail-closed)."""
+    env = _prod_env_without_bot_token(BOT_TOKEN_REQUIRED="")
+    result = _run_settings_import(env)
+    assert result.returncode != 0, result.stderr
+    assert "ImproperlyConfigured" in result.stderr
+    assert "BOT_TOKEN" in result.stderr
+
+
+@pytest.mark.parametrize("value", ["yes", "no", "1", "true", "garbage", "FALSE!"])
+def test_bot_token_required_when_role_flag_unrecognised(value: str) -> None:
+    """Any value other than "0"/"false" is unrecognised and still requires it."""
+    env = _prod_env_without_bot_token(BOT_TOKEN_REQUIRED=value)
+    result = _run_settings_import(env)
+    assert result.returncode != 0, result.stderr
+    assert "ImproperlyConfigured" in result.stderr
+    assert "BOT_TOKEN" in result.stderr
+
+
+@pytest.mark.parametrize("value", ["false", "FALSE", "0", " false "])
+def test_bot_token_not_required_when_role_declared_false(value: str) -> None:
+    """An explicit "0"/"false" (any case, surrounding space) opts out cleanly."""
+    env = _prod_env_without_bot_token(BOT_TOKEN_REQUIRED=value)
+    result = _run_settings_import(env)
+    assert result.returncode == 0, result.stderr
+    assert "ImproperlyConfigured" not in result.stderr
+
+
+def test_bot_token_role_flag_does_not_bypass_other_guards() -> None:
+    """The role flag gates ONLY BOT_TOKEN; CFG-001 cannot regress through it.
+
+    With BOT_TOKEN_REQUIRED=false and BOT_TOKEN absent, a *different* missing
+    required secret must still raise. This is the non-regression proof: the flag
+    is not a second DJANGO_ONESHOT that silently disables every guard.
+    """
+    env = _prod_env_without_bot_token(
+        BOT_TOKEN_REQUIRED="false", GOOGLE_TRANSLATE_API_KEY=""
+    )
+    result = _run_settings_import(env)
+    assert result.returncode != 0, result.stderr
+    assert "ImproperlyConfigured" in result.stderr
+    assert "GOOGLE_TRANSLATE_API_KEY" in result.stderr
+    assert "BOT_TOKEN must be set" not in result.stderr
+
+
+def test_bot_token_role_flag_does_not_suppress_secret_key_guard() -> None:
+    """BOT_TOKEN_REQUIRED=false must not weaken the SECRET_KEY guard (CFG-001)."""
+    env = _prod_env_without_bot_token(
+        BOT_TOKEN_REQUIRED="false",
+        DJANGO_SECRET_KEY="dev-only-dummy-key-not-for-production",
+    )
+    result = _run_settings_import(env)
+    assert result.returncode != 0, result.stderr
+    assert "ImproperlyConfigured" in result.stderr
+    assert "DJANGO_SECRET_KEY" in result.stderr
+
+
+def test_bot_token_role_flag_does_not_bypass_email_host_warning_shape() -> None:
+    """The role flag does not turn the EMAIL_HOST warning into a gate or a skip.
+
+    EMAIL_HOST is a loud WARNING (09-API-009), independent of the BOT_TOKEN role
+    signal. With EMAIL_HOST empty and a valid BOT_TOKEN present, the import still
+    succeeds and warns — the role flag changes nothing about it.
+    """
+    env = _prod_env_without_bot_token(
+        BOT_TOKEN="123456789:ABCdefGHIjkl-MNO", EMAIL_HOST=""
+    )
+    result = _run_settings_import(env)
+    assert result.returncode == 0, result.stderr
+    assert "EMAIL_HOST is not set" in (result.stderr + result.stdout)

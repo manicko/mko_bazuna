@@ -370,3 +370,90 @@ def test_deploy_workflow_does_not_build() -> None:
         assert "docker compose" not in line or " build" not in line, (
             f"deploy.yml must NOT run `docker compose ... build`: {line.strip()}"
         )
+
+
+
+# --- BOT_TOKEN least-privilege boundary (09-API-011) -----------------------
+
+
+def _merged_environment(service: str) -> dict[str, str]:
+    """Return the effective ``environment`` map for a prod service.
+
+    Mirrors Compose's key-wise merge of ``environment`` (the sequence and
+    mapping shorthands are both normalised to a mapping, and the override wins
+    per key), over ``docker-compose.yml`` then ``docker-compose.prod.yml``.
+    Only ``environment`` is merged — enough to prove which value of BOT_TOKEN a
+    service resolves to when the override declares one.
+    """
+    from ruamel.yaml import YAML
+
+    yaml = YAML(typ="safe")
+
+    def _normalise(raw: object) -> dict[str, str]:
+        result: dict[str, str] = {}
+        if isinstance(raw, dict):
+            for key, value in raw.items():
+                result[str(key)] = "" if value is None else str(value)
+        elif isinstance(raw, list):
+            for item in raw:
+                key, sep, value = str(item).partition("=")
+                result[key] = value if sep else ""
+        return result
+
+    merged: dict[str, str] = {}
+    for path in (_COMPOSE, _PROD_COMPOSE):
+        with open(path, encoding="utf-8") as fh:
+            data = yaml.load(fh) or {}
+        block = data.get("services", {}).get(service, {}) or {}
+        merged.update(_normalise(block.get("environment", {})))
+    return merged
+
+
+def test_prod_one_shots_resolve_without_a_usable_bot_token() -> None:
+    """The five one-shots carry no usable BOT_TOKEN AND declare the role false.
+
+    This is the process-level privilege withholding (09-API-011): a guard that
+    tolerates a missing token while the token is still in the environment is
+    theatre. Compose ``environment:`` overrides ``env_file:``, so BOT_TOKEN
+    resolves to "" for these services, and BOT_TOKEN_REQUIRED=false is the
+    matching declaration the prod settings guard reads.
+    """
+    for service in _ONE_SHOT_SERVICES:
+        env = _merged_environment(service)
+        assert env.get("BOT_TOKEN") == "", (
+            f"{service} must resolve BOT_TOKEN to empty in prod (Compose "
+            f"environment: overrides env_file:); got {env.get('BOT_TOKEN')!r}"
+        )
+        assert env.get("BOT_TOKEN_REQUIRED", "").strip().lower() in {"0", "false"}, (
+            f"{service} must declare BOT_TOKEN_REQUIRED=false in prod; got "
+            f"{env.get('BOT_TOKEN_REQUIRED')!r}"
+        )
+
+
+def test_prod_long_lived_services_keep_a_bot_token() -> None:
+    """web, bot and scheduler must NOT withhold or opt out of BOT_TOKEN.
+
+    All three construct a Bot and send: bot (all flows), scheduler
+    (send_alerts, live and unconditional) and web (immediate_alerts, latent
+    behind IMMEDIATE_ALERTS_ENABLED). The least-privilege boundary is exactly
+    the five one-shots, not "everything that is not the bot".
+    """
+    for service in ("web", "bot", "scheduler"):
+        env = _merged_environment(service)
+        assert env.get("BOT_TOKEN") != "", (
+            f"{service} must keep a usable BOT_TOKEN (it sends Telegram "
+            f"messages); got {env.get('BOT_TOKEN')!r}"
+        )
+        assert env.get("BOT_TOKEN_REQUIRED", "").strip().lower() not in {
+            "0",
+            "false",
+        }, (
+            f"{service} must NOT declare BOT_TOKEN_REQUIRED=false — it needs the "
+            "token"
+        )
+        # The token reaches these services from .env.prod via env_file; the
+        # override must not have removed that source.
+        text = _service_block(_PROD_COMPOSE, service)
+        assert "env_file:" in text and ".env.prod" in text, (
+            f"{service} must keep env_file: .env.prod as the source of BOT_TOKEN"
+        )

@@ -40,6 +40,14 @@ services:
       - .env.prod
     volumes:
       - ./.env.prod:/app/src/.env:ro
+    # BOT_TOKEN is withheld (09-API-011): this one-shot never sends a Telegram
+    # message, so the token must not be in its process environment. Compose
+    # `environment:` overrides `env_file:`, and read_env(overwrite=False) then
+    # cannot restore it from the bind-mounted .env.prod. BOT_TOKEN_REQUIRED=false
+    # is the matching per-service declaration the prod settings guard reads.
+    environment:
+      BOT_TOKEN: ""
+      BOT_TOKEN_REQUIRED: "false"
 
   # Override create_admin for production: use pre-built image from GHCR
   create_admin:
@@ -48,6 +56,10 @@ services:
       - .env.prod
     volumes:
       - ./.env.prod:/app/src/.env:ro
+    # BOT_TOKEN withheld — create_admin never sends a Telegram message (09-API-011).
+    environment:
+      BOT_TOKEN: ""
+      BOT_TOKEN_REQUIRED: "false"
 
   # Override seed for production: use pre-built image from GHCR
   seed:
@@ -57,6 +69,10 @@ services:
     volumes:
       - ./.env.prod:/app/src/.env:ro
       - media_volume:/app/media
+    # BOT_TOKEN withheld — seed never sends a Telegram message (09-API-011).
+    environment:
+      BOT_TOKEN: ""
+      BOT_TOKEN_REQUIRED: "false"
 
   # Override load_cities for production: use pre-built image from GHCR
   # Added to override inherited env_file: .env.dev and volumes bind-mount
@@ -66,6 +82,10 @@ services:
       - .env.prod
     volumes:
       - ./.env.prod:/app/src/.env:ro
+    # BOT_TOKEN withheld — load_cities never sends a Telegram message (09-API-011).
+    environment:
+      BOT_TOKEN: ""
+      BOT_TOKEN_REQUIRED: "false"
 
   # Override load_catalog for production: use pre-built image from GHCR
   # Added to override inherited env_file: .env.dev and volumes bind-mount
@@ -75,6 +95,10 @@ services:
       - .env.prod
     volumes:
       - ./.env.prod:/app/src/.env:ro
+    # BOT_TOKEN withheld — load_catalog never sends a Telegram message (09-API-011).
+    environment:
+      BOT_TOKEN: ""
+      BOT_TOKEN_REQUIRED: "false"
 
   # Override nginx for production: TLS certificate mount
   nginx:

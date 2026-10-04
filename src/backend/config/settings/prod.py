@@ -190,17 +190,56 @@ if not _SKIP_SECRET_VALIDATION:
         )
     _validate_production_secret("DJANGO_SECRET_KEY", SECRET_KEY)  # noqa: F405
 
-# Fail fast: BOT_TOKEN is required in production. The bot process cannot
-# function without a valid token; an empty value indicates a deployment error.
-# Skipped during the Docker image build (DJANGO_BUILD=1) so collectstatic
-# succeeds with the build placeholder. Dev bootstrap one-shots run
-# config.settings.oneshot, not this module. The real token is provided at
-# runtime via .env.prod, and web/bot services always enforce it here.
-if not _SKIP_SECRET_VALIDATION:
+# --- BOT_TOKEN role signal (09-API-011) ---
+# BOT_TOKEN_REQUIRED declares whether THIS process must hold a bot token. It
+# gates the BOT_TOKEN guard and NOTHING else. The five one-shot services
+# (migrate, create_admin, seed, load_cities, load_catalog) set it to "false" via
+# Compose `environment:`, because they never send a Telegram message and the
+# token is withheld from their process environment at the same time
+# (`BOT_TOKEN: ""`, which Compose `environment:` applies over `env_file:` and
+# which read_env(overwrite=False) then cannot restore from the bind-mounted
+# file). web, bot and scheduler do not set it, so the requirement stays in force
+# for every process that constructs a Bot — including the scheduler
+# (send_alerts, live) and the web tier (immediate_alerts, latent).
+#
+# Fail-closed by design: absent, empty, or any value other than an explicit
+# "0"/"false" (case-insensitive, stripped) leaves the requirement in force.
+# The flag can therefore never become a way to skip the guard by accident, and
+# it relaxes no other guard (CFG-001, which this must not regress, was a flag
+# that silently disabled EVERY guard: see _SKIP_SECRET_VALIDATION above).
+_BOT_TOKEN_OPT_OUT_VALUES = frozenset({"0", "false"})
+
+
+def _is_bot_token_required() -> bool:
+    """Return True unless this process explicitly declared it needs no token.
+
+    Fail-closed: absent, empty, "1", "true", "yes", "no" and arbitrary junk all
+    return True (required). Only an explicit "0"/"false" opts out. Consults
+    BOT_TOKEN_REQUIRED alone, so no other production guard can be suppressed
+    through this door.
+    """
+    return (
+        os.getenv("BOT_TOKEN_REQUIRED", "").strip().lower()
+        not in _BOT_TOKEN_OPT_OUT_VALUES
+    )
+
+
+# Fail fast: BOT_TOKEN is required in production for every process that holds a
+# send-capable token. The bot process cannot function without a valid token; an
+# empty value indicates a deployment error. The five one-shot services declare
+# BOT_TOKEN_REQUIRED=false and are exempt (09-API-011): they never call
+# `translate_text`'s consumers or any Bot send path, and the token is withheld
+# from their environment, so a guard here would only force a secret they cannot
+# use to be distributed to them. Skipped during the Docker image build
+# (DJANGO_BUILD=1) so collectstatic succeeds with the build placeholder. Dev
+# bootstrap one-shots run config.settings.oneshot, not this module.
+if not _SKIP_SECRET_VALIDATION and _is_bot_token_required():
     if not BOT_TOKEN:  # noqa: F405
         raise ImproperlyConfigured(
             "BOT_TOKEN must be set in production. "
-            "Provide it via the .env.prod runtime file."
+            "Provide it via the .env.prod runtime file. "
+            "(Set BOT_TOKEN_REQUIRED=false only for a process that never sends "
+            "a Telegram message; that is a per-service Compose declaration.)"
         )
     _validate_production_secret("BOT_TOKEN", BOT_TOKEN)  # noqa: F405
 
