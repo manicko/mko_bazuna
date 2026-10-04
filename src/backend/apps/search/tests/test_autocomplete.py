@@ -662,11 +662,6 @@ class TestRateLimitService:
     def test_rate_limit_check_fails_open_on_cache_outage(self) -> None:
         """A cache outage allows the request rather than raising.
 
-        The failing cache is applied at the guard module's own ``cache`` name
-        while it exists, and at ``apps.core.utils.cache.cache`` once the guard
-        delegates — so this single test is genuinely RED before the fail-open
-        change and GREEN after it.
-
         The seam is the shared cache backend, not a module-level ``cache`` name.
         ``django.core.cache.cache`` is a single proxy over one backend, so every
         guard module's ``cache`` global is the same object; patching the backend

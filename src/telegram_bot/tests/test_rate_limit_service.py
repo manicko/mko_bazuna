@@ -129,7 +129,7 @@ class TestBotGuardsFailOpenOnCacheOutage:
 
     The failing cache is applied at the shared cache **backend** seam
     (``caches[DEFAULT_CACHE_ALIAS]``), never at a module-level ``cache`` name.
-    ``django.core.cache.cache`` is a single ``DefaultCacheProxy`` over one
+    ``django.core.cache.cache`` is a single ``ConnectionProxy`` over one
     backend, so every guard module's ``cache`` global is the same object;
     patching the backend is invariant to which module holds a reference and
     cannot be neutralised by a guard gaining, losing or duplicating a ``cache``
