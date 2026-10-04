@@ -725,6 +725,70 @@ def test_moderation_failure_still_reclaims_skipped_files(
         assert AdImage.objects.filter(ad=ad).count() == 1
 
 
+def test_reclaim_failure_leaves_skipped_file_staged_not_promoted(
+    seller, category, city, tmp_path
+) -> None:
+    """A reclaim that exhausts its retries never promotes the skipped file.
+
+    The prune of ``permanent_keys`` runs **before** the reclaim hook: the
+    promotion closure binds that same list object (``lambda keys=permanent_keys``)
+    and is pruned by in-place slice assignment, so when
+    ``reclaim_staged_keys`` fails to delete the skipped file the key is already
+    absent from the promotion list.  The bytes therefore stay in
+    ``staging/`` for the mtime TTL instead of becoming a permanent orphan.
+
+    This is the counterpart to the success-path test above.  It fails if the
+    two ``on_commit`` registrations are reordered (a reclaim that runs after a
+    promotion would race the file's promotion) or if the in-place prune is
+    replaced by a rebind (the closure would keep the unpruned list and promote
+    the orphan).  ``os.remove`` is forced to fail all retries and ``time.sleep``
+    is stubbed so there is no real backoff.
+    """
+    from django.test import override_settings
+
+    from apps.ads.models import AdImage
+    from apps.media.services.filesystem import STAGING_PREFIX
+
+    ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+    media_root = tmp_path
+
+    with override_settings(MEDIA_ROOT=str(media_root)):
+        photos = _stage_photos(media_root, [("first.jpg", 0), ("second.jpg", 1)])
+
+        with (
+            patch(
+                "apps.moderation.services.auto_moderation.auto_moderate",
+                return_value=True,
+            ),
+            patch(
+                "apps.media.services.filesystem.os.remove",
+                side_effect=PermissionError("simulated delete failure"),
+            ) as remove_mock,
+            patch("apps.media.services.filesystem.time.sleep"),
+        ):
+            result = submit_ad(_submit_input(ad, photos))
+
+        assert result.outcome is SubmitAdOutcome.PUBLISHED, result.errors
+
+        # Each of the skipped upload's four staged files was retried the full
+        # three attempts before ``delete_photo`` gave up.
+        assert remove_mock.call_count == 4 * 3
+
+        # Exactly one row: the second photo was skipped.
+        assert AdImage.objects.filter(ad=ad).count() == 1
+
+        # The skipped file survives in staging/ — never promoted to permanent
+        # storage, so it awaits TTL reclamation rather than orphaning forever.
+        assert (media_root / STAGING_PREFIX / "second.jpg").is_file()
+        assert not (media_root / "second.jpg").exists()
+
+        # The surviving photo was promoted normally, proving the failed reclaim
+        # did not abort the promotion hook.
+        assert (media_root / "first.jpg").is_file()
+        for suffix in ("small", "medium", "large"):
+            assert (media_root / f"first-{suffix}.jpg").is_file()
+
+
 
 # ---------------------------------------------------------------------------
 # 06-PII-109: create-time storage-consent gate — refused before any write
