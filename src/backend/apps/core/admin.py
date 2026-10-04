@@ -75,7 +75,6 @@ class SupportTicketAdmin(admin.ModelAdmin):
         return False
 
     def has_delete_permission(self, request, obj=None) -> bool:
-        # Audit trail preservation
         return False
 
     @admin.display(description="Chat ID (masked)", ordering="chat_id")

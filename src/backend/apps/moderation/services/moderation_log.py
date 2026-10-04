@@ -127,10 +127,11 @@ def log_photo_removed(
 
     Creates a ModeratorActionLog entry with action_type=OTHER and the supplied
     **canned** reason. The reason is passed through ``redact_free_text`` like
-    every other free-text writer, but callers must supply a fixed literal
-    rather than request text: phase 06's reason-redaction has not landed at the
-    ``apps.moderation.admin_actions`` boundary, so a canned value sidesteps the
-    redaction question entirely.
+    every other free-text writer — phase 06's write-time redaction landed at
+    this ``moderation_log.py`` chokepoint (06-PII-114, ``b3fde27``), so the
+    stored value is redacted regardless of the caller. Callers still supply a
+    fixed literal rather than request text, which keeps a canned value from
+    carrying PII in the first place.
 
     ``ModeratorActionLog`` has no dedicated actor column; its ``user`` field is
     documented as "User who was moderated **or performed action**", so the

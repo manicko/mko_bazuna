@@ -3,13 +3,21 @@ Seller ad edit views for Mko Bazuna.
 
 Implements US-S5/S7 edit flow with zone C2 hide-on-text-edit behavior:
     - Text edits (title/description): PUBLISHED -> ON_MODERATION, immediately hidden
-    - Price/photo edits: save immediately, status stays PUBLISHED
+    - Price edits: save immediately, status stays PUBLISHED
     - Mixed edits follow text rule (re-moderation)
     - Reactivate (ARCHIVED -> PUBLISHED): text re-checked, hidden until pass
+
+Photos are not seller-editable in phase 1: this view never changes an ad's
+photos, and the bot affordance for seller-side photo editing was deliberately
+deferred (owner decision Q07-6=(b)). The only post-publish photo change is a
+moderator removing a single photo (apps.ads.services.ad_image_removal).
 """
+
+from __future__ import annotations
 
 import logging
 from decimal import Decimal
+from typing import TYPE_CHECKING
 
 from django.contrib.auth.decorators import login_required
 from django.db import OperationalError, transaction
@@ -17,6 +25,9 @@ from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
+
+if TYPE_CHECKING:
+    from apps.users.models import User
 
 from apps.ads.models import Ad
 from apps.ads.services.submission import (
@@ -110,7 +121,7 @@ def _text_fields_changed(dto: AdEditInput, ad: Ad) -> bool:
     return dto.title != ad.title or dto.description != ad.description
 
 
-def _seller_may_create_ad(user) -> bool:
+def _seller_may_create_ad(user: User) -> bool:
     """Whether the authenticated seller may create/edit an ad (06-PII-109).
 
     Thin view-layer seam over the composed ``can_create_ad`` predicate so every
@@ -124,7 +135,7 @@ def _seller_may_create_ad(user) -> bool:
     return can_create_ad(user)
 
 
-def _consent_required_forbidden(user, ad_id: int) -> HttpResponseForbidden:
+def _consent_required_forbidden(user: User, ad_id: int) -> HttpResponseForbidden:
     """Log and build the storage-consent 403 for a seller write surface.
 
     Uses ``HttpResponseForbidden`` with a distinct message — the same shape
@@ -151,11 +162,15 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
 
     Behavior by status and field type:
         - PUBLISHED + text edit: -> ON_MODERATION, immediately hidden
-        - PUBLISHED + price/photo edit: stays PUBLISHED, public within 5s
+        - PUBLISHED + price-only edit: stays PUBLISHED, public within 5s
         - PUBLISHED + mixed edit: follows text rule
         - ARCHIVED + reactivate: text re-checked, hidden until pass
         - DRAFT or ON_MODERATION: direct save, status unchanged
         - Any other status: refused, the ad is left completely unchanged
+
+    Photos are not edited here (phase 1 defers seller-side photo editing,
+    Q07-6=(b)); a price-only change is the only field edit on a live ad that
+    stays PUBLISHED.
 
     Args:
         request: HTTP request (authenticated user required)
@@ -275,7 +290,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
 
             elif ad.status == AdStatus.PUBLISHED:
                 # Zone C2: Text edit -> ON_MODERATION, hidden immediately
-                # Price/photo edit -> stays PUBLISHED
+                # Price edit -> stays PUBLISHED (photos are not seller-editable in phase 1)
                 # Mixed edit -> follows text rule
                 if has_text_change:
                     # Delegate to the shared submission orchestrator, mirroring the
@@ -317,8 +332,10 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                         },
                     )
                 else:
-                    # Price/photo only edit: stay published; recompute normalized
-                    # price and restart the auto-archive clock. The clock reset
+                    # Price-only edit: stays published; recompute normalized
+                    # price and restart the auto-archive clock. Photos are not
+                    # editable here (phase 1 defers seller-side photo editing,
+                    # Q07-6=(b)). The clock reset
                     # shares the existing single save() deliberately: a second
                     # save() would fire a second post_save and register a second
                     # transaction.on_commit(deliver_immediate_alerts), which can
@@ -332,7 +349,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                     ]
                     ad.reset_publish_clock(update_fields)
                     ad.save(update_fields=update_fields)
-                    logger.info("Ad %s price/photo edited, stays PUBLISHED", ad_id)
+                    logger.info("Ad %s price edited, stays PUBLISHED", ad_id)
 
                 return redirect("ads:dashboard")
 

@@ -90,7 +90,8 @@ def account_state_q(prefix: str = "") -> Q:
     own filters without mutating the declaration or a sibling call's result.
 
     Mirrors ``get_account_state()``'s access-control flags — including
-    ``is_active``, which the predicate gained in plan 19 ``B-1``. The one
+    ``is_active``, which has been one of the predicate's five conjuncts since
+    it was declared in BLOCK 6 (06-PII-104). The one
     deliberate omission remains ``ads_auto_publish``: it is a publishing
     restriction orthogonal to whether an account may receive messages (rule
     5), so it is not a term here. The five conjuncts are ``is_deleted``,

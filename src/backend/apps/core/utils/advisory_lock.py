@@ -62,7 +62,7 @@ def advisory_lock(lock_id: int, *, session: bool = False):
           111  TEST_SCHEMA_SETUP            test schema setup (serializes xdist workers)
 
     ID 10 is intentionally unused/reserved; it was formerly QUEUE_PROCESSING and
-    was removed. IDs 14-99 are reserved for future scheduled jobs.
+    was removed. IDs 15-99 are reserved for future scheduled jobs.
     """
     if not session:
         if not transaction.get_connection().in_atomic_block:

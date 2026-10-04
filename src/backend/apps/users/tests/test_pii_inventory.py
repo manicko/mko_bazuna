@@ -264,6 +264,26 @@ def test_every_declared_entry_resolves_to_a_real_field() -> None:
         )
 
 
+def test_every_entry_model_is_a_reviewed_model() -> None:
+    """Tripwire: every declared model must also be a reviewed model.
+
+    ``test_listed_models_have_no_unreviewed_column`` iterates
+    ``REVIEWED_NON_IDENTITY_COLUMNS``, so a model present in
+    ``PII_ERASURE_ENTRIES`` but absent from ``REVIEWED_NON_IDENTITY_COLUMNS``
+    would escape the per-model column guard silently: none of its columns would
+    ever be checked. Requiring the declared model set to be a subset of the
+    reviewed model set closes that escape hole. The sets are consistent today;
+    this pins the invariant.
+    """
+    declared_models = {model_label for model_label, _column, _a, _r in PII_ERASURE_ENTRIES}
+    reviewed_models = set(REVIEWED_NON_IDENTITY_COLUMNS)
+    assert declared_models <= reviewed_models, (
+        "these models have PII_ERASURE_ENTRIES rows but no "
+        "REVIEWED_NON_IDENTITY_COLUMNS entry, so the column guard never checks "
+        f"them: {sorted(declared_models - reviewed_models)}"
+    )
+
+
 def test_listed_models_have_no_unreviewed_column() -> None:
     """Tripwire: every data column is declared or explicitly reviewed out.
 
