@@ -65,6 +65,27 @@ def test_metrics_endpoint(client: Client) -> None:
     assert "# HELP" in content or "# TYPE" in content
 
 
+@pytest.mark.django_db
+def test_metrics_gate_rejects_non_loopback_remote_addr() -> None:
+    """A ``/metrics`` request from a non-loopback peer is 403 (09-API-014).
+
+    nginx carries ``allow 127.0.0.1; deny all;``, but that control does not
+    cover a caller reaching the ``web`` container directly across the Docker
+    bridge. The ``config/urls.py`` gate is the second control: a Docker-bridge
+    source (``172.x``) is refused here. The test fails if the gate is removed —
+    it is not a no-op.
+    """
+    response = Client(REMOTE_ADDR="172.18.0.4").get("/metrics")
+    assert response.status_code == 403
+
+
+@pytest.mark.django_db
+def test_metrics_gate_allows_loopback() -> None:
+    """A ``/metrics`` request from a loopback peer reaches the exporter."""
+    response = Client(REMOTE_ADDR="127.0.0.1").get("/metrics")
+    assert response.status_code == 200
+
+
 # ---------------------------------------------------------------------------
 # Prometheus multiprocess mode (P1 — 12-OPS-011)
 # ---------------------------------------------------------------------------

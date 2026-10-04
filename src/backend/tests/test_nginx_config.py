@@ -435,3 +435,93 @@ def test_media_deny_adds_no_collateral_change() -> None:
     assert "= /metrics" not in deny_comment, (
         "the new media comment must not contain `= /metrics`"
     )
+
+
+# ---------------------------------------------------------------------------
+# 09-API-010 / 09-API-014 — the nginx contract bundle
+# ---------------------------------------------------------------------------
+
+
+def _server_blocks(text: str) -> list[str]:
+    """Return every ``server`` block in ``text`` as a brace-delimited string."""
+    lines = text.split("\n")
+    blocks: list[str] = []
+    for i, line in enumerate(lines):
+        if re.match(r"\s*server\s*\{", line):
+            blocks.append(_brace_block(lines, i))
+    return blocks
+
+
+def _http80_block(text: str) -> str:
+    """Return the ``server`` block whose ``listen`` is plain port 80."""
+    for block in _server_blocks(text):
+        for line in block.split("\n"):
+            if re.match(r"\s*listen\s+80\s*;", line):
+                return block
+    return ""
+
+
+@pytest.mark.parametrize("conf_path", _PROXIED_CONFS)
+def test_http_listener_declares_an_explicit_catch_all(conf_path: Path) -> None:
+    """The ``:80`` listener must declare ``server_name _;`` (Q14).
+
+    A ``listen 80`` block with no ``server_name`` is already nginx's default
+    server for the port, so this line changes no routing. It closes the
+    asymmetry with the ``:443`` block, which declares its own catch-all: both
+    listeners now state the same thing rather than one relying on the implicit
+    default. The domain mechanism is deliberately routed, not invented.
+    """
+    text = conf_path.read_text()
+    block = _http80_block(text)
+    assert block, f"{conf_path.name}: must define a `listen 80` server block"
+    assert "server_name _;" in block, (
+        f"{conf_path.name}: the `listen 80` block must declare `server_name _;` "
+        "(Q14 — close the asymmetry with the :443 catch-all)"
+    )
+
+
+@pytest.mark.parametrize("conf_path", _PROXIED_CONFS)
+def test_every_proxied_location_sets_x_forwarded_host(conf_path: Path) -> None:
+    """Every proxying location must set ``X-Forwarded-Host`` (09-API-010).
+
+    ``USE_X_FORWARDED_HOST`` is trusted in Django, so a location that omits
+    this header leaves the trust model depending on a header nobody sets or
+    clears. Includes ``location /static/``, which re-declares the whole
+    security-header set and is easy to miss.
+    """
+    text = conf_path.read_text()
+    proxied = _proxied_locations(text)
+    assert proxied, f"{conf_path.name} must define at least one proxying location"
+    for block in proxied:
+        assert "proxy_set_header X-Forwarded-Host $host;" in block, (
+            f"{conf_path.name}: every proxying location must set "
+            "`proxy_set_header X-Forwarded-Host $host;`"
+        )
+
+
+@pytest.mark.parametrize("conf_path", _PROXIED_CONFS)
+def test_tls_posture_is_pinned_without_a_cipher_string(conf_path: Path) -> None:
+    """``ssl_protocols`` and the session cache are pinned; no ``ssl_ciphers``.
+
+    Pinning the protocols and the session cache is reviewable; an explicit
+    cipher string is a maintenance burden that silently rots. TLS 1.2 is kept —
+    this is about reviewability, not deprecating TLS 1.2.
+    """
+    text = conf_path.read_text()
+    assert "ssl_protocols TLSv1.2 TLSv1.3;" in text, (
+        f"{conf_path.name}: the TLS block must pin "
+        "`ssl_protocols TLSv1.2 TLSv1.3;`"
+    )
+    assert "ssl_session_cache shared:SSL:" in text, (
+        f"{conf_path.name}: the TLS block must pin an `ssl_session_cache`"
+    )
+    cipher_directives = [
+        line.strip()
+        for line in text.split("\n")
+        if line.strip().startswith("ssl_ciphers")
+    ]
+    assert not cipher_directives, (
+        f"{conf_path.name}: no explicit `ssl_ciphers` string may be pinned; "
+        f"found: {cipher_directives}"
+    )
+

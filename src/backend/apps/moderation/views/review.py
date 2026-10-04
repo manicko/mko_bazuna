@@ -157,6 +157,7 @@ def approve_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
         return redirect(f"/admin/ads/ad/{ad_id}/change/")
 
 
+@require_POST
 @staff_required
 def reject_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
@@ -170,9 +171,6 @@ def reject_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
         Redirect to admin ad list
     """
     from apps.moderation.admin_actions import reject_ad as do_reject
-
-    if request.method != "POST":
-        return redirect(f"/admin/ads/ad/{ad_id}/change/")
 
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         ad = get_object_or_404(
@@ -196,6 +194,7 @@ def reject_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
     return redirect("/admin/ads/ad/?status__exact=on_moderation")
 
 
+@require_POST
 @staff_required
 def ban_user(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
@@ -209,9 +208,6 @@ def ban_user(request: HttpRequest, ad_id: int) -> HttpResponse:
         Redirect to admin ad list
     """
     from apps.moderation.admin_actions import ban_user_for_ad
-
-    if request.method != "POST":
-        return redirect(f"/admin/ads/ad/{ad_id}/change/")
 
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         ad = get_object_or_404(

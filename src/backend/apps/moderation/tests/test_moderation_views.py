@@ -578,15 +578,20 @@ class TestRejectAdView:
         category: Category,
         city: City,
     ) -> None:
-        """GET to reject_ad redirects rather than rejecting."""
+        """GET to reject_ad is refused with 405 rather than rejecting.
+
+        ``09-API-010`` converted ``reject_ad`` to ``@require_POST`` to match
+        ``approve_ad``; a non-POST is now a 405 instead of the previous 302. The
+        moderation template submits only POST forms (no GET fallback), so no
+        working surface depended on the redirect.
+        """
         ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
         client = Client()
         client.force_login(staff_user)
         response = client.get(f"/moderation/reject/{ad.id}/")
 
-        # The view checks for POST and redirects otherwise
-        assert response.status_code == 302
+        assert response.status_code == 405
 
         # Ad should NOT be rejected
         ad.refresh_from_db()
@@ -676,14 +681,18 @@ class TestBanUserView:
         category: Category,
         city: City,
     ) -> None:
-        """GET to ban_user redirects without banning."""
+        """GET to ban_user is refused with 405 without banning.
+
+        ``09-API-010`` converted ``ban_user`` to ``@require_POST`` to match
+        ``approve_ad``; a non-POST is now a 405 instead of the previous 302.
+        """
         ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
 
         client = Client()
         client.force_login(staff_user)
         response = client.get(f"/moderation/ban/{ad.id}/")
 
-        assert response.status_code == 302
+        assert response.status_code == 405
 
         # Seller should NOT be banned
         seller.refresh_from_db()

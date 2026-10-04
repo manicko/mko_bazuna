@@ -172,7 +172,13 @@ class TestStaffRequiredApi:
         assert response.status_code == 403
 
     def test_unauthenticated_returns_401(self) -> None:
-        """An unauthenticated POST gets a 401 with a WWW-Authenticate challenge."""
+        """An unauthenticated POST gets a 401 without a bearer challenge.
+
+        ``09-API-010`` dropped ``WWW-Authenticate: Bearer``: the endpoint's only
+        credential is the session cookie, so the challenge named a scheme the
+        server cannot satisfy. Phase 15 owns the branch reorder; this commit
+        drops the header only.
+        """
         request = _make_request(method="POST", is_authenticated=False)
 
         @staff_required_api
@@ -182,7 +188,7 @@ class TestStaffRequiredApi:
         response = view(request)
         assert response.status_code == 401
         assert json.loads(response.content) == {"error": "Authentication required"}
-        assert response.headers["WWW-Authenticate"] == "Bearer"  # pyright: ignore[reportIndexIssue] - Django: django-stubs not installed; HttpResponse.headers untyped
+        assert "WWW-Authenticate" not in response.headers
 
     def test_unauthenticated_get_returns_401(self) -> None:
         """An unauthenticated GET gets 401 (authn check precedes method check)."""
@@ -195,4 +201,4 @@ class TestStaffRequiredApi:
         response = view(request)
         assert response.status_code == 401
         assert json.loads(response.content) == {"error": "Authentication required"}
-        assert response.headers["WWW-Authenticate"] == "Bearer"  # pyright: ignore[reportIndexIssue] - Django: django-stubs not installed; HttpResponse.headers untyped
+        assert "WWW-Authenticate" not in response.headers

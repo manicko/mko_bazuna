@@ -551,7 +551,13 @@ class TestBulkModerationActionView:
         assert response.status_code == 403
 
     def test_unauthenticated_returns_401(self) -> None:
-        """Anonymous POST gets 401 with a WWW-Authenticate challenge."""
+        """Anonymous POST gets 401 without a bearer challenge (09-API-010).
+
+        The decorator no longer emits ``WWW-Authenticate: Bearer``: the only
+        credential the endpoint accepts is the session cookie, so the challenge
+        named a scheme the server cannot satisfy (phase 15 owns the branch
+        reorder; this commit only drops the header).
+        """
         client = Client()
         response = client.post(
             self.bulk_url,
@@ -561,7 +567,7 @@ class TestBulkModerationActionView:
             content_type="application/json",
         )
         assert response.status_code == 401
-        assert response.headers["WWW-Authenticate"] == "Bearer"  # pyright: ignore[reportIndexIssue] - Django: django-stubs not installed; HttpResponse.headers untyped
+        assert "WWW-Authenticate" not in response.headers
 
     def test_requires_post_method(self) -> None:
         """GET request returns 405."""

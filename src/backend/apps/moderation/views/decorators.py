@@ -38,18 +38,21 @@ def staff_required_api(
 ) -> Callable[..., JsonResponse]:
     """Require staff or superuser access for JSON API endpoints.
 
-    Returns 401 (with WWW-Authenticate challenge) for unauthenticated requests,
-    403 for authenticated-but-non-staff users, and 405 for wrong HTTP method.
+    Returns 401 for unauthenticated requests, 403 for authenticated-but-non-staff
+    users, and 405 for wrong HTTP method.
+
+    The 401 carries no ``WWW-Authenticate`` header (09-API-010): the only
+    credential this endpoint accepts is the Django session cookie, so a
+    ``Bearer`` challenge names a scheme the server cannot satisfy and sends a
+    generic client into a retry loop for a token that does not exist. The
+    branch ordering (identity before method) is deliberately unchanged here —
+    phase 15 owns that reorder.
     """
 
     @wraps(view_func)
     def wrapper(request: HttpRequest, *args: object, **kwargs: object) -> JsonResponse:
         if not request.user.is_authenticated:
-            return JsonResponse(
-                {"error": "Authentication required"},
-                status=401,
-                headers={"WWW-Authenticate": "Bearer"},
-            )
+            return JsonResponse({"error": "Authentication required"}, status=401)
         if request.user.role != UserRole.ADMIN:
             return JsonResponse({"error": "Staff access required"}, status=403)
         if request.method != "POST":
