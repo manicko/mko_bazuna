@@ -389,9 +389,14 @@ db_table: lookup_items
 id (PK)
 ad_id (FK → ads.id)
 image (VARCHAR / storage key)        # served URL/key (our storage). Phase 1: local MEDIA_ROOT via FileSystemStorage.
-                                     #   Key contains NO user_id/telegram_id/username — only ad_id + UUID v4 (zone R6: URL anonymity)
+                                     #   Key contains NO user_id/telegram_id/username and NO ad_id — the scheme is
+                                     #   <uuid4>.jpg (<uuid4> only), with staging/<uuid4>.jpg in flight and
+                                     #   seed/<filename>.jpg for demo data (zone R6: URL anonymity — an ad-scoped
+                                     #   key would leak the ad id in the URL). NOT unique to one row; see below.
 telegram_file_id (VARCHAR, nullable) # dedup/re-download metadata; NOT used in <img src>
-sha256 (CHAR(64), db_index=True)     # SHA-256 hex digest for per-user deduplication; auto-computed on save
+sha256 (CHAR(64), db_index=True)     # SHA-256 hex digest of the original, auto-computed on save; used for
+                                     #   duplicate-photo detection SCOPED TO THE TARGET AD (not per-user), so
+                                     #   identical bytes sent by different sellers are stored as separate files
 position (INT)                                    # unique per ad (uq_ad_images_ad_position); NOT required to be contiguous
 thumbnail_small (VARCHAR, nullable)    # 240x180 thumbnail storage key
 thumbnail_medium (VARCHAR, nullable) # 640x480 thumbnail storage key
@@ -405,18 +410,29 @@ one ad** and that is the whole rule: **contiguity is deliberately not enforced, 
 permitted and preserved** (`copy_ad` carries a source ad's positions such as `[0, 2, 5]` through
 verbatim). Do not add a contiguity check to `AdImage.Meta.constraints`.
 
-A storage key is **not** unique to one row: `copy_ad` points the copy at the source ad's
-keys instead of duplicating files, so one key can be legitimately referenced by several
-`AdImage` rows. Deletion is therefore guarded in the `AdImage` `pre_delete` signal
-(`apps.media.signals`) — `delete_photo()` is skipped while another `AdImage` row still
-references that key. That per-key existence check **is** the AD-003 fix (retired as `64a9de6`):
-it is the minimal correct mechanism at the one seam every deletion path shares, not a reference
-count, and `delete_photo()` itself remains unconditional once a key is unreferenced.
+**Storage-key ownership rule.** A storage key may be referenced by **N ≥ 1** `AdImage` rows, and its bytes
+are freed **only when the last referencing row goes away**. `copy_ad` points the copy at the source ad's
+keys instead of duplicating files, so one key is legitimately shared across several rows (and often across
+several ads). The reference check is owned by
+`apps.media.services.references.unreferenced_keys` — a **single combined query over all four key columns**
+(`image`, `thumbnail_small`, `thumbnail_medium`, `thumbnail_large`), not just `image`. It is evaluated inside
+the `transaction.on_commit` closure that `apps.media.signals.delete_adimage_files_on_delete` registers, i.e.
+**after** the departing rows are gone, so the predicate is unexcluded ("referenced by any row") and the
+multi-row-cascade leak of the earlier `pre_delete`-time shape is eliminated. That per-key existence check
+**is** the AD-003 fix (retired as `64a9de6`, repaired to four columns at `59cc460`): it is the minimal
+correct mechanism at the one seam every deletion path shares, not a reference count, and `delete_photo()`
+itself remains unconditional once a key is unreferenced. Two residual characteristics remain and are
+deliberate: in a multi-row cascade a shared key is passed to `delete_photo` once per departing row (the
+second call hits the terminal `FileNotFoundError` path and logs one WARN, writing no `MediaDeletionError`
+row), and a concurrent insert between the reference query and the `unlink` is not closed.
 
-> Zone R6 / R8 (storage-boundary validation): `ad_images.image` key is ad-scoped + UUID v4
-> (unguessable, non-sequential). JPEG validated strictly (magic bytes / PIL) on save; non-JPEG
-> rejected with 415. nginx `/media/` sets `X-Content-Type-Options: nosniff`, whitelists
-> `image/jpeg`, default `application/octet-stream`, `Content-Disposition: inline`.
+> Zone R6 / R8 (storage-boundary validation): `ad_images.image` is an unguessable `<uuid4>.jpg` and carries
+> **no `ad_id`** (zone R6: URL anonymity — an ad-scoped key would expose the ad id). JPEG validated strictly
+> (magic bytes / PIL) on save; non-JPEG rejected with 415. The stored original is re-encoded at
+> `apps.media.services.filesystem.STORED_JPEG_QUALITY` (75) to strip EXIF/ICC, and thumbnails are derived at
+> `apps.media.services.thumbnails.ThumbnailService.QUALITY` (85). nginx `/media/` sets
+> `X-Content-Type-Options: nosniff`, whitelists `image/jpeg`, default `application/octet-stream`,
+> `Content-Disposition: inline`.
 
 ### ad_features
 Through table for the `Ad.features` M2M relationship. An ad can have 0..N listing features.
@@ -747,7 +763,7 @@ is a recorded product decision**, not an accident.
 Whether **editing a live ad** should re-alert matching buyers is an **open product
 question**; today it does not. Any future epoch for that decision must be a
 **content-revision column, not `Ad.published_at`** — `published_at` is reset by
-`ad_reactivate` and price/photo edits too, so it would re-alert on the wrong half
+`ad_reactivate` and price-only edits too, so it would re-alert on the wrong half
 of the transitions.
 
 ---

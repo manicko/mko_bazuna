@@ -42,13 +42,22 @@ told their draft was reaped, not that it was not found. A seller has at most one
 progress; starting a new ad or copying an existing one replaces it. See decisions I, E.
 
 ### US-S5 — Edit ad
-Seller edits description/price/photos. **Text edits** (title/description) →
+Seller edits description/price. **Text edits** (title/description) →
 `PUBLISHED → ON_MODERATION` and the ad is **hidden immediately** until it passes re-check
-(zone C2). Price/photo edits publish instantly (≤5s). A mixed edit follows the text rule. An
+(zone C2). **Price** edits publish immediately (≤5s). A mixed edit follows the text rule. An
 unsubmitted `DRAFT` and a pending `ON_MODERATION` ad save directly with the status unchanged; an
 ad in any other status (`ON_MODERATION_FAILED`, `REJECTED`, `DELETED`) is **refused with an
 explicit message** and nothing is written. The dashboard's Edit link is shown only for the
 statuses that can reach a working edit form. See decision J.
+
+**Photos are not seller-editable in phase 1.** The web edit form does not change an ad's photos,
+and the bot affordance for seller-side photo editing was **deliberately deferred** (owner decision
+`Q07-6=(b)`); a seller who wants different photos re-posts the ad. The only post-publish photo
+change is a **moderator** removing a single inappropriate photo
+(`apps.ads.services.ad_image_removal.remove_ad_image`, staff-only and audited), which deletes the
+`AdImage` row and leaves the file's bytes to the media reference check — a key still referenced by
+another row is kept. When a price-only edit lands on a live ad, only the auto-archive clock is
+reset (US-S7); the photos are untouched.
 
 ### US-S6 — Delete own ad
 Seller deletes an ad → `DELETED` (soft), hidden from the site.

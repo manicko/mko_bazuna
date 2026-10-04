@@ -831,12 +831,12 @@ msgstr "Выберите несколько файлов, чтобы добав�
 
 msgid ""
 "Editing text (title/description) will send this ad for re-moderation and "
-"temporarily hide it from public view. Price/photo changes will be published "
-"immediately."
+"temporarily hide it from public view. A price change is published "
+"immediately; photos cannot be edited here."
 msgstr ""
 "Редактирование текста (заголовка/описания) отправит объявление на повторную "
-"модерацию и временно скроет его из публичного просмотра. Изменения цены/фото "
-"будут опубликованы немедленно."
+"модерацию и временно скроет его из публичного просмотра. Изменение цены "
+"публикуется немедленно; фотографии здесь изменить нельзя."
 
 msgid "Save Changes"
 msgstr "Сохранить изменения"

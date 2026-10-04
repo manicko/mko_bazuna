@@ -1,4 +1,4 @@
-{# Ad edit template for Mko Bazuna. Edit form for seller's own ads. Handles text vs price/photo edit behavior. Zone C2: text edits trigger moderation, price/photo edits stay published. #}
+{# Ad edit template for Mko Bazuna. Edit form for seller's own ads. Handles text vs price-only edit behavior (photos are not seller-editable in phase 1, Q07-6=(b)). Zone C2: text edits trigger moderation, price edits stay published. #}
 {% load static %}
 {% load i18n %}
 <!DOCTYPE html>
@@ -90,7 +90,7 @@
                 </div>
                 <div class="border-t pt-4 mt-6">
                     <p class="text-xs text-gray-600 mb-4">
-                        {% trans "Editing text (title/description) will send this ad for re-moderation and temporarily hide it from public view. Price/photo changes will be published immediately." %}
+                        {% trans "Editing text (title/description) will send this ad for re-moderation and temporarily hide it from public view. A price change is published immediately; photos cannot be edited here." %}
                     </p>
                     <div class="flex gap-3">
                         <button type="submit"

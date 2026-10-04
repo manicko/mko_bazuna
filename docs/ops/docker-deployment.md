@@ -936,10 +936,12 @@ location /protected-media/ {
 
 ### Media Security
 
-- Script execution blocked: `.php`, `.py`, `.cgi`, `.pl`, `.sh` files return 403
+- Script execution blocked: `.php`, `.py`, `.cgi`, `.pl`, `.sh` files return 403 — a `~*` regex location `location ~* ^/media/.*\.(?:php|py|cgi|pl|sh)(?:/|$) { deny all; return 403; }` (07-MEDIA-006). The `~*` form is mandatory: a prefix `location /media/` block would replace the proxying block and 403 every genuine photo.
 - Only `image/jpeg` served for uploads
 - `Content-Disposition: inline` for all media
-- Storage keys are UUID v4 (unguessable, non-sequential)
+- `/media/` is rate-limited with `limit_req zone=browse_limit burst=40 nodelay`, reusing the existing `browse_limit` zone (no new `limit_req_zone`; 07-MEDIA-006)
+- Storage keys are unguessable `<uuid4>.jpg` and contain **no `ad_id`** (zone R6: URL anonymity — an ad-scoped key would expose the ad id). In-flight uploads live at `staging/<uuid4>.jpg` (bounded by a global `MEDIA_STAGING_BYTE_BUDGET`, default 2 GiB) and generated demo photos at `seed/<filename>.jpg`.
+- **Storage-key ownership:** a key may be referenced by **N ≥ 1** `AdImage` rows (`copy_ad` shares keys rather than copying files), and its bytes are freed only when the last referencing row goes away. The check covers all four key columns (`image` + the three thumbnails) in `apps.media.services.references.unreferenced_keys`, evaluated after commit. The stored original is re-encoded at `STORED_JPEG_QUALITY` (75) to strip EXIF/ICC and thumbnails are derived at `ThumbnailService.QUALITY` (85) — the served photo is **not** the raw Telegram upload.
 
 ### Client IP Trust Model
 

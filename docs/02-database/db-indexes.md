@@ -288,7 +288,7 @@ models.Index(
 
 ## Indexes — ad_images
 ```python
-models.Index(name="IX_adimages_sha256", fields=["sha256"])  # photo deduplication lookup
+models.Index(name="IX_adimages_sha256", fields=["sha256"])  # duplicate-photo lookup, scoped to one ad (ad + sha256)
 # B-tree on each lookup field for media_gate's OR query across ``image`` /
 # ``thumbnail_small`` / ``thumbnail_medium`` / ``thumbnail_large``
 # (listings.py:169-174). PostgreSQL uses a bitmap scan across these indexes

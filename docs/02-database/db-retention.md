@@ -154,6 +154,42 @@ distinct table and nothing in the suite catches an id collision. Ids are allocat
 bootstrap jobs); re-read that table immediately before taking a new id, because id reuse across
 two phases is a silent, collision-prone failure.
 
+### purge_media_deletion_errors (07-MEDIA-010)
+
+`delete_photo` records a `MediaDeletionError` row whenever a storage-key deletion exhausts all
+retries; until this command shipped nothing bounded that table. Rows older than `--older-than`
+days (**30 by default**) are **deleted**. The predicate filters on `created_at`, which carries
+`idx_media_del_err_created`, so the eligible set is an index range scan.
+
+```bash
+# Mandatory first run — counts, deletes nothing
+python src/backend/manage.py purge_media_deletion_errors --dry-run
+# Optional override
+python src/backend/manage.py purge_media_deletion_errors --older-than 90
+```
+
+- The purge is **irreversible** — a revert does not restore purged rows — so `--dry-run` is the
+  mandatory first run.
+- `--older-than` is **the one retention window this project deliberately exposes as a CLI knob**;
+  all other retention durations are hardcoded module constants.
+- The rows are **diagnostic, not personal data**: `storage_key` is an unguessable UUID (or a
+  `seed/` filename), `error_type` is a class name, and `error_message` is `str(exc)[:1000]`.
+- **Hourly**, advisory lock **15** (`AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS`). The command is
+  hourly rather than daily because a daily command's non-zero exit is load-bearing for the durable
+  daily marker; an hourly command only gates the liveness marker.
+- The admin reader (`apps.media.admin.MediaDeletionErrorAdmin`) is **read-only** — no add, change or
+  delete permission and no editable field.
+
+### sweep_orphaned_media --check (07-MEDIA-012)
+
+`sweep_orphaned_media --check` is the **non-destructive report** half of the store-versus-database
+diff: it reports a dangling row (a referenced `AdImage` key whose file is absent) and orphan files,
+then exits **non-zero** via `CommandError` when either count is non-zero, so an operator's cron or
+monitoring observes the condition. The report scope **includes `seed/`** and probes each referenced
+key verbatim; `staging/` is the sole suppression (its files are bounded by the mtime TTL). `--check`
+is mutually exclusive with `--dry-run`, and the deletion counter now counts only files actually
+removed.
+
 ### Other sweeps
 
 | Command | Retention | Description |
@@ -164,6 +200,7 @@ two phases is a silent, collision-prone failure.
 | `purge_rejected_ads` | 90 days | Delete REJECTED ads older than 90 days |
 | `sweep_drafts` | 30 minutes | Delete DRAFT ads with no seller activity for 30 minutes (`Ad.updated_at`) |
 | `consent_hard_delete` | 30 days | Hard-delete user PII after 30-day consent withdrawal |
+| `purge_media_deletion_errors` | 30 days (default) | **Hourly**, advisory lock 15. Deletes `MediaDeletionError` rows older than `--older-than` days (default 30, the one operator-overridable retention window). **Irreversible** — `--dry-run` is the mandatory first run. Admin reader is read-only. Diagnostic table, no PII (see [purge_media_deletion_errors](#purge_media_deletion_errors-07-media-010)) |
 | `purge_consent_records` | 90 days (fingerprint) / 5 years (decision) | **Daily**, advisory lock 14. Anonymises the `ConsentRecord` fingerprint fields (`user`, `session_key`, `ip_address`, `user_agent`) at 90 days and retains the decision fields (`choice`, `categories`, `consent_version`, `consent_given_at`) for 5 years. **Never deletes rows** — see [purge_consent_records](#purge_consent_records-06-pii-116) |
 
 **`DRAFT` retention measures inactivity, not age.** The predicate is
@@ -228,7 +265,7 @@ When a seller withdraws consent (GDPR Article 21 opt-out), the following lifecyc
    - All `Ad` rows belonging to the user (including `DELETED` status ads)
    - All `AdImage` rows (via `on_delete=CASCADE`)
    - All `SellerVerification` rows (via `on_delete=CASCADE`)
-    - Physical ad-image files (including thumbnail derivatives) deleted via `delete_photo()` loop (`apps.media.services.filesystem`) after transaction commits, using `AdImage.storage_keys()` to collect all key variants (image + `thumbnail_small/medium/large`). A key still referenced by another `AdImage` row is **skipped** by the `pre_delete` signal (`apps.media.signals`) — `copy_ad` shares keys instead of duplicating files, so unconditional deletion would destroy another ad's photo. That per-key reference check **is** the AD-003 fix; it retired as `64a9de6`. The receiver collects `storage_keys()`, drops the keys still referenced by any **other** `AdImage` row, and defers `delete_photo` for the remainder to `transaction.on_commit`. The exclusion of the row being deleted is load-bearing: `pre_delete` runs before the cascade, so an unexcluded existence check always matches the row itself and would silently stop all file cleanup, leaking every orphaned file.
+    - Physical ad-image files (including thumbnail derivatives) deleted via `delete_photo()` loop (`apps.media.services.filesystem`) after transaction commits, using `AdImage.storage_keys()` to collect all key variants (image + `thumbnail_small/medium/large`). A key still referenced by **any** `AdImage` row is **skipped** — the reference check covers **all four** key columns in `apps.media.services.references.unreferenced_keys`. That per-key reference check **is** the AD-003 fix; it retired as `64a9de6` and was repaired to four columns at `59cc460`. The receiver captures `storage_keys()` by value at `pre_delete` time and evaluates the check **inside** the `transaction.on_commit` closure, after commit and unexcluded ("referenced by any row", `copy_ad` shares keys instead of duplicating files, so unconditional deletion would destroy another ad's photo). Evaluating after commit is what eliminates the multi-row-cascade leak of the earlier `pre_delete`-time shape, where two rows sharing a key in one cascade each saw the other still present and both skipped. `.exclude(pk=instance.pk)` is deliberately **absent**: by closure time the departing row is already gone, and `Collector` sets `instance.pk = None` after its `atomic()` block, so an exclusion would raise `ValueError`. Residual characteristics remain: in a multi-row cascade a shared key is freed once per departing row, and a concurrent insert between the reference query and the `unlink` is not closed.
 
    **Note:** This is a **30-day** hard-delete, distinct from `purge_deleted_ads` which uses a **120-day** retention window for all `DELETED`-status ads regardless of consent withdrawal. Consent-withdrawn users' ads are purged at 30 days; other soft-deleted ads persist until 120 days.
 
@@ -238,7 +275,7 @@ See also: [technical-specification.md Decision F](../01-spec/technical-specifica
 
 ## Configuration
 
-All retention values are hardcoded in the respective management command source files. No environment variables or CLI arguments (beyond `--dry-run`) are read for retention durations. The values are: `archive_sweep` (60 days), `delete_sweep` (60 days), `purge_deleted_ads` (120 days), `purge_failed_ads` (7 days), `purge_rejected_ads` (90 days), `sweep_drafts` (30 minutes), `consent_hard_delete` (30 days), `purge_consent_records` (90-day fingerprint window / 5-year decision window).
+All retention values are hardcoded in the respective management command source files. No environment variables or CLI arguments are read for retention durations, **with one deliberate exception**: `purge_media_deletion_errors --older-than` (default 30 days) exposes the `MediaDeletionError` diagnostic-table window as an operator knob (07-MEDIA-010). The values are: `archive_sweep` (60 days), `delete_sweep` (60 days), `purge_deleted_ads` (120 days), `purge_failed_ads` (7 days), `purge_rejected_ads` (90 days), `sweep_drafts` (30 minutes), `consent_hard_delete` (30 days), `purge_consent_records` (90-day fingerprint window / 5-year decision window), `purge_media_deletion_errors` (30 days, overridable).
 
 Separately, `LOCK_TIMEOUT_SECONDS` (default 10) bounds every lock wait; it is a
 connection setting, not a retention value.
@@ -275,10 +312,10 @@ duration** — it is bounded by the table, not by a time window — and its
 All sweep commands run hourly via the `scheduler` service, which dispatches
 them through the extracted module `apps.core.utils.scheduler`
 (`python -m apps.core.utils.scheduler`, invoked by `entrypoint-scheduler.sh`).
-The scheduler runs **9 hourly** commands (`archive_sweep`, `delete_sweep`,
+The scheduler runs **10 hourly** commands (`archive_sweep`, `delete_sweep`,
 `consent_hard_delete`, `sweep_drafts`, `sweep_orphaned_media`,
 `cleanup_login_tokens`, `purge_failed_ads`, `purge_rejected_ads`,
-`purge_deleted_ads`) and **3 daily** commands (`send_alerts`,
+`purge_deleted_ads`, `purge_media_deletion_errors`) and **3 daily** commands (`send_alerts`,
 `rollup_daily_metrics`, `purge_consent_records` — all three fire at 08:00 UTC on
 the first hourly tick at or after that hour; the daily set is gated on the
 durable `scheduler_daily_state` marker, see

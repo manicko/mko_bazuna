@@ -731,8 +731,8 @@ msgstr ""
 
 msgid ""
 "Editing text (title/description) will send this ad for re-moderation and "
-"temporarily hide it from public view. Price/photo changes will be published "
-"immediately."
+"temporarily hide it from public view. A price change is published "
+"immediately; photos cannot be edited here."
 msgstr ""
 
 msgid "Save Changes"
