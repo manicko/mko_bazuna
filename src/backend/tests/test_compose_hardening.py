@@ -294,3 +294,79 @@ def test_compose_oneshot_flags() -> None:
         assert _BOOTSTRAP_MODULE not in path.read_text(encoding="utf-8"), (
             f"{path.name} must not reference {_BOOTSTRAP_MODULE}"
         )
+
+
+
+# --- image-tag reproducibility (09-API-016) --------------------------------
+
+
+def test_prod_app_services_require_image_tag() -> None:
+    """No production application service resolves to a floating ``latest`` tag.
+
+    Every application service in ``docker-compose.prod.yml`` must require
+    ``IMAGE_TAG`` through the ``${IMAGE_TAG:?...}`` form. A ``:-latest`` default
+    let ``docker compose pull`` on two hosts running the same compose file move
+    the entire application to different code with no repository change.
+    """
+    text = _PROD_COMPOSE.read_text(encoding="utf-8")
+    image_lines = [
+        line.strip()
+        for line in text.split("\n")
+        if line.strip().startswith("image:") and "IMAGE_TAG" in line
+    ]
+    # Eight application services share the pinned image reference.
+    assert len(image_lines) == 8, (
+        "all eight production application services must pin the image tag; "
+        f"found {len(image_lines)}"
+    )
+    for line in image_lines:
+        assert "${IMAGE_TAG:?" in line, (
+            f"image line must require IMAGE_TAG via ${{IMAGE_TAG:?...}}: {line}"
+        )
+        assert ":${IMAGE_TAG:-latest}" not in line, (
+            f"image line must not default the tag to :latest: {line}"
+        )
+    assert "${IMAGE_TAG:-latest}" not in text, (
+        "docker-compose.prod.yml must NOT default IMAGE_TAG to the floating "
+        "`:latest` tag (09-API-016)"
+    )
+
+
+def test_prod_env_template_ships_a_pinned_image_tag() -> None:
+    """``.env.prod.example`` must not ship ``IMAGE_TAG=latest``.
+
+    The template is the operator's source of truth; shipping a floating default
+    defeats the compose-side requirement (09-API-016).
+    """
+    env_example = (_ROOT / ".env.prod.example").read_text(
+        encoding="utf-8", errors="replace"
+    )
+    for line in env_example.split("\n"):
+        if line.startswith("IMAGE_TAG="):
+            value = line.split("=", 1)[1].strip()
+            assert value != "latest", (
+                ".env.prod.example must ship a concrete pinned IMAGE_TAG, not "
+                "`latest`"
+            )
+            assert value, ".env.prod.example IMAGE_TAG must be non-empty"
+
+
+def test_deploy_workflow_does_not_build() -> None:
+    """The deploy job must pull a pre-built image, never build one (09-API-016).
+
+    A build step in the deploy job would reintroduce the untraceable-tag
+    problem the image-tag pin exists to prevent.
+    """
+    deploy_workflow = (
+        _ROOT / ".github" / "workflows" / "deploy.yml"
+    ).read_text(encoding="utf-8")
+    assert "docker compose" in deploy_workflow and "pull" in deploy_workflow, (
+        "deploy.yml must pull the pre-built image"
+    )
+    for line in deploy_workflow.split("\n"):
+        assert "docker build" not in line, (
+            f"deploy.yml must NOT build the image: {line.strip()}"
+        )
+        assert "docker compose" not in line or " build" not in line, (
+            f"deploy.yml must NOT run `docker compose ... build`: {line.strip()}"
+        )

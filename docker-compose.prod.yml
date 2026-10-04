@@ -1,11 +1,19 @@
 # Production override for docker-compose.yml
 # Immutable image deployment with TLS hardening, scheduler, and image overrides for GHCR
+#
+# Image tag policy (09-API-016): every application service requires IMAGE_TAG
+# (`${IMAGE_TAG:?...}`) rather than defaulting to `latest`. A floating default
+# let `docker compose pull` on two hosts running "the same compose file" move the
+# entire application to different code with no repository change. The deploy job
+# (.github/workflows/deploy.yml) MUST NOT build: it only pulls, passing the CI
+# commit SHA as IMAGE_TAG. Set IMAGE_TAG in .env.prod (the template ships a
+# concrete dated tag, not `latest`).
 
 services:
   # Override web for production: use pre-built image from GHCR
   # This prevents docker-compose from using build directive and forces pull
   web:
-    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:?IMAGE_TAG must be set; a floating :latest makes two hosts run different code}
     restart: unless-stopped
     stop_grace_period: 30s
     env_file:
@@ -16,7 +24,7 @@ services:
 
   # Override bot for production: use pre-built image from GHCR
   bot:
-    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:?IMAGE_TAG must be set; a floating :latest makes two hosts run different code}
     restart: unless-stopped
     stop_grace_period: 30s
     env_file:
@@ -27,7 +35,7 @@ services:
 
   # Override migrate for production: use pre-built image from GHCR
   migrate:
-    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:?IMAGE_TAG must be set; a floating :latest makes two hosts run different code}
     env_file:
       - .env.prod
     volumes:
@@ -35,7 +43,7 @@ services:
 
   # Override create_admin for production: use pre-built image from GHCR
   create_admin:
-    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:?IMAGE_TAG must be set; a floating :latest makes two hosts run different code}
     env_file:
       - .env.prod
     volumes:
@@ -43,7 +51,7 @@ services:
 
   # Override seed for production: use pre-built image from GHCR
   seed:
-    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:?IMAGE_TAG must be set; a floating :latest makes two hosts run different code}
     env_file:
       - .env.prod
     volumes:
@@ -53,7 +61,7 @@ services:
   # Override load_cities for production: use pre-built image from GHCR
   # Added to override inherited env_file: .env.dev and volumes bind-mount
   load_cities:
-    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:?IMAGE_TAG must be set; a floating :latest makes two hosts run different code}
     env_file:
       - .env.prod
     volumes:
@@ -62,7 +70,7 @@ services:
   # Override load_catalog for production: use pre-built image from GHCR
   # Added to override inherited env_file: .env.dev and volumes bind-mount
   load_catalog:
-    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:?IMAGE_TAG must be set; a floating :latest makes two hosts run different code}
     env_file:
       - .env.prod
     volumes:
@@ -79,7 +87,7 @@ services:
   # Scheduler service: runs management commands in loop (hourly)
   # Gated by profiles:["scheduler"] to prevent import crash before commands exist
   scheduler:
-    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+    image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:?IMAGE_TAG must be set; a floating :latest makes two hosts run different code}
     restart: unless-stopped
     stop_grace_period: 30s
     command: /app/entrypoint-scheduler.sh

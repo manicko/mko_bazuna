@@ -349,6 +349,16 @@ The production override file (`docker-compose.prod.yml`) includes:
 - HTTP to HTTPS redirect on port 80
 - TLS certificate paths configurable via `TLS_CERT_PATH`
 
+> **Deferred decision (09-API-016): the host certificate path is not yet decided.**
+> The production host filesystem and the CI-runner filesystem are not visible from this
+> repository, so only the owner can name the real path. The candidate namespaced path is
+> `deploy/secrets/mko_bazuna.crt` (namespaced rather than a bare filename, which would be
+> ambiguous). Do **not** treat the current default (`/etc/nginx/certs`) as a decided path,
+> and do not add a certificate copy step until the owner rules. Note the failure mode this
+> guards against: Docker auto-creates a missing bind-mount source as an **empty directory**,
+> so a forgotten export does not fail at mount time — nginx starts, mounts empty, then aborts
+> with `cannot load certificate`.
+
 ### Environment Variables
 
 | Variable | Required | Description |
@@ -370,7 +380,7 @@ The production override file (`docker-compose.prod.yml`) includes:
 | `REDIS_URL` | Yes (prod) | Redis connection for cache and rate-limiting. Set inline to `redis://redis:6379/0` in all prod Compose services. Required in production (`config/settings/prod.py` fail-fast guard raises `ImproperlyConfigured` if empty, preventing silent fallback to `MemoryStorage`/`LocMemCache`). Empty in dev/test (falls back to locmem) |
 | `GOOGLE_TRANSLATE_API_KEY` | Yes (prod) | Google Cloud Translation API v2 key used by `apps.core.services.translation.translate_text()`. Required in production (`config/settings/prod.py` fail-fast guard; placeholder `<...>` values are rejected at boot). Empty in `.env.dev`. Rotate if committed to VCS or exposed. After rotation, restart the `bot` container — the translation service reads the key at call time via `settings.GOOGLE_TRANSLATE_API_KEY`. |
 | `PLAUSIBLE_HOST` | No | Analytics host for Plausible traffic tracking (cookieless, no consent banner). Empty disables analytics |
-| `TLS_CERT_PATH` | No (default: `/etc/nginx/certs/`) | Path to TLS certificates (fullchain.pem / privkey.pem) mounted into nginx |
+| `TLS_CERT_PATH` | No (default: `/etc/nginx/certs/`) | Path to TLS certificates (fullchain.pem / privkey.pem) mounted into nginx. **The host path is DEFERRED, not decided** (09-API-016): the candidate namespaced path is `deploy/secrets/mko_bazuna.crt`; only the owner can name the real path because the host and CI-runner filesystems are not visible from this repository. Docker auto-creates a missing bind-mount source as an empty directory, so a forgotten export yields a crash-looping nginx whose compose output looks successful. |
 | `ADMIN_USERNAME` | No (default: `admin`) | Django admin username for the `create_admin` one-shot service |
 | `ADMIN_PASSWORD` | No* | Admin password; required for `create_admin` auto-creation. Create manually if not set |
 | `ADMIN_TELEGRAM_ID` | No (default: `-1`) | Placeholder telegram_id for the admin user (negative avoids collision with real Telegram IDs) |
@@ -571,6 +581,19 @@ Deployment configuration is validated via Django's `manage.py check --deploy`:
 > `docs` are excluded; `B101` (assert) and `B105` (hardcoded password strings) are skipped
 > as pre-existing/mitigated. This complements the existing `pip-audit`, Trivy filesystem
 > scan, and Gitleaks secret scan that also run in the `security` job.
+
+### Image tag policy
+
+`docker-compose.prod.yml` requires `IMAGE_TAG` (`${IMAGE_TAG:?...}`) on every application
+service — `web`, `bot`, `migrate`, `create_admin`, `seed`, `load_cities`, `load_catalog` and
+`scheduler`. It deliberately has **no `latest` default**: a floating default let
+`docker compose pull` on two hosts running "the same compose file" move the whole
+application to different code with no repository change (09-API-016). `.env.prod.example`
+ships a concrete dated tag (`IMAGE_TAG=2026.10.03`), not `latest`.
+
+The deploy job (`.github/workflows/deploy.yml`) overrides `IMAGE_TAG` with the CI commit SHA
+and only **pulls** — it must not build. Keep it that way: the image is built and pushed by
+CI, and a build step in the deploy job would reintroduce the untraceable-tag problem.
 
 ### Deployment Rollback
 
