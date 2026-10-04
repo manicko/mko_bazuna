@@ -14,7 +14,8 @@ import logging
 from typing import Final
 
 from asgiref.sync import sync_to_async
-from django.core.cache import cache
+
+from apps.core.utils.cache import bump_rate_limit_window
 
 logger = logging.getLogger(__name__)
 
@@ -36,9 +37,10 @@ def check_upload_rate_limit(
 ) -> bool:
     """Return True if the seller is within the upload rate limit.
 
-    Uses the atomic ``cache.add`` + ``cache.incr`` pattern (identical to the
-    search autocomplete rate limiter) so concurrent increments are serialized
-    by the cache backend. Returns ``False`` when the limit is exceeded.
+    Delegates the atomic ``cache.add`` + ``cache.incr`` window bump to
+    ``apps.core.utils.cache.bump_rate_limit_window`` (shared with the contact,
+    support, login and web-tier guards). Returns ``False`` when the limit is
+    exceeded, and ``True`` (fail-open) when the cache is unreachable.
 
     Args:
         user_id: The ad-owner's id (from FSM state).
@@ -49,20 +51,7 @@ def check_upload_rate_limit(
         ``True`` if the upload may proceed, ``False`` if rate-limited.
     """
     key = _RATE_LIMIT_KEY_PATTERN.format(user_id=user_id)
-
-    try:
-        added = cache.add(key, 1, timeout=period)
-        if added:
-            current = 1
-        else:
-            current = cache.incr(key)
-
-        return current <= limit
-
-    except ValueError:
-        # Key expired between the add/incr calls — treat as a fresh start.
-        cache.set(key, 1, timeout=period)
-        return True
+    return bump_rate_limit_window(key, limit, period)
 
 
 # --- contact-us deep-link limiter -------------------------------------------
@@ -88,9 +77,10 @@ def check_contact_start_rate_limit(
 ) -> bool:
     """Return ``True`` if the user is within the contact-start rate limit.
 
-    Per-user sliding-window limiter for ``/start contact_us`` triggers, using
-    the atomic ``cache.add`` + ``cache.incr`` idiom (identical to
-    ``check_upload_rate_limit``). Returns ``False`` when the limit is exceeded.
+    Per-user sliding-window limiter for ``/start contact_us`` triggers, delegating
+    the window bump to ``apps.core.utils.cache.bump_rate_limit_window``. Returns
+    ``False`` when the limit is exceeded, and ``True`` (fail-open) when the cache
+    is unreachable.
 
     Args:
         user_id: The Telegram user's id (``message.from_user.id``).
@@ -101,22 +91,7 @@ def check_contact_start_rate_limit(
         ``True`` if the trigger may proceed, ``False`` if rate-limited.
     """
     key = _CONTACT_RATE_LIMIT_KEY_PATTERN.format(user_id=user_id)
-
-    try:
-        # cache.add returns True if the key was created (first request).
-        added = cache.add(key, 1, timeout=period)
-        if added:
-            current = 1
-        else:
-            # Atomic increment on the existing key.
-            current = cache.incr(key)
-
-        return current <= limit
-
-    except ValueError:
-        # Key expired between the add/incr calls — treat as a fresh start.
-        cache.set(key, 1, timeout=period)
-        return True
+    return bump_rate_limit_window(key, limit, period)
 
 
 # --- support message limiter ------------------------------------------------
@@ -140,10 +115,10 @@ def check_support_message_rate_limit(
 ) -> bool:
     """Return ``True`` if the user is within the support message rate limit.
 
-    Per-user sliding-window limiter for the support/contact message intake
-    flow, using the atomic ``cache.add`` + ``cache.incr`` idiom (identical to
-    ``check_contact_start_rate_limit`` and ``check_upload_rate_limit``).
-    Returns ``False`` when the limit is exceeded.
+    Per-user sliding-window limiter for the support/contact message intake flow,
+    delegating the window bump to
+    ``apps.core.utils.cache.bump_rate_limit_window``. Returns ``False`` when the
+    limit is exceeded, and ``True`` (fail-open) when the cache is unreachable.
 
     Args:
         user_id: The Telegram user's id (``message.from_user.id``).
@@ -154,20 +129,7 @@ def check_support_message_rate_limit(
         ``True`` if the message may proceed, ``False`` if rate-limited.
     """
     key = _SUPPORT_RATE_LIMIT_KEY_PATTERN.format(user_id=user_id)
-
-    try:
-        added = cache.add(key, 1, timeout=period)
-        if added:
-            current = 1
-        else:
-            current = cache.incr(key)
-
-        return current <= limit
-
-    except ValueError:
-        # Key expired between the add/incr calls — treat as a fresh start.
-        cache.set(key, 1, timeout=period)
-        return True
+    return bump_rate_limit_window(key, limit, period)
 
 
 # --- login deep-link limiter ------------------------------------------------
@@ -190,10 +152,10 @@ def check_login_rate_limit(
 ) -> bool:
     """Return ``True`` if the user is within the login rate limit.
 
-    Per-user sliding-window limiter for ``/start login_<token>`` claims, using
-    the atomic ``cache.add`` + ``cache.incr`` idiom (identical to
-    ``check_upload_rate_limit`` and ``check_contact_start_rate_limit``).
-    Returns ``False`` when the limit is exceeded.
+    Per-user sliding-window limiter for ``/start login_<token>`` claims,
+    delegating the window bump to
+    ``apps.core.utils.cache.bump_rate_limit_window``. Returns ``False`` when the
+    limit is exceeded, and ``True`` (fail-open) when the cache is unreachable.
 
     Args:
         user_id: The Telegram user's id (``message.from_user.id``).
@@ -204,17 +166,4 @@ def check_login_rate_limit(
         ``True`` if the login claim may proceed, ``False`` if rate-limited.
     """
     key = _LOGIN_RATE_LIMIT_KEY_PATTERN.format(user_id=user_id)
-
-    try:
-        added = cache.add(key, 1, timeout=period)
-        if added:
-            current = 1
-        else:
-            current = cache.incr(key)
-
-        return current <= limit
-
-    except ValueError:
-        # Key expired between the add/incr calls — treat as a fresh start.
-        cache.set(key, 1, timeout=period)
-        return True
+    return bump_rate_limit_window(key, limit, period)

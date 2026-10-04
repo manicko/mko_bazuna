@@ -9,10 +9,14 @@ from __future__ import annotations
 
 import inspect
 from collections.abc import Iterator
+from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 from django.core.cache import cache
+from django_redis.exceptions import ConnectionInterrupted
 
+import telegram_bot.services.rate_limit as bot_rate_limit
 from telegram_bot.services.rate_limit import (
     check_contact_start_rate_limit,
     check_support_message_rate_limit,
@@ -72,7 +76,6 @@ class TestSupportMessageRateLimit:
         """First 5 support messages within the window are allowed."""
         for _ in range(5):
             assert await check_support_message_rate_limit(222) is True
-
     @pytest.mark.asyncio
     async def test_blocks_after_threshold(self) -> None:
         """6th support message within the window is rate-limited."""
@@ -118,3 +121,46 @@ def test_rate_limit_functions_are_async_callable() -> None:
     """
     assert inspect.iscoroutinefunction(check_upload_rate_limit)
     assert inspect.iscoroutinefunction(check_contact_start_rate_limit)
+    assert inspect.iscoroutinefunction(check_support_message_rate_limit)
+
+
+class TestBotGuardsFailOpenOnCacheOutage:
+    """Each bot guard allows the request when the shared cache is unreachable.
+
+    The failing cache is applied at the guard module's ``cache`` name when the
+    module still holds one (today), and at ``apps.core.utils.cache.cache`` — the
+    seam the shared helper reads — once the guard delegates and the module no
+    longer imports ``cache``. Resolving the seam this way keeps ONE test that is
+    genuinely RED before the fail-open change and GREEN after it; a test pinned
+    to the guard module's own name would raise ``AttributeError`` after the fix,
+    and one pinned only to ``apps.core.utils.cache.cache`` would pass vacuously
+    before it. The failing-cache shape is the same ``MagicMock`` as
+    ``src/telegram_bot/tests/test_update_id_dedup.py::test_redis_unavailable_fail_open``.
+    """
+
+    @pytest.mark.asyncio
+    async def test_upload_guard_fails_open(self) -> None:
+        """``check_upload_rate_limit`` allows when the cache raises."""
+        with _cache_outage():
+            assert await check_upload_rate_limit(111) is True
+
+    @pytest.mark.asyncio
+    async def test_contact_start_guard_fails_open(self) -> None:
+        """``check_contact_start_rate_limit`` allows when the cache raises."""
+        with _cache_outage():
+            assert await check_contact_start_rate_limit(222) is True
+
+    @pytest.mark.asyncio
+    async def test_support_message_guard_fails_open(self) -> None:
+        """``check_support_message_rate_limit`` allows when the cache raises."""
+        with _cache_outage():
+            assert await check_support_message_rate_limit(333) is True
+
+
+def _cache_outage() -> Any:
+    """Patch the cache the bot guards read through to raise on ``add``."""
+    mock_cache = MagicMock()
+    mock_cache.add.side_effect = ConnectionInterrupted(None)
+    if hasattr(bot_rate_limit, "cache"):
+        return patch.object(bot_rate_limit, "cache", mock_cache)
+    return patch("apps.core.utils.cache.cache", mock_cache)

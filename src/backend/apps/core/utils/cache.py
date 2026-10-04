@@ -4,17 +4,21 @@ Django cache utilities for Mko Bazuna.
 Holds the project's call-shaped cache helpers: five getter/setter/invalidate
 triads (moderation criteria, site config, bot username, support contacts,
 anonymous language) plus :func:`cache_get_or_none`, the shared cache-read
-primitive.
+primitive, and :func:`bump_rate_limit_window`, the shared
+:func:`cache_get_or_none` sibling that guards a rate-limit window write.
 
-Cache-failure policy (declared here, once). A cache **read** must never raise
-into a request path: a cache outage degrades to "no cached value", never to a
-5xx. Route every request-path read through :func:`cache_get_or_none`, which
-swallows ``ConnectionInterrupted`` and ``redis.RedisError``, logs, and returns
-``None``. This is the same exception tuple and the same fail-open intent as
-``telegram_bot.middlewares.update_id_dedup.UpdateIdDedupMiddleware.__call__``.
-A cache **write** may still raise; the caller that owns the value decides
-whether to guard it (see ``apps.core.services.site_config``), because the
-correct recovery differs per caller.
+Cache-failure policy (declared here, once). A request-path cache **read** must
+never raise into a request path: a cache outage degrades to "no cached value",
+never to a 5xx. Route every request-path read through :func:`cache_get_or_none`,
+which swallows ``ConnectionInterrupted`` and ``redis.RedisError``, logs, and
+returns ``None``. This is the same exception tuple and the same fail-open intent
+as ``telegram_bot.middlewares.update_id_dedup.UpdateIdDedupMiddleware.__call__``.
+A request-path **write** that guards traffic — the rate-limit window bump — also
+fails open, through :func:`bump_rate_limit_window`, which logs a WARNING naming
+the key and reports "allowed". Other cache writes still raise; the caller that
+owns the value decides whether to guard them (see
+``apps.core.services.site_config``), because the correct recovery differs per
+caller.
 """
 
 import logging
@@ -43,6 +47,39 @@ def cache_get_or_none(key: str) -> object | None:
     except (ConnectionInterrupted, redis.RedisError):
         logger.warning("Cache read failed for %s; treating as a cache miss", key)
         return None
+
+
+def bump_rate_limit_window(key: str, limit: int, period: int) -> bool:
+    """Return ``True`` when the caller is within its window, fail-open on cache loss.
+
+    The shared body of every request-path rate-limit guard: it bumps ``key`` in
+    the shared cache using the atomic ``cache.add`` + ``cache.incr`` idiom and
+    reports whether the resulting count is within ``limit``. On a cache outage it
+    degrades to "no limit" rather than raising, mirroring
+    ``telegram_bot.middlewares.update_id_dedup.UpdateIdDedupMiddleware``: a Redis
+    outage must not drop legitimate traffic. Never raises into a request path.
+
+    Args:
+        key: The already-derived cache key (the caller owns the key format).
+        limit: Maximum number of hits allowed within the window.
+        period: Window length in seconds.
+
+    Returns:
+        ``True`` if the caller may proceed, ``False`` if it is over the limit.
+        A cache outage is reported as ``True`` (fail-open).
+    """
+    try:
+        if cache.add(key, 1, timeout=period):
+            return True
+        current = cache.incr(key)
+    except (ConnectionInterrupted, redis.RedisError):
+        logger.warning("Cache write failed for %s; allowing request", key)
+        return True
+    except ValueError:
+        # Key expired between the add/incr calls - treat as a fresh start.
+        cache.set(key, 1, timeout=period)
+        return True
+    return current <= limit
 
 
 def get_cached_criteria(key: str = CRITERIA_CACHE_KEY) -> dict | None:
