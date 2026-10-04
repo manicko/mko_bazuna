@@ -239,13 +239,26 @@ class ConsentRecord(models.Model):
     Actor definition (``06-NEW-02``): the actor is the account that performed the
     action, and it is recorded **only when that account is not the subject**.
     ``user`` already names the subject, so a self-action would store the same
-    account twice. Invariant: ``initiated_by IS NOT NULL`` only when it is a
-    different row from ``user``. Read the pair, never one column alone —
-    ``action_source`` is authoritative for *which case* the row is, and
+    account twice. Write-time invariant: ``initiated_by IS NOT NULL`` at insert
+    only when it is a different row from ``user``. Read the pair, never one column
+    alone — ``action_source`` is authoritative for *which case* the row is, and
     ``initiated_by`` names the account when one exists. A null ``initiated_by``
-    means "no acting account distinct from the subject", covering a self-service
-    action, an anonymous visitor and a system action; ``action_source`` tells
-    those three apart.
+    means either "no acting account distinct from the subject" (a self-service
+    action, an anonymous visitor or a system action) **or** an ``admin_staff``
+    attribution that has since expired at the 12-month actor window
+    (``purge_consent_records``) or whose acting account was hard-deleted
+    (``SET_NULL``); ``action_source`` tells those apart — ``admin_staff`` is
+    written only when a staff account acted.
+
+    Retention is **per field**: ``user`` (the subject) follows the general
+    record retention — the 90-day fingerprint bound; ``initiated_by`` (the actor)
+    is irreversibly anonymised **12 months after the action**, unless the row is
+    under a documented ``legal_hold``; the event and timestamp fields (``choice``,
+    ``categories``, ``consent_version``, ``consent_given_at``) are anonymised,
+    never deleted. The 12-month actor period is a **chosen minimisation period
+    justified by purpose — one full operational/audit cycle — and explicitly NOT
+    a statutory term**; it is deliberately shorter than the 5-year decision
+    bound, which governs the decision fields only.
     """
 
     user = models.ForeignKey(
@@ -302,12 +315,17 @@ class ConsentRecord(models.Model):
         related_name="+",
         help_text=(
             "Acting account, recorded ONLY when it is not the subject "
-            "(06-NEW-02). NULL means no acting account distinct from the "
+            "(06-NEW-02). NULL means either no acting account distinct from the "
             "subject — a self-service action, an anonymous visitor, or a system "
-            "action; action_source tells those apart. Never CASCADE: "
+            "action — or an admin_staff attribution cleared after 12 months "
+            "(unless held) or emptied by SET_NULL when the acting account was "
+            "hard-deleted; action_source tells those apart. Never CASCADE: "
             "consent_hard_delete deletes User rows and a cascade would destroy "
-            "the Art. 7(1) ledger. Retained to the decision bound (5 years), not "
-            "the 90-day fingerprint bound — see the open owner/DPO question."
+            "the Art. 7(1) ledger. The acting account is irreversibly anonymised "
+            "12 months after the action — a chosen minimisation period justified "
+            "by purpose, NOT a statutory term, and deliberately shorter than the "
+            "5-year decision bound which governs the decision fields only. A "
+            "documented legal_hold suspends this actor erasure."
         ),
     )
     action_source = models.CharField(
@@ -321,6 +339,17 @@ class ConsentRecord(models.Model):
             "default and means the row predates this column: the mechanism was "
             "never captured and is not recoverable. No row written through the "
             "recording service carries UNKNOWN."
+        ),
+    )
+    legal_hold = models.BooleanField(
+        default=False,  # pyright: ignore[reportArgumentType]
+        help_text=(
+            "Documented legal hold (06-NEW-02). Default False leaves every "
+            "existing row un-held, so no backfill is needed. A hold suspends the "
+            "12-month actor erasure ONLY: it never restores what the 90-day "
+            "fingerprint window already cleared, and it never extends the "
+            "decision fields, which are anonymised-but-never-deleted at every "
+            "age. Superuser-settable (exemption from erasure, not evidence)."
         ),
     )
 

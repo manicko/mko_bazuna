@@ -374,7 +374,16 @@ class ConsentRecordAdmin(admin.ModelAdmin):
         "choice",
         "consent_version",
     ]
-    list_filter = ["choice", "consent_version", "consent_given_at", "action_source"]
+    list_filter = [
+        "choice",
+        "consent_version",
+        "consent_given_at",
+        "action_source",
+        # A superuser must be able to FIND held rows to clear a hold. This is a
+        # filter, not a display column: a hold is an exemption from actor
+        # erasure, not evidence a changelist needs to show at a glance.
+        "legal_hold",
+    ]
     search_fields = ["session_key"]
     readonly_fields = [
         "user",
@@ -389,6 +398,13 @@ class ConsentRecordAdmin(admin.ModelAdmin):
         # form is auto-built from the editable fields. Without these two the actor
         # and the mechanism would be writable by a superuser — forgeable
         # accountability evidence.
+        #
+        # DELIBERATE ASYMMETRY (BLOCK 19): ``legal_hold`` is the ONE editable
+        # field among these non-editable ones. The two actor columns ARE the
+        # evidence, so a superuser who can edit them can forge them; a hold is an
+        # exemption FROM erasure — not evidence — so it must be settable. Both
+        # effects are superuser-only: ``has_change_permission`` gates the whole
+        # change form on ``is_superuser``, so no extra check is needed.
         "initiated_by",
         "action_source",
     ]

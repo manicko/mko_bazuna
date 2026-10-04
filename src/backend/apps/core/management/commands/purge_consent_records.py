@@ -2,8 +2,9 @@
 Management command to anonymise aged ``ConsentRecord`` rows on a ratified schedule.
 
 The consent ledger is Art. 7(1) accountability evidence, so this sweep
-**anonymises, never deletes**. Two windows apply, both owner-ratified and both
-hardcoded (``_FINGERPRINT_RETENTION_DAYS`` / ``_DECISION_RETENTION_DAYS``):
+**anonymises, never deletes**. Three windows apply, all owner-ratified and all
+hardcoded (``_FINGERPRINT_RETENTION_DAYS`` / ``_ACTOR_RETENTION_DAYS`` /
+``_DECISION_RETENTION_DAYS``):
 
 * At the **fingerprint** window the HTTP-layer identity is removed: ``user`` and
   ``session_key`` are cleared in the **same** ``UPDATE`` (an anonymous record is
@@ -11,16 +12,23 @@ hardcoded (``_FINGERPRINT_RETENTION_DAYS`` / ``_DECISION_RETENTION_DAYS``):
   live re-identification path through ``django_session``), ``ip_address`` is set
   ``NULL`` and ``user_agent`` is cleared to ``""`` (the column is ``blank=True``
   and **not** nullable, so the action is ``CLEAR``, not ``NULL``).
+* At the **actor** window the acting account (``initiated_by``) is irreversibly
+  anonymised 12 months after the action, unless the row is under a documented
+  ``legal_hold``. This is the only second mutation stage: the fingerprint and
+  decision windows are not symmetric — the decision window is count-only.
 * The **decision** fields (``choice``, ``categories``, ``consent_version``,
   ``consent_given_at``) are retained at every age; the row itself is never
   deleted, which is what lets the controller demonstrate that consent was given
   and survives the re-prompt boundary.
 
-The command asserts ``0 < _FINGERPRINT_RETENTION_DAYS <= _DECISION_RETENTION_DAYS``
-itself so a mis-ordering fails loudly instead of making the fingerprint stage a
-silent no-op; the fingerprint window is additionally floored at the declared
-Django session lifetime (``SESSION_COOKIE_AGE``) so a still-live session's
-support evidence is not destroyed.
+The command asserts
+``0 < _FINGERPRINT_RETENTION_DAYS <= _ACTOR_RETENTION_DAYS <= _DECISION_RETENTION_DAYS``
+itself so a mis-ordering fails loudly, **before** ``transaction.atomic()`` is
+entered, instead of making a stage a silent no-op; the fingerprint window is
+additionally floored at the declared Django session lifetime
+(``SESSION_COOKIE_AGE``) so a still-live session's support evidence is not
+destroyed. That floor applies to the fingerprint bound only: the actor is an
+account FK, not live-session evidence.
 
 Uses advisory lock 14 for idempotent, safe concurrent execution. Batching is
 deliberately off: ``ConsentRecord`` grows by consent *actions*, not by requests,
@@ -53,6 +61,14 @@ logger = logging.getLogger(__name__)
 #: ip_address, plus the user link) are retained after the consent action.
 _FINGERPRINT_RETENTION_DAYS = 90
 
+#: Ratified R1 (BLOCK 19, 06-NEW-02): how long the acting account
+#: (``initiated_by``) is retained before it is irreversibly anonymised. Twelve
+#: months is a **chosen minimisation period justified by purpose — one full
+#: operational/audit cycle — and explicitly NOT a statutory term**. It is
+#: deliberately shorter than the decision bound below, which governs the decision
+#: fields only. A documented ``legal_hold`` exempts a row from this stage alone.
+_ACTOR_RETENTION_DAYS = 365
+
 #: Ratified R1: how long the decision fields are retained. The rows themselves
 #: are anonymised, never deleted, so this is not a deletion boundary.
 _DECISION_RETENTION_DAYS = 365 * 5
@@ -62,8 +78,9 @@ class Command(BaseCommand):
     """Anonymise aged ConsentRecord rows without ever deleting them."""
 
     help = (
-        "Anonymise ConsentRecord fingerprint fields older than 90 days and "
-        "retain the decision fields for 5 years (never deletes rows)"
+        "Anonymise ConsentRecord fingerprint fields older than 90 days, the "
+        "acting account older than 12 months (unless held), and retain the "
+        "decision fields for 5 years (never deletes rows)"
     )
 
     def add_arguments(self, parser) -> None:
@@ -88,6 +105,7 @@ class Command(BaseCommand):
                 fingerprint_cutoff = now - timedelta(
                     days=_FINGERPRINT_RETENTION_DAYS
                 )
+                actor_cutoff = now - timedelta(days=_ACTOR_RETENTION_DAYS)
                 decision_cutoff = now - timedelta(days=_DECISION_RETENTION_DAYS)
 
                 # A row is fingerprint-eligible when it is older than the
@@ -111,13 +129,30 @@ class Command(BaseCommand):
                     consent_given_at__lt=decision_cutoff,
                 ).count()
 
+                # A row is actor-eligible when it is older than the actor window,
+                # still names an acting account, and is not under a documented
+                # legal hold. The hold is an exemption from ACTOR erasure only —
+                # never from the 90-day fingerprint window, never from the
+                # decision fields. Excluding a null actor keeps the stage
+                # idempotent: an already-anonymised row is not re-counted.
+                actor_qs = (
+                    ConsentRecord.objects.filter(
+                        consent_given_at__lt=actor_cutoff,
+                        legal_hold=False,
+                    )
+                    .exclude(initiated_by__isnull=True)
+                )
+
                 if dry_run:
                     logger.info(
                         "DRY RUN: Would anonymise %d consent records older than "
-                        "%d days (%d rows past the %d-day decision window are "
-                        "retained, never deleted)",
+                        "%d days and %d acting accounts older than %d days "
+                        "(%d rows past the %d-day decision window are retained, "
+                        "never deleted)",
                         fingerprint_qs.count(),
                         _FINGERPRINT_RETENTION_DAYS,
+                        actor_qs.count(),
+                        _ACTOR_RETENTION_DAYS,
                         decision_eligible,
                         _DECISION_RETENTION_DAYS,
                     )
@@ -133,30 +168,48 @@ class Command(BaseCommand):
                     user_agent="",
                 )
 
+                # Second, independent mutation stage. Not folded into the
+                # fingerprint UPDATE: that queryset excludes already-cleared
+                # rows and the actor rule is independent of it. A failure here
+                # rolls the fingerprint clear back with it (same atomic block).
+                actor_anonymised_count = actor_qs.update(initiated_by=None)
+
         logger.info(
-            "Anonymised %d consent records older than %d days; %d records past "
-            "the %d-day decision window retained (never deleted).",
+            "Anonymised %d consent records older than %d days and %d acting "
+            "accounts older than %d days; %d records past the %d-day decision "
+            "window retained (never deleted).",
             anonymised_count,
             _FINGERPRINT_RETENTION_DAYS,
+            actor_anonymised_count,
+            _ACTOR_RETENTION_DAYS,
             decision_eligible,
             _DECISION_RETENTION_DAYS,
         )
 
     @staticmethod
     def _assert_retention_ordering() -> None:
-        """Fail loudly if the two windows are mis-ordered.
+        """Fail loudly if the three windows are mis-ordered.
 
-        ``0 < fingerprint TTL <= decision TTL`` makes the fingerprint stage a
+        ``0 < fingerprint TTL <= actor TTL <= decision TTL`` makes a stage a
         silent no-op otherwise. The fingerprint TTL is additionally floored at
         the declared Django session lifetime so a still-live session's evidence
-        is not destroyed on a run that lands between the two.
+        is not destroyed on a run that lands between the two; the actor bound is
+        an account FK, not live-session evidence, so this floor does not apply to
+        it.
         """
         session_cookie_age_days = settings.SESSION_COOKIE_AGE / 86400
-        if not 0 < _FINGERPRINT_RETENTION_DAYS <= _DECISION_RETENTION_DAYS:
+        if not (
+            0
+            < _FINGERPRINT_RETENTION_DAYS
+            <= _ACTOR_RETENTION_DAYS
+            <= _DECISION_RETENTION_DAYS
+        ):
             raise ValueError(
                 "Retention mis-ordering: expected "
-                "0 < _FINGERPRINT_RETENTION_DAYS <= _DECISION_RETENTION_DAYS, "
+                "0 < _FINGERPRINT_RETENTION_DAYS <= _ACTOR_RETENTION_DAYS "
+                "<= _DECISION_RETENTION_DAYS, "
                 f"got {_FINGERPRINT_RETENTION_DAYS} / "
+                f"{_ACTOR_RETENTION_DAYS} / "
                 f"{_DECISION_RETENTION_DAYS}"
             )
         if _FINGERPRINT_RETENTION_DAYS < session_cookie_age_days:

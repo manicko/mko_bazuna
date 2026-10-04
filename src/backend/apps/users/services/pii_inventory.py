@@ -31,6 +31,9 @@ they are *not* identity material on this product:
   (``self_service`` / ``anonymous_web`` / ``admin_staff`` / ``system`` /
   ``unknown``) carrying no personal data; it is the discriminator that makes the
   audit ledger's meaning complete (06-NEW-02).
+- ``ConsentRecord.legal_hold`` — a boolean hold flag carrying no subject data;
+  it is an exemption from the actor-erasure stage, not an erasure action, so it
+  has no entry in the erasure contract (BLOCK 19, 06-NEW-02).
 
 Promotion path to a real registry: the consuming block (BLOCK 9 first) may
 write a single accessor function over the *same* tuples — resolving each
@@ -173,18 +176,19 @@ PII_ERASURE_ENTRIES: tuple[tuple[str, str, ErasureAction, str], ...] = (
     (
         "users.ConsentRecord",
         "initiated_by",
-        ErasureAction.RETAIN,
-        "NOT implemented as an erasure (retention) — BLOCK 18 (06-NEW-02). The "
-        "acting-account FK never holds the subject: the recording service "
-        "records an actor only when it is a different row from user, so a "
-        "self-service action leaves it NULL. It is retained to the DECISION "
-        "bound (5 years), not the 90-day fingerprint bound, because clearing the "
-        "staff actor at 90 days would destroy the accountability the owner "
-        "asked for. It is emptied only by SET_NULL when the ACTING ACCOUNT's own "
-        "row is hard-deleted (consent_hard_delete / seed_service); no erasure "
-        "path nulls it. RETAIN, not NULL — declaring NULL would describe a scrub "
-        "that does not happen. The 5-year retention of a superuser identifier on "
-        "an anonymous-subject row is an open owner/DPO proportionality question.",
+        ErasureAction.NULL,
+        "Implemented by BLOCK 19's purge_consent_records at the 12-month actor "
+        "window (lock 14, 06-NEW-02). The sweep irreversibly anonymises the "
+        "acting account 12 months after the action; NULL replaces BLOCK 18's "
+        "RETAIN, which claimed the column survived to the 5-year decision bound. "
+        "The write-time invariant is unchanged: the acting-account FK never holds "
+        "the subject (the recording service records an actor only when it is a "
+        "different row from user). A legal_hold row is exempt from this stage "
+        "ONLY — a hold never restores the 90-day fingerprint fields and never "
+        "extends the decision fields. SET_NULL on the acting account's own hard "
+        "delete (consent_hard_delete / seed_service) still empties the pointer "
+        "while the row survives; no other path nulls it. The subject link user "
+        "runs on its own 90-day fingerprint bound.",
     ),
     (
         "users.LoginToken",
@@ -347,6 +351,12 @@ REVIEWED_NON_IDENTITY_COLUMNS: dict[str, frozenset[str]] = {
             "choice",
             "categories",
             "action_source",
+            # BLOCK 19 (06-NEW-02): a hold carries no subject data and no erasure
+            # path nulls or clears it — it is an exemption from actor erasure, not
+            # an erasure action — so it belongs in the REVIEWED set, not in
+            # PII_ERASURE_ENTRIES. Reviewed here so the concrete BooleanField
+            # cannot silently drop out of the review surface.
+            "legal_hold",
         }
     ),
     "users.LoginToken": frozenset(

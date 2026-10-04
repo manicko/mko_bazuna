@@ -1,7 +1,8 @@
-"""Tests for the ``purge_consent_records`` retention sweep (06-PII-116).
+"""Tests for the ``purge_consent_records`` retention sweep (06-PII-116, BLOCK 19).
 
 The sweep **anonymises, never deletes** ConsentRecord rows: at the ratified R2
-fingerprint window (90 days) the identity fields are cleared, and the decision
+fingerprint window (90 days) the identity fields are cleared, at the R1 actor
+window (12 months) the acting account is cleared unless held, and the decision
 fields (``choice``, ``categories``, ``consent_version``, ``consent_given_at``)
 are retained at every age because the row is the Art. 7(1) evidence.
 
@@ -30,6 +31,7 @@ from conftest import make_user
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 _FINGERPRINT_DAYS = 90
+_ACTOR_DAYS = 365
 _DECISION_DAYS = 365 * 5
 
 
@@ -42,6 +44,8 @@ def _aged_record(
     ip_address: str = "192.168.1.0",
     user_agent: str = "Mozilla/5.0 test",
     categories: dict | None = None,
+    initiated_by=None,
+    legal_hold: bool = False,
 ) -> ConsentRecord:
     """Create a ConsentRecord and age it past ``auto_now_add``."""
     record = ConsentRecord.objects.create(
@@ -52,6 +56,8 @@ def _aged_record(
         categories=categories if categories is not None else {"analytics": True},
         ip_address=ip_address,
         user_agent=user_agent,
+        initiated_by=initiated_by,
+        legal_hold=legal_hold,
     )
     ConsentRecord.objects.filter(pk=record.pk).update(
         consent_given_at=timezone.now() - timedelta(days=age_days)
@@ -251,6 +257,7 @@ class TestIdempotence:
             record.session_key,
             record.ip_address,
             record.user_agent,
+            record.initiated_by_id,
         )
 
         call_command("purge_consent_records")
@@ -260,24 +267,20 @@ class TestIdempotence:
             record.session_key,
             record.ip_address,
             record.user_agent,
+            record.initiated_by_id,
         )
 
-        assert after_first == after_second == (None, None, None, "")
+        assert after_first == after_second == (None, None, None, "", None)
 
 
-class TestStaffActorRetention:
-    """The sweep retains the acting staff account to the decision bound (06-NEW-02)."""
+class TestActorWindow:
+    """The 12-month actor stage is separate from the 90-day fingerprint stage."""
 
-    def test_sweep_clears_fingerprint_but_keeps_the_staff_actor(self, user) -> None:
-        """An aged staff-revocation row keeps its actor, which the sweep never names.
-
-        The sweep's one-statement ``.update(...)`` names ``user``,
-        ``session_key``, ``ip_address`` and ``user_agent`` only — never
-        ``initiated_by`` — so the accountability the owner asked for survives the
-        90-day fingerprint window. This is the behavioural pin for that decision;
-        the production command is unchanged.
-        """
-        staff = make_user(900000098, is_staff=True)
+    def test_expired_staff_actor_cleared_but_row_and_decisions_kept(
+        self, user
+    ) -> None:
+        """An admin_staff row past the actor bound loses only its acting account."""
+        staff = make_user(900000097, is_staff=True)
         withdraw_consent(
             user,
             action_source=ConsentActionSource.ADMIN_STAFF,
@@ -285,6 +288,37 @@ class TestStaffActorRetention:
         )
         row = ConsentRecord.objects.get(user=user)
         assert row.initiated_by_id == staff.pk
+        ConsentRecord.objects.filter(pk=row.pk).update(
+            consent_given_at=timezone.now() - timedelta(days=_ACTOR_DAYS + 1)
+        )
+
+        call_command("purge_consent_records")
+
+        row.refresh_from_db()
+        # The row, the mechanism and every decision field survive.
+        assert ConsentRecord.objects.filter(pk=row.pk).exists()
+        assert row.action_source == ConsentActionSource.ADMIN_STAFF.value
+        assert row.choice == ConsentChoice.WITHDRAWN.value
+        assert row.categories == {"analytics": False, "preferences": False}
+        assert row.consent_version == ConsentVersion.V1_0.value
+        assert row.consent_given_at is not None
+        # The acting account expired; the fingerprint fields are also cleared.
+        assert row.initiated_by_id is None
+        assert row.user_id is None
+        assert row.session_key is None
+        assert row.ip_address is None
+        assert row.user_agent == ""
+        assert User.objects.filter(pk=staff.pk).exists()
+
+    def test_staff_actor_inside_actor_window_stays_readable(self, user) -> None:
+        """A staff row past the fingerprint bound but inside the actor bound keeps it."""
+        staff = make_user(900000096, is_staff=True)
+        withdraw_consent(
+            user,
+            action_source=ConsentActionSource.ADMIN_STAFF,
+            initiated_by=staff,
+        )
+        row = ConsentRecord.objects.get(user=user)
         ConsentRecord.objects.filter(pk=row.pk).update(
             consent_given_at=timezone.now() - timedelta(days=_FINGERPRINT_DAYS + 1)
         )
@@ -296,9 +330,189 @@ class TestStaffActorRetention:
         assert row.session_key is None
         assert row.ip_address is None
         assert row.user_agent == ""
-        # The staff actor survives; the acting account is still readable.
+        # Inside the actor window: the acting account is still readable.
         assert row.initiated_by_id == staff.pk
+        assert row.action_source == ConsentActionSource.ADMIN_STAFF.value
         assert User.objects.filter(pk=staff.pk).exists()
+
+    def test_expired_actor_is_distinguishable_from_self_service_on_the_pair(
+        self, user
+    ) -> None:
+        """An expired admin_staff row and an aged self_service row share a null
+        actor, but the ``(action_source, initiated_by_id)`` PAIR separates them.
+
+        Asserting either column alone would be wrong: ``initiated_by`` is null in
+        both cases. ``action_source = admin_staff`` says a staff account acted and
+        the attribution has expired; ``action_source = self_service`` says the
+        subject acted, so there was never a distinct actor to record.
+        """
+        staff = make_user(900000095, is_staff=True)
+        withdraw_consent(
+            user,
+            action_source=ConsentActionSource.ADMIN_STAFF,
+            initiated_by=staff,
+        )
+        staff_row = ConsentRecord.objects.get(user=user)
+        ConsentRecord.objects.filter(pk=staff_row.pk).update(
+            consent_given_at=timezone.now() - timedelta(days=_ACTOR_DAYS + 1)
+        )
+
+        self_user = make_user(900000094)
+        withdraw_consent(self_user)
+        self_row = ConsentRecord.objects.get(user=self_user)
+        ConsentRecord.objects.filter(pk=self_row.pk).update(
+            consent_given_at=timezone.now() - timedelta(days=_ACTOR_DAYS + 1)
+        )
+
+        call_command("purge_consent_records")
+
+        staff_row.refresh_from_db()
+        self_row.refresh_from_db()
+        assert staff_row.initiated_by_id is None
+        assert self_row.initiated_by_id is None
+        staff_pair = (staff_row.action_source, staff_row.initiated_by_id)
+        self_pair = (self_row.action_source, self_row.initiated_by_id)
+        assert staff_pair == (ConsentActionSource.ADMIN_STAFF.value, None)
+        assert self_pair == (ConsentActionSource.SELF_SERVICE.value, None)
+        assert staff_pair != self_pair
+
+
+class TestLegalHold:
+    """A hold exempts a row from the actor stage only — never from the others."""
+
+    def test_held_row_past_actor_bound_is_not_anonymised_and_clear_releases(
+        self, user
+    ) -> None:
+        """A held actor survives; clearing the hold lets the next run do it."""
+        staff = make_user(900000093, is_staff=True)
+        withdraw_consent(
+            user,
+            action_source=ConsentActionSource.ADMIN_STAFF,
+            initiated_by=staff,
+        )
+        row = ConsentRecord.objects.get(user=user)
+        ConsentRecord.objects.filter(pk=row.pk).update(
+            consent_given_at=timezone.now() - timedelta(days=_ACTOR_DAYS + 1),
+            legal_hold=True,
+        )
+
+        call_command("purge_consent_records")
+
+        row.refresh_from_db()
+        assert row.initiated_by_id == staff.pk
+
+        ConsentRecord.objects.filter(pk=row.pk).update(legal_hold=False)
+        call_command("purge_consent_records")
+
+        row.refresh_from_db()
+        assert row.initiated_by_id is None
+
+    def test_hold_does_not_extend_decision_fields(self, user) -> None:
+        """A held row past the DECISION bound still retains the decision fields."""
+        staff = make_user(900000092, is_staff=True)
+        withdraw_consent(
+            user,
+            action_source=ConsentActionSource.ADMIN_STAFF,
+            initiated_by=staff,
+        )
+        row = ConsentRecord.objects.get(user=user)
+        ConsentRecord.objects.filter(pk=row.pk).update(
+            consent_given_at=timezone.now() - timedelta(days=_DECISION_DAYS + 1),
+            legal_hold=True,
+        )
+
+        call_command("purge_consent_records")
+
+        row.refresh_from_db()
+        # The hold spares the actor; the decision fields are retained regardless.
+        assert row.initiated_by_id == staff.pk
+        assert row.choice == ConsentChoice.WITHDRAWN.value
+        assert row.categories == {"analytics": False, "preferences": False}
+        assert row.consent_version == ConsentVersion.V1_0.value
+        assert row.consent_given_at is not None
+
+    def test_non_held_row_past_decision_bound_retains_decision_fields(self, user) -> None:
+        """Without a hold, a row past the decision bound keeps its decision fields."""
+        row = _aged_record(
+            user=user,
+            age_days=_DECISION_DAYS + 1,
+            choice=ConsentChoice.DECLINED.value,
+            categories={"analytics": False},
+        )
+
+        call_command("purge_consent_records")
+
+        row.refresh_from_db()
+        assert row.choice == ConsentChoice.DECLINED.value
+        assert row.categories == {"analytics": False}
+        assert row.consent_version == ConsentVersion.V1_0.value
+        assert row.consent_given_at is not None
+
+
+class TestRetentionOrderingGuard:
+    """The three-bound ordering guard fails loudly and mutates nothing."""
+
+    def test_misordered_actor_below_fingerprint_raises(self, monkeypatch, user) -> None:
+        from apps.core.management.commands import purge_consent_records as module
+
+        monkeypatch.setattr(module, "_ACTOR_RETENTION_DAYS", 1)
+        with pytest.raises(ValueError, match="mis-ordering"):
+            call_command("purge_consent_records")
+
+    def test_misordered_actor_above_decision_raises(self, monkeypatch, user) -> None:
+        from apps.core.management.commands import purge_consent_records as module
+
+        monkeypatch.setattr(module, "_ACTOR_RETENTION_DAYS", _DECISION_DAYS + 1)
+        with pytest.raises(ValueError, match="mis-ordering"):
+            call_command("purge_consent_records")
+
+    def test_misordering_leaves_an_eligible_row_untouched(
+        self, monkeypatch, user
+    ) -> None:
+        """The guard raises before ``transaction.atomic()`` — nothing mutates."""
+        staff = make_user(900000091, is_staff=True)
+        withdraw_consent(
+            user,
+            action_source=ConsentActionSource.ADMIN_STAFF,
+            initiated_by=staff,
+        )
+        row = ConsentRecord.objects.get(user=user)
+        ConsentRecord.objects.filter(pk=row.pk).update(
+            consent_given_at=timezone.now() - timedelta(days=_FINGERPRINT_DAYS + 1)
+        )
+
+        from apps.core.management.commands import purge_consent_records as module
+
+        monkeypatch.setattr(module, "_ACTOR_RETENTION_DAYS", 1)
+        with pytest.raises(ValueError):
+            call_command("purge_consent_records")
+
+        row.refresh_from_db()
+        assert row.user_id is not None
+        assert row.initiated_by_id == staff.pk
+
+    def test_dry_run_past_actor_bound_mutates_nothing(self, user, caplog) -> None:
+        """--dry-run reports the actor-eligible count and changes no row."""
+        staff = make_user(900000090, is_staff=True)
+        withdraw_consent(
+            user,
+            action_source=ConsentActionSource.ADMIN_STAFF,
+            initiated_by=staff,
+        )
+        row = ConsentRecord.objects.get(user=user)
+        ConsentRecord.objects.filter(pk=row.pk).update(
+            consent_given_at=timezone.now() - timedelta(days=_ACTOR_DAYS + 1)
+        )
+
+        with caplog.at_level("INFO"):
+            call_command("purge_consent_records", "--dry-run")
+
+        row.refresh_from_db()
+        assert row.initiated_by_id == staff.pk
+        assert row.user_id is not None
+        assert "DRY RUN" in caplog.text
+        # The actor-eligible count is reported.
+        assert "1 acting accounts older than 365 days" in caplog.text
 
 
 class TestNoInteractionWithTeardown:

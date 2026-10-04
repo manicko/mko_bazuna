@@ -184,6 +184,14 @@ def record_consent_action_with_context(
     only when it is a different row from ``user``. ``action_source`` is required
     keyword-only (no default) so a new caller cannot forget to classify itself.
 
+    The written value is **not permanent**. The ledger keeps the *fact* of a
+    staff-initiated action (``action_source = admin_staff``) indefinitely, but it
+    keeps *which acting account* for one audit cycle only: ``purge_consent_records``
+    irreversibly anonymises ``initiated_by`` 12 months after the action, unless the
+    row is under a documented ``legal_hold``. A caller that needs durable
+    attribution beyond that window must keep its own record; this column is not
+    it. The write-time invariant above is unchanged by that sweep.
+
     Args:
         user: The subject of the action, or ``None`` for anonymous visitors.
         choice: The ``ConsentChoice`` made (ACCEPTED / DECLINED / WITHDRAWN).

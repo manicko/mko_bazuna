@@ -453,31 +453,39 @@ def test_ad_text_entries_are_delete_row() -> None:
         )
 
 
-def test_consent_record_actor_is_declared_retain_citing_06_new_02() -> None:
-    """``ConsentRecord.initiated_by`` is a declared RETAIN naming BLOCK 18.
+def test_consent_record_actor_is_declared_null_citing_06_new_02() -> None:
+    """``ConsentRecord.initiated_by`` is a declared NULL naming BLOCK 19.
 
     The positive pin matters: ``test_listed_models_have_no_unreviewed_column``
     fails if the reviewed decision is *missing*, but nothing stops a later hand
-    from deleting the entry. This asserts the retention decision (and that
-    ``action_source`` is in the reviewed set) survives.
+    from deleting the entry. This asserts the erasure decision (and that
+    ``action_source`` and ``legal_hold`` are in the reviewed set) survives.
 
     ``initiated_by`` is relational, so the guard's field filter skips it — it is
-    declared here precisely to record a staff-identifier retention decision that
-    would otherwise be an invisible omission.
+    declared here precisely to record the 12-month actor-erasure decision that
+    would otherwise be an invisible omission. BLOCK 19's ``purge_consent_records``
+    empties the column at that window, so ``NULL`` (not BLOCK 18's ``RETAIN``)
+    describes what actually happens.
     """
     lookup = _entry_lookup()
 
     entry = lookup.get(("users.ConsentRecord", "initiated_by"))
     assert entry is not None, "ConsentRecord.initiated_by must be a declared entry"
     _label, _column, action, reason = entry
-    assert action == ErasureAction.RETAIN, (
-        "ConsentRecord.initiated_by must be RETAIN — no erasure path nulls it"
+    assert action == ErasureAction.NULL, (
+        "ConsentRecord.initiated_by must be NULL — the 12-month actor stage "
+        "empties it, so a RETAIN pin would be false"
     )
-    assert "BLOCK 18" in reason, "the reason must name its owning block"
+    assert "BLOCK 19" in reason, "the reason must name its owning block"
     assert "06-NEW-02" in reason, "the reason must cite 06-NEW-02"
 
     assert "action_source" in REVIEWED_NON_IDENTITY_COLUMNS["users.ConsentRecord"], (
         "ConsentRecord.action_source must be a reviewed non-identity decision"
+    )
+    # Positive pin: without it a later hand could delete the reviewed legal_hold
+    # decision silently, and the guard's review surface would be incomplete.
+    assert "legal_hold" in REVIEWED_NON_IDENTITY_COLUMNS["users.ConsentRecord"], (
+        "ConsentRecord.legal_hold must be a reviewed non-identity decision"
     )
 
 

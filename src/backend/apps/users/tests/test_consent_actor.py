@@ -6,11 +6,14 @@ ledger is incomplete. These tests therefore assert on values **re-read from the
 database**, never on a settings or source check and never on a symbol's presence.
 
 The actor definition under test: the actor is the account that performed the
-action, recorded only when it is **not the subject**. Invariant: ``initiated_by
-IS NOT NULL`` only when it is a different row from ``user``. ``action_source`` is
-authoritative for which case a row is; a null ``initiated_by`` covers a
-self-service action, an anonymous visitor and a system action, which
-``action_source`` tells apart.
+action, recorded only when it is **not the subject**. Write-time invariant:
+``initiated_by IS NOT NULL`` at insert only when it is a different row from
+``user``. ``action_source`` is authoritative for which case a row is; a null
+``initiated_by`` covers a self-service action, an anonymous visitor and a system
+action — or an ``admin_staff`` attribution cleared after 12 months — which
+``action_source`` tells apart. The actor column is time-limited: the sweep
+anonymises it 12 months after the action unless the row is under a
+``legal_hold``.
 
 Eight behaviours, one per acceptance criterion. ``conftest.py`` is contended, so
 module-local fixtures use ``get_or_create`` (the ``--reuse-db`` pattern).
@@ -137,6 +140,7 @@ class TestSubjectVsStaffDistinguishable:
 
         row = ConsentRecord.objects.get(user=subject)
         assert row.initiated_by_id is None
+        assert row.action_source == ConsentActionSource.SELF_SERVICE.value
 
 
 # ---------------------------------------------------------------------------
@@ -258,6 +262,9 @@ class TestLedgerSurvivesActorDeletion:
         assert after.user_id == target.pk
         assert after.choice == ConsentChoice.WITHDRAWN.value
         assert after.categories == {"analytics": False, "preferences": False}
+        # The null is provably SET_NULL, not expiry: the mechanism still names a
+        # staff action, and the row is far inside the 12-month actor window.
+        assert after.action_source == ConsentActionSource.ADMIN_STAFF.value
         assert after.initiated_by_id is None  # SET_NULL: pointer emptied, row kept
 
     def test_subject_hard_delete_leaves_its_own_rows(self) -> None:
@@ -271,19 +278,26 @@ class TestLedgerSurvivesActorDeletion:
         row = ConsentRecord.objects.get(pk=pk)
         assert row.user_id is None
         assert row.initiated_by_id is None
+        assert row.action_source == ConsentActionSource.SELF_SERVICE.value
         assert row.choice == ConsentChoice.WITHDRAWN.value
 
 
 # ---------------------------------------------------------------------------
-# 5. The sweep clears fingerprint fields but leaves the staff actor readable.
+# 5. The sweep clears fingerprint fields but leaves the staff actor readable
+#    inside the actor window (12 months).
 # ---------------------------------------------------------------------------
 
 
-class TestSweepRetainsStaffActor:
+class TestSweepRetainsStaffActorInsideTheActorWindow:
     def test_sweep_clears_fingerprint_but_keeps_staff_actor(
         self, superuser: User
     ) -> None:
-        """An aged staff-revocation row keeps its actor after the 90-day sweep."""
+        """An aged staff-revocation row keeps its actor inside the 12-month window.
+
+        The row is aged past the 90-day fingerprint window but well inside the
+        12-month actor window, so the sweep clears the fingerprint fields and the
+        acting account stays readable.
+        """
         target = _user(930000450)
         client = Client()
         client.force_login(superuser)
@@ -310,13 +324,16 @@ class TestSweepRetainsStaffActor:
         assert User.objects.filter(pk=superuser.pk).exists()
 
     def test_aged_self_service_row_has_no_actor_to_preserve(self) -> None:
-        """An aged self-service row has no acting account, and still the row stays."""
+        """An aged self-service row has no acting account, and still the row stays.
+
+        The row is aged past the actor window too, proving the new stage leaves an
+        already-null actor untouched (and the row itself in place).
+        """
         subject = _user(930000451)
         withdraw_consent(subject)
         row = ConsentRecord.objects.get(user=subject)
         ConsentRecord.objects.filter(pk=row.pk).update(
-            consent_given_at=timezone.now()
-            - timedelta(days=_FINGERPRINT_DAYS + 1)
+            consent_given_at=timezone.now() - timedelta(days=365 + 1)
         )
 
         call_command("purge_consent_records")
@@ -386,6 +403,38 @@ class TestAdminCannotForge:
         assert "action_source" in body
         result_ids = [obj.pk for obj in response.context["cl"].result_list]
         assert result_ids == [ConsentRecord.objects.get(user=subject).pk]
+
+
+class TestAdminCanSetLegalHold:
+    def test_superuser_can_set_legal_hold_through_the_change_form(
+        self, superuser: User
+    ) -> None:
+        """A hold IS settable via the real admin change form by a superuser.
+
+        A hold is an exemption from actor erasure, not evidence, so unlike the
+        two actor columns it is deliberately editable. ``has_change_permission``
+        gates the whole change form on ``is_superuser``, so no extra check is
+        required.
+        """
+        subject = _user(930000463)
+        row = record_consent_action_with_context(
+            subject,
+            ConsentChoice.WITHDRAWN,
+            {CookieCategory.ANALYTICS: False, CookieCategory.PREFERENCES: False},
+            action_source=ConsentActionSource.ADMIN_STAFF,
+        )
+        assert row.legal_hold is False
+
+        client = Client()
+        client.force_login(superuser)
+        response = client.post(
+            reverse("admin:users_consentrecord_change", args=[row.pk]),
+            data={"legal_hold": "on", "_save": "Save"},
+        )
+        assert response.status_code == 302
+
+        row.refresh_from_db()
+        assert row.legal_hold is True
 
 
 # ---------------------------------------------------------------------------
