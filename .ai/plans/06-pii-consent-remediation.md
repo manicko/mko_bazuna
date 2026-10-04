@@ -183,7 +183,7 @@ and their consequences. Silence is not an acceptable outcome for any of them.
 | **Q-D1** | **Is DECLINE reversible?** Option (a) drop `is_declined` from `can_login`, keep it in `can_publish_ad` and the bot publish gate; option (b) intentionally one-way, with corrected `privacy.html` §7 and a warning before live listings disappear | **BLOCK 1** | **Owner (product)**, published by Planner; Researcher supplies the consequences; Auditor verifies the code/spec correspondence | **GATED — the first scheduled decision in this plan.** Phase 04's BLOCK 6 is hard-gated on it |
 | **Q-D2** | **`06-PII-101`: what replaces the ticket's identity as a support lookup key, and which storage shape?** Nullable columns + sentinel backfill vs. a `0` sentinel vs. deleting the row | **BLOCK 13** | **Owner (product)** — this is a product decision, not an engineering one; Planner publishes the options | **GATED** |
 | **Q-D3** | **`06-PII-109`: scrub the ad text, or correct the spec's "anonymized" wording?** | **BLOCK 11** | Owner (product) for the scope question; Researcher for the placeholder shape | **GATED** |
-| **Q-D4** | **`06-PII-116`: the `ConsentRecord` TTL number, and the sweep's lock** — reuse an existing id with a written rationale, or allocate a new one (now `14`+) | **BLOCK 15** | TTL: **business/legal**. Lock: Planner + **coordinator** (three-file one-commit change) | **GATED** |
+| **Q-D4** | **`06-PII-116`: the `ConsentRecord` TTL number, and the sweep's lock** — reuse an existing id with a written rationale, or allocate a new one (now `14`+) | **BLOCK 15** (fingerprint + decision windows) · **BLOCK 19** (`06-NEW-02`, the actor window) | TTL: **owner/product, on purpose-based grounds — NOT legal**. Lock: Planner + **coordinator** (three-file one-commit change) | **RESOLVED, then RE-GROUNDED 2026-10-04 — read §*Retention framing correction (owner ruling 2026-10-04)* before treating any number here as settled.** Lock `14` was ratified 2026-10-03. The TTLs are **owner-ratified project decisions**, not legal requirements. **R1 is RE-GROUNDED 2026-10-04 and its limitation-period justification is WITHDRAWN**; **R3 is unchanged and still out of scope**, and BLOCK 19 adds a third window |
 | **Q-D5** | **`06-PII-108`: redact `query_normalized`, or store a keyed digest?** The anonymous **session** store (`_record_session_history`) has the same raw/redacted split and needs the same treatment | **BLOCK 14** | Researcher + Planner | **RESOLVED 2026-10-01 — redact-for-the-key, all three stores.** `search_query_key()` = redact-**then**-lower. See §0.6 |
 | **Q-D6** | **`VAL-003`: who owns the queryset-level account-state predicate, and what is its exact shape?** Phase 15 owns the framework; phase 06 owns the semantics. A **default-manager filter is forbidden** | **BLOCK 6** | Researcher + Planner, **confirmed with the coordinator** so phase 15 does not fork it | **RESOLVED 2026-10-02 (Researcher) — Option B: one module-level `account_state_q(prefix: str = "") -> Q` in `apps/users/services/account_state.py`, five conjuncts, consumed from a `User` qs (`prefix=""`) and from `SavedSearch`/`Ad` via the owner (`prefix="user__"`). No manager, no `get_queryset()` override, no `models.py` edit. Default-manager filter prohibition restated with its fail-open mechanism. Import-cycle verified absent by static closure + a live injected-edge probe; the latent `apps/search/services/__init__.py` back-edge is frozen + test-pinned. **Still the coordinator's to ratify**; BLOCK 6 does not start until it is. See BLOCK 6 |
 | **Q-D7** | **`06-PII-107`: wire or remove `UserAdmin.withdraw_consent_action`**, and what is the shape of the consent context object | **BLOCK 10** | Planner (wire-or-remove) + Researcher (context shape) | **RESOLVED 2026-10-01 — WIRE**, `permissions=["delete"]`, per-user `atomic()`, explicit kwargs (no context object). The phase-04 dependency is **discharged**. See §0.6 |
@@ -493,17 +493,123 @@ Implementor was told not to make.
 
 ---
 
+## Retention framing correction (owner ruling 2026-10-04)
+
+**This section governs every retention statement in this plan.** Where an earlier subsection, a
+risk row or an execution block states a retention period, this section is the authority.
+
+### What is withdrawn
+
+This phase recommended a retention period for the consent ledger and anchored it to a **statutory
+limitation period**. **That inference is withdrawn.** A limitation period governs the window in which
+a *claim* may be brought; it says nothing about how long a controller must keep a record, and stating
+it as the reason for a retention period was the error being undone. Every location that carried that
+anchor has been corrected. **No document in this project now asserts a statutory, regulatory,
+guideline or limitation-period anchor for any retention window.**
+
+Specifically withdrawn: the "longest plausible limitation period for a consumer claim" basis for the
+event-field window; the BiH general-limitation-period figure and its statute citation; the
+FBiH-versus-RS entity split and its stated confidence rating; the claim-window comparison in the
+fingerprint window's basis; and, in BLOCK 18, the reasoning that the actor field must be retained to
+the event bound. **No substitute statute and no substitute number was written in their place.**
+
+### The rule as ruled — retention is **per field**
+
+| Field | Rule | Standing |
+|---|---|---|
+| `user` (the subject) | the general record retention — the existing **90-day fingerprint bound** | project decision, **unchanged** |
+| `choice`, `categories`, `consent_version`, `consent_given_at` (the consent/revocation event and its timestamp) | the **event retention period** — **policy-based and justified by purpose** | project decision, **re-grounded 2026-10-04** |
+| `initiated_by` (the actor) | **12 months from the action, then irreversibly anonymised**, subject to a documented legal hold | project decision, **new — BLOCK 19, `06-NEW-02`** |
+
+The governing statement, in the form that replaces the figure:
+
+> `ConsentRecord` retention is **policy-based and must be justified by purpose; no general
+> five-year retention requirement for this record is imposed by law.** In need-based form:
+> **retain while there is a necessity to prove consent/withdrawal and the lawfulness of the
+> corresponding processing; after a justified period expires, delete or anonymise.**
+
+The implemented event window is still the value the command carries
+(`_DECISION_RETENTION_DAYS`). It is now a **project decision defended on purpose** and revisitable
+by the rule above. **It is not a deletion boundary** — the decision fields are anonymised, never
+deleted, at every age. No law requires that value, and no document may cite one that does.
+
+### The actor window, and why twelve months — the owner's rationale
+
+- **Full accountability is preserved across a year.** The whole point of the actor column is being
+  able to say *who* performed an action; a year is long enough to serve every plausible internal
+  accountability process.
+- **It is substantially shorter than the contested 5 years.** The owner rejected that figure.
+- **A year covers a complete operational/audit cycle**, so the bound does not cut a cycle in half.
+- **Identifying a specific employee beyond that requires separate justification** — it is not
+  available by default.
+- **This is a chosen minimisation period, not a statutory term.** It must never be described,
+  here or anywhere, as required by law.
+
+The window is enforced as a second mutation stage in the same sweep, and a **documented
+`legal_hold`** exempts a row from it. A hold is an exemption from **actor** erasure only: it never
+restores what the 90-day fingerprint window already cleared, and it never extends the event fields.
+
+### Two supporting facts, recorded so no reader re-derives them by inference
+
+- **GDPR Art. 5(1)(e) requires storage limitation** — that personal data is kept no longer than
+  necessary — and **prescribes no number.** Any document reading it as prescribing a duration is
+  wrong. Art. 7(1), cited elsewhere in this plan for demonstrability, likewise states no duration.
+  **5 years must nowhere be described as a requirement of Montenegrin data-protection law, nor
+  anchored to any limitation period.**
+- **Montenegro's Personal Data Protection Law №133/2026** entered into force **19 September 2026**,
+  applies from **20 March 2027**, and sets **no** universal five-year period for a consent record.
+  It is a **neighbouring regime, not this project's applicable law** — see the jurisdiction
+  assumption below. It is recorded because it is the regime of the **launch market**, which is not
+  the regime of the **data subject**, and a reader meeting the two in one document will otherwise
+  conflate them.
+
+### Jurisdiction — a documented, revisitable assumption
+
+- The **launch market** is **Montenegro**; the **data subject** is in **Bosnia and Herzegovina**.
+- The applicable law is therefore **not** the GDPR directly, and this project's documentation **does
+  not establish** that Montenegrin data-protection law applies.
+- **GDPR article numbers used in this plan are descriptive shorthand for substantive standards**
+  (storage limitation, demonstrability, withdrawal), **not** citations of directly applicable EU
+  law. That reading is what the retention analysis rests on.
+- **Open for the DPO to confirm or overturn.** It is recorded as an assumption because this pass
+  could not close it, and it deliberately names **no** BiH statute, gazette reference or article
+  number — that citation could not be supported from the repository.
+
+What depends on it:
+
+| Depends on the assumption | If it is wrong |
+|---|---|
+| Every "GDPR Art. X" citation used as a substantive standard in this plan | each must be re-cited to the correct instrument, or dropped as unsupported |
+| The need-based retention rule as the applicable test | must be re-derived against whatever instrument actually applies |
+| **The retention windows themselves (90 d / 12 months / event)** | **not dependent** — they are project decisions justified on purpose. A different instrument changes the *legal floor*, not the *justification*; a lower floor could require **shortening** a window, never **lengthening** one on legal grounds |
+| `privacy.html`'s statement of the retention period to the data subject | the period stated must match the window actually enforced |
+
+### What did not change
+
+The 90-day fingerprint window, the anonymise-never-delete design, the absence of any `DELETE` path in
+the sweep, the `_DECISION_RETENTION_DAYS` literal, and the existing 30-day post-withdrawal user
+erasure. **None of those was part of this ruling.**
+
+**Mirror:** `docs/99-agent/pii-consent-remediation-record.md` carries the same ruling in prose under
+the same heading. The two are kept in step deliberately; if they ever disagree, the owner's ruling
+governs and both must be corrected.
+
+---
+
 ## 3. Execution blocks
 
-Seventeen blocks. Three are **decision or architecture** blocks that ship no
-production behaviour (BLOCK 1, BLOCK 3) or ship documentation only (BLOCK 2); fourteen
+Nineteen blocks. Three are **decision or architecture** blocks that ship no
+production behaviour (BLOCK 1, BLOCK 3) or ship documentation only (BLOCK 2); sixteen
 are implementation blocks. **One Implementor, strictly sequential, one commit per block**
-(§1.3).
+(§1.3). BLOCKS 18 and 19 are the `06-NEW-02` follow-ups and are owned separately from the
+`06-PII-1xx` remediation sequence.
 
 Two blocks (**3** and **4**) have no dependency on anything in this plan and can be
 prepared in parallel by the Auditor/Researcher while BLOCK 1's decision is being made —
-but the **serial execution order is still 1 → 17** (§4.1), because BLOCK 1 is what
-unblocks another phase.
+but the **serial execution order is still §4.1's**, because BLOCK 1 is what
+unblocks another phase. (BLOCKS 18 and 19 are the `06-NEW-02` follow-ups: they are recorded
+here and in §3, but they are **not** in §4.1's serial order — both have already shipped, and
+adding them would misstate the order that was actually executed.)
 
 ### BLOCK 1 — Publish the DECLINE-reversibility decision (06-PII-105, decision half)
 
@@ -7131,21 +7237,27 @@ evidence.** That is a floor derived from the tree, not from guidance.
 
 | # | Item | Value I would defend | Basis |
 |---|---|---|---|
-| **R1** | **Decision-field retention** (`choice`, `categories`, `consent_version`, `consent_given_at`) — the rows are **anonymised, never deleted** | **5 years** from `consent_given_at` | The longest plausible limitation period for a consumer claim in the subject's jurisdiction, which is the only EDPB §107 / Art. 17(3)(e) basis for keeping proof after the processing stops. In BiH that is the general limitation period under **Zakon o obligacionim odnosima, čl. 371 — 5 years in FBiH** (čl. 376(2) caps damages at 5 years from occurrence); **MEDIUM confidence and entity-specific — RS runs 10 years**, so this is the number a lawyer should confirm, not one I can assert |
-| **R2** | **Fingerprint-field retention** (`session_key`, `user_agent`, `ip_address`, plus the `user` link) | **90 days** | EDPB §106: demonstrability "should not in itself lead to excessive amounts of additional data processing". These fields are needed only while the session that produced them can still be investigated, and 90 d sits well above the 14-day session floor and well below any claim window. **The 14-day floor and the R1 ceiling are both hard**; 90 d is the value I would pick inside that band, and it is the number most likely to be argued down to 30 d without loss of anything |
+| **R1** | **Event-field retention** (`choice`, `categories`, `consent_version`, `consent_given_at`) — the rows are **anonymised, never deleted** | the **event retention period** — **policy-based and justified by purpose**. The implemented literal is `_DECISION_RETENTION_DAYS`; it is **not a deletion boundary**, because the row is never deleted at any age | **RE-GROUNDED 2026-10-04.** Need-based: *retain while there is a necessity to prove consent/withdrawal and the lawfulness of the corresponding processing; after a justified period expires, delete or anonymise.* **The 2026-10-03 figure survives only as an implemented project value. Its statutory-limitation-period justification is WITHDRAWN** — a limitation period governs the window in which a *claim* may be brought; it says nothing about how long a record must be kept, and stating it as the reason for a retention period was the error being undone. **No statute, article, jurisdiction split or confidence rating is asserted here, because none could be supported from this repository.** See §*Retention framing correction (owner ruling 2026-10-04)* |
+| **R2** | **Fingerprint-field retention** (`session_key`, `user_agent`, `ip_address`, plus the `user` link) | **90 days** — **unchanged by the 2026-10-04 ruling** | **A project decision, defended on necessity, not on any statutory or limitation-period ground.** These fields are needed only while the session that produced them can still be investigated, and 90 d sits well above the 14-day session floor derived from the tree. No authority is cited for the number and none is implied: an earlier draft rested this row partly on a claim-window comparison, and **that framing is withdrawn** — a claim window is not a retention justification. **The 14-day floor is hard, and so is the R1 ceiling**; 90 d is the value chosen inside that band, and it remains the number most likely to be argued down to 30 d without loss of anything |
 | **R3** | Re-ask interval | **unchanged — `CONSENT_REPROMPT_DAYS = 365`** | Out of scope. Do **not** reuse it as a retention number (the trap in the header table above). California's 12-month and the CNIL's 6-month are the same *kind* of number and neither outranks this project's existing value |
 
-**Constraints that bind R1 and R2 regardless of the values chosen:**
-`0 < fingerprint TTL ≤ decision TTL` (a longer fingerprint TTL is a silent no-op), and
-`fingerprint TTL ≥ 14 days` (the session-lifetime floor).
+**Constraints that bind R1 and R2 regardless of the values chosen — the three-bound form, as
+implemented by BLOCK 19:**
+`0 < fingerprint TTL ≤ actor TTL ≤ event TTL` (a longer fingerprint TTL than the actor TTL, or an
+actor TTL longer than the event TTL, makes a stage a silent no-op), and `fingerprint TTL ≥ 14 days`
+(the session-lifetime floor, which applies to the fingerprint bound **only** — the actor is an
+account FK, not live-session evidence). The command asserts this ordering itself, **before**
+`transaction.atomic()` is entered, so a mis-ordering fails loudly rather than silently skipping a
+stage.
 
-**What would move R1 off 5 years:**
-- **Shorter**, if the owner accepts that a consent claim must be brought within the
-  *advertiser's* or *platform's* published complaint window rather than the general
-  limitation period — or if a lawyer advises the Art. 17(3)(e) basis does not reach
-  first-party marketing consent in BiH. 2 years is then defensible.
-- **Longer**, if the entity is the RS (10-year limitation period) or if the marketplace
-  contract carries a longer limitation clause. 10 years would be the honest answer there.
+**What would move R1 — stated as a project decision, with no statutory anchor:**
+- **Shorter**, on a necessity argument: if the owner accepts that proving the consent event needs a
+  materially shorter period than the implemented literal. A different applicable instrument could
+  also require this — but see the jurisdiction note below, which records that such an instrument can
+  only ever force a window **shorter**, never justify a longer one on legal grounds.
+- **Longer**, only on a purpose argument the owner accepts in writing. **A limitation period, a
+  contract clause or an entity-level rule is not such an argument**, and no such period is asserted
+  anywhere in this plan.
 - **Either way**, if the owner decides the *rows* should be deleted rather than anonymised,
   R1 becomes a **destruction** decision rather than a **de-identification** one and needs
   its own review. My recommendation is against it (§2 above).
@@ -7156,24 +7268,38 @@ R2 toward R1, but do **not** raise it above R1, and do not raise it by making th
 permanent. If no such workflow exists (and I found none in the tree), **30 days** is
 equally defensible and strictly better for the data subject.
 
-**Jurisdiction note, stated as the tree's own framing:** the subject is in Bosnia, so the
-operative instrument is the **Zakon o zaštiti ličnih podataka BiH** (Sl. glasnik BiH br.
-12/2025), **not** the GDPR directly. Član 1(2) aligns that law with Regulation (EU)
-2016/679; **član 7(1)(e) reproduces Art. 5(1)(e) word for word**; član 6(1)–(2) bring a
-foreign controller into scope when processing relates to offering goods or services to data
-subjects in BiH, which is this marketplace's whole activity. **Consequence: the GDPR analysis
-above is the right analysis for the right reason — it is the text the BiH law was aligned
-to — but it is not a citation of directly applicable EU law, and this document must not be
-written as though it were.** The BiH law also requires the controller to inform the subject
-of the period for which data is kept, which is why `privacy.html` §6 must state one.
+**Jurisdiction — a documented, revisitable assumption. This replaces a citation that could not be
+supported.** An earlier draft of this subsection named a specific BiH statute, its gazette reference
+and three of its articles as the operative instrument. **All of that is removed.** The citation could
+not be verified from this repository, and naming an unverifiable instrument is worse than recording
+the gap. The assumption now stands in its place:
+
+- The **launch market** is **Montenegro**; the **data subject** this ledger records consent for is
+  in **Bosnia and Herzegovina**. Those are two different questions and the difference changes the
+  analysis.
+- The applicable law is therefore **not** the GDPR directly, and this project's documentation **does
+  not establish** that Montenegrin data-protection law applies.
+- Every "GDPR Art. X" citation in this plan — Art. 5(1)(e), Art. 7(1), Art. 21 — is read as
+  **descriptive shorthand for the substantive standard** it stands for (storage limitation,
+  demonstrability, withdrawal), **not** as a citation of directly applicable EU law. The same reading
+  applies to the EDPB and ICO quotations above: they state the standards, they do not bind here.
+  **This reading is what the whole retention analysis rests on.**
+- **This assumption must be confirmed with the DPO, and is revisitable.** It is recorded as an
+  assumption precisely because this pass could not close it. The authoritative statement and its
+  dependents are in §*Retention framing correction (owner ruling 2026-10-04)* and in
+  `docs/99-agent/pii-consent-remediation-record.md`.
+- **What is *not* dependent on it: the retention windows themselves.** They are project decisions
+  justified on purpose. A different applicable instrument changes the *legal floor*, not the
+  *justification*, and a lower floor could require **shortening** a window — it could never justify
+  lengthening one on legal grounds.
 
 **What I could not establish, and am not asserting:** any authority-mandated number for
-consent-evidence retention in the EU or BiH; any industry survey giving a median
+consent-evidence retention in any jurisdiction; any industry survey giving a median
 consent-log retention period (secondary vendor blogs repeat each other and trace back to
-ICO/CNIL re-ask intervals, not to retention practice); and any BiH DPA (Agencija za zaštitu
-ličnih podataka BiH) guidance document on consent-log retention — I found the statute and
-its Art. 5/Art. 7 equivalents, not a retention decision. **This is an ambiguity in the
-guidance, not a gap I can close by choosing a number.**
+ICO/CNIL re-ask intervals, not to retention practice); and any data-protection authority guidance
+document on consent-log retention — **no number was found, and no instrument is named as the source
+of one.** **This is an ambiguity in the guidance, not a gap that can be closed by choosing a
+number.**
 
 ##### 6. What the sweep does to BLOCK 3's `RETAIN` entries — **yes, all three change**
 
@@ -7236,10 +7362,11 @@ location argument; the name keeps the `purge_*` verb the "Other sweeps" table in
 "already carries `sweep_expired_consents` and `send_alerts`" is wrong on both counts**; there
 is no such command (C-B15-4). Justified against the cadence the TTL implies:
 
-- **The TTL is measured in months to years (R1/R2).** Against a 5-year boundary, an hourly
-  re-derivation of the eligible set is 24 identical evaluations a day for 24 hours of pure
-  work. Nothing about the legal boundary turns on a row being purged at 08:00 today rather
-  than 08:00 tomorrow; the imprecision is bounded by 24 h against a multi-month period.
+- **The TTL is measured in months to years (R1/R2/R1-actor).** Against a multi-year boundary, an
+  hourly re-derivation of the eligible set is 24 identical evaluations a day for 24 hours of pure
+  work. **No boundary here is a legal deadline**, so nothing turns on a row being purged at 08:00
+  today rather than 08:00 tomorrow; the imprecision is bounded by 24 h against a period measured in
+  months.
 - **The table is small by construction.** `ConsentRecord` grows by consent *actions*, not by
   requests. It is orders of magnitude below `ads`, so the hourly tier's cost model — sized
   for `archive_sweep` over the ads table — does not apply.
@@ -7475,7 +7602,11 @@ description: >
   ConsentRecordAdmin.list_display; add the index the sweep filters on; and record the
   periods in privacy.html section 6 and db-retention.md. The TTLs are OWNER-RATIFIED
   literals (_FINGERPRINT_RETENTION_DAYS, _DECISION_RETENTION_DAYS) - the Implementor does
-  not choose them and does not add a CLI flag for them.
+  not choose them and does not add a CLI flag for them. RATIFIED AS PROJECT DECISIONS: the
+  owner ruling of 2026-10-04 re-grounded R1 on purpose and WITHDREW the limitation-period
+  justification it was originally ratified with - see section "Retention framing correction
+  (owner ruling 2026-10-04)". BLOCK 19 (06-NEW-02) later added the third literal,
+  _ACTOR_RETENTION_DAYS, inside this same command.
 goals:
   - "bound the consent ledger by de-identifying aged rows instead of deleting them"
   - "stop a live session identifier being enumerable in the staff changelist"
@@ -8506,7 +8637,10 @@ and accountability defect, so it needs its own owner and follow-up. The shape th
 - BLOCK 15 (`fd5201d`) added `apps/core/management/commands/purge_consent_records.py` under
   **advisory lock 14**, anonymising — **never deleting** — rows past the 90-day fingerprint window:
   `user=NULL`, `session_key=NULL`, `ip_address=NULL`, `user_agent=""` in **one** statement. The
-  decision fields are retained for **5 years** (owner-ratified R1/R2).
+  decision fields follow the event retention period (a policy decision justified by purpose —
+  see "Retention framing correction (owner ruling 2026-10-04)"), and BLOCK 19 (06-NEW-02) adds a
+  third, separate window that anonymises the actor field 12 months from the action, subject to a
+  documented legal hold.
   **Verified: the sweep writes no `ConsentRecord`.** It only `.update()`s existing rows
   (`purge_consent_records.py` is the only command that names `ConsentRecord`; `consent_hard_delete`
   names `User`, `AnalyticsEvent`, `ModeratorActionLog`, `SupportTicket`).
@@ -8592,25 +8726,29 @@ from three nulls. The anonymous row is distinguishable from a system row with no
   actor to bound. BLOCK 15 needs **no change**: the actor column is never named in the sweep's
   `.update(...)`, so it is untouched, and it holds nothing that points at the subject.
 - The **staff-attributed** case is accountability data about a **third party** — an employee — not
-  about the subject. **Recommendation: retain it to the decision bound (5 years); do NOT clear it at
-  the 90-day fingerprint window.** The reasoning: the row exists for 5 years *because* it is
-  Art. 7(1) evidence, and the owner's complaint is that the evidence is incomplete. Stripping *who*
-  at 90 days while keeping *what* for 5 years re-creates the incompleteness for four fifths of the
-  row's life, and a staff revocation is rare enough that losing the actor after 90 days usually
-  means losing it forever. It is also **not** a re-identification path for the subject: the surviving
-  link points at the operator, not at the erased data subject, and a reader who knows "S revoked V"
-  already knows V.
-- **The counter-argument, stated because it is real:** a superuser identifier retained for 5 years on
-  consent rows is itself personal data about an employee, and it yields a durable per-operator
-  behavioural record (*which operator revoked whose consent, and how often*) that the product does not
-  otherwise have and has not declared, with **no erasure path** — an employee who leaves cannot have
-  it cleared, because clearing it is exactly what destroys the accountability. Data minimisation
-  (Art. 5(1)(c)) and accountability pull in opposite directions here.
-- **This block therefore implements the retention recommendation and flags the bound as an
-  owner/DPO decision.** It is a proportionality judgement between two legal obligations, not a
-  technical one, and the Implementor is **not** to settle it. The reversal is one line in
-  `purge_consent_records` plus the `RETAIN` entry's action, so if the owner rules for 90-day
-  clearing, the change is cheap and lands as a follow-up. **State this in the commit body.**
+  about the subject. **SUPERSEDED POSITION (recorded, not deleted):** this block originally
+  recommended retaining the actor "to the decision bound (5 years); do NOT clear it at the
+  90-day fingerprint window", reasoning that the row exists as Art. 7(1) evidence so stripping
+  *who* at 90 days while keeping *what* re-creates the incompleteness. **The owner ruled on
+  2026-10-04 that this recommendation is withdrawn**, and BLOCK 19 replaced it: the actor field is
+  **irreversibly anonymised 12 months from the action, subject to a documented legal hold.** The
+  reasoning that is *retained* is the part that still holds — the actor column is not a
+  re-identification path **for the subject** (the surviving link points at the operator, not at the
+  erased data subject, and a reader who knows "S revoked V" already knows V), and the row is
+  retained so accountability survives at all.
+- **The counter-argument, stated because it is real — and it is why the 12-month bound exists:** a
+  superuser identifier retained indefinitely on consent rows is itself personal data about an
+  employee, and it yields a durable per-operator behavioural record (*which operator revoked whose
+  consent, and how often*) that the product does not otherwise have and has not declared, with **no
+  erasure path** — an employee who leaves cannot have it cleared, because clearing it is exactly
+  what destroys the accountability. Data minimisation and accountability pull in opposite directions
+  here. **The 12-month bound resolves that tension by putting an end to it**, and it does so as a
+  **chosen minimisation period justified by purpose, not as a statutory term.**
+- **This block no longer defers the bound.** It originally shipped with the retention recommendation
+  implemented and the *bound* flagged as an owner/DPO decision the Implementor must not settle, on
+  the reasoning that the reversal would be one cheap line. **That flag is discharged: the owner has
+  now ruled (2026-10-04), and BLOCK 19 implements the ruled bound.** The implementor of this block
+  must not re-raise it.
   *Constraint that makes the recommendation safe to ship now:* the population is bounded to
   superusers (`permissions=["delete"]` dispatches to `UserAdmin.has_delete_permission`, which is
   `request.user.is_superuser`) and the event is rare, so the exposure is small while the decision is
@@ -8839,8 +8977,14 @@ but nothing stops a later hand from deleting it.
    its lock 14, not its one-statement clear, not its never-delete invariant, not its dry-run.
 4. **`ConsentRecordAdmin.list_display` and `search_fields` are not touched** (BLOCK 12). BLOCK 15's
    `session_key` residual is BLOCK 15's to close.
-5. **The actor-retention bound is not the Implementor's to settle.** Implement the 5-year
-   recommendation, record the DPO question in the commit body, and do not silently choose 90 days.
+5. **The actor-retention bound is OWNER-RULED, not the Implementor's to settle, and not open.**
+   The original text of this constraint said *"Implement the 5-year recommendation, record the DPO
+   question in the commit body, and do not silently choose 90 days."* **That is superseded.** The
+   owner ruled on **2026-10-04**: the actor field is retained **12 months from the action and then
+   irreversibly anonymised**, subject to a documented legal hold, as a **chosen minimisation period
+   justified by purpose and explicitly not a statutory term**. BLOCK 19 implements it. An
+   Implementor working this block must not implement the 5-year recommendation, must not treat the
+   bound as open, and must not re-derive it from a limitation period.
 6. **No `CASCADE`, ever.** `SET_NULL` on the actor FK; `consent_hard_delete`'s collector delete and
    `seed_service`'s bulk delete both pass through it.
 7. **No data migration and no backfill.** The unknown mechanism is the honest reading of a
@@ -9007,8 +9151,11 @@ changes:
               "means no acting account distinct from the subject - a self-service action, "
               "an anonymous visitor, or a system action; action_source tells those apart. "
               "Never CASCADE: consent_hard_delete deletes User rows and a cascade would "
-              "destroy the Art. 7(1) ledger. Retained to the decision bound (5 years), not "
-              "the 90-day fingerprint bound - see the open owner/DPO question."
+              "destroy the Art. 7(1) ledger. The acting account is irreversibly anonymised "
+              "12 months after the action (BLOCK 19, 06-NEW-02) - a chosen minimisation "
+              "period justified by purpose, NOT a statutory term, and deliberately shorter "
+              "than the event bound, which governs the decision fields only. A documented "
+              "legal_hold suspends this actor erasure."
           ),
       )
       action_source = models.CharField(
@@ -9211,16 +9358,20 @@ extra_context: |
      system               -> user=V, initiated_by=-, action_source=system
      predates this block  -> unchanged, initiated_by=-, action_source=unknown
 
-  3. RETENTION ANSWER - IMPLEMENT IT, DO NOT SETTLE IT. Retain the staff actor to the DECISION
-     bound (5 years); do NOT clear it at the 90-day fingerprint window. Clearing it destroys
-     the accountability the owner asked for; retaining a superuser identifier for 5 years on a
-     row whose subject is anonymous is itself a privacy question and yields a per-operator
-     behavioural record with no erasure path. This is an owner/DPO proportionality decision.
-     Implement the recommendation, record the open question in the COMMIT BODY, and do not
-     silently choose 90 days. The reversal is one line plus the RETAIN entry's action.
-     Consequence: apps/core/management/commands/purge_consent_records.py is NOT MODIFIED. The
-     actor column is never named in its .update(...), so it is untouched, and it never holds a
-     link to the subject, so BLOCK 15's invariant is preserved without a code change.
+  3. RETENTION - IMPLEMENT THE RULED BOUND; DO NOT RE-DERIVE IT. SUPERSEDED: this step
+     originally read "Retain the staff actor to the DECISION bound (5 years); do NOT clear it
+     at the 90-day fingerprint window ... This is an owner/DPO proportionality decision ...
+     do not silently choose 90 days", and concluded that
+     apps/core/management/commands/purge_consent_records.py was NOT MODIFIED by this block.
+     All of that is withdrawn by the owner ruling of 2026-10-04. The staff actor is now
+     irreversibly anonymised 12 MONTHS from the action, subject to a documented legal_hold
+     (BLOCK 19, 06-NEW-02). The data-minimisation concern that made the original deferral
+     necessary is real and is now answered by a bounded period rather than by an open question:
+     a superuser identifier kept indefinitely yields a per-operator behavioural record with no
+     erasure path. This step's own scope is UNCHANGED - BLOCK 18 still does not modify
+     purge_consent_records.py - but the reason is now scope, not an open legal question, and
+     the actor column is no longer "never named in its .update(...)" by design: it is cleared
+     by BLOCK 19, which is the successor to this step, not a contradiction of it.
 
   4. FIFTH-WRITER ORDERING RULE for withdraw_consent (apps/users/services/deletion.py).
      Re-read the file immediately before editing and assert this. Landed writers so far:
@@ -9326,6 +9477,113 @@ extra_context: |
       defects - re-run a red gate serially before reporting it. One Implementor at a time, one
       commit per block, stage_only list only, never git add -A.
 ```
+
+---
+
+### BLOCK 19 — Separate the 12-month actor window from the event bound (`06-NEW-02`)
+
+| | |
+|---|---|
+| **Findings owned** | `06-NEW-02` (retention half). BLOCK 18 owns the column; this block owns its **bound** |
+| **Depends on** | **BLOCK 18** (`initiated_by`, `action_source` exist) and **BLOCK 15** (`purge_consent_records`, lock 14) |
+| **Blocks** | nothing |
+| **Priority** | P1 — closes the owner's 2026-10-04 retention ruling |
+| **Risk level** | **MEDIUM** — a second mutation stage on the audit ledger and one migration |
+| **Required agents** | **Implementor · Validator** |
+| **Status** | **SHIPPED** as `2ae74fb`. This section records what was built |
+
+**The owner ruling (2026-10-04) — implemented, not reopened.** Retention is **per field**. Twelve
+months is a **chosen minimisation period justified by purpose** — one full operational/audit cycle —
+and **explicitly not a statutory term**. The state this block changed was actor-retained to the
+5-year event bound; **BLOCK 18's recorded reasoning for that is superseded** (see that section).
+
+#### 1. The three windows, as implemented
+
+| Window | Literal | Applies to | Action |
+|---|---|---|---|
+| **fingerprint** | `_FINGERPRINT_RETENTION_DAYS = 90` | `user`, `session_key`, `ip_address`, `user_agent` | one `UPDATE`: `user=None, session_key=None, ip_address=None, user_agent=""` |
+| **actor** (`06-NEW-02`) | `_ACTOR_RETENTION_DAYS = 365` | `initiated_by` | second, independent `UPDATE`: `initiated_by=None`, unless `legal_hold` |
+| **event** | `_DECISION_RETENTION_DAYS = 365 * 5` | `choice`, `categories`, `consent_version`, `consent_given_at` | **count-only** — the row is retained at every age and **never deleted** |
+
+The event window is **not** a deletion boundary, and **no boundary here is a legal deadline.** The
+actor stage is **not** symmetric with the others: the fingerprint and actor windows mutate, the
+event window only counts, because deleting the ledger row is the failure mode this sweep exists to
+avoid.
+
+**The actor stage is a second mutation stage inside the same `atomic()` and the same advisory lock
+14** — not a new command, not a new lock, not a new scheduler entry. A failure in the actor stage
+rolls the fingerprint clear back with it. It is deliberately **not** folded into the fingerprint
+`UPDATE`: that queryset excludes already-cleared rows, and the actor rule is independent of it.
+Excluding a null `initiated_by` keeps the stage idempotent.
+
+#### 2. The clock, and why no new column exists
+
+The anchor is **`consent_given_at`** — the sole production writer is
+`record_consent_action_with_context`'s `objects.create`, synchronous with the action. It already
+leads `IX_consent_records_sweep`, so the actor cutoff is an **Index Cond**. **No `action_at` column
+was added**: a dedicated action clock is a second clock that can only drift, and it would require an
+unrecoverable backfill. **No `actor_anonymised_at` marker column was added either** — the state is
+derivable from `action_source` plus the row's age, and a second concrete non-timestamp column would
+have widened the inventory guard's review surface for nothing.
+
+#### 3. `legal_hold` and migration `users/0006_consentrecord_legal_hold.py`
+
+`legal_hold = BooleanField(default=False)` — a **superuser-settable exemption from actor erasure
+only**. The migration is `AddField` plus a **`help_text`-only `AlterField`** on `initiated_by`. The
+default leaves **every existing row un-held, so no backfill is needed.**
+
+**A hold never restores what the 90-day fingerprint window already cleared, and never extends the
+event fields.** It suspends one stage only.
+
+**The deliberate admin asymmetry — `legal_hold` is absent from `ConsentRecordAdmin.readonly_fields`
+while both actor columns remain non-editable.** This is intentional and must not be "fixed":
+
+- `initiated_by` and `action_source` **are the evidence**, so a superuser able to edit them could
+  **forge** accountability. They stay in `readonly_fields`.
+- `legal_hold` is an **exemption from erasure, not evidence**, so it must be settable — a superuser
+  has to be able to *find* held rows (hence it was added to `list_filter`) and clear the hold.
+- Both effects are superuser-only already: `has_change_permission` gates the whole change form on
+  `is_superuser`, so no extra check is needed.
+
+#### 4. The ordering guard
+
+The command asserts `0 < fingerprint ≤ actor ≤ event` **itself, before `transaction.atomic()` is
+entered** (`_assert_retention_ordering`), raising `ValueError` otherwise, so a mis-ordered set fails
+loudly instead of making a stage a silent no-op. The fingerprint TTL is additionally floored at the
+declared Django session lifetime (`SESSION_COOKIE_AGE`) so a still-live session's support evidence
+is not destroyed. **That floor applies to the fingerprint bound only** — the actor is an account FK,
+not live-session evidence.
+
+#### 5. Inventory, and the five-case reading
+
+`initiated_by` is re-declared **`ErasureAction.NULL`** (BLOCK 18 declared it `RETAIN`, which claimed
+a scrub that did not happen). `legal_hold` joins **`REVIEWED_NON_IDENTITY_COLUMNS`** — a hold carries
+no subject data and no erasure path touches it, so it has no erasure-contract entry.
+
+**`initiated_by IS NULL` now covers five situations, and `action_source` alone still separates them
+completely, without a join:** self-service, anonymous web, system, legacy `unknown`, and an
+`admin_staff` attribution whose 12-month window expired or whose acting account was hard-deleted.
+That last case is why `action_source` remains authoritative for *which case* a row is:
+`admin_staff` is written **only** when a staff account acted. The write-time invariant is unchanged —
+the actor FK never holds the subject.
+
+#### 6. Confirmed unchanged
+
+- **No production writer emits `action_source = SYSTEM`.** The member exists because the owner named
+  "system revoked" as a case that must be distinguishable; no live path writes it, and that is
+  recorded rather than engineered.
+- **`SET_NULL`, never `CASCADE`**, on the actor FK; `consent_hard_delete`'s collector delete and
+  `seed_service`'s bulk delete both pass through it.
+- **Anonymise, never delete** for the decision fields, and **no `DELETE` path** in the sweep.
+- **No configuration surface.** The three literals are hardcoded module constants; `--dry-run`
+  remains the **only** argument, matching `db-retention.md`'s explicit rule.
+- **`withdraw_consent`'s signature and body are untouched** by this block.
+- **`views/consent.py` is untouched** by this block.
+- **`AdvisoryLockId` is unchanged** — lock 14 is reused, no new member.
+
+**Flagged, not acted on:** the event-retention wording could be read as implying a five-year
+deletion boundary. **The shipped rule is anonymise-never-delete**, and the wording is corrected in
+§*Retention framing correction (owner ruling 2026-10-04)* rather than in code.
 
 ---
 
