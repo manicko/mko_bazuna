@@ -54,8 +54,9 @@ jobs:
             set -e
             cd /app
 
-            # Capture CI-provided image tag before sourcing .env.prod,
-            # which has IMAGE_TAG=latest as its default.
+            # Capture the CI-provided image tag before sourcing .env.prod.
+            # .env.prod ships a concrete pinned IMAGE_TAG (never a `latest`
+            # default), and this value is threaded through explicitly below.
             CI_IMAGE_TAG="${IMAGE_TAG}"
 
             # Load production environment variables for POSTGRES_* and REGISTRY/REPOSITORY.
@@ -63,7 +64,8 @@ jobs:
             source .env.prod
             set +a
 
-            # Restore the CI-provided image tag — takes precedence over .env.prod's default.
+            # Restore the CI-provided image tag captured above, overriding any
+            # IMAGE_TAG that .env.prod happens to define.
             export IMAGE_TAG="${CI_IMAGE_TAG}"
 
             echo "=== Starting deployment of IMAGE_TAG=${IMAGE_TAG} ==="

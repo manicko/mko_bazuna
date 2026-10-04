@@ -41,7 +41,10 @@ services:
   # This keeps the container alive between `make test` runs. Port 5433 on the host
   # allows debugging with psql / GUI tools.
   db:
-    image: postgres:18-alpine
+    # Pinned patch (09-API-016), matching the base `db` service. The test DB
+    # stays on PostgreSQL major 18; only the floating major/minor tag is removed.
+    # Rollback value: `postgres:18-alpine`.
+    image: postgres:18.6-alpine
     restart: unless-stopped
     environment:
       - DATABASE_URL=postgres://postgres:postgres@db:5432/mko_bazuna

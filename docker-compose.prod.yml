@@ -158,7 +158,9 @@ services:
   # Backup service: daily database dumps with 7-day retention
   # Opt-in via --profile backup to prevent storage consumption before needed
   backup:
-    image: postgres:18-alpine
+    # Pinned identically to the base `db` service (09-API-016): the dump client
+    # and the server must be the same patch. Rollback value: `postgres:18-alpine`.
+    image: postgres:18.6-alpine
     environment:
       POSTGRES_HOST: db
       POSTGRES_PORT: 5432

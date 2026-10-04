@@ -26,6 +26,7 @@ while not (_ROOT / "pyproject.toml").exists():
 _COMPOSE = _ROOT / "docker-compose.yml"
 _PROD_COMPOSE = _ROOT / "docker-compose.prod.yml"
 _DEV_OVERRIDE_COMPOSE = _ROOT / "docker-compose.dev.override.yml"
+_TEST_COMPOSE = _ROOT / "docker-compose.test.yml"
 
 # One-shot bootstrap services. In dev they run the bootstrap settings module
 # (config.settings.oneshot) with dev placeholder secrets and DJANGO_ONESHOT=1;
@@ -457,3 +458,131 @@ def test_prod_long_lived_services_keep_a_bot_token() -> None:
         assert "env_file:" in text and ".env.prod" in text, (
             f"{service} must keep env_file: .env.prod as the source of BOT_TOKEN"
         )
+
+
+
+# --- third-party image patch pinning (09-API-016) --------------------------
+
+
+# Every shipped compose file. The structural rule below applies to all of them,
+# so a new override that reintroduces a floating datastore tag fails here.
+_SHIPPED_COMPOSE_FILES = (
+    _COMPOSE,
+    _PROD_COMPOSE,
+    _DEV_OVERRIDE_COMPOSE,
+    _TEST_COMPOSE,
+)
+
+# The explicit set of patch-pinned third-party image references allowed in the
+# shipped compose files. Each carries the precision its own project uses:
+# PostgreSQL's `MAJOR.MINOR` (the second number is the patch), Redis and nginx
+# `MAJOR.MINOR.PATCH`. A regex cannot know per-project schemes, so the rule is
+# an explicit allowlist — a new floating tag (or a new third-party image) fails
+# loudly and must be pinned and added here deliberately. ``edoburu/pgbouncer``
+# is the original model (09-API-016).
+_ALLOWED_IMAGE_REFERENCES = frozenset(
+    {
+        "postgres:18.6-alpine",
+        "redis:7.4.11-alpine",
+        "nginx:1.30.5",
+        "edoburu/pgbouncer:1.25.2",
+    }
+)
+
+# Floating aliases that carry no version number at all.
+_FLOATING_ALIASES = {"latest", "stable", "mainline", "edge", "alpine", "slim"}
+
+
+def _image_lines(path: Path) -> list[str]:
+    """Return the stripped value of every ``image:`` line in a compose file.
+
+    String-level scan (no YAML parse) so an env-substituted reference such as
+    ``${REGISTRY:-ghcr.io}/...`` is preserved verbatim rather than resolved.
+    """
+    lines: list[str] = []
+    for raw in path.read_text(encoding="utf-8").split("\n"):
+        stripped = raw.strip()
+        if stripped.startswith("image:"):
+            lines.append(stripped.split(":", 1)[1].strip())
+    return lines
+
+
+def test_no_shipped_compose_file_uses_a_floating_image_tag() -> None:
+    """No ``image:`` in any shipped compose file resolves to a floating tag.
+
+    A bare major/minor tag (``postgres:18-alpine``, ``redis:7-alpine``,
+    ``nginx:alpine``) lets two hosts on the same compose file move to different
+    engine builds with no repository change — the same untraceable-tag problem
+    09-API-016 closes for the application image. Only two forms are allowed:
+
+    * a patch-pinned third-party tag (``postgres:18.6-alpine``,
+      ``redis:7.4.11-alpine``, ``nginx:1.30.5``) — the ``edoburu/pgbouncer:1.25.2``
+      model; or
+    * an application image whose tag is required at runtime by
+      ``${IMAGE_TAG:?...}`` (a ``:latest`` default would itself be floating).
+    """
+    offenders: list[str] = []
+    for path in _SHIPPED_COMPOSE_FILES:
+        assert path.exists(), f"shipped compose file missing: {path}"
+        for value in _image_lines(path):
+            # Application images require IMAGE_TAG explicitly; that is the
+            # no-floating contract asserted separately above.
+            if "${IMAGE_TAG:?" in value:
+                continue
+            if value in _ALLOWED_IMAGE_REFERENCES:
+                continue
+            tag = value.rsplit("@", 1)[0].rpartition(":")[2]
+            if tag in _FLOATING_ALIASES:
+                offenders.append(f"{path.name}: {value} (bare alias)")
+                continue
+            offenders.append(f"{path.name}: {value} (not patch-pinned)")
+
+    assert not offenders, (
+        "every third-party image must be patch-pinned (09-API-016); add each "
+        "pinned reference to _ALLOWED_IMAGE_REFERENCES deliberately. "
+        "Floating or unrecognised image tags found:\n" + "\n".join(offenders)
+    )
+
+
+def test_third_party_datastore_images_are_pinned() -> None:
+    """The three datastores are pinned, and prod matches the base ``db``.
+
+    Locks the exact patch values so a regression to the floating tag is caught
+    at the file level, not only by the general rule above. Only ``image:``
+    values are inspected — the rollback values are recorded in comments and
+    must not fail this test.
+    """
+    base_images = set(_image_lines(_COMPOSE))
+    prod_images = set(_image_lines(_PROD_COMPOSE))
+    test_images = set(_image_lines(_TEST_COMPOSE))
+
+    assert "postgres:18.6-alpine" in base_images, (
+        "base db must be postgres:18.6-alpine"
+    )
+    assert "redis:7.4.11-alpine" in base_images, (
+        "base redis must be redis:7.4.11-alpine"
+    )
+    assert "nginx:1.30.5" in base_images, "base nginx must be nginx:1.30.5"
+    # The prod backup client must match the server patch.
+    assert "postgres:18.6-alpine" in prod_images, (
+        "prod backup must be postgres:18.6-alpine"
+    )
+    # The test DB stays on major 18 but no longer floats the minor tag.
+    assert "postgres:18.6-alpine" in test_images, (
+        "test db must be postgres:18.6-alpine"
+    )
+
+    for name, images in (
+        ("base", base_images),
+        ("prod", prod_images),
+        ("test", test_images),
+    ):
+        assert "postgres:18-alpine" not in images, (
+            f"{name} compose must not float postgres:18-alpine"
+        )
+    assert "redis:7-alpine" not in base_images, (
+        "base compose must not float redis:7-alpine"
+    )
+    assert "nginx:alpine" not in base_images, (
+        "base compose must not float nginx:alpine"
+    )

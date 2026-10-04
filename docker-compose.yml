@@ -4,7 +4,11 @@
 
 services:
   db:
-    image: postgres:18-alpine
+    # Pinned patch, not a floating `postgres:18-alpine` (09-API-016). The plan
+    # names `edoburu/pgbouncer:1.25.2` as the model: a floating major/minor tag
+    # lets `docker compose pull` move two "same file" hosts to different engine
+    # builds with no repository change. Rollback value: `postgres:18-alpine`.
+    image: postgres:18.6-alpine
     restart: always
     read_only: true
     tmpfs:
@@ -26,7 +30,9 @@ services:
       timeout: 5s
       retries: 5
   redis:
-    image: redis:7-alpine
+    # Pinned patch, not a floating `redis:7-alpine` (09-API-016).
+    # Rollback value: `redis:7-alpine`.
+    image: redis:7.4.11-alpine
     restart: always
     user: redis
     command: redis-server --save "" --appendonly no --dir /tmp
@@ -314,7 +320,10 @@ services:
       retries: 3
       start_period: 30s
   nginx:
-    image: nginx:alpine
+    # Pinned patch, not a floating `nginx:alpine` (09-API-016). The floating
+    # tag tracks mainline; the project tracks the stable 1.30.x line
+    # (docs/03-packages/packages-list.md). Rollback value: `nginx:alpine`.
+    image: nginx:1.30.5
     ports:
       - "80:80"
       - "443:443"
