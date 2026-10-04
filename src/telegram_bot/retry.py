@@ -80,7 +80,7 @@ _TRANSIENT_EXCEPTIONS: Final[tuple[type[AiogramError], ...]] = (
 # the unit tests, but it is not exported to ``web``'s ``/metrics``.
 _DROPPED_OUTBOUND_CALLS: Final = Counter(
     "telegram_dropped_outbound_calls_total",
-    "Outbound Telegram calls dropped after the replay budget was exhausted.",
+    "Outbound Telegram calls dropped after the replay budget or attempt cap was exhausted.",
 )
 
 
