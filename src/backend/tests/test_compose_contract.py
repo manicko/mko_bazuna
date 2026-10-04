@@ -12,6 +12,7 @@ and that no override contradicts it, plus the ``stop_grace_period`` and dev
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -200,3 +201,89 @@ def test_dev_bot_asymmetry_comment_present() -> None:
     assert "deliberately does NOT depend on seed" in content, (
         "dev bot block must carry the deliberate-asymmetry comment"
     )
+
+
+# ---------------------------------------------------------------------------
+# healthcheck start_period contract (12-OPS-019)
+# ---------------------------------------------------------------------------
+
+# Compose duration grammar: one or more `<number><unit>` groups (e.g. `30s`,
+# `1m30s`, `1h`). Bare numbers (nanoseconds) are deliberately rejected — a probe
+# window written as a bare integer is not the reviewed form.
+_DURATION_GROUPS_RE = re.compile(r"^(?:\d+(?:\.\d+)?(?:ns|us|ms|s|m|h))+$")
+_DURATION_TOKEN_RE = re.compile(r"\d+(?:\.\d+)?(?:ns|us|ms|s|m|h)")
+
+
+def _is_parseable_duration(value: object) -> bool:
+    """Whether *value* is a Compose duration string like ``30s`` or ``1m30s``.
+
+    Guards a parseable duration, not the presence of the key: ``start_period:
+    banana`` must fail. A bare integer (nanoseconds) is also rejected — the
+    reviewed form is an explicit unit.
+    """
+    if not isinstance(value, str):
+        return False
+    text = value.strip()
+    if not text or _DURATION_GROUPS_RE.match(text) is None:
+        return False
+    # Every character must be consumed by a duration token, so a trailing
+    # garbage suffix cannot slip through.
+    return "".join(_DURATION_TOKEN_RE.findall(text)) == text
+
+
+def test_every_healthcheck_declares_a_parseable_start_period() -> None:
+    """Every declared healthcheck carries a parseable ``start_period``.
+
+    Each compose file is parsed independently (never merged with its override),
+    so the contract is asserted per file. A missing key or a non-duration value
+    (``start_period: banana``) fails, naming the ``(file, service)`` pair
+    (12-OPS-019).
+    """
+    offenders: list[str] = []
+    for path in (_COMPOSE, _TEST_COMPOSE, _PROD_COMPOSE):
+        data = _load_yaml(path)
+        services = data.get("services", {}) or {}
+        for name, service in services.items():
+            healthcheck = (service or {}).get("healthcheck")
+            if healthcheck is None:
+                continue
+            value = healthcheck.get("start_period")
+            if not _is_parseable_duration(value):
+                offenders.append(f"{path.name}: {name} -> start_period={value!r}")
+
+    assert not offenders, (
+        "every healthcheck must declare a parseable start_period (12-OPS-019); "
+        "missing or malformed:\n" + "\n".join(offenders)
+    )
+
+
+def test_is_parseable_duration_rejects_non_durations() -> None:
+    """The duration guard fails on a non-duration value, not just a missing key.
+
+    This is the ``start_period: banana`` case: the guard asserts a parseable
+    duration, not the presence of the key string (12-OPS-019). Docker's own
+    config parser rejects a bad value before it can ship, but this unit check
+    keeps the guard's malformed branch covered independently of that.
+    """
+    for good in ("5s", "30s", "600s", "1m30s", "1h"):
+        assert _is_parseable_duration(good), f"{good!r} must parse"
+    for bad in ("banana", "", "15", "5sec", "5 s", None, 30):
+        assert not _is_parseable_duration(bad), f"{bad!r} must not parse"
+
+
+def test_start_period_does_not_alter_probe_cadence() -> None:
+    """The four amended healthchecks keep interval/timeout/retries byte-identical.
+    This block adds ``start_period`` and nothing else; changing ``retries``
+    alters cold-start recovery semantics and is a different decision.
+    """
+    expected = {
+        (_COMPOSE, "db"): ("5s", "5s", 5),
+        (_COMPOSE, "redis"): ("5s", "3s", 5),
+        (_TEST_COMPOSE, "db"): ("5s", "5s", 5),
+        (_PROD_COMPOSE, "pgbouncer"): ("5s", "5s", 5),
+    }
+    for (path, service), (interval, timeout, retries) in expected.items():
+        healthcheck = _load_yaml(path)["services"][service]["healthcheck"]
+        assert healthcheck["interval"] == interval, f"{path.name} {service} interval"
+        assert healthcheck["timeout"] == timeout, f"{path.name} {service} timeout"
+        assert healthcheck["retries"] == retries, f"{path.name} {service} retries"

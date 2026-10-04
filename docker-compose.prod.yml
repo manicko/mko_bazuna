@@ -241,6 +241,10 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+      # PgBouncer starts quickly, but its probe only succeeds once it has opened
+      # the 6432 listener and established an upstream connection to db. A modest
+      # window covers that handshake without masking a genuine post-start failure.
+      start_period: 10s
     profiles:
       - pgbouncer
     cap_drop: ["ALL"]

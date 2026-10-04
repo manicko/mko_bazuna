@@ -29,6 +29,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+      # PostgreSQL writes to disk before it accepts connections: on a fresh
+      # volume it runs initdb, and after an unclean shutdown it replays WAL.
+      # Both are disk-bound and can far exceed the 25s retry budget (5s x 5),
+      # so without a start_period a healthy-but-recovering server is marked
+      # unhealthy and the whole depends_on chain refuses to start.
+      start_period: 30s
   redis:
     # Pinned patch, not a floating `redis:7-alpine` (09-API-016).
     # Rollback value: `redis:7-alpine`.
@@ -49,6 +55,10 @@ services:
       interval: 5s
       timeout: 3s
       retries: 5
+      # Redis runs with persistence disabled (--save ""), so recovery is
+      # immediate and there is nothing to replay. The window only needs to
+      # cover process spawn before the first probe counts against retries.
+      start_period: 5s
   migrate:
     build:
       context: .

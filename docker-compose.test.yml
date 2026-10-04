@@ -55,6 +55,11 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+      # Same PostgreSQL engine as the base db, but this volume is persistent and
+      # reused, so initdb does not recur between runs; only crash recovery after
+      # an interrupted run applies. A shorter window than the base 30s keeps the
+      # fast gate responsive while still covering that recovery.
+      start_period: 10s
 
   # Override migrate service for test: uses test settings
   migrate:
