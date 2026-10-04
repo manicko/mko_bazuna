@@ -12,7 +12,7 @@ related:
 
 ## Purpose
 
-This file is the **single source of truth for the product owner's decisions O1–O5**. It is written for
+This file is the **single source of truth for the product owner's decisions O1–O8**. It is written for
 the **product owner** — the person who owns user-facing behavior, not architecture or implementation.
 
 Each decision records, in plain language, what the owner actually said about how the system should
@@ -38,6 +38,7 @@ anywhere else.
 | **O5** | Finding ads by category | Buyers must be able to **find ads by category name** in phase 1. | Hybrid search: denormalized category name included in the search index (weight 'C') plus fuzzy category detection; buyers search in their own language against per-language FTS vectors (no query-time translation — decision G). | D1 / D2 |
 | **O6** | Does a ban hide the banned seller's inventory? (Q7) | **A ban hides inventory.** A banned seller's ads are excluded from every public surface — search results, category listings, the ad detail page and the media gate. This is a **moderation** sanction, not a consent matter: banning is a seller-relationship sanction, and removing the inventory is part of that sanction. | Add the `is_banned=False` term to the shared public ad-visibility predicate on all four read surfaces (search, category listings, ad detail, media gate). Argue and record it as **ban enforcement**; never as a consent/`is_declined`/`consent_version` fix — those are different concepts and conflating them mislabels the change. | R4 |
 | **O7** | Does a ban also stop the seller creating or publishing? (Q7′) | **Yes.** A banned seller **cannot create or publish** a new ad. Ban enforcement covers **relisting**, not only login. | The write path (create/publish) refuses a banned seller. This is a **phase-06 follow-on** on the `SRCH-008` write boundary. Anywhere in the plan set that "a banned seller can still relist" is recorded as an accepted known gap, that gap is **closed** and the documenting test becomes a positive control asserting the block. | R4 |
+| **O8** | The single-word category narrowing: may the buyer undo the guess? (Q8) | **Yes — as a user-initiated opt-out, not as default behaviour.** The narrowing stays a **hard filter** for every request that does not ask otherwise, and the results page signals it. The buyer may undo the guess for their own query by following a control that **keeps their search term** and re-runs it across the **whole tree**. This is the ruling that discharges Q8's *"an undo, not merely a notice"* condition. | `search()` reads `?all_categories=1` and threads it into the narrowing step and the search cache key, suppressing the single-word category narrow **for that request only**. With the parameter absent, `_apply_fts_filtering` / `_is_single_word` behave exactly as before and the default predicate is **byte-identical**, so option (a)'s disjunctive branch is never adopted as default behaviour. The control's link carries `q` **and** the flag (plus the other seven filters). `SRCH-009` is now fully discharged. | D1 / D2 |
 
 ## Cross-References
 

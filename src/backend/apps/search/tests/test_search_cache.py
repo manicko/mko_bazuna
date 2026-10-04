@@ -528,6 +528,30 @@ class TestSearchCacheKey:
         key_b = build_search_cache_key(self._params(feature_slugs=["abs"]), "q", locale)
         assert key_a != key_b
 
+    def test_all_categories_flag_changes_the_key(self):
+        """The O8 opt-out is folded into the key so narrowed and whole-tree differ.
+
+        A narrowed search and a whole-tree search for the same query must never
+        share a cache entry — one would otherwise serve the other's result set.
+        """
+        locale = LanguageLocale.RUSSIAN
+        narrowed = build_search_cache_key(self._params(), "велосипед", locale)
+        whole_tree = build_search_cache_key(
+            self._params(), "велосипед", locale, all_categories=True
+        )
+        assert narrowed != whole_tree
+
+    def test_default_all_categories_key_is_byte_identical(self):
+        """With the flag absent the key is unchanged from the pre-O8 default."""
+        locale = LanguageLocale.RUSSIAN
+        default_explicit = build_search_cache_key(
+            self._params(), "велосипед", locale, all_categories=False
+        )
+        default_implicit = build_search_cache_key(
+            self._params(), "велосипед", locale
+        )
+        assert default_explicit == default_implicit
+
     def test_key_is_deterministic(self):
         """Same parameters always produce the same key."""
         params = self._params(

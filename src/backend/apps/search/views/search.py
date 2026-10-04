@@ -52,6 +52,16 @@ logger = logging.getLogger(__name__)
 # via increment_popular_search / record_search_history (SRH-001).
 MAX_SEARCH_QUERY_LENGTH: Final[int] = 200
 
+# Query parameter that suppresses the single-word fuzzy category narrowing for one
+# request. The buyer-initiated undo of the Q8 guess: with ``all_categories=1`` the
+# same query runs against the whole tree instead of the guessed subtree. It is an
+# opt-out, never a default: the parameter is absent from every pre-existing URL, so
+# the default predicate is byte-identical and option (a)'s disjunctive branch is
+# never adopted as default behaviour (Q8 ruling 2026-10-03; owner decision O8).
+ALL_CATEGORIES_PARAM: Final[str] = "all_categories"
+# Truthy spellings accepted for the opt-out flag.
+_ALL_CATEGORIES_TRUTHY: Final[frozenset[str]] = frozenset({"1", "true", "yes", "on"})
+
 
 def search(request: HttpRequest) -> HttpResponse:
     """
@@ -149,21 +159,28 @@ def search(request: HttpRequest) -> HttpResponse:
     results_truncated = False
 
     # The single-word fuzzy category narrowing is a hard filter (Q8 ruling
-    # 2026-10-03): this block signals it instead of changing it. The category
-    # resolved here is the same one ``_apply_fts_filtering`` narrows to, so the
-    # results page can name it and offer an undo. It is None for a multi-word
-    # query or when the match is ambiguous (08-VAL-003), so no control renders
-    # when no narrowing was applied. Nothing here changes the FTS predicate.
+    # 2026-10-03). The default path signals it and offers an undo; the buyer can
+    # opt out of the guess for one request with ``?all_categories=1`` (O8). The
+    # flag is read here, before the cache key is built, and threaded into both the
+    # narrowing and the cache key so a narrowed and a whole-tree search for the
+    # same query can never collide. When the flag is set, ``narrowed_category`` is
+    # None (there is nothing to undo) and ``_apply_fts_filtering`` skips the
+    # narrowing, so the buyer sees their own query across the whole tree.
+    all_categories = _all_categories_requested(request)
     narrowed_category: Category | None = None
 
     if query:
         locale = LanguageLocale.from_code(request.LANGUAGE_CODE)
-        if _is_single_word(query):
+        if _is_single_word(query) and not all_categories:
             narrowed_category = _fuzzy_category_match(query, locale)
-        cache_key = build_search_cache_key(params, query, locale)
+        cache_key = build_search_cache_key(
+            params, query, locale, all_categories=all_categories
+        )
 
         def producer() -> list[int]:
-            filtered_qs = _apply_fts_filtering(ads, query, params, request)
+            filtered_qs = _apply_fts_filtering(
+                ads, query, params, request, all_categories=all_categories
+            )
             return list(
                 filtered_qs.values_list("id", flat=True)
             )[:SEARCH_CACHE_MAX_HITS]
@@ -187,7 +204,9 @@ def search(request: HttpRequest) -> HttpResponse:
         else:
             # Cold miss loser (lock held by another worker): fall back to a
             # direct FTS query so the response is never blocked.
-            ads = _apply_fts_filtering(ads, query, params, request)
+            ads = _apply_fts_filtering(
+                ads, query, params, request, all_categories=all_categories
+            )
 
         _record_search_analytics(query, request)
 
@@ -198,7 +217,7 @@ def search(request: HttpRequest) -> HttpResponse:
         # it is below the cap, a dedicated COUNT(*) only at/over the cap, and
         # the already-built FTS queryset on the cold-miss loser fallback.
         total_count, results_truncated = _resolve_search_count(
-            cached_ids, ads, query, params, request
+            cached_ids, ads, query, params, request, all_categories=all_categories
         )
 
     # Resolve category-constrained filter options (F4/F5).
@@ -286,6 +305,7 @@ def search(request: HttpRequest) -> HttpResponse:
         "total_count": total_count,
         "results_truncated": results_truncated,
         "narrowed_category": narrowed_category,
+        "all_categories": all_categories,
         "show_filters": True,
     }
 
@@ -296,12 +316,23 @@ def search(request: HttpRequest) -> HttpResponse:
 
 
 def _apply_fts_filtering(
-    queryset: QuerySet, query: str, params: ListingsQueryParams, request: HttpRequest
+    queryset: QuerySet,
+    query: str,
+    params: ListingsQueryParams,
+    request: HttpRequest,
+    *,
+    all_categories: bool = False,
 ) -> QuerySet:
     """Apply per-language FTS filtering and relevance sort (pure, no side effects).
 
     Adds ``SearchRank`` annotation + TSVector filter on the locale's vector
     column, and overrides sort to keep ``-rank`` as a tiebreaker.
+
+    ``all_categories=True`` is the buyer's per-request opt-out of the single-word
+    fuzzy category narrowing (O8): the narrowing block is skipped for that request
+    only, so the same query runs against the whole tree. With the default
+    ``all_categories=False`` this function is byte-identical to its pre-O8 form and
+    ``_is_single_word`` still gates the narrowing.
 
     Side effects (analytics recording) are deliberately excluded — the caller
     should invoke :func:`_record_search_analytics` separately so that analytics
@@ -311,8 +342,9 @@ def _apply_fts_filtering(
     vector_field = locale.fts_vector_field
     config = locale.fts_config
 
-    # One-word queries: apply fuzzy category detection (locale-aware)
-    if _is_single_word(query):
+    # One-word queries: apply fuzzy category detection (locale-aware), unless the
+    # buyer opted out for this request (O8).
+    if _is_single_word(query) and not all_categories:
         category_filter = _fuzzy_category_match(query, locale)
         if category_filter:
             descendant_ids = category_filter.get_descendants(
@@ -353,6 +385,8 @@ def _resolve_search_count(
     query: str,
     params: ListingsQueryParams,
     request: HttpRequest,
+    *,
+    all_categories: bool = False,
 ) -> tuple[int, bool]:
     """Resolve the true match count and truncation flag for a query search.
 
@@ -367,6 +401,9 @@ def _resolve_search_count(
     - ``cached_ids is None`` (cold-miss loser, lock held): ``ads`` is already
       the FTS-filtered queryset, so its count is reused directly.
 
+    ``all_categories`` is threaded through to the count rebuild so a whole-tree
+    search counts the same rows the display path renders (O8).
+
     Returns:
         A ``(total_count, results_truncated)`` tuple.
     """
@@ -377,7 +414,11 @@ def _resolve_search_count(
     if cached_ids is not None:
         # At/over the cap: recompute the true count from a fresh FTS queryset.
         fts_count_qs = _apply_fts_filtering(
-            ListingsQuery.build_queryset(params), query, params, request
+            ListingsQuery.build_queryset(params),
+            query,
+            params,
+            request,
+            all_categories=all_categories,
         )
         total_count = fts_count_qs.count()
         return total_count, total_count > SEARCH_CACHE_MAX_HITS
@@ -385,6 +426,18 @@ def _resolve_search_count(
     # Cold-miss loser fallback: ads is already the FTS-filtered queryset.
     total_count = ads.count()
     return total_count, total_count > SEARCH_CACHE_MAX_HITS
+
+
+def _all_categories_requested(request: HttpRequest) -> bool:
+    """Whether the request opted out of the category narrowing (O8).
+
+    Reads ``?all_categories=`` and accepts the truthy spellings in
+    ``_ALL_CATEGORIES_TRUTHY``. Any other value (absent, empty, ``0``, ``false``)
+    leaves the default narrowing in place, so every pre-existing URL keeps the
+    exact pre-O8 predicate.
+    """
+    value = (request.GET.get(ALL_CATEGORIES_PARAM) or "").strip().lower()
+    return value in _ALL_CATEGORIES_TRUTHY
 
 
 def _record_search_analytics(query: str, request: HttpRequest) -> None:

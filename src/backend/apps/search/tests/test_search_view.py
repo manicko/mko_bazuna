@@ -24,7 +24,7 @@ from django.utils import timezone
 from apps.ads.models import Ad
 from apps.ads.services.listings_query import MAX_FEATURE_FILTER_SLUGS
 from apps.categories.models import Category
-from apps.core.enums import AdStatus
+from apps.core.enums import AdSort, AdStatus
 from apps.core.utils.json_logging import RedactingJsonFormatter
 from apps.locations.models import City
 from apps.lookups.models import LookupGroup, LookupItem
@@ -50,6 +50,23 @@ def _create_feature_group(count: int) -> dict[str, LookupItem]:
             group=group, slug=slug, name_i18n={"ru": slug, "en": slug}, is_active=True
         )
     return result
+
+
+def _create_lookup_item(group_code: str, slug: str) -> LookupItem:
+    """Create one active lookup item in its group (local helper).
+
+    ``purpose_lookup`` / ``condition_lookup`` / ``feature_lookup`` live in the
+    ads tests conftest and are not importable from the search tests package.
+    """
+    group, _ = LookupGroup.objects.get_or_create(
+        code=group_code, defaults={"is_system": True}
+    )
+    return LookupItem.objects.create(
+        group=group,
+        slug=slug,
+        name_i18n={"ru": slug, "en": slug},
+        is_active=True,
+    )
 
 
 
@@ -750,12 +767,14 @@ class TestSearchViewAmbiguousCategoryName:
 
 
 class TestSearchViewCategoryNarrowingSignal:
-    """The single-word narrowing is signalled and undoable (08-SRCH-009).
+    """The single-word narrowing is signalled and undoable (08-SRCH-009, O8).
 
-    Q8 was resolved 2026-10-03 (options b+c): the narrowing stays a hard
-    filter and the results page signals it with an undo. These tests pin the
-    signal, the undo, and the visibility guarantee that the undo must not
-    widen.
+    Q8 was resolved 2026-10-03 (options b+c): the narrowing stays a hard filter
+    and the results page signals it with an undo. O8 (coordinator ruling) added
+    the real undo as a per-request opt-out (``?all_categories=1``) that leaves the
+    default predicate byte-identical. These tests pin the signal, the real undo,
+    the whole-tree+query-preserving behaviour, and the visibility guarantee that
+    the undo must not widen.
     """
 
     def test_control_renders_and_undo_widens_to_whole_tree(
@@ -766,7 +785,7 @@ class TestSearchViewCategoryNarrowingSignal:
         other_category: Category,
         city: City,
     ) -> None:
-        """A one-word category match renders the control; its undo returns the whole tree."""
+        """A one-word category match renders the control; its undo keeps q, drops the guess."""
         ad_narrowed = create_test_ad(
             seller,
             child_category,
@@ -796,18 +815,24 @@ class TestSearchViewCategoryNarrowingSignal:
         # Under ?lang=ru the msgids resolve to the Russian catalogue, so assert
         # the translated strings (which also proves the ru msgstr is wired).
         html = response.content.decode()
-        assert "Искать во всех категориях" in html
+        assert "Смотреть все объявления" in html
         assert root_category.name in html
 
-        # Follow the undo link exactly as rendered: it widens to the whole tree
-        # while preserving the other active filters.
+        # Follow the undo link exactly as rendered: it keeps the buyer's query,
+        # opts out of the guess, and preserves the other active filters.
         href_match = re.search(
-            r'<a href="([^"]*)"[^>]*>Искать во всех категориях</a>', html
+            r'<a href="([^"]*)"[^>]*>Смотреть все объявления</a>', html
         )
         assert href_match, "undo link not found in rendered control"
-        assert "min_price=10" in href_match.group(1)
-        undo = client.get(href_match.group(1))
+        undo_href = href_match.group(1)
+        assert "all_categories=1" in undo_href
+        assert "q=" in undo_href
+        assert "min_price=10" in undo_href
+
+        undo = client.get(undo_href)
         assert undo.status_code == 200
+        # The buyer's own query is preserved, not discarded.
+        assert undo.context["query"] == "Транспорт"
         whole_tree_ids = {a.id for a in undo.context["page_obj"]}
         assert ad_narrowed.id in whole_tree_ids
         assert ad_other_branch.id in whole_tree_ids
@@ -822,7 +847,8 @@ class TestSearchViewCategoryNarrowingSignal:
     ) -> None:
         """The undo must not expose non-PUBLISHED or inactive-category ads.
 
-        Asserted WITH the control rendered, not instead of it.
+        Asserted WITH the control rendered and by following its rendered href
+        (which carries ``all_categories=1``), not a hand-built URL.
         """
         active_ad = create_test_ad(
             seller,
@@ -853,11 +879,16 @@ class TestSearchViewCategoryNarrowingSignal:
         response = client.get("/search/?q=Транспорт&lang=ru")
 
         assert response.status_code == 200
+        html = response.content.decode()
         # The control is rendered ...
-        assert "Искать во всех категориях" in response.content.decode()
+        assert "Смотреть все объявления" in html
 
         # ... and the undo target still applies the visibility predicate.
-        undo = client.get("/?lang=ru")
+        href_match = re.search(
+            r'<a href="([^"]*)"[^>]*>Смотреть все объявления</a>', html
+        )
+        assert href_match, "undo link not found in rendered control"
+        undo = client.get(href_match.group(1))
         assert undo.status_code == 200
         whole_tree_ids = {a.id for a in undo.context["page_obj"]}
         assert active_ad.id in whole_tree_ids
@@ -884,7 +915,155 @@ class TestSearchViewCategoryNarrowingSignal:
 
         assert response.status_code == 200
         assert response.context["narrowed_category"] is None
-        assert "Искать во всех категориях" not in response.content.decode()
+        assert "Смотреть все объявления" not in response.content.decode()
+
+    def test_all_categories_flag_returns_whole_tree_and_keeps_query(
+        self,
+        seller: User,
+        root_category: Category,
+        child_category: Category,
+        other_category: Category,
+        city: City,
+    ) -> None:
+        """The flag suppresses the narrowing and keeps the query (O8).
+
+        With ``?all_categories=1`` a single-word query returns results from the
+        whole tree and the buyer's query is preserved in the context.
+        """
+        ad_narrowed = create_test_ad(
+            seller,
+            child_category,
+            city,
+            title="Транспорт — детский велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+        ad_other_branch = create_test_ad(
+            seller,
+            other_category,
+            city,
+            title="Транспорт — электроника",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        # Default: the narrowing hides the other branch.
+        narrowed = client.get("/search/?q=Транспорт&lang=ru")
+        assert ad_other_branch.id not in {
+            a.id for a in narrowed.context["page_obj"]
+        }
+
+        # Opt-out: the whole tree returns and the query is retained.
+        response = client.get("/search/?q=Транспорт&all_categories=1&lang=ru")
+
+        assert response.status_code == 200
+        assert response.context["query"] == "Транспорт"
+        # Nothing to undo when the guess did not apply.
+        assert response.context["narrowed_category"] is None
+        result_ids = {a.id for a in response.context["page_obj"]}
+        assert ad_narrowed.id in result_ids
+        assert ad_other_branch.id in result_ids
+
+    def test_all_categories_flag_multi_word_is_unaffected(
+        self,
+        seller: User,
+        root_category: Category,
+        child_category: Category,
+        city: City,
+    ) -> None:
+        """A multi-word query is unaffected by the flag (no narrowing either way)."""
+        ad = create_test_ad(
+            seller,
+            child_category,
+            city,
+            title="Транспорт красный",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        without = client.get("/search/?q=Транспорт+красный&lang=ru")
+        with_flag = client.get(
+            "/search/?q=Транспорт+красный&all_categories=1&lang=ru"
+        )
+
+        assert with_flag.status_code == 200
+        assert with_flag.context["narrowed_category"] is None
+        assert ad.id in {a.id for a in with_flag.context["page_obj"]}
+        # The flag changes nothing for a multi-word query.
+        assert {a.id for a in without.context["page_obj"]} == {
+            a.id for a in with_flag.context["page_obj"]
+        }
+
+    def test_all_categories_flag_preserves_every_other_filter(
+        self,
+        seller: User,
+        root_category: Category,
+        child_category: Category,
+        other_category: Category,
+        city: City,
+    ) -> None:
+        """The opt-out preserves all eight other active filters, not just min_price.
+
+        The Validator noted the shipped test exercised only ``min_price``. This
+        asserts city, sort, price range, purpose, condition and features all
+        survive alongside the flag.
+        """
+        purpose = _create_lookup_item("listing_purpose", "sell")
+        condition = _create_lookup_item("listing_condition", "new")
+        feature = _create_lookup_item("listing_feature", "delivery")
+
+        ad = create_test_ad(
+            seller,
+            child_category,
+            city,
+            title="Транспорт — детский велосипед",
+            status=AdStatus.PUBLISHED,
+            price=150,
+            listing_purpose=purpose,
+            listing_condition=condition,
+        )
+        ad.features.add(feature)
+        # A same-query ad that must be excluded by the preserved city filter.
+        ad_wrong_city = create_test_ad(
+            seller,
+            child_category,
+            city=None,
+            title="Транспорт — без города",
+            status=AdStatus.PUBLISHED,
+            listing_purpose=purpose,
+            listing_condition=condition,
+        )
+        ad_wrong_city.features.add(feature)
+
+        client = Client()
+        params = {
+            "q": "Транспорт",
+            "all_categories": "1",
+            "city": city.slug,
+            "sort": AdSort.PRICE_LOW.value,
+            "min_price": "10",
+            "max_price": "200",
+            "listing_purpose": purpose.slug,
+            "condition": condition.slug,
+            "features": feature.slug,
+            "lang": "ru",
+        }
+        query_string = "&".join(f"{k}={v}" for k, v in params.items())
+        response = client.get(f"/search/?{query_string}")
+
+        assert response.status_code == 200
+        ctx = response.context
+        assert ctx["current_city"] == city.slug
+        assert ctx["current_sort"] == AdSort.PRICE_LOW
+        assert ctx["min_price"] == "10"
+        assert ctx["max_price"] == "200"
+        assert ctx["current_listing_purpose"] == purpose.slug
+        assert ctx["current_condition"] == condition.slug
+        assert list(ctx["current_features"]) == [feature.slug]
+
+        result_ids = {a.id for a in ctx["page_obj"]}
+        assert ad.id in result_ids
+        # The city filter is preserved, so the same-query ad in no city is out.
+        assert ad_wrong_city.id not in result_ids
 
 
 class TestSearchViewCitySuggestion:

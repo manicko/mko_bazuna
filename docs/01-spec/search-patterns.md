@@ -78,10 +78,14 @@ critical path.
 4. Single-word queries trigger locale-aware fuzzy category detection against the
    locale-appropriate category name (`Category.get_name(locale)`). A match narrows
    the query to that category's subtree as a hard filter; the results page signals
-   the narrowing ("showing results for &lt;Category&gt; only") and offers an undo
-   ("search all categories"). When two or more active categories share the
-   localised display name the match is ambiguous, so no guess is made and the
-   search stays whole-tree (08-VAL-003).
+   the narrowing ("showing results for &lt;Category&gt; only") and offers a real
+   undo. Following the undo re-runs the buyer's **own query** (`q` preserved)
+   across the whole tree via `?all_categories=1`, which suppresses the narrowing
+   for that request only and preserves every other active filter. The opt-out
+   never alters the default predicate: with the parameter absent, `_is_single_word`
+   still gates the narrowing and the default path is byte-identical. When two or
+   more active categories share the localised display name the match is ambiguous,
+   so no guess is made and the search stays whole-tree (08-VAL-003).
 
 ### Implementation
 
@@ -372,10 +376,13 @@ Category names are searchable via per-language fields in the search vectors.
   `search_vector_bs` / `search_vector_en`, at weight 'C'
 - Single-word queries matching category names set `category_id` filter
   (locale-aware via `Category.get_name(locale)`). The narrowing is a decided
-  hard filter (Q8 ruling 2026-10-03); the results page signals it and offers an
-  undo. An ambiguous display name (two or more active categories sharing it)
-  makes no guess, so the search is not scoped to an arbitrary branch
-  (08-VAL-003).
+  hard filter (Q8 ruling 2026-10-03); the results page signals it and offers a
+  real undo. The undo re-runs the buyer's own query across the whole tree with
+  `?all_categories=1`, which suppresses the narrowing for that one request and
+  is folded into the search cache key so a narrowed and a whole-tree result set
+  for the same query never share an entry (O8). An ambiguous display name (two
+  or more active categories sharing it) makes no guess, so the search is not
+  scoped to an arbitrary branch (08-VAL-003).
 
 Related user stories: US-B3, US-B6
 

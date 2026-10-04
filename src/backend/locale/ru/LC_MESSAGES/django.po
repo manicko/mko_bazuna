@@ -1810,5 +1810,5 @@ msgid "Showing results for %(category)s only"
 msgstr "Показаны объявления только в категории «%(category)s»"
 
 #: src/backend/templates/ads/partials/ad_list.html
-msgid "Search all categories"
-msgstr "Искать во всех категориях"
+msgid "Browse all listings"
+msgstr "Смотреть все объявления"

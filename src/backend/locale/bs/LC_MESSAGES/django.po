@@ -1789,5 +1789,5 @@ msgid "Showing results for %(category)s only"
 msgstr "Prikazani su samo oglasi u kategoriji „%(category)s”"
 
 #: src/backend/templates/ads/partials/ad_list.html
-msgid "Search all categories"
-msgstr "Pretraži sve kategorije"
+msgid "Browse all listings"
+msgstr "Pregledaj sve oglase"

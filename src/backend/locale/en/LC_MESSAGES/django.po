@@ -1583,5 +1583,5 @@ msgid "Showing results for %(category)s only"
 msgstr ""
 
 #: src/backend/templates/ads/partials/ad_list.html
-msgid "Search all categories"
+msgid "Browse all listings"
 msgstr ""

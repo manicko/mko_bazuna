@@ -94,17 +94,18 @@ is unaffected. {% endcomment %}
         {% blocktrans %}Over 1,000 results found. Showing the first 1,000. Refine your search to see more.{% endblocktrans %}
     </div>
 {% endif %}
-<!-- Single-word category narrowing signal + undo (08-SRCH-009, Q8 ruling 2026-10-03).
-     The narrowing stays a hard filter; this control names the guessed category and
-     offers an undo that widens the query to the whole tree while preserving the
-     other active filters. It changes the scope of the query, never who may see what. -->
+<!-- Single-word category narrowing signal + undo (08-SRCH-009, Q8 ruling 2026-10-03, O8).
+     The narrowing stays a hard filter by default; this control names the guessed
+     category and offers a real UNDO: it re-runs the buyer's own query (q preserved)
+     across the whole tree via ?all_categories=1, while preserving the other active
+     filters. It changes the scope of the query, never who may see what. -->
 {% if query and narrowed_category %}
     <div class="mb-4 flex flex-wrap gap-2 items-center text-sm text-gray-700 bg-blue-50 border border-blue-200 rounded-lg px-4 py-3">
         <p class="m-0">
             {% blocktrans with category=narrowed_category|get_category_name:LANGUAGE_CODE %}Showing results for {{ category }} only{% endblocktrans %}
         </p>
-        <a href="{% url 'ads:listings' %}?{% if LANGUAGE_CODE %}lang={{ LANGUAGE_CODE }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% if current_condition %}&condition={{ current_condition }}{% endif %}{% for fslug in current_features %}&features={{ fslug }}{% endfor %}"
-           class="underline font-medium text-blue-700">{% trans "Search all categories" %}</a>
+        <a href="{% url 'search:search' %}?q={{ query|urlencode }}&all_categories=1{% if LANGUAGE_CODE %}&lang={{ LANGUAGE_CODE }}{% endif %}{% if current_city %}&city={{ current_city }}{% endif %}{% if current_sort %}&sort={{ current_sort }}{% endif %}{% if min_price %}&min_price={{ min_price }}{% endif %}{% if max_price %}&max_price={{ max_price }}{% endif %}{% if current_listing_purpose %}&listing_purpose={{ current_listing_purpose }}{% endif %}{% if current_condition %}&condition={{ current_condition }}{% endif %}{% for fslug in current_features %}&features={{ fslug }}{% endfor %}"
+           class="underline font-medium text-blue-700">{% trans "Browse all listings" %}</a>
     </div>
 {% endif %}
 <!-- Ads grid -->

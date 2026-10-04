@@ -99,6 +99,8 @@ def build_search_cache_key(
     params: ListingsQueryParams,
     query: str,
     locale: LanguageLocale,
+    *,
+    all_categories: bool = False,
 ) -> str:
     """Build a cache key encoding all search-varying parameters.
 
@@ -114,6 +116,12 @@ def build_search_cache_key(
     condition, features, sort, per_page) are JSON-serialized with sorted
     keys for deterministic hashing.  The locale ensures per-language vector
     queries never collide.
+
+    ``all_categories`` is the per-request opt-out of the single-word category
+    narrowing (O8). It is folded into the filters hash so a narrowed search and a
+    whole-tree search for the *same* query never share a cache entry — one would
+    otherwise serve the other's result set. It defaults to ``False``, so every
+    pre-existing key is byte-identical.
 
     Note: ``page`` is intentionally excluded — the cache stores the complete
     ordered result set (up to ``SEARCH_CACHE_MAX_HITS``).  Pagination is
@@ -132,6 +140,7 @@ def build_search_cache_key(
         "feat": ",".join(sorted(params.feature_slugs)),
         "sort": params.sort.value,
         "per_page": params.per_page,
+        "all_categories": all_categories,
     }
     filters_hash = hashlib.sha256(
         json.dumps(filters, sort_keys=True, default=str).encode("utf-8")
