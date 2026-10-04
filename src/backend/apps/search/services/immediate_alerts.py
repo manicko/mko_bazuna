@@ -5,8 +5,17 @@ builder (AL-002).
 Flow (Approach 1, per alert-delivery-research):
     ``Ad.post_save(PUBLISHED)`` -> ``transaction.on_commit`` ->
     ``deliver_immediate_alerts(ad_id)`` -> ad-centric matcher ->
-    idempotent ``SavedSearchNotification`` recording -> background daemon thread
-    ``asyncio.run(Bot(...))`` send capped by ``asyncio.Semaphore(10)``.
+    idempotent ``SavedSearchNotification`` recording -> a
+    ``ThreadPoolExecutor(max_workers=5)`` worker running
+    ``asyncio.run(Bot(...))``, whose send fan-out is capped by
+    ``asyncio.Semaphore(10)``.
+
+The dispatch runs on a ``concurrent.futures`` pool, **not** a
+``threading.Thread``: its workers are **non-daemon** on Python 3.9+, so the
+interpreter joins them at exit. Gunicorn's ``graceful_timeout`` (30 s) can
+therefore expire while a worker still holds in-flight sends, which is why a
+**worker-side** shutdown hook (``gunicorn.conf.py::worker_exit``) exists to
+cancel queued work. Do not describe this pool as a daemon thread.
 
 Delivery state (03-DB-007): a ``SavedSearchNotification`` row is an ATTEMPT
 RECORD and ``delivered_at`` is the receipt. ``find_matching_saved_searches``
@@ -19,7 +28,8 @@ never recorded (A4/C8); their pair stays collectable.
 
 import asyncio
 import logging
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import Future, ThreadPoolExecutor
+from functools import partial
 from typing import Final
 
 from aiogram import Bot
@@ -64,13 +74,33 @@ _BACKOFF_BASE: Final[float] = 0.5
 # leaves ``_BACKOFF_BASE`` (0.5) below the ceiling unchanged.
 RETRY_AFTER_CEILING: Final[float] = 30.0
 
-# Bounded thread pool: caps concurrent delivery daemon threads globally.
-# Replaces unbounded threading.Thread (one per published ad burst).
+# Bounded thread pool: caps concurrent delivery worker threads globally.
+# Replaces unbounded threading.Thread (one per published ad burst). The pool's
+# work queue is itself UNBOUNDED, so this caps concurrency, not backlog; the
+# backlog is bounded by _MAX_IN_FLIGHT_BATCHES below.
 _MAX_DELIVERY_THREADS: Final[int] = 5
 _executor: ThreadPoolExecutor = ThreadPoolExecutor(
     max_workers=_MAX_DELIVERY_THREADS,
     thread_name_prefix="immediate-alert-send",
 )
+
+# Backpressure threshold on in-flight batches (09-API-013, option (a)).
+# ``ThreadPoolExecutor`` accepts an unbounded number of queued submissions, so
+# ``_MAX_DELIVERY_THREADS`` throttles concurrency without bounding the backlog.
+# When more than this many batches are in flight, a new dispatch is SKIPPED with
+# a WARNING rather than queued. This is a DECISION, never a wait:
+# ``deliver_immediate_alerts`` runs inside ``transaction.on_commit`` and must not
+# block the committing thread. Because ``ThreadPoolExecutor`` starts a worker per
+# submitted callable until ``max_workers`` is reached, in-flight can legitimately
+# reach ``_MAX_DELIVERY_THREADS`` (all busy) but not exceed it while queued work
+# is being rejected; the threshold is set above the worker cap so a batch is
+# only shed once the queue itself is filling behind busy workers.
+_MAX_IN_FLIGHT_BATCHES: Final[int] = 2 * _MAX_DELIVERY_THREADS
+
+# Batches submitted to ``_executor`` and not yet finished. Incremented before
+# ``submit`` and decremented in the done-callback, so it cannot leak on a
+# failure path. Fork-local: each process gets its own copy after ``fork()``.
+_in_flight_batches: int = 0
 
 # Inline callback prefix for unsubscribe (callback_data="unsub:<token>").
 # Defined as a backend-native string constant to avoid a backend→bot dependency
@@ -85,11 +115,12 @@ def deliver_immediate_alerts(ad_id: int) -> None:
 
     Matches active saved searches for the ad, records notifications
     idempotently, and sends one per-ad message to each matching user with a
-    stable ``chat_id`` in a background daemon thread.
+    stable ``chat_id`` on a background thread-pool worker.
 
     Must be called from within the ad's transaction via
     ``transaction.on_commit`` so delivery only fires after the PUBLISHED
-    commit (F6/F8/R3).
+    commit (F6/F8/R3). It therefore never blocks the committing thread: the
+    backpressure gate below is a decision to skip, never a wait.
 
     The ad's *owner* must be account-state eligible: a decline preserves a
     seller's already-published ads, and this signal fires on ANY ``post_save``
@@ -138,8 +169,59 @@ def deliver_immediate_alerts(ad_id: int) -> None:
         saved_search.save(update_fields=["last_notified_at", "updated_at"])
 
     # Dispatch to the bounded global thread pool so concurrent publish
-    # bursts never exceed _MAX_DELIVERY_THREADS daemon threads.
-    _executor.submit(_run_send, payloads)
+    # bursts never exceed _MAX_DELIVERY_THREADS worker threads. The returned
+    # Future is never discarded: _on_send_finished retrieves its exception and
+    # decrements the in-flight counter.
+    global _in_flight_batches
+    if _in_flight_batches >= _MAX_IN_FLIGHT_BATCHES:
+        # Shedding is duplicate-safe: the SavedSearchNotification rows above
+        # were written BEFORE this dispatch, and the daily ``send_alerts``
+        # digest is an unconditional backstop, so a dropped immediate alert is
+        # still delivered later rather than lost (09-API-013).
+        logger.warning(
+            "Immediate-alert dispatch for ad %s skipped: %s batches already "
+            "in flight (threshold %s)",
+            ad_id,
+            _in_flight_batches,
+            _MAX_IN_FLIGHT_BATCHES,
+        )
+        return
+
+    _in_flight_batches += 1
+    try:
+        future = _executor.submit(_run_send, payloads)
+    except BaseException:
+        # Submit itself failed (e.g. a shutdown executor): undo the increment
+        # and re-raise, so the counter cannot leak.
+        _in_flight_batches -= 1
+        raise
+    future.add_done_callback(partial(_on_send_finished, len(payloads)))
+
+
+def _on_send_finished(payload_count: int, future: Future[None]) -> None:
+    """Retrieve the dispatch outcome, release its in-flight slot, and log failures.
+
+    Attached to every submitted ``Future``. ``deliver_immediate_alerts`` is
+    called from ``transaction.on_commit``, so nothing above the submission can
+    ever observe a failure inside ``_run_send``; retrieving
+    ``future.exception()`` here is the only place the exception becomes
+    visible. It also decrements the in-flight counter so a failure path cannot
+    leak a slot.
+
+    Args:
+        payload_count: Number of payloads in the completed batch (bound at
+            submission time; a ``Future`` does not carry it).
+        future: The completed dispatch future.
+    """
+    global _in_flight_batches
+    _in_flight_batches -= 1
+    exc = future.exception()
+    if exc is not None:
+        logger.error(
+            "Immediate-alert dispatch failed for a batch of %s payloads",
+            payload_count,
+            exc_info=exc,
+        )
 
 
 def _payload_ss_ids(payloads: list[dict]) -> set[int]:
@@ -244,11 +326,20 @@ def _build_payload(ad: Ad, saved_search: SavedSearch) -> dict | None:
 
 
 def _run_send(payloads: list[dict]) -> None:
-    """Run the async send loop for the collected payloads in this thread."""
+    """Run the async send loop for the collected payloads in this thread.
+
+    Catches ``Exception`` broadly so a ``RuntimeError`` from the payload
+    builder, from ``asyncio.run``, from a DB error inside
+    ``_mark_delivered``'s ``sync_to_async`` bridge, or from
+    ``bot.session.close()`` in the ``finally`` does not disappear into a
+    ``Future`` nobody retrieves (09-API-013). ``logger.exception`` (not
+    ``logger.warning``) preserves the stack trace, so a programming error
+    stays diagnosable.
+    """
     try:
         asyncio.run(_send_payloads(settings.BOT_TOKEN, payloads))
-    except AiogramError as exc:
-        logger.error("Immediate alert send failed: %s", exc)
+    except Exception:
+        logger.exception("Immediate alert send failed")
 
 
 async def _send_payloads(bot_token: str, payloads: list[dict]) -> None:

@@ -90,6 +90,89 @@ def test_gunicorn_has_child_exit_hook() -> None:
 
 
 # ---------------------------------------------------------------------------
+# gunicorn worker_exit hook — worker-side shutdown of the alert executor
+# (09-API-013)
+# ---------------------------------------------------------------------------
+
+
+def test_gunicorn_has_worker_exit_hook_with_lazy_import() -> None:
+    """gunicorn.conf.py defines a WORKER-side worker_exit that imports lazily.
+
+    ``preload_app = True`` means an import-time (``atexit``/``ready()``) hook
+    belongs to the master and is a no-op in the forked workers that own the
+    in-flight sends. ``worker_exit`` runs inside the child's own exit path, so
+    the hook must live there — and its import must be INSIDE the function body
+    or the module becomes a Django import at config-parse time.
+    """
+    content = (_PROJECT_ROOT / "gunicorn.conf.py").read_text(encoding="utf-8")
+    assert "def worker_exit" in content, (
+        "gunicorn.conf.py must define a worker_exit hook"
+    )
+    assert "cancel_futures=True" in content, (
+        "worker_exit must cancel queued work via shutdown(cancel_futures=True)"
+    )
+    # The exec of gunicorn.conf.py must not import Django: the import of
+    # immediate_alerts appears only inside the worker_exit body, never at module
+    # top level.
+    assert "from apps.search.services import immediate_alerts" in content, (
+        "worker_exit must import immediate_alerts to reach its executor"
+    )
+    module_level_imports = [
+        line
+        for line in content.splitlines()
+        if line.startswith("from apps.") or line.startswith("import apps.")
+    ]
+    assert module_level_imports == [], (
+        "gunicorn.conf.py must not import Django apps at module level: "
+        f"{module_level_imports}"
+    )
+
+
+def test_worker_exit_shuts_down_alert_executor_without_wait(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """worker_exit calls ``_executor.shutdown(wait=False, cancel_futures=True)``.
+
+    The executor is monkeypatched with a Mock: executing the hook against the
+    real module would shut down the session-wide global executor and silently
+    break every later test that dispatches an alert. This mirrors
+    ``_patch_mark_process_dead``.
+    """
+    from apps.search.services import immediate_alerts
+
+    gunicorn_conf = _load_gunicorn_conf()
+
+    shutdown = Mock()
+    monkeypatch.setattr(immediate_alerts._executor, "shutdown", shutdown)
+
+    gunicorn_conf.worker_exit(None, _worker())
+
+    shutdown.assert_called_once_with(wait=False, cancel_futures=True)
+
+
+def test_worker_exit_import_failure_does_not_raise(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """An import failure inside worker_exit is swallowed (guarded lazy import)."""
+    gunicorn_conf = _load_gunicorn_conf()
+
+    import builtins
+
+    real_import = builtins.__import__
+
+    def _boom(name: str, *args: object, **kwargs: object):
+        if name == "apps.search.services":
+            raise ImportError("simulated")
+        return real_import(name, *args, **kwargs)
+
+    monkeypatch.setattr(builtins, "__import__", _boom)
+
+    # Must not raise: the guard keeps the exit path safe in containers that
+    # never import the alert module (migrate, seed, load_cities, ...).
+    gunicorn_conf.worker_exit(None, _worker())
+
+
+# ---------------------------------------------------------------------------
 # gunicorn child_exit hook guard (ENT-001)
 # ---------------------------------------------------------------------------
 

@@ -66,3 +66,40 @@ def child_exit(server, worker):
     )
     if path:
         multiprocess.mark_process_dead(worker.pid)
+
+
+def worker_exit(server, worker):
+    """Cancel the immediate-alert executor's queued work as a worker exits.
+
+    ``preload_app = True`` means ``django.setup()`` runs in the master before
+    workers fork, so the app (and the module-level ``ThreadPoolExecutor``) is
+    constructed in the master. Worker-side-ness of the pool therefore depends
+    on the *import* of ``immediate_alerts`` happening post-fork, which it does:
+    ``apps/moderation/signals.py`` imports it lazily inside ``transaction.on_commit``.
+    An ``atexit``/``ready()`` hook would belong to the master and would be a
+    no-op for the forked children that hold the in-flight sends.
+
+    ``worker_exit`` is the worker-side registration point: Gunicorn invokes it
+    inside the child's own ``finally`` after ``worker.init_process()``, on the
+    normal exit path. (``on_exit`` and ``worker_int`` are master-side.)
+    ``concurrent.futures`` threads are non-daemon on Python 3.9+, so without
+    this hook the interpreter joins them at exit and a worker can outlast the
+    30 s ``graceful_timeout``; ``shutdown(wait=False, cancel_futures=True)``
+    cancels queued work without blocking the exit.
+
+    Both the import and the shutdown are guarded by a broad ``except Exception``:
+    the one-shot containers (``migrate``, ``seed``, ``load_cities``,
+    ``load_catalog``, ``create_admin``) never import the module, and an
+    exception escaping this hook during Gunicorn's exit path is expensive — an
+    unguarded ``TypeError`` from ``child_exit`` once escaped to the loop-level
+    handler and stopped the arbiter with exit 255. The lazy import keeps this
+    import-time module free of Django imports, preserving the ``preload_app``
+    promise stated above.
+    """
+    try:
+        from apps.search.services import immediate_alerts
+
+        immediate_alerts._executor.shutdown(wait=False, cancel_futures=True)
+    except Exception:
+        # Best-effort cleanup on the exit path; never let this hook raise.
+        pass

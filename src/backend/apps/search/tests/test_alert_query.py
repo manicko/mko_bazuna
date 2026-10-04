@@ -11,6 +11,7 @@ Covers:
 - ``deliver_immediate_alerts``: idempotent recording + gate behavior (AL-001)
 """
 
+from concurrent.futures import Future
 from unittest.mock import patch
 
 import pytest
@@ -68,15 +69,20 @@ class _SyncExecutor:
     another thread and any exception is captured in the worker, not propagated
     to the caller. Tests that assert on what was submitted (or on an exception
     escaping) replace it with this inline stand-in.
+
+    ``submit`` returns a real, already-resolved ``concurrent.futures.Future``
+    on success: ``deliver_immediate_alerts`` attaches a done-callback that
+    retrieves the future's exception and decrements the in-flight counter, so a
+    stand-in without ``add_done_callback`` would break the dispatch. A callable
+    that raises still propagates inline (the old behaviour), which is what the
+    "an exception escaping" test in this module relies on.
     """
 
     def submit(self, fn, *args):
         fn(*args)
-
-        class _Immediate:
-            """Minimal Future stand-in; the caller ignores it."""
-
-        return _Immediate()
+        future: Future = Future()
+        future.set_result(None)
+        return future
 
 
 @pytest.fixture

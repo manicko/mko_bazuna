@@ -21,6 +21,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable
+from concurrent.futures import Future
 
 import pytest
 from django.db.models import Q
@@ -227,10 +228,14 @@ class TestDeclinedSellerAdDoesNotFanOut:
 
         # Real executor submits on another thread; run inline so the assertion
         # is deterministic (same idiom as the sync_executor fixture elsewhere).
+        # ``submit`` returns a resolved Future: the caller attaches a
+        # done-callback that would fail on ``None``.
         class _Inline:
             def submit(self, fn, *args):
                 fn(*args)
-                return None
+                future: Future = Future()
+                future.set_result(None)
+                return future
 
         monkeypatch.setattr(
             "apps.search.services.immediate_alerts._executor", _Inline()
@@ -299,10 +304,13 @@ class TestOneDeclarationDrivesAllSites:
         )
 
         # Inline executor so the immediate-path observation is deterministic.
+        # ``submit`` returns a resolved Future for the caller's done-callback.
         class _Inline:
             def submit(self, fn, *args):
                 fn(*args)
-                return None
+                future: Future = Future()
+                future.set_result(None)
+                return future
 
         monkeypatch.setattr(
             "apps.search.services.immediate_alerts._executor", _Inline()

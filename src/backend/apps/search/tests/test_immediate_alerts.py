@@ -5,12 +5,17 @@ Covers:
 - One Bot constructed per batch (not per message); session.close once in finally.
 - asyncio.gather return_exceptions=True isolates failures (siblings proceed).
 - 429 TelegramRetryAfter backoff honored and retry attempted.
-- _run_send narrows except to AiogramError (non-Aiogram errors propagate).
+- _run_send catches Exception and logs with a stack trace; a failure no longer
+  escapes into a Future nobody retrieves (09-API-013).
 """
 
 from __future__ import annotations
 
 import logging
+import os
+import subprocess
+import sys
+from concurrent.futures import Future
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -21,7 +26,10 @@ from aiogram.exceptions import (
     TelegramServerError,
 )
 
+from apps.core.enums import AdStatus
 from apps.core.utils.sanitize import mask_telegram_id
+from apps.search.models import SavedSearch
+from conftest import create_test_ad
 
 pytestmark = [pytest.mark.unit]
 
@@ -401,7 +409,14 @@ class TestHostileMarkupEscaped:
 # ---------------------------------------------------------------------------
 
 class TestRunSendExceptionNarrowing:
-    """_run_send catches AiogramError, not bare Exception."""
+    """_run_send contains any exception and logs it with a stack trace.
+
+    The previous class docstring stated "_run_send catches AiogramError, not
+    bare Exception", and ``test_non_aiogram_error_propagates`` asserted that a
+    ``RuntimeError`` propagated. Both encoded the 09-API-013 defect as intended
+    behaviour: a non-``AiogramError`` reached the unretrieved ``Future`` and was
+    lost with no log line. ``_run_send`` now catches ``Exception`` and logs it.
+    """
 
     def test_aiogram_error_caught_and_logged(self) -> None:
         """AiogramError from _send_payloads is caught (not propagated)."""
@@ -414,16 +429,229 @@ class TestRunSendExceptionNarrowing:
             # Must not raise — AiogramError is caught and logged.
             _run_send([])
 
-    def test_non_aiogram_error_propagates(self) -> None:
-        """Non-AiogramError (e.g. RuntimeError) propagates — not swallowed."""
+    def test_non_aiogram_error_is_logged_with_stack_trace(
+        self, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A RuntimeError is logged at ERROR with a traceback — it does not escape.
+
+        The old ``test_non_aiogram_error_propagates`` asserted
+        ``pytest.raises(RuntimeError)`` here. That documented the defect:
+        ``deliver_immediate_alerts`` discards the ``Future``, so an escaping
+        error was stored where nobody read it and the batch was lost silently.
+        """
         with patch(
             "apps.search.services.immediate_alerts._send_payloads",
             new=AsyncMock(side_effect=RuntimeError("unexpected")),
         ):
             from apps.search.services.immediate_alerts import _run_send
 
-            with pytest.raises(RuntimeError, match="unexpected"):
+            with caplog.at_level(logging.ERROR):
+                # Must not raise: the error is contained, not propagated.
                 _run_send([])
+
+        records = [
+            r for r in caplog.records if r.levelno == logging.ERROR
+        ]
+        assert records, "a non-AiogramError dispatch must leave an ERROR log"
+        assert any(r.exc_info is not None for r in records), (
+            "the failure must be logged with a stack trace (logger.exception)"
+        )
+        assert "unexpected" in caplog.text
+
+
+# ---------------------------------------------------------------------------
+# Dispatch observability + backpressure (09-API-013)
+# ---------------------------------------------------------------------------
+
+
+class _ImmediateFutureExecutor:
+    """Run each submission inline and return a real, already-resolved Future.
+
+    Mirrors the production contract the caller relies on: ``submit`` returns a
+    ``concurrent.futures.Future`` so the done-callback can retrieve its outcome.
+    """
+
+    def submit(self, fn, *args):  # noqa: ANN001, ANN201
+        future: Future = Future()
+        try:
+            fn(*args)
+        except BaseException as exc:  # noqa: BLE001
+            future.set_exception(exc)
+        else:
+            future.set_result(None)
+        return future
+
+
+class TestDispatchFailureIsRetrievable:
+    """A failed dispatch leaves a retrievable ERROR log with the payload count."""
+
+    def test_done_callback_logs_failure_with_payload_count(
+        self, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+    ) -> None:
+        """A non-AiogramError batch failure is retrieved, not lost in the Future."""
+        from apps.search.services import immediate_alerts
+
+        monkeypatch.setattr(
+            immediate_alerts, "_executor", _ImmediateFutureExecutor()
+        )
+        monkeypatch.setattr(
+            immediate_alerts,
+            "_run_send",
+            lambda payloads: (_ for _ in ()).throw(RuntimeError("payload builder")),
+        )
+        monkeypatch.setattr(immediate_alerts, "_in_flight_batches", 0)
+
+        # Drive _on_send_finished directly with a resolved-with-exception Future
+        # carrying the payload count, exactly as deliver_immediate_alerts binds it.
+        future: Future = Future()
+        future.set_exception(RuntimeError("payload builder"))
+
+        with caplog.at_level(logging.ERROR):
+            immediate_alerts._on_send_finished(3, future)
+
+        records = [r for r in caplog.records if r.levelno == logging.ERROR]
+        assert records, "a failed dispatch must leave a retrievable ERROR log"
+        assert any("3" in r.getMessage() for r in records), (
+            "the ERROR log must carry the payload count"
+        )
+        assert any(r.exc_info is not None for r in records), (
+            "the failure must be logged with a stack trace"
+        )
+
+    def test_done_callback_decrements_counter_on_failure(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The in-flight counter cannot leak on an exception path."""
+        from apps.search.services import immediate_alerts
+
+        monkeypatch.setattr(immediate_alerts, "_in_flight_batches", 1)
+        future: Future = Future()
+        future.set_exception(RuntimeError("boom"))
+
+        immediate_alerts._on_send_finished(1, future)
+
+        assert immediate_alerts._in_flight_batches == 0
+
+
+class TestBackpressureSheds:
+    """Above the in-flight threshold the dispatch is skipped with a WARNING."""
+
+    @pytest.mark.django_db
+    @pytest.mark.integration
+    def test_backlog_above_threshold_skips_and_warns(
+        self,
+        seller,
+        buyer,
+        category,
+        city,
+        monkeypatch: pytest.MonkeyPatch,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A saturated backlog issues no outbound send and logs a WARNING."""
+        from apps.search.services import immediate_alerts
+
+        submitted: list[list] = []
+        monkeypatch.setattr(
+            immediate_alerts,
+            "_executor",
+            type(
+                "_Recorder",
+                (),
+                {"submit": lambda self, fn, *a: submitted.append(a)},
+            )(),
+        )
+        # Pretend the backlog is already at the threshold.
+        monkeypatch.setattr(
+            immediate_alerts,
+            "_in_flight_batches",
+            immediate_alerts._MAX_IN_FLIGHT_BATCHES,
+        )
+
+        ad = create_test_ad(
+            seller, category, city, title="Красный велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+        SavedSearch.objects.create(user=buyer, is_active=True)
+
+        with caplog.at_level(logging.WARNING):
+            immediate_alerts.deliver_immediate_alerts(ad.id)
+
+        assert submitted == [], "a shed dispatch must not reach the executor"
+        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+        assert any(f"ad {ad.id}" in r.getMessage() for r in warnings), (
+            "the WARNING must name the ad"
+        )
+        assert any(
+            str(immediate_alerts._MAX_IN_FLIGHT_BATCHES) in r.getMessage()
+            for r in warnings
+        ), "the WARNING must name the in-flight count/threshold"
+        # The counter is untouched by a shed dispatch.
+        assert (
+            immediate_alerts._in_flight_batches
+            == immediate_alerts._MAX_IN_FLIGHT_BATCHES
+        )
+
+
+# ---------------------------------------------------------------------------
+# Worker-side invariant pin (09-API-013 / 09-NEW-01)
+# ---------------------------------------------------------------------------
+
+_IMPORT_GRAPH_PROBE = """
+import sys
+
+import django
+
+django.setup()
+print("SETUP:" + str("apps.search.services.immediate_alerts" in sys.modules))
+import apps.moderation.signals  # noqa: F401
+
+print("SIGNALS:" + str("apps.search.services.immediate_alerts" in sys.modules))
+"""
+
+
+class TestWorkerSideInvariant:
+    """The executor must be built post-fork, i.e. not during ``django.setup()``.
+
+    ``preload_app = True`` means ``django.setup()`` runs in the gunicorn master
+    before workers fork. Worker-side-ness of the pool holds ONLY because
+    ``apps/moderation/signals.py`` imports ``immediate_alerts`` lazily inside
+    ``transaction.on_commit``. Hoisting that import to module level, or adding
+    ``immediate_alerts`` to ``apps/search/services/__init__.py``, would build
+    the executor in the master and reproduce "rows written, delivered_at NULL,
+    no send, no log" (09-NEW-01). A pytest process has already imported the
+    module by test time, so the assertion must run in a fresh interpreter.
+    """
+
+    def test_module_absent_from_setup_import_graph(self) -> None:
+        """``django.setup()`` and ``import moderation.signals`` do not pull it in."""
+        from django.conf import settings as django_settings
+
+        backend_dir = str(django_settings.BASE_DIR)
+        project_src = str(django_settings.BASE_DIR.parent)
+        env = dict(os.environ)
+        env.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.test")
+        existing = env.get("PYTHONPATH", "")
+        env["PYTHONPATH"] = os.pathsep.join(
+            p for p in (project_src, backend_dir, existing) if p
+        )
+        result = subprocess.run(
+            [sys.executable, "-c", _IMPORT_GRAPH_PROBE],
+            capture_output=True,
+            text=True,
+            env=env,
+            timeout=120,
+            check=False,
+        )
+        assert result.returncode == 0, result.stderr
+        assert "SETUP:False" in result.stdout, (
+            "immediate_alerts was imported by django.setup() - the executor "
+            f"would be built in the gunicorn master\n{result.stdout}\n{result.stderr}"
+        )
+        assert "SIGNALS:False" in result.stdout, (
+            "importing apps.moderation.signals pulled in immediate_alerts - the "
+            "lazy import inside _deliver() was hoisted\n"
+            f"{result.stdout}\n{result.stderr}"
+        )
 
 
 # ---------------------------------------------------------------------------
