@@ -213,10 +213,10 @@ exits 0; `web` and `bot` then start.
 
 ```bash
 # List applied migrations
-docker compose run --rm web uv run python src/backend/manage.py showmigrations
+docker compose --env-file .env.dev -f docker-compose.yml run --rm web uv run python src/backend/manage.py showmigrations
 
 # Fail CI-style if model drift produced un-committed migrations
-docker compose run --rm web uv run python src/backend/manage.py makemigrations --check --dry-run
+docker compose --env-file .env.dev -f docker-compose.yml run --rm web uv run python src/backend/manage.py makemigrations --check --dry-run
 ```
 
 The committed test `apps/core/tests/test_migrations.py` (TST-005) asserts both of the above in CI:
@@ -460,13 +460,13 @@ Most often caused by one of the fragile patterns documented above:
 Run interactively to read the full traceback:
 
 ```bash
-docker compose run --rm migrate 2>&1 | tail -40
+docker compose --env-file .env.dev -f docker-compose.yml run --rm migrate 2>&1 | tail -40
 ```
 
 ### Pending migrations / schema drift
 
 ```bash
-docker compose run --rm web uv run python src/backend/manage.py makemigrations --check --dry-run
+docker compose --env-file .env.dev -f docker-compose.yml run --rm web uv run python src/backend/manage.py makemigrations --check --dry-run
 ```
 
 If this reports files to create, commit a new migration (or consolidate). Do not `--fake` drift
@@ -478,7 +478,7 @@ After deleting migration files but keeping the DB, Django reports the new `0001_
 `[ ]`. Reapply with `--fake`:
 
 ```bash
-docker compose run --rm web uv run python src/backend/manage.py migrate --fake
+docker compose --env-file .env.dev -f docker-compose.yml run --rm web uv run python src/backend/manage.py migrate --fake
 ```
 
 The `make consolidate` target does this for you automatically.
@@ -492,7 +492,7 @@ still records the old filename. After updating all cross-app
 `dependencies` tuples that referenced the old name, reconcile with:
 
 ```bash
-docker compose run --rm web uv run python src/backend/manage.py migrate --fake
+docker compose --env-file .env.dev -f docker-compose.yml run --rm web uv run python src/backend/manage.py migrate --fake
 ```
 
 `--fake` marks the renamed migration as applied **without** re-executing its
@@ -505,7 +505,7 @@ Django reads the new filename directly.
 If `makemigrations` emits a circular-dependency error, inspect the generated graph:
 
 ```bash
-docker compose run --rm web uv run python src/backend/manage.py showmigrations --plan
+docker compose --env-file .env.dev -f docker-compose.yml run --rm web uv run python src/backend/manage.py showmigrations --plan
 ```
 
 Break the cycle with `SeparateDatabaseAndState` (split schema vs. data operations) or by reordering
@@ -518,7 +518,7 @@ After running `load_catalog` (which reassigns `parent` FKs), the tree's `lft`/`r
 Rebuild from the command line:
 
 ```bash
-docker compose run --rm web uv run python src/backend/manage.py shell -c \
+docker compose --env-file .env.dev -f docker-compose.yml run --rm web uv run python src/backend/manage.py shell -c \
   "from mptt.templatetags.mptt_tags import cache_tree_children; from apps.categories.models import Category; Category.objects.rebuild()"
 ```
 

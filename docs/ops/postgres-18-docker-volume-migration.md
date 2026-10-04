@@ -77,10 +77,10 @@ This is the safest approach for databases without special requirements:
 
 ```bash
 # Step 1: Backup existing database
-docker compose exec -T db pg_dump -U postgres -d postgres -F c > backup_17.dump
+docker compose --env-file .env.dev -f docker-compose.yml exec -T db pg_dump -U postgres -d postgres -F c > backup_17.dump
 
 # Step 2: Stop services
-docker compose stop web bot
+docker compose --env-file .env.dev -f docker-compose.yml stop web bot
 
 # Step 3: Rename existing volume (optional, for safety)
 docker volume rename mko_bazuna_postgres_data mko_bazuna_postgres_data_bak
@@ -184,10 +184,10 @@ services:
 
 ```bash
 # 1. Create a backup of the existing database
-docker compose exec -T db pg_dump -U postgres -d postgres -F c > backups/postgres_17_backup.dump
+docker compose --env-file .env.dev -f docker-compose.yml exec -T db pg_dump -U postgres -d postgres -F c > backups/postgres_17_backup.dump
 
 # 2. Stop all services to prevent write conflicts
-docker compose stop web bot
+docker compose --env-file .env.dev -f docker-compose.yml stop web bot
 
 # 3. Backup the existing volume (optional but recommended)
 docker run --rm -v mko_bazuna_postgres_data:/source -v mko_bazuna_postgres_backup:/backup alpine ash -c "cp -a /source/. /backup/"
@@ -202,16 +202,16 @@ docker volume rm mko_bazuna_postgres_data
 docker volume create mko_bazuna_postgres_data
 
 # 7. Start the new PostgreSQL 18 container
-docker compose up -d db
+docker compose --env-file .env.dev -f docker-compose.yml up -d db
 
 # 8. Wait for container to be healthy
-docker compose ps db
+docker compose --env-file .env.dev -f docker-compose.yml ps db
 
 # 9. Copy backup file into container
 docker cp backups/postgres_17_backup.dump mko_bazuna-db-1:/tmp/backup.dump
 
 # 10. Restore the database
-docker compose exec -T db pg_restore \
+docker compose --env-file .env.dev -f docker-compose.yml exec -T db pg_restore \
     --clean \
     --if-exists \
     -U postgres \
@@ -219,13 +219,13 @@ docker compose exec -T db pg_restore \
     /tmp/backup.dump
 
 # 11. Run ANALYZE to rebuild query planner statistics
-docker compose exec -T db psql -U postgres -d postgres -c "ANALYZE;"
+docker compose --env-file .env.dev -f docker-compose.yml exec -T db psql -U postgres -d postgres -c "ANALYZE;"
 
 # 12. Start other services
-docker compose start web bot
+docker compose --env-file .env.dev -f docker-compose.yml start web bot
 
 # 13. Verify everything works
-docker compose logs -f web | head -20
+docker compose --env-file .env.dev -f docker-compose.yml logs -f web | head -20
 ```
 
 ---

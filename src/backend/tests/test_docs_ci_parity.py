@@ -227,3 +227,53 @@ def test_makefile_test_recreate_opts_match() -> None:
     assert "--no-reuse-db" not in make_opts, "Makefile must not use the nonexistent --no-reuse-db flag"
     assert "--no-reuse-db" not in ps1_opts, "Makefile.ps1 must not use the nonexistent --no-reuse-db flag"
 
+
+# --- DR runbook executability (12-OPS-006) ---------------------------------
+# The restore runbook is opened when the database is already lost. docker
+# compose aborts during config rendering without --env-file (docker-compose.yml
+# and docker-compose.prod.yml use mandatory interpolation), so a production
+# invocation that omits it — or omits -f docker-compose.prod.yml and silently
+# runs the dev config — cannot be followed. This guard asserts the invariant the
+# runbook now depends on. Scope: docs/ops/restore.md, the DR runbook the finding
+# names. rollback.md's manual production invocations already carry the flags and
+# its automated-rollback excerpt mirrors deploy.yml's sourced-.env.prod script,
+# so it is deliberately out of scope here.
+
+_DOCS_OPS = _ROOT / "docs" / "ops"
+_RESTORE_RUNBOOK = _DOCS_OPS / "restore.md"
+_PROD_OVERRIDE = "-f docker-compose.prod.yml"
+_PROD_ENV_FILE = "--env-file .env.prod"
+
+
+def _production_compose_invocations(text: str) -> list[str]:
+    """Return the `docker compose` lines that target the production stack."""
+    return [
+        line.strip()
+        for line in text.split("\n")
+        if line.strip().startswith("docker compose")
+        and _PROD_OVERRIDE in line
+    ]
+
+
+def test_restore_runbook_production_invocations_are_executable() -> None:
+    """Every production `docker compose` line in restore.md carries both -f files.
+
+    A missing `--env-file .env.prod` aborts during config rendering; a missing
+    `-f docker-compose.prod.yml` silently runs the dev configuration. Both are
+    demonstrated failures (12-OPS-006).
+    """
+    text = _RESTORE_RUNBOOK.read_text(encoding="utf-8")
+    invocations = _production_compose_invocations(text)
+    assert invocations, (
+        "restore.md must contain at least one production docker compose "
+        "invocation for the guard to check"
+    )
+    for line in invocations:
+        assert _PROD_ENV_FILE in line, (
+            f"production invocation must carry {_PROD_ENV_FILE!r} (12-OPS-006): {line}"
+        )
+        assert "-f docker-compose.yml" in line, (
+            f"production invocation must carry the base -f file (12-OPS-006): {line}"
+        )
+
+

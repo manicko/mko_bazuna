@@ -22,7 +22,17 @@ This document describes the procedure for restoring the Mko Bazuna database from
 
 - Backup file exists in `./backups/` directory
 - Docker compose environment is running (or can be started)
-- Environment variables `POSTGRES_USER`, `POSTGRES_DB` are configured in `.env.dev`
+- Environment variables `POSTGRES_USER`, `POSTGRES_DB` are configured in `.env.prod`
+
+> **Every production invocation below carries `--env-file .env.prod` and both
+> `-f docker-compose.yml -f docker-compose.prod.yml`.** `docker-compose.yml`
+> and `docker-compose.prod.yml` use mandatory interpolation
+> (`${POSTGRES_USER:?…}`, `${DJANGO_SECRET_KEY:?…}`), so a `docker compose`
+> invocation without `--env-file` aborts during config rendering — including
+> read-only `ps`, `stop` and `exec`. Omitting `-f docker-compose.prod.yml`
+> silently runs the **dev** configuration, which is quieter than the abort
+> (12-OPS-006). Read `POSTGRES_USER` / `POSTGRES_DB` from `.env.prod`, never
+> `.env.dev`: the dev values name the development database.
 
 ## Automated Backup Service
 
@@ -30,7 +40,7 @@ When running in production with the backup profile enabled, backups run automati
 
 ```bash
 # Start production with backup service
-docker compose -f docker-compose.yml -f docker-compose.prod.yml --profile backup up -d
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml --profile backup up -d
 ```
 
 The backup service uses the `postgres:18-alpine` image and connects directly to the `db` service. It:
@@ -68,13 +78,13 @@ Before restore, verify:
 2. The database service is healthy:
 
 ```bash
-docker compose ps db
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml ps db
 ```
 
 3. Stop web and bot services to prevent write conflicts:
 
 ```bash
-docker compose stop web bot
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml stop web bot
 ```
 
 ## Restore Procedure
@@ -87,54 +97,69 @@ docker compose stop web bot
 ### Option A: Manual Restore (Recommended for Production)
 
 ```bash
-# Set environment variables for the restore
-export POSTGRES_USER=$(grep POSTGRES_USER .env.dev | cut -d= -f2)
-export POSTGRES_DB=$(grep POSTGRES_DB .env.dev | cut -d= -f2)
+# Set environment variables for the restore from the PRODUCTION env file.
+# Reading .env.dev here yields the development database's credentials.
+export POSTGRES_USER=$(grep '^POSTGRES_USER=' .env.prod | cut -d= -f2)
+export POSTGRES_DB=$(grep '^POSTGRES_DB=' .env.prod | cut -d= -f2)
 
-# Perform the restore
-docker compose exec -T db pg_restore \
+# Perform the restore. The dump lives on the HOST, and the `db` service mounts
+# only `postgres_data` — no `./backups` — so the file is streamed in on stdin.
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml \
+    exec -T db pg_restore \
     --clean \
     --if-exists \
-    -U $POSTGRES_USER \
-    -d $POSTGRES_DB \
-    ./backups/<BACKUP_FILE_NAME>
+    -U "$POSTGRES_USER" \
+    -d "$POSTGRES_DB" \
+    < ./backups/<BACKUP_FILE_NAME>
 ```
 
 Example with actual file:
 
 ```bash
-docker compose exec -T db pg_restore \
+export POSTGRES_USER=$(grep '^POSTGRES_USER=' .env.prod | cut -d= -f2)
+export POSTGRES_DB=$(grep '^POSTGRES_DB=' .env.prod | cut -d= -f2)
+
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml \
+    exec -T db pg_restore \
     --clean \
     --if-exists \
-    -U postgres \
-    -d postgres \
-    ./backups/dump_20250719_143022.dump
+    -U "$POSTGRES_USER" \
+    -d "$POSTGRES_DB" \
+    < ./backups/dump_20250719_143022.dump
 ```
 
-### Option B: Using Makefile Target
+### Option B: Using the Makefile Target
+
+`make restore` is a **dev-stack** target: it sources `.env.dev` and runs against
+the dev compose files (`COMPOSE_FILES`), so it restores the **development**
+database. It must not be used to restore production.
 
 ```bash
+# DEV ONLY — restores the development database
 make restore BACKUP_FILE=./backups/dump_20250719_143022.dump
 ```
+
+For a **production** restore there is no Makefile target; use Option A above,
+which names `.env.prod` and both production compose files explicitly.
 
 ## Post-Restore Steps
 
 1. Start services:
 
 ```bash
-docker compose start web bot
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml start web bot
 ```
 
 2. Verify database connectivity:
 
 ```bash
-docker compose exec web python -c "import django; django.setup(); from django.db import connection; print(connection.status)"
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml exec web python -c "import django; django.setup(); from django.db import connection; print(connection.status)"
 ```
 
 3. Check migrations are applied:
 
 ```bash
-docker compose run --rm migrate
+docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml run --rm migrate
 ```
 
 ## Isolated Restore Target
@@ -194,6 +219,12 @@ docker network rm mko-bazuna-restore-net
 
 ## Recovery Point Objective (RPO)
 
+> **Conditional.** The figures below assume three preconditions that are **not
+> all met today** (12-OPS-006): (1) the daily backup job is actually running,
+> (2) an off-host copy of the newest dump exists, and (3) a real-artifact
+> restore drill has passed. Until all three hold, this is a **target**, not a
+> guarantee — see [Restore-Test Procedure](#restore-test-procedure).
+
 - **RPO = 24 hours.** Backups are produced by a daily `pg_dump -F c` job in the production backup
   service (`docker-compose.prod.yml`, `--profile backup`). The service loops with `sleep 86400`,
   producing one dump per day at `./backups/dump_YYYYMMDD.dump`.
@@ -212,6 +243,9 @@ docker network rm mko-bazuna-restore-net
 
 ## Recovery Time Objective (RTO)
 
+> **Conditional**, for the same three preconditions as the RPO above: the
+> figures assume the newest dump is on-host and restore-tested (12-OPS-006).
+
 - **Target RTO ≈ 4 hours.** This is a target, not an SLA. Actual time depends on backup size and
   host I/O throughput.
   - Backup retrieval / copy to restore host: ~30 min
@@ -221,7 +255,9 @@ docker network rm mko-bazuna-restore-net
 - **DB-size dependent.** The restore target (`pg_restore`) is I/O bound. A 10 GB database may
   restore in ~60 min; a 100 GB database could take 4+ hours.
 - **No automated failover.** There is no standby replica; restore is a manual process that
-  requires an operator to run `make restore-test` or the full `make restore` procedure.
+  requires an operator to run `make restore-test` (validation) or the production restore
+  procedure in [Option A](#option-a-manual-restore-recommended-for-production). **`make
+  restore` is dev-only and must not be used for production.**
 - **Quarterly review.** RTO targets should be exercised and recalibrated quarterly via the
   restore-test procedure.
 
