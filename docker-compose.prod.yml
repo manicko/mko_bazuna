@@ -239,7 +239,12 @@ services:
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
       - PGBOUNCER_DATABASE=${POSTGRES_DB:?POSTGRES_DB must be set}
       - PGBOUNCER_USER=${POSTGRES_USER:?POSTGRES_USER must be set}
-      - PGBOUNCER_AUTH_TYPE=md5
+      # The role's password is stored by PostgreSQL 18 using the engine default
+      # password_encryption = scram-sha-256, so PgBouncer must send SCRAM
+      # verifiers, not md5 (12-OPS-015). md5 is verified against a stored md5
+      # hash and cannot authenticate a SCRAM-only role. PgBouncer >=1.19
+      # (this image is edoburu/pgbouncer:1.25.2) supports SCRAM auth_file.
+      - PGBOUNCER_AUTH_TYPE=scram-sha-256
       - PGBOUNCER_POOL_MODE=transaction
       # The app sends libpq's `options` startup parameter (-c lock_timeout=Ns,
       # 03-DB-004). PgBouncer rejects every startup parameter it does not know,

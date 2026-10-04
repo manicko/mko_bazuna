@@ -411,3 +411,128 @@ def test_backup_service_hardening_unchanged() -> None:
     )
     assert "mem_limit" in block, "backup must keep mem_limit"
     assert "cpus" in block, "backup must keep cpus"
+
+
+# ---------------------------------------------------------------------------
+# capacity-limit contract (VAL-001 / 12-VAL-001)
+# ---------------------------------------------------------------------------
+# Every mem_limit / cpus in the shipped compose files resolves through a
+# ${VAR:-default} fallback, so no environment file declares a capacity limit and
+# every environment silently ships the compose default. This is the ops-layer
+# half of the capacity question; SRCH-001 owns the application-side OOM
+# consequence of an unbounded ?features= join, and this guard does NOT close it.
+# The contract asserted here: (1) every declared limit is the env-substituted
+# form, so the default cannot be silently replaced by a bare literal, and
+# (2) every service declares mem_limit and cpus together — a half-declared pair
+# is the inconsistency that lets one bound ship while the other is unbounded.
+_CAPACITY_LIMIT_KEYS = ("mem_limit", "cpus")
+# ${VAR:-default}, where the variable name is upper-case and the default is
+# non-empty and free of the closing brace. Rejects a bare literal and a
+# bare `${VAR}` with no default (which would fail compose interpolation loudly,
+# but is not a declaration).
+_LIMIT_ENV_SUBSTITUTION_RE = re.compile(r"^\$\{[A-Z][A-Z0-9_]*:-[^}]+}$")
+
+
+def test_every_declared_capacity_limit_is_paired_and_env_substituted() -> None:
+    """Every mem_limit / cpus is `${VAR:-default}` and paired on the same service.
+
+    Parses each compose file independently (never merged with its override). A
+    bare-literal limit, an unsubstituted `${VAR}`, or a service that declares
+    only one of the two keys fails, naming the ``(file, service, key)`` triple
+    (12-VAL-001).
+    """
+    offenders: list[str] = []
+    for path in (_COMPOSE, _PROD_COMPOSE, _DEV_OVERRIDE_COMPOSE, _TEST_COMPOSE):
+        data = _load_yaml(path)
+        services = data.get("services", {}) or {}
+        for name, service in services.items():
+            svc = service or {}
+            declared = [key for key in _CAPACITY_LIMIT_KEYS if key in svc]
+            if not declared:
+                continue
+            for key in _CAPACITY_LIMIT_KEYS:
+                if key not in svc:
+                    offenders.append(
+                        f"{path.name}: {name} declares {declared[0]} without {key}"
+                    )
+                    continue
+                value = svc[key]
+                if not (
+                    isinstance(value, str)
+                    and _LIMIT_ENV_SUBSTITUTION_RE.match(value)
+                ):
+                    offenders.append(
+                        f"{path.name}: {name}.{key}={value!r} is not a "
+                        "${VAR:-default} declaration"
+                    )
+    assert not offenders, (
+        "every declared capacity limit must be a paired ${VAR:-default} "
+        "declaration so the default cannot ship silently (12-VAL-001):\n"
+        + "\n".join(offenders)
+    )
+
+
+def test_capacity_limit_defaults_are_the_shipped_profile() -> None:
+    """The recorded compose defaults are the shipped production profile.
+
+    These are cgroup HARD LIMITS, not hints: under them an expensive query
+    becomes a backend OOM kill, not a slow request. The values are the ones
+    phase 08 declared as capacity parameters (``1 GB / 2.0 CPU`` for `db`) and
+    must not change without a capacity decision. Recording them here means a
+    silent retune fails this guard (12-VAL-001). The `db` default is read from
+    the base file only — no override redeclares it.
+    """
+    expected = {
+        (_COMPOSE, "db"): ("${DB_MEM_LIMIT:-1g}", "${DB_CPUS:-2.0}"),
+        (_PROD_COMPOSE, "backup"): (
+            "${BACKUP_MEM_LIMIT:-256m}",
+            "${BACKUP_CPUS:-0.5}",
+        ),
+        (_PROD_COMPOSE, "scheduler"): (
+            "${SCHEDULER_MEM_LIMIT:-256m}",
+            "${SCHEDULER_CPUS:-0.5}",
+        ),
+        (_PROD_COMPOSE, "pgbouncer"): (
+            "${PGBOUNCER_MEM_LIMIT:-128m}",
+            "${PGBOUNCER_CPUS:-0.5}",
+        ),
+    }
+    for (path, service), (mem_limit, cpus) in expected.items():
+        block = _load_yaml(path)["services"][service]
+        assert block["mem_limit"] == mem_limit, (
+            f"{path.name} {service}.mem_limit must remain {mem_limit!r} "
+            "(a capacity decision, not a tuning knob)"
+        )
+        assert block["cpus"] == cpus, (
+            f"{path.name} {service}.cpus must remain {cpus!r} "
+            "(a capacity decision, not a tuning knob)"
+        )
+
+
+# ---------------------------------------------------------------------------
+# PgBouncer authentication contract (12-OPS-015)
+# ---------------------------------------------------------------------------
+# The opt-in pgbouncer service must authenticate the same role whose password
+# PostgreSQL 18 stores using the engine default password_encryption =
+# scram-sha-256 (verified against a live pg_authid/`SHOW password_encryption`).
+# `md5` is verified against a stored md5 hash and cannot authenticate a
+# SCRAM-only role, so the pooler would refuse every client. This is a
+# CONFIGURATION assertion: the service's own healthcheck is `pg_isready`, which
+# does not exercise authentication, which is why the defect stayed latent.
+_PG_PASSWORD_ENCRYPTION_DEFAULT = "scram-sha-256"
+
+
+def test_pgbouncer_auth_type_matches_engine_password_encryption() -> None:
+    """PGBOUNCER_AUTH_TYPE must match the engine's password_encryption default.
+
+    Parses docker-compose.prod.yml independently. If the auth type and the
+    engine default drift apart, the pooler cannot authenticate the role and the
+    clients are refused once the profile is enabled (12-OPS-015).
+    """
+    pgbouncer = _load_yaml(_PROD_COMPOSE)["services"]["pgbouncer"]
+    env = _env_map(pgbouncer.get("environment"))
+    auth_type = env.get("PGBOUNCER_AUTH_TYPE", "")
+    assert auth_type == _PG_PASSWORD_ENCRYPTION_DEFAULT, (
+        f"pgbouncer PGBOUNCER_AUTH_TYPE must be {_PG_PASSWORD_ENCRYPTION_DEFAULT!r} "
+        f"to match the PostgreSQL 18 password_encryption default; got {auth_type!r}"
+    )
