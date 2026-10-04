@@ -28,7 +28,11 @@ from apps.ads.services.listings_query import ListingsQuery, ListingsQueryParams
 from apps.categories.models import Category
 from apps.core.enums import AdSort, AnalyticsEventType, LanguageLocale
 from apps.core.services.analytics import record_event
-from apps.core.utils.sanitize import sanitize_query_for_log, strip_control_chars
+from apps.core.utils.sanitize import (
+    redact_search_query,
+    sanitize_query_for_log,
+    strip_control_chars,
+)
 from apps.locations.models import City
 from apps.locations.services.city_suggestions import suggest_city
 from apps.search.services.cache import (
@@ -207,8 +211,17 @@ def search(request: HttpRequest) -> HttpResponse:
         results_truncated = False
     has_results = total_count > 0
     if query and not has_results:
+        # Redact PII (phone, e-mail, multi-word capitalised name) before the value
+        # reaches the production JSONL sink. RedactingJsonFormatter cannot rescue
+        # this: its pattern only matches key=value, not a bare quoted value. The
+        # composition keeps the control-character strip that sanitize_query_for_log
+        # already provides on this path; redact_search_query never lengthens and
+        # truncates to the same _MAX_QUERY_LENGTH. Only the log argument changes -
+        # the search, cache key, analytics and template context keep ``query``
+        # unredacted (08-SRCH-002).
         logger.info(
-            "Empty search results for query '%s'", sanitize_query_for_log(query)
+            "Empty search results for query '%s'",
+            redact_search_query(sanitize_query_for_log(query)),
         )
 
     context = {

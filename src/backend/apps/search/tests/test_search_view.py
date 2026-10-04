@@ -12,6 +12,7 @@ skipped during pytest collection). Migrated here so the /search/ endpoint
 coverage is exercised in CI alongside the autocomplete/alert tests.
 """
 
+import logging
 from unittest.mock import patch
 
 import pytest
@@ -26,6 +27,7 @@ from apps.ads.services.listings_query import (
 )
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
+from apps.core.utils.json_logging import RedactingJsonFormatter
 from apps.locations.models import City
 from apps.lookups.models import LookupGroup, LookupItem
 from apps.search.services.cache import SEARCH_CACHE_MAX_HITS
@@ -880,6 +882,92 @@ class TestSearchViewInputRobustness:
         assert baseline_ids  # sanity: the legal query actually matched
         assert cleaned_ids == baseline_ids
         assert cleaned.context["query"] == "велосипед"
+
+
+class TestSearchLogRedaction:
+    """The zero-result search log line redacts PII (08-SRCH-002).
+
+    ``search()`` logs on the zero-result branch only. Before this change the
+    ``%s`` argument was ``sanitize_query_for_log(query)`` — a control-character
+    stripper and 100-char truncator that is **not** a redactor — so a phone
+    number, an e-mail address or a two-word capitalised name typed into ``q``
+    reached the production JSONL sink verbatim. Rendering the captured
+    ``LogRecord`` through the real ``RedactingJsonFormatter`` is the point: the
+    argument is a lazily-formatted ``%s`` placeholder, so asserting on the call
+    argument alone would not have caught the defect.
+    """
+
+    def test_zero_result_log_line_redacts_pii(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """The formatted line contains none of the phone/e-mail/name."""
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Транспорт",
+            status=AdStatus.PUBLISHED,
+        )
+
+        phone = "+38267123456"
+        email = "person@example.com"
+        name = "Ivan Petrov"
+        query = f"{phone} {email} {name}"
+
+        client = Client()
+        with caplog.at_level(logging.INFO, logger="apps.search.views.search"):
+            response = client.get("/search/", {"q": query, "lang": "ru"})
+
+        assert response.status_code == 200
+        assert response.context["has_results"] is False
+
+        record = next(
+            r
+            for r in caplog.records
+            if r.name == "apps.search.views.search" and r.levelno == logging.INFO
+        )
+        formatted = RedactingJsonFormatter().format(record)
+
+        assert phone not in formatted
+        assert email not in formatted
+        assert name not in formatted
+
+    def test_benign_zero_result_query_still_logs(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+        caplog: pytest.LogCaptureFixture,
+    ) -> None:
+        """A query with no identifiers is still logged (triage is not lost)."""
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Транспорт",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        with caplog.at_level(logging.INFO, logger="apps.search.views.search"):
+            response = client.get("/search/", {"q": "велосипед", "lang": "ru"})
+
+        assert response.status_code == 200
+        assert response.context["has_results"] is False
+
+        record = next(
+            r
+            for r in caplog.records
+            if r.name == "apps.search.views.search" and r.levelno == logging.INFO
+        )
+        # The formatter JSON-escapes non-ASCII, so assert on the rendered
+        # message text rather than the escaped JSON byte sequence.
+        assert "велосипед" in record.getMessage()
+        assert "Empty search results for query" in RedactingJsonFormatter().format(record)
 
 
 class TestSearchViewTotalCount:
