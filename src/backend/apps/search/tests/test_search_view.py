@@ -821,6 +821,92 @@ class TestSearchViewInputRobustness:
         assert response.status_code == 200
         assert response.context["query"] == "abcd"
 
+    def test_lone_space_query_trims_to_browse_all(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """A lone-space q trims to empty and browses all (08-SRCH-006 follow-up).
+
+        ``?q=+`` decodes to a single space, so this input is reachable by
+        accident. The pre-fix line trimmed before slicing, so the empty query
+        falls through to the unfiltered browse-all listing; the 08-SRCH-006
+        rewrite dropped the trim as collateral and made this a zero-result.
+        This test pins the restored (trim) behaviour.
+        """
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Транспорт",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/search/?q=%20&lang=ru")
+
+        assert response.status_code == 200
+        assert response.context["query"] == ""
+        assert response.context["page_obj"].paginator.count == 1
+
+    def test_leading_and_trailing_space_query_is_trimmed(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """A q padded with spaces is trimmed to the bare term and still matches.
+
+        ``?q=%20abc%20`` must search ``"abc"``, not ``" abc "``: the trim runs
+        before the control-character strip and the slice, so the rendered context
+        query is the trimmed value (08-SRCH-006 follow-up).
+        """
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Продам abc велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/search/?q=%20abc%20&lang=ru")
+
+        assert response.status_code == 200
+        assert response.context["query"] == "abc"
+        assert response.context["page_obj"].paginator.count == 1
+
+    def test_trim_then_strip_control_chars_order(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """The control-character strip still runs BEFORE the trim (08-SRCH-006).
+
+        ``?q=%20%00%20abc%00`` must yield ``"abc"``: the control-character strip
+        removes both NULs first, ``.strip()`` then removes the surrounding spaces,
+        and the slice leaves the bare term. If the trim ran first, a NUL adjacent
+        to a space would shield that space (``" \\x00 abc\\x00".strip()`` keeps the
+        leading space), and the context query would come out as ``" abc"`` — this
+        test pins the working order.
+        """
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Продам abc велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/search/?q=%20%00%20abc%00&lang=ru")
+
+        assert response.status_code == 200
+        assert response.context["query"] == "abc"
+        assert response.context["page_obj"].paginator.count == 1
+
     def test_control_char_0x07_query_returns_200(
         self,
         seller: User,

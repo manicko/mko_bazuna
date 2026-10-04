@@ -74,12 +74,19 @@ def search(request: HttpRequest) -> HttpResponse:
     if not rate_limit_check(request, namespace="search"):
         return JsonResponse({"error": "rate_limit"}, status=429)
 
-    # Strip control characters (incl. NUL) at the input edge, then slice. The
-    # strip is non-truncating so the 200-char ``q`` contract is preserved; the
-    # cleaned value is what is searched, cached, analysed and rendered. Order is
-    # strip-then-slice so ``len(query) <= MAX_SEARCH_QUERY_LENGTH`` still holds
-    # (08-SRCH-006).
-    query = strip_control_chars(request.GET.get("q") or "")[:MAX_SEARCH_QUERY_LENGTH]
+    # Strip control characters (incl. NUL) at the input edge, trim surrounding
+    # whitespace, then slice. Trimming is restored here: the 08-SRCH-006 rewrite
+    # dropped it as collateral; ``?q=+`` decodes to a space, so without it a lone
+    # space was a deliberate zero-result instead of the pre-fix browse-all (see
+    # the 08-SRCH-006 follow-up commit). The control strip is non-truncating so
+    # the 200-char ``q`` contract is preserved and it runs BEFORE the trim, so a
+    # padded control character cannot shield a space from the trim; the cleaned
+    # value is what is searched, cached, analysed and rendered. The slice is last
+    # so ``len(query) <= MAX_SEARCH_QUERY_LENGTH`` holds and ``?q=%20%00%20abc%00``
+    # yields ``"abc"`` (08-SRCH-006).
+    query = strip_control_chars(request.GET.get("q") or "").strip()[
+        :MAX_SEARCH_QUERY_LENGTH
+    ]
 
     # City filter (by slug). An explicit URL city (``request.current_city``,
     # resolved by CityResolutionMiddleware from ``/city/<slug>/`` or
