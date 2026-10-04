@@ -76,7 +76,12 @@ critical path.
 3. PostgreSQL FTS runs the original query against the matching vector **without
    translation**
 4. Single-word queries trigger locale-aware fuzzy category detection against the
-   locale-appropriate category name (`Category.get_name(locale)`)
+   locale-appropriate category name (`Category.get_name(locale)`). A match narrows
+   the query to that category's subtree as a hard filter; the results page signals
+   the narrowing ("showing results for &lt;Category&gt; only") and offers an undo
+   ("search all categories"). When two or more active categories share the
+   localised display name the match is ambiguous, so no guess is made and the
+   search stays whole-tree (08-VAL-003).
 
 ### Implementation
 
@@ -366,7 +371,11 @@ Category names are searchable via per-language fields in the search vectors.
   `name_i18n->>'bs'` / `->>'en'` names (falling back to the Russian name) in
   `search_vector_bs` / `search_vector_en`, at weight 'C'
 - Single-word queries matching category names set `category_id` filter
-  (locale-aware via `Category.get_name(locale)`)
+  (locale-aware via `Category.get_name(locale)`). The narrowing is a decided
+  hard filter (Q8 ruling 2026-10-03); the results page signals it and offers an
+  undo. An ambiguous display name (two or more active categories sharing it)
+  makes no guess, so the search is not scoped to an arbitrary branch
+  (08-VAL-003).
 
 Related user stories: US-B3, US-B6
 

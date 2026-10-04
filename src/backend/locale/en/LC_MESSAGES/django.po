@@ -1576,3 +1576,12 @@ msgstr ""
 #: src/telegram_bot/handlers/ad_create/photos.py
 msgid "Storage is temporarily full. Please try again later."
 msgstr ""
+
+#: src/backend/templates/ads/partials/ad_list.html
+#, python-format
+msgid "Showing results for %(category)s only"
+msgstr ""
+
+#: src/backend/templates/ads/partials/ad_list.html
+msgid "Search all categories"
+msgstr ""

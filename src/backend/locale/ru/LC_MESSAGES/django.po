@@ -1803,3 +1803,12 @@ msgstr "Удалено фотографий: %(count)s."
 #: src/telegram_bot/handlers/ad_create/photos.py
 msgid "Storage is temporarily full. Please try again later."
 msgstr "Хранилище временно заполнено. Пожалуйста, попробуйте позже."
+
+#: src/backend/templates/ads/partials/ad_list.html
+#, python-format
+msgid "Showing results for %(category)s only"
+msgstr "Показаны объявления только в категории «%(category)s»"
+
+#: src/backend/templates/ads/partials/ad_list.html
+msgid "Search all categories"
+msgstr "Искать во всех категориях"

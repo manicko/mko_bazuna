@@ -148,8 +148,18 @@ def search(request: HttpRequest) -> HttpResponse:
     total_count = 0
     results_truncated = False
 
+    # The single-word fuzzy category narrowing is a hard filter (Q8 ruling
+    # 2026-10-03): this block signals it instead of changing it. The category
+    # resolved here is the same one ``_apply_fts_filtering`` narrows to, so the
+    # results page can name it and offer an undo. It is None for a multi-word
+    # query or when the match is ambiguous (08-VAL-003), so no control renders
+    # when no narrowing was applied. Nothing here changes the FTS predicate.
+    narrowed_category: Category | None = None
+
     if query:
         locale = LanguageLocale.from_code(request.LANGUAGE_CODE)
+        if _is_single_word(query):
+            narrowed_category = _fuzzy_category_match(query, locale)
         cache_key = build_search_cache_key(params, query, locale)
 
         def producer() -> list[int]:
@@ -258,6 +268,7 @@ def search(request: HttpRequest) -> HttpResponse:
         "selected_category": selected_category_id,
         "total_count": total_count,
         "results_truncated": results_truncated,
+        "narrowed_category": narrowed_category,
         "show_filters": True,
     }
 

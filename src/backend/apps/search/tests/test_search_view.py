@@ -13,6 +13,7 @@ coverage is exercised in CI alongside the autocomplete/alert tests.
 """
 
 import logging
+import re
 from unittest.mock import patch
 
 import pytest
@@ -746,6 +747,144 @@ class TestSearchViewAmbiguousCategoryName:
         assert ad_bicycles.id in result_ids
         # ... so an ad in a different branch is excluded by the filter.
         assert ad_electronics.id not in result_ids
+
+
+class TestSearchViewCategoryNarrowingSignal:
+    """The single-word narrowing is signalled and undoable (08-SRCH-009).
+
+    Q8 was resolved 2026-10-03 (options b+c): the narrowing stays a hard
+    filter and the results page signals it with an undo. These tests pin the
+    signal, the undo, and the visibility guarantee that the undo must not
+    widen.
+    """
+
+    def test_control_renders_and_undo_widens_to_whole_tree(
+        self,
+        seller: User,
+        root_category: Category,
+        child_category: Category,
+        other_category: Category,
+        city: City,
+    ) -> None:
+        """A one-word category match renders the control; its undo returns the whole tree."""
+        ad_narrowed = create_test_ad(
+            seller,
+            child_category,
+            city,
+            title="Транспорт — детский велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+        ad_other_branch = create_test_ad(
+            seller,
+            other_category,
+            city,
+            title="Транспорт — электроника",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/search/?q=Транспорт&min_price=10&lang=ru")
+
+        assert response.status_code == 200
+        # The narrowing happened: only the matching subtree is returned.
+        narrowed_ids = {a.id for a in response.context["page_obj"]}
+        assert ad_narrowed.id in narrowed_ids
+        assert ad_other_branch.id not in narrowed_ids
+        assert response.context["narrowed_category"] is not None
+
+        # The control renders, naming the guessed category and offering the undo.
+        # Under ?lang=ru the msgids resolve to the Russian catalogue, so assert
+        # the translated strings (which also proves the ru msgstr is wired).
+        html = response.content.decode()
+        assert "Искать во всех категориях" in html
+        assert root_category.name in html
+
+        # Follow the undo link exactly as rendered: it widens to the whole tree
+        # while preserving the other active filters.
+        href_match = re.search(
+            r'<a href="([^"]*)"[^>]*>Искать во всех категориях</a>', html
+        )
+        assert href_match, "undo link not found in rendered control"
+        assert "min_price=10" in href_match.group(1)
+        undo = client.get(href_match.group(1))
+        assert undo.status_code == 200
+        whole_tree_ids = {a.id for a in undo.context["page_obj"]}
+        assert ad_narrowed.id in whole_tree_ids
+        assert ad_other_branch.id in whole_tree_ids
+
+    def test_control_does_not_widen_visibility(
+        self,
+        seller: User,
+        root_category: Category,
+        child_category: Category,
+        other_category: Category,
+        city: City,
+    ) -> None:
+        """The undo must not expose non-PUBLISHED or inactive-category ads.
+
+        Asserted WITH the control rendered, not instead of it.
+        """
+        active_ad = create_test_ad(
+            seller,
+            child_category,
+            city,
+            title="Транспорт — детский велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+        draft_ad = create_test_ad(
+            seller,
+            child_category,
+            city,
+            title="Транспорт — черновик",
+            status=AdStatus.DRAFT,
+        )
+        # An ad whose category is inactive must stay hidden.
+        other_category.is_active = False
+        other_category.save(update_fields=["is_active"])
+        inactive_ad = create_test_ad(
+            seller,
+            other_category,
+            city,
+            title="Транспорт — неактивная категория",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/search/?q=Транспорт&lang=ru")
+
+        assert response.status_code == 200
+        # The control is rendered ...
+        assert "Искать во всех категориях" in response.content.decode()
+
+        # ... and the undo target still applies the visibility predicate.
+        undo = client.get("/?lang=ru")
+        assert undo.status_code == 200
+        whole_tree_ids = {a.id for a in undo.context["page_obj"]}
+        assert active_ad.id in whole_tree_ids
+        assert draft_ad.id not in whole_tree_ids
+        assert inactive_ad.id not in whole_tree_ids
+
+    def test_multi_word_query_renders_no_control(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """A two-word query applies no category narrowing and renders no control."""
+        create_test_ad(
+            seller,
+            root_category,
+            city,
+            title="Транспорт красный",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/search/?q=Транспорт+красный&lang=ru")
+
+        assert response.status_code == 200
+        assert response.context["narrowed_category"] is None
+        assert "Искать во всех категориях" not in response.content.decode()
 
 
 class TestSearchViewCitySuggestion:
