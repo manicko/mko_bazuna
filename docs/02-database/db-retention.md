@@ -101,8 +101,8 @@ python src/backend/manage.py purge_consent_records
 ```
 
 **Cadence: daily**, dispatched from `DAILY_COMMANDS` in `apps/core/utils/scheduler.py` on the
-first hourly tick at or after **08:00 UTC**. Daily rather than hourly because both bounds are
-multi-month: against a 5-year decision window an hourly sweep would find nothing eligible
+first hourly tick at or after **08:00 UTC**. Daily rather than hourly because every bound is
+multi-month: against an event window measured in years an hourly sweep would find nothing eligible
 essentially always. It is the **third** daily command (after `send_alerts` and
 `rollup_daily_metrics`), so its **exit code is load-bearing**: `run_one_cycle` writes the durable
 `scheduler_daily_state` marker only when *every* daily command exited `0`, and a non-zero entry
@@ -110,20 +110,78 @@ clears `hourly_marker`, which re-runs the whole daily set on the next hourly tic
 `send_alerts` is not idempotent, so that is not a free retry. The command therefore returns `0`
 on every non-exceptional outcome, including an empty eligible set and `--dry-run`.
 
-**Two windows, both hardcoded, both owner-ratified on 2026-10-03** (decision `Q-D4`):
+**Retention is decided per field, not as one blanket period.** `user` (the subject), `initiated_by`
+(the actor) and the consent-event fields are three different kinds of record with three different
+purposes, and each carries its own window. All three windows are hardcoded, and all three are
+**project decisions with a stated rationale** — see
+[Consent-record retention is policy-based](#consent-record-retention-is-policy-based-not-statutory)
+below for the rule that governs them and for the two things no document may assert about them.
 
 | Window | Constant | Value | Fields it governs | What the sweep does |
 |---|---|---|---|---|
 | **Fingerprint** | `_FINGERPRINT_RETENTION_DAYS` | **90 days** | `user`, `session_key`, `ip_address`, `user_agent` | **clears** them |
-| **Decision** | `_DECISION_RETENTION_DAYS` | **5 years** (`365 * 5`) | `choice`, `categories`, `consent_version`, `consent_given_at` | **retains** them at every age |
+| **Actor** | module constant in the same command | **12 months** from the consent action | `initiated_by` | **irreversibly anonymises** it — destroys the pointer, keeps the row — unless `legal_hold` is set |
+| **Event** | `_DECISION_RETENTION_DAYS` | **5 years** (`365 * 5`) from `consent_given_at` | `choice`, `categories`, `consent_version`, `consent_given_at` | **retains** them at every age |
+
+**Why each window is the value it is.** All three are choices, not findings:
+
+- **Fingerprint, 90 days** — these fields identify a *session*, and a session is the only thing a
+  live support or fraud investigation can still be conducted against. They exist to serve the
+  investigation that may follow the action, and they are worthless once the session that produced
+  them can no longer be examined. The floor is derived from the tree, not from guidance: no window
+  may fall below the declared Django session lifetime.
+- **Actor, 12 months, then anonymised** — the acting account is employee personal data attached to
+  a subject-facing record, and it is the only thing that makes a staff revocation attributable. The
+  owner's rationale for the figure: a year preserves **full accountability** across a complete
+  operational and audit cycle; it is **substantially shorter than the 5 years** previously proposed;
+  **identifying a specific employee beyond that requires a separate necessity and proportionality
+  justification**; and the figure is **a chosen minimisation period, not a statutory term**.
+- **Event, the current constant is 5 years** — a project decision on how long the proof of a
+  consent decision is worth keeping. It is revisitable on the same need-based rule as any other
+  window; it is not a number any law imposes on this record.
 
 **Anonymise, never delete — and that is the point.** The command has no `DELETE` path. A row past
-the decision window is still counted and still logged as *retained*, never removed. Deleting a
+the event window is still counted and still logged as *retained*, never removed. Deleting a
 `ConsentRecord` would destroy the ability to **demonstrate that consent was given** (GDPR
 Art. 7(1)) — the exact opposite failure from the unbounded-retention defect this sweep closes —
 and it would contradict `privacy.html` §6, which already promises the data subject that the
-consent log exists precisely so compliance can be demonstrated. The decision fields *are* the
+consent log exists precisely so compliance can be demonstrated. The event fields *are* the
 evidence and must survive; only the identity material attached to them goes.
+
+### Consent-record retention is policy-based, not statutory
+
+**The rule.** `ConsentRecord` retention is **policy-based and must be justified by purpose; no
+general five-year retention requirement for this record is imposed by law.** The need-based form of
+the rule: **retain while there is a necessity to prove consent or withdrawal and the lawfulness of
+the corresponding processing; after a justified period expires, delete or anonymise.** Every window
+in the table above is a reading of that rule for one kind of field, and each is revisitable by the
+same process that produced it.
+
+**Two things this document must never assert, and previously did:**
+
+1. **No statutory anchor for any of these windows.** None of 90 days, 12 months or the event window
+   is prescribed by a statute, a regulation, a supervisory-authority guideline or a limitation
+   period. **GDPR Art. 5(1)(e) requires storage limitation — that personal data is kept no longer
+   than necessary — and it prescribes no number.** Any reading of Art. 5(1)(e) as prescribing a
+   duration is wrong. Art. 7(1), cited above, is a demonstrability requirement and likewise states
+   no duration.
+2. **A limitation period is not a retention anchor.** A statutory limitation period governs the
+   window in which a *claim* may be brought. It says nothing about how long a controller must keep a
+   record. This document previously justified the event window by the general limitation period in
+   the subject's jurisdiction; **that inference is withdrawn by owner ruling 2026-10-04** and the
+   justification is gone. The window that remains is a project decision, defended on purpose above.
+
+**A neighbouring regime, recorded for accuracy and not relied on.** Montenegro's Personal Data
+Protection Law **№133/2026** entered into force **19 September 2026** and applies from
+**20 March 2027**. It sets **no** universal five-year period for a consent record. It is recorded
+here because a reader may encounter it, and it is **not** this project's applicable law — see the
+jurisdiction assumption in
+[`pii-consent-remediation-record.md`](../99-agent/pii-consent-remediation-record.md#jurisdiction--a-documented-revisitable-assumption).
+
+**Legal hold.** If an investigation, claim or litigation arises **before** the 12 months elapse,
+actor anonymisation is **suspended for the period of documented necessity**. The mechanism is a
+`legal_hold` flag on the record, which this sweep honours: a held row is skipped by the actor
+stage. A hold must be documented — an undocumented hold is indistinguishable from a bug.
 
 Mechanics that are load-bearing and easy to undo by accident:
 
@@ -132,18 +190,25 @@ Mechanics that are load-bearing and easy to undo by accident:
   re-identifiable through `django_session` — a live link the PII inventory does not declare.
 - `user_agent` is **cleared to `""`, not nulled**: the column is `blank=True` and **not nullable**,
   so the action is a CLEAR, not a NULL. `ip_address` is set `NULL` (nullable).
-- The sweep **asserts its own ordering**: `0 < _FINGERPRINT_RETENTION_DAYS <= _DECISION_RETENTION_DAYS`
-  is checked before any work, so a mis-ordering fails loudly instead of quietly turning the
-  fingerprint stage into a no-op. The fingerprint window is additionally **floored at the declared
-  Django session lifetime** (`SESSION_COOKIE_AGE`, 14 days), so a run that lands while a session is
-  still live cannot destroy that session's support evidence.
+- The sweep **asserts its own ordering** before any work, so a mis-ordering fails loudly instead of
+  quietly turning a stage into a no-op — a stage whose window is shorter than the stage before it
+  can never fire. The windows are ordered **fingerprint (90 d) ≤ actor (12 m) ≤ event (years)**.
+  The fingerprint window is additionally **floored at the declared Django session lifetime**
+  (`SESSION_COOKIE_AGE`, 14 days), so a run that lands while a session is still live cannot destroy
+  that session's support evidence.
+- The **actor stage** empties `initiated_by` once 12 months have passed, and **skips any row whose
+  `legal_hold` is set**. It empties the pointer and nothing else: the row, the event fields and the
+  accountability that a decision was attributable all survive, and no shadow or pseudonym is written
+  in place of the actor. `initiated_by` is otherwise emptied only by `SET_NULL` when the *acting
+  account's* own row is hard-deleted.
 - `consent_given_at` is the leading column of `IX_consent_records_sweep`, so the fingerprint
   predicate is an index condition rather than a sequential scan.
 - Batching is **off**. `ConsentRecord` grows by consent *actions*, not by requests, and is far
   below the row count that would justify `archive_sweep`'s keyset-batched shape.
 - **There is deliberately no `--older-than` flag, no environment variable and no Django setting for
-  either window.** A knob is exactly the thing that lets this document and the command drift apart:
-  the values above are hardcoded module constants, and that is what makes the two a single fact.
+  any of these windows.** A knob is exactly the thing that lets this document and the command drift
+  apart: the values above are hardcoded module constants, and that is what makes the two a single
+  fact. Changing one is an owner/DPO decision on purpose, not an operator preference.
 
 **Advisory lock 14** (`AdvisoryLockId.CONSENT_RECORD_SWEEP`,
 `src/backend/apps/core/enums.py`), acquired transaction-scoped inside `transaction.atomic()` and
@@ -216,7 +281,7 @@ removed.
 | `sweep_drafts` | 30 minutes | Delete DRAFT ads with no seller activity for 30 minutes (`Ad.updated_at`) |
 | `consent_hard_delete` | 30 days | Hard-delete user PII after 30-day consent withdrawal |
 | `purge_media_deletion_errors` | 30 days (default) | **Hourly**, advisory lock 15. Deletes `MediaDeletionError` rows older than `--older-than` days (default 30, the one operator-overridable retention window). **Irreversible** — `--dry-run` is the mandatory first run. Admin reader is read-only. Diagnostic table, no PII (see [purge_media_deletion_errors](#purge_media_deletion_errors-07-media-010)) |
-| `purge_consent_records` | 90 days (fingerprint) / 5 years (decision) | **Daily**, advisory lock 14. Anonymises the `ConsentRecord` fingerprint fields (`user`, `session_key`, `ip_address`, `user_agent`) at 90 days and retains the decision fields (`choice`, `categories`, `consent_version`, `consent_given_at`) for 5 years. **Never deletes rows** — see [purge_consent_records](#purge_consent_records-06-pii-116) |
+| `purge_consent_records` | 90 days (fingerprint) / 12 months (actor) / event window | **Daily**, advisory lock 14. Clears the `ConsentRecord` fingerprint fields (`user`, `session_key`, `ip_address`, `user_agent`) at 90 days, irreversibly anonymises the acting account (`initiated_by`) 12 months after the action unless `legal_hold` is set, and retains the consent-event fields (`choice`, `categories`, `consent_version`, `consent_given_at`). All three windows are **project decisions, not legal requirements**. **Never deletes rows** — see [purge_consent_records](#purge_consent_records-06-pii-116) |
 
 **`DRAFT` retention measures inactivity, not age.** The predicate is
 `status = DRAFT AND updated_at < now() - interval '30 minutes'`. `updated_at` is
@@ -290,10 +355,12 @@ See also: [technical-specification.md Decision F](../01-spec/technical-specifica
 
 ## Configuration
 
-All retention values are hardcoded in the respective management command source files. No environment variables or CLI arguments are read for retention durations, **with one deliberate exception**: `purge_media_deletion_errors --older-than` (default 30 days) exposes the `MediaDeletionError` diagnostic-table window as an operator knob (07-MEDIA-010). The values are: `archive_sweep` (60 days), `delete_sweep` (60 days), `purge_deleted_ads` (120 days), `purge_failed_ads` (7 days), `purge_rejected_ads` (90 days), `sweep_drafts` (30 minutes), `consent_hard_delete` (30 days), `purge_consent_records` (90-day fingerprint window / 5-year decision window), `purge_media_deletion_errors` (30 days, overridable).
+All retention values are hardcoded in the respective management command source files. No environment variables or CLI arguments are read for retention durations, **with one deliberate exception**: `purge_media_deletion_errors --older-than` (default 30 days) exposes the `MediaDeletionError` diagnostic-table window as an operator knob (07-MEDIA-010). The values are: `archive_sweep` (60 days), `delete_sweep` (60 days), `purge_deleted_ads` (120 days), `purge_failed_ads` (7 days), `purge_rejected_ads` (90 days), `sweep_drafts` (30 minutes), `consent_hard_delete` (30 days), `purge_consent_records` (90-day fingerprint window / 12-month actor window / event-retention window), `purge_media_deletion_errors` (30 days, overridable).
 
 Separately, `LOCK_TIMEOUT_SECONDS` (default 10) bounds every lock wait; it is a
-connection setting, not a retention value.
+connection setting, not a retention value. Every value is a **project decision defended on
+purpose**, not a figure prescribed by law — for the consent-record windows, see
+[Consent-record retention is policy-based](#consent-record-retention-is-policy-based-not-statutory).
 
 **Transaction batching (finding 03-DB-008).** `archive_sweep` and
 `recompute_normalized_prices` process their rows in per-batch transactions of

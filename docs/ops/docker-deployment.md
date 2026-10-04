@@ -830,7 +830,7 @@ service is restarted immediately after a graceful stop (ENT-002).
 | `purge_media_deletion_errors` | Delete `MediaDeletionError` rows older than `--older-than` days (default 30 — the one operator-overridable retention window). **Irreversible**: run `--dry-run` first. Advisory lock 15. See [`db-retention.md`](../02-database/db-retention.md#purge_media_deletion_errors-07-media-010) | Hourly |
 | `send_alerts` | Deliver pending search alerts | Daily at 08:00 UTC (first hourly tick ≥ 08:00 UTC; only if not already completed today) — one digest per user per day, max 10 ads |
 | `rollup_daily_metrics` | Roll up daily analytics metrics | Daily at 08:00 UTC |
-| `purge_consent_records` | Anonymise aged `ConsentRecord` fingerprint fields (90 d); retain the decision record (5 y). **Never deletes rows** — advisory lock 14. See [`db-retention.md`](../02-database/db-retention.md#purge_consent_records-06-pii-116) | Daily at 08:00 UTC |
+| `purge_consent_records` | `ConsentRecord` per-field retention: clear the fingerprint fields at 90 d; irreversibly anonymise the actor (`initiated_by`) 12 months after the action unless `legal_hold` is set; retain the consent-event fields. All windows are **project decisions, not legal requirements**. **Never deletes rows** — advisory lock 14. See [`db-retention.md`](../02-database/db-retention.md#purge_consent_records-06-pii-116) | Daily at 08:00 UTC |
 
 Per-user digest fairness note: the 10-ad per-user cap is applied at **collection** time
 (in `_collect_alerts`, so the notification rows and the rendered digest are the same set),

@@ -255,6 +255,15 @@ names the acting account when one exists and is not the subject. A null
 `initiated_by` covers a self-service action, an anonymous visitor and a system
 action, which `action_source` tells apart.
 
+**`initiated_by` is not kept indefinitely.** It is **12 months after the consent
+action, then irreversibly anonymised, subject to documented legal hold** — a
+**chosen minimisation period, not a statutory term**, and a **project decision, not
+a legal requirement**. The full rule, the rationale and the `legal_hold` mechanism
+are in [`db-schema.md`](db-schema.md#consent_records-zone-f--plan-21) and
+[`db-retention.md`](db-retention.md#consent-record-retention-is-policy-based-not-statutory).
+An `admin_staff` row therefore stops naming its actor after a year; the decision it
+attributed survives, and `action_source` still says a staff account performed it.
+
 | Value | Meaning |
 |-------|---------|
 | `self_service` | the subject acted, from their own session (`initiated_by` is NULL — the subject is already `user`) |

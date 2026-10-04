@@ -117,6 +117,7 @@ ip_address (INET, nullable)                   # anonymised CLIENT address, maske
 user_agent (TEXT, blank=True, NOT nullable)   # cleared to "" (not NULLed) by the retention sweep
 initiated_by_id (FK → users.id, nullable, SET_NULL)  # the ACTING account, only when it is not the subject (06-NEW-02); NULL covers self-service / anonymous / system
 action_source (StrEnum — ConsentActionSource, default "unknown", indexed)  # BY WHAT MECHANISM the action was initiated; see db-enums.md
+legal_hold (BOOL, default False)                  # SUSPENDS actor anonymisation while set; see the retention decision below
 db_table: consent_records
 ```
 There is **no `consented_at` and no `revoked_at` column**: the action timestamp is
@@ -140,11 +141,12 @@ Index on `user_id` supports the `consent_hard_delete` sweep. `consent_hard_delet
 after the full grace window.
 
 `IX_consent_records_sweep` on `consent_given_at` supports the `purge_consent_records`
-retention sweep, which **anonymises** (never deletes) rows older than the ratified
+retention sweep, which **anonymises** (never deletes) rows older than the project-decided
 fingerprint window. `Meta.ordering = ["-consent_given_at"]` does not create an index, so the
 sweep column leads this real index.
 
-**Actor and mechanism (`06-NEW-02`, closed by BLOCK 18).** `consent_records` records
+**Actor and mechanism (`06-NEW-02` — CLOSED and owned by BLOCK 18; the actor column exists).**
+`consent_records` records
 both **who acted** (`initiated_by`) and **by what mechanism** (`action_source`). The
 **actor definition**: the actor is the account that performed the action, and it is
 recorded **only when that account is not the subject**. `user` already names the
@@ -170,17 +172,37 @@ to a live account — re-opening the sweep's own re-identification path.
 collector; a cascade would delete the `ConsentRecord` rows through it and destroy the
 Art. 7(1) ledger. `related_name="+"` avoids a second reverse accessor on `User`.
 
-**Retention decision (BLOCK 18 recommendation, open owner/DPO question).** The acting
-account is retained to the **decision bound (5 years)** and is **not** cleared at the
-90-day fingerprint window: clearing the staff actor at 90 days would destroy the
-accountability the change exists to record. `purge_consent_records` is unmodified — its
-one-statement `.update(...)` never names `initiated_by`, so the column is untouched.
-`initiated_by` is emptied **only** by `SET_NULL` when the *acting account's* own row is
-hard-deleted. The counter-argument is real and deliberately unresolved: a superuser
-identifier held for 5 years on a row whose subject is anonymous is employee personal
-data with no erasure path, yielding a per-operator behavioural record — a
-proportionality judgement, not a technical one. The reversal is one line in
-`purge_consent_records` plus the `RETAIN` inventory entry's action.
+**Retention of the actor (`initiated_by`) — ruled 2026-10-04.** **12 months after the consent
+action, then irreversibly anonymised, subject to documented legal hold.** The earlier position in
+this document — retain the actor to the event bound, with the proportionality counter-argument
+"deliberately unresolved" — is **withdrawn**: the owner declined to approve long retention of the
+actor identifier without a separate necessity and proportionality justification.
+
+The rationale of record: a year preserves **full accountability** across a complete operational and
+audit cycle; it is **substantially shorter than the contested 5 years**; **identifying a specific
+employee beyond that requires separate justification**; and the figure is **a chosen minimisation
+period, not a statutory term**. A longer employee identifier on a row whose subject is already
+anonymous is a per-operator behavioural record, and minimisation is the default.
+
+**The two mechanisms that empty the column**, and only these:
+
+- the **12-month actor stage** of `purge_consent_records`, which destroys the pointer and writes
+  nothing in its place — no shadow row, no pseudonym — so the link is irreversibly broken and the
+  row survives; and
+- `SET_NULL` when the *acting account's* own row is hard-deleted by `consent_hard_delete`.
+
+**`legal_hold` suspends the first of those.** If an investigation, claim or litigation arises
+**before** the 12 months elapse, actor anonymisation is **suspended for the period of documented
+necessity**: a row with `legal_hold` set is skipped by the actor stage. The hold must be documented
+— an undocumented hold is indistinguishable from a defect. **Who may set a hold, and how a hold is
+reviewed and released, is an open owner/DPO question**, recorded in
+[`pii-consent-remediation-record.md`](../99-agent/pii-consent-remediation-record.md#open-work).
+
+**None of these windows is a legal requirement.** `ConsentRecord` retention is policy-based and
+justified by purpose; **no general five-year retention requirement for this record is imposed by
+law**, and GDPR Art. 5(1)(e) prescribes no number. The full per-field rule, the two supporting
+facts and the neighbouring-regime note (Montenegro №133/2026) are in
+[`db-retention.md`](db-retention.md#consent-record-retention-is-policy-based-not-statutory).
 
 **Reading convention for pre-existing rows.** This change shipped no data migration and
 no backfill: the ledger never recorded the actor or the mechanism, so nothing is

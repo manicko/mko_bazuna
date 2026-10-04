@@ -662,8 +662,9 @@ identity:
   `is_deleted` / `is_declined` writes therefore *does* have a compensating operator
   trigger. It is still **logout-less** — the subject is never the caller, so a
   `logout()` would be the same wrong-target trap as `ban_user` — and it writes the
-  `WITHDRAWN` `ConsentRecord` inside the withdrawal transaction with **no actor
-  column and no IP/user-agent**, which is the open `06-NEW-02` limitation recorded in
+  `WITHDRAWN` `ConsentRecord` inside the withdrawal transaction. The row **does** name its actor
+  (`initiated_by` / `action_source`, `06-NEW-02`, closed by BLOCK 18), but it still carries **no
+  IP/user-agent** — a recorded residual, not an open finding. See
   [`db-schema.md`](../02-database/db-schema.md#consent_records-zone-f--plan-21).
 - `moderation/views/review.py::ban_user` is **reachable but unfixable with a
   `logout()`**: it is `@staff_required`, so `request.user` is the **moderator**
