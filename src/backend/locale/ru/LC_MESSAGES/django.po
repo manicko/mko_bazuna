@@ -371,6 +371,9 @@ msgstr ""
 msgid "Too many requests to support. Please try again later."
 msgstr "Слишком много запросов в поддержку. Попробуйте позже."
 
+msgid "Too many contact requests right now. Please try again later."
+msgstr "Слишком много запросов на связь. Попробуйте позже."
+
 msgid "Contact us"
 msgstr "Связаться с нами"
 

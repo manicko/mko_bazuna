@@ -19,7 +19,11 @@ from asgiref.sync import sync_to_async
 from django.utils.translation import gettext as _, gettext_lazy
 
 from telegram_bot.schemas.callbacks import BotCallbackPrefix
-from telegram_bot.services.rate_limit import check_contact_start_rate_limit
+from telegram_bot.services.rate_limit import (
+    check_contact_deep_link_buyer_rate_limit,
+    check_contact_seller_window,
+    check_contact_start_rate_limit,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -83,6 +87,13 @@ _CONTACT_US_GREETING: Final = gettext_lazy(
 # Shown when a user exceeds the contact-start rate limit (OQ1).
 CONTACT_US_RATE_LIMITED_MESSAGE: Final = gettext_lazy(
     "Too many requests to support. Please try again later."
+)
+
+# Shown when a buyer exceeds either contact deep-link budget (per buyer or the
+# seller's inbound cap). Deliberately distinct from the support-desk message —
+# this is a seller contact, not the support desk.
+CONTACT_DEEP_LINK_RATE_LIMITED_MESSAGE: Final = gettext_lazy(
+    "Too many contact requests right now. Please try again later."
 )
 
 
@@ -191,11 +202,19 @@ async def handle_contact(message: types.Message, bot: Bot, ad_id: int) -> bool:
         - NOT seller.is_banned
         - seller.consent_revoked_at IS NULL
 
+    Rate limiting (09-API-003) — two independent budgets, refused **before**
+    any side effect (no ``AnalyticsEvent`` row, no outbound ``send_message``):
+        - per buyer: ``CONTACT_BUYER_RATE_LIMIT_*`` on ``message.from_user.id``;
+        - per seller: ``CONTACT_SELLER_RATE_LIMIT_*`` on the resolved seller's
+          primary key, checked inside the fused ORM hop (before the analytics
+          INSERT) so a buyer-account rotation cannot evade it.
+
     Returns True if contact was handled, False if not available.
 
     Bot messages:
         - ad missing/not PUBLISHED -> "the ad is no longer available"
         - seller unavailable -> "the seller is no longer available for contact"
+        - either budget exhausted -> "too many contact requests"
     """
     if not message.from_user:
         await message.answer(_("Error: could not determine the sender"))
@@ -203,14 +222,24 @@ async def handle_contact(message: types.Message, bot: Bot, ad_id: int) -> bool:
 
     buyer_telegram_id = message.from_user.id
 
-    # Combined ORM: check seller availability + record analytics
-    is_available, seller_telegram_id = await handle_contact_orm(
+    # Per-buyer refusals are decided without touching the ORM at all.
+    if not await check_contact_deep_link_buyer_rate_limit(buyer_telegram_id):
+        await message.answer(CONTACT_DEEP_LINK_RATE_LIMITED_MESSAGE)
+        return True
+
+    # Combined ORM: resolve the seller, enforce the per-seller cap, and only
+    # then record analytics — all in one @sync_to_async body (CONN_MAX_AGE=0).
+    is_available, seller_telegram_id, seller_rate_limited = await handle_contact_orm(
         ad_id=ad_id,
         buyer_telegram_id=buyer_telegram_id,
     )
 
     if not is_available:
         await message.answer(_("The ad is no longer available."))
+        return True
+
+    if seller_rate_limited:
+        await message.answer(CONTACT_DEEP_LINK_RATE_LIMITED_MESSAGE)
         return True
 
     if seller_telegram_id is None:
@@ -242,15 +271,20 @@ async def handle_contact(message: types.Message, bot: Bot, ad_id: int) -> bool:
 async def handle_contact_orm(
     ad_id: int,
     buyer_telegram_id: int | None,
-) -> tuple[bool, int | None]:
+) -> tuple[bool, int | None, bool]:
     """
-    Check seller availability and record contact analytics event.
+    Resolve the seller, enforce the per-seller cap, and record analytics.
 
-    Delegates R2 gating to core.services.contact.get_seller_for_contact()
-    and analytics recording to core.services.contact.record_contact_initiated().
+    Delegates R2 gating to core.services.contact.get_seller_for_contact(),
+    the per-seller rate check to
+    ``telegram_bot.services.rate_limit.check_contact_seller_window``, and
+    analytics recording to core.services.contact.record_contact_initiated().
 
-    Wraps both in a single sync_to_async call to reduce DB connection churn
-    with CONN_MAX_AGE=0.
+    All three run in a single sync_to_async call to reduce DB connection churn
+    with CONN_MAX_AGE=0 — the per-seller window is bumped in the same hop that
+    resolves the seller, so the guard adds **no** extra ORM round trip. When
+    the per-seller cap is exhausted, ``record_contact_initiated`` is **not**
+    called: a refused contact must write no ``AnalyticsEvent`` row.
 
     Zone R2 conditions:
         - ad.status == PUBLISHED
@@ -264,7 +298,9 @@ async def handle_contact_orm(
         buyer_telegram_id: The buyer's Telegram ID (may be None).
 
     Returns:
-        Tuple of (is_available, seller_telegram_id or None).
+        Tuple of (is_available, seller_telegram_id or None, seller_rate_limited).
+        ``seller_rate_limited`` is only meaningful when ``is_available`` and a
+        seller was resolved.
     """
     from apps.core.services.contact import (
         get_seller_for_contact,
@@ -272,13 +308,21 @@ async def handle_contact_orm(
     )
 
     @sync_to_async
-    def _handle() -> tuple[bool, int | None]:
+    def _handle() -> tuple[bool, int | None, bool]:
         is_available, seller = get_seller_for_contact(ad_id)
         seller_telegram_id: int | None = seller.telegram_id if seller else None
 
+        seller_rate_limited = False
+        if is_available and seller is not None:
+            # Keyed on the seller's stable PK: never None on a contactable
+            # path and immune to a telegram_id re-binding.
+            seller_rate_limited = not check_contact_seller_window(seller.pk)
+            if seller_rate_limited:
+                return (True, seller_telegram_id, True)
+
         record_contact_initiated(buyer_telegram_id)
 
-        return (is_available, seller_telegram_id)
+        return (is_available, seller_telegram_id, seller_rate_limited)
 
     return await _handle()
 

@@ -363,6 +363,9 @@ msgstr ""
 msgid "Too many requests to support. Please try again later."
 msgstr "Previše zahtjeva za podrškom. Pokušaj kasnije."
 
+msgid "Too many contact requests right now. Please try again later."
+msgstr "Previše zahtjeva za kontakt. Pokušaj kasnije."
+
 msgid "Contact us"
 msgstr "Kontaktiraj nas"
 

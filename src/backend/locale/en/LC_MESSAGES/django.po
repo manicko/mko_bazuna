@@ -301,6 +301,9 @@ msgstr ""
 msgid "Too many requests to support. Please try again later."
 msgstr ""
 
+msgid "Too many contact requests right now. Please try again later."
+msgstr ""
+
 msgid "Contact us"
 msgstr ""
 
