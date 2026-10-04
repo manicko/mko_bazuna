@@ -1428,6 +1428,12 @@ docker compose --env-file .env.prod \
 > `PROMETHEUS_MULTIPROC_DIR` — they do not expose a `/metrics` endpoint. Only the
 > `web` gunicorn service needs multiprocess mode.
 
+> **Expected flat series:** the `translation_requests_total`, `translation_fallback_total` and
+> `translation_circuit_open` series are expected to read **flat (zero/0)** on this endpoint — `web`
+> constructs them (it imports `apps.core.services`) but never calls `translate_text`; the real
+> increments happen only in `bot` and the `migrate` one-shot, which do not share web's multiprocess
+> directory (09-API-017). Do not read these three zeros as an outage.
+
 ### Viewing Metrics
 
 ```bash

@@ -1127,8 +1127,11 @@ backend (see [Environment Variable Resolution](#environment-variable-resolution)
 | `DEFAULT_FROM_EMAIL` | `noreply@<SITE_URL>` | — | — | — |
 | `SUPPORT_NOTIFICATION_RECIPIENTS` | `[]` (`env.list`) | — | — | — |
 
-- `EMAIL_*` are the classic Django SMTP settings; `prod.py` raises `ImproperlyConfigured` if
-  `EMAIL_HOST` is empty at runtime (ensures transactional email deliverability).
+- `EMAIL_*` are the classic Django SMTP settings; an empty `EMAIL_HOST` is a **loud `WARNING`,
+  not a boot gate** — `prod.py` logs the warning and the import still succeeds (Product Owner
+  ruling 2026-10-03, Q1, 09-API-009). The site serves normally; only the support-desk
+  notification degrades, which is already the fail-open behaviour of its sole consumer
+  (`telegram_bot/services/support_delivery_email.py::send_support_notification_email`).
 - **`EMAIL_BACKEND` is not operator-configurable in production.** `base.py` still honours the env
   var, but `prod.py` re-pins `EMAIL_BACKEND` to `smtp.EmailBackend` unconditionally after the
   import, so a console or locmem backend cannot be injected into a deployed environment (message

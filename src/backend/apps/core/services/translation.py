@@ -20,22 +20,44 @@ alone does NOT mask PII and must never be the sole sanitiser here;
 adds a 100-char cap) and is not the right audience for ad text. Neither helper
 is modified here — ``apps/core/utils/sanitize.py`` is phase 08's.
 
-Observability limit (deliberate, de-scoped follow-on — 09-API-017): the
-counters below are created in this module, and this module is imported by the
-``bot`` process (publish path, ``telegram_bot.services.ad_data.translation``)
-and by the ``migrate`` one-shot (``backfill_translations``) — neither sets
-``PROMETHEUS_MULTIPROC_DIR`` nor mounts its tmpfs. Only ``web`` sets that env
-var (``docker-compose.yml``, pinned by ``src/backend/tests/
-test_compose_contract.py``), and ``web`` never calls ``translate_text``. A
-``prometheus_client`` counter is therefore process-local here and is NOT
-exported by ``web``'s ``/metrics`` (whose ``ExportToDjangoView`` builds a fresh
-registry populated solely by ``MultiProcessCollector``). The counters are
-in-process bookkeeping — the increments are real and asserted by the unit
-tests — and the open-breaker state remains observable in logs. Exporting them
-requires a bot-side ``/metrics`` or a shared multiprocess volume: a
+Observability limit (deliberate, de-scoped follow-on — 09-API-017): the three
+metric families below are created in this module, and **whether a family appears
+on ``/metrics`` depends on whether the process imported this module — not on
+whether it calls ``translate_text``.** Import is what constructs the objects;
+an imported-but-never-incremented ``prometheus_client`` metric is still
+exported, because ``valuetype`` selects ``MmapedValue`` whenever
+``PROMETHEUS_MULTIPROC_DIR`` is set and ``MmapedValue.__init__`` writes a ``0.0``
+record (``mmap_dict.MmapedDict._init_value``) with no ``.inc()`` required.
+
+The import graph, stated correctly:
+
+* This module **is** imported by ``web``. ``apps/core/services/__init__.py``
+  does ``from .translation import translate_text``, so importing **any**
+  ``apps.core.services.*`` submodule executes it. Web-side importers include
+  ``apps/ads/views/listings.py``, ``apps/core/context_processors.py``,
+  ``apps/search/views/search.py`` and ``apps/users/views/consent.py``. ``web``
+  therefore **constructs all three families** and they **do** appear on
+  ``web``'s ``/metrics`` — but they read **permanently zero**, because ``web``
+  never calls ``translate_text``. Three flat series that look instrumented.
+* The **real increments** happen only in the ``bot`` process (publish path,
+  ``telegram_bot.services.ad_data.translation``) and in the ``migrate``
+  one-shot (``backfill_translations``). Only ``web`` sets
+  ``PROMETHEUS_MULTIPROC_DIR`` and mounts its tmpfs pair
+  (``docker-compose.yml``, pinned by ``src/backend/tests/
+  test_compose_contract.py``); **neither** ``bot`` **nor** ``migrate`` shares
+  that directory, so no real increment ever reaches ``web``'s ``/metrics``.
+
+The increments are real in the process that makes them and are what the unit
+tests assert; the open-breaker state also remains observable in logs. Exporting
+a real value requires a bot-side ``/metrics`` or a shared multiprocess volume: a
 deployment-topology change of the same scale as §6.2's declined "one outbound
 gateway", recorded here as a named, de-scoped follow-on and NOT built in this
 change.
+
+Do **not** generalise this to ``telegram_bot/retry.py``: its baseline claim is
+accurate. ``telegram_bot.retry`` is imported only by ``telegram_bot.main`` and
+its test, and nothing under ``src/backend/`` imports ``telegram_bot``, so that
+counter genuinely never enters ``web``.
 """
 
 import html
@@ -68,9 +90,11 @@ TRANSLATION_BACKOFF_BASE: Final[float] = 0.1  # 100ms base; backoff = 0.1 * 2**a
 
 GOOGLE_TRANSLATE_V2_URL: Final[str] = "https://translation.googleapis.com/language/translate/v2"
 
-# --- Observability (09-API-017). Process-local only — see the module docstring:
-# the modules that import this one do not set PROMETHEUS_MULTIPROC_DIR, so these
-# are NOT exported to web's /metrics. The increments are what the tests assert.
+# --- Observability (09-API-017). See the module docstring: web imports this
+# module (via the apps.core.services package __init__), so it DOES construct and
+# export these three families on /metrics — but they read permanently zero,
+# because web never calls translate_text. The real increments are made only by
+# bot and the migrate one-shot, neither of which shares web's multiprocess dir.
 TRANSLATION_REQUESTS: Final = Counter(
     "translation_requests_total",
     "translate_text calls that reached the upstream attempt loop (non-empty input).",
