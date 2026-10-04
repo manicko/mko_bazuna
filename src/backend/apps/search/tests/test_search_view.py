@@ -18,13 +18,10 @@ from unittest.mock import patch
 import pytest
 from django.core.cache import cache
 from django.test import Client
+from django.utils import timezone
 
 from apps.ads.models import Ad
-from apps.ads.services.listings_query import (
-    MAX_FEATURE_FILTER_SLUGS,
-    ListingsQuery,
-    ListingsQueryParams,
-)
+from apps.ads.services.listings_query import MAX_FEATURE_FILTER_SLUGS
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.core.utils.json_logging import RedactingJsonFormatter
@@ -385,42 +382,58 @@ class TestSearchViewDeclinedConsent:
         assert response.status_code == 200
         assert declined_ad.id not in {a.id for a in response.context["page_obj"]}
 
+    @pytest.mark.django_db(transaction=True)
     def test_give_consent_restores_declined_ads_to_queryset(
         self,
         seller: User,
         root_category: Category,
         city: City,
     ) -> None:
-        """Restoring consent (is_declined=False) makes the user's ads visible again.
+        """Restoring consent makes the user's ads visible through the search VIEW.
 
-        Verified against the live queryset (``build_queryset``) rather than the
-        cached search view: ``give_consent`` intentionally does not bump the
-        search cache, so a warm cache entry persists until TTL expiry — the ad
-        reappears via the live ``user__is_declined=False`` filter once results
-        are (re)computed.
+        Drives the anonymous ``/search/`` endpoint with a **warm** cache: the
+        page is loaded twice (the second request is a cache hit, proven by an
+        unchanged ``get_search_version()``), consent is restored, and the ad must
+        reappear on the next request with **no manual cache bump**. The assertion
+        moved from ``ListingsQuery.build_queryset`` to the view because the whole
+        defect — a stale cached result set — is invisible to a queryset-level
+        check (08-SRCH-005). The old docstring claimed ``give_consent``
+        intentionally does not bump the search cache; that claim documented the
+        defect and is gone.
         """
+        from apps.search.services.cache import get_search_version
         from apps.users.services.deletion import give_consent
 
         ad = create_test_ad(
             seller,
             root_category,
             city,
-            title="Велосипед после согласия",
+            title="Продам красный велосипед",
             status=AdStatus.PUBLISHED,
+            published_at=timezone.now(),
         )
 
         seller.is_declined = True
         seller.save(update_fields=["is_declined"])
 
-        params = ListingsQueryParams()
-        assert ad.id not in {a.id for a in ListingsQuery.build_queryset(params)}
+        client = Client()
+        # Warm the cache with the declined (empty) result set.
+        first = client.get("/search/?q=велосипед&lang=ru")
+        assert ad.id not in {a.id for a in first.context["page_obj"]}
 
-        # give_consent clears is_declined -> live filter lets the ad reappear.
+        version_after_first = get_search_version()
+        second = client.get("/search/?q=велосипед&lang=ru")
+        # The second request is a cache hit: the version did not move.
+        assert get_search_version() == version_after_first
+        assert ad.id not in {a.id for a in second.context["page_obj"]}
+
+        # give_consent clears is_declined and invalidates the search cache.
         give_consent(seller)
         seller.refresh_from_db()
         assert seller.is_declined is False
 
-        assert ad.id in {a.id for a in ListingsQuery.build_queryset(params)}
+        third = client.get("/search/?q=велосипед&lang=ru")
+        assert ad.id in {a.id for a in third.context["page_obj"]}
 
 
 class TestSearchViewDescendantCategories:

@@ -985,3 +985,57 @@ class TestSearchCacheInvalidationOnWithdrawal:
         # The withdrawn ad should no longer appear in search results
         resp2 = client.get("/search/?q=велосипед&lang=ru")
         assert len(list(resp2.context["page_obj"])) == 0
+
+
+
+# ---------------------------------------------------------------------------
+# Account-state invalidation (08-SRCH-005): a User.post_save receiver in
+# apps/search/signals.py bumps the search version via transaction.on_commit.
+# django_db(transaction=True) runs the test in autocommit mode so the on_commit
+# callback actually fires and the DB writes are visible to the search queries.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.integration
+class TestSearchCacheInvalidationOnAccountState:
+    """A user's ``is_declined`` change invalidates the search cache (08-SRCH-005)."""
+
+    def test_give_consent_bumps_cache_version(self, seller, category, city):
+        """``give_consent`` increases the search content version.
+
+        The bump is delivered by the ``User`` ``post_save`` receiver in
+        ``apps/search/signals.py`` (deferred through ``transaction.on_commit``),
+        not by a manual call in the test: the receiver is the declared
+        invariant that closes the defect.
+        """
+        from apps.users.services.deletion import give_consent
+        from conftest import create_test_ad
+
+        create_test_ad(
+            seller,
+            category,
+            city,
+            title="Продам красный велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+        seller.is_declined = True
+        seller.save(update_fields=["is_declined"])
+
+        version_before = get_search_version()
+        give_consent(seller)
+        version_after = get_search_version()
+
+        assert version_after > version_before
+
+    def test_unrelated_user_save_does_not_bump_cache(self, seller):
+        """A targeted save on a field unrelated to visibility does not bump.
+
+        Without this control the receiver would be a performance regression on
+        every ``User.save()``.
+        """
+        version_before = get_search_version()
+        seller.save(update_fields=["preferred_city"])
+        version_after = get_search_version()
+
+        assert version_after == version_before
