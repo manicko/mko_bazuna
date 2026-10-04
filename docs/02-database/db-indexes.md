@@ -217,11 +217,23 @@ models.Index(fields=["escalation_required"])
 
 ## Indexes — popular_searches
 ```python
-# Implicit via db_index=True on model fields
+# Explicit columns, kept in step with the model declaration (models.py is the
+# source of truth; this sample reproduces it).
 models.CharField("query", max_length=200, db_index=True)
-# query_normalized carries a UniqueConstraint (08-SRCH-003). The unique index
-# it creates supersedes the plain db_index=True index — a unique index IS the
-# index — so no separate non-unique index is needed on this column.
+# query_normalized after migration 0006 carries a UniqueConstraint
+# (08-SRCH-003), on top of the db_index=True declared on the field. That leaves
+# THREE indexes on the column:
+#   1. uq_popular_search_query_normalized           — the unique btree
+#   2. popular_searches_query_normalized_c335c338   — Django's db_index=True btree
+#   3. popular_searches_query_normalized_c335c338_like — varchar_pattern_ops
+#
+# The unique btree supersedes the plain db_index=True btree as a duplicate —
+# both are default-collation btrees over the same column, so #2 is redundant
+# with #1. But the varchar_pattern_ops index (#3) is NOT redundant and MUST be
+# retained: get_popular_suggestions filters query_normalized__startswith, which
+# compiles to LIKE 'prefix%', and a default-collation btree cannot serve that.
+# Dropping db_index=True would delete the pattern-ops index and regress every
+# autocomplete prefix lookup. models.py deliberately keeps db_index=True.
 models.UniqueConstraint(
     fields=["query_normalized"], name="uq_popular_search_query_normalized"
 )
