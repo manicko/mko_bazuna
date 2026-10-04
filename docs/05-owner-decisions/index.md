@@ -36,6 +36,8 @@ anywhere else.
 | **O3** | What happens when a user deletes their account | When a user deletes their account, **all their personal data and ads must be fully erased 30 days later**. | Delete ads and images, clear `telegram_id`/`username`, and clear user references in analytics/moderator logs after 30 days. | R1 |
 | **O4** | How ads are checked before they are published | Ads are checked **automatically before publishing** using text rules (minimum lengths, required fields, duplicate detection). A **human moderator** reviews the photos and content, and can **edit the rules at any time** while the system is running. The rules are not versioned. | Two layers: automatic checks (`moderation_criteria`) plus manual admin review of photos/content. Minimum-text-length rule removed. | D3 / D4 |
 | **O5** | Finding ads by category | Buyers must be able to **find ads by category name** in phase 1. | Hybrid search: denormalized category name included in the search index (weight 'C') plus fuzzy category detection; buyers search in their own language against per-language FTS vectors (no query-time translation — decision G). | D1 / D2 |
+| **O6** | Does a ban hide the banned seller's inventory? (Q7) | **A ban hides inventory.** A banned seller's ads are excluded from every public surface — search results, category listings, the ad detail page and the media gate. This is a **moderation** sanction, not a consent matter: banning is a seller-relationship sanction, and removing the inventory is part of that sanction. | Add the `is_banned=False` term to the shared public ad-visibility predicate on all four read surfaces (search, category listings, ad detail, media gate). Argue and record it as **ban enforcement**; never as a consent/`is_declined`/`consent_version` fix — those are different concepts and conflating them mislabels the change. | R4 |
+| **O7** | Does a ban also stop the seller creating or publishing? (Q7′) | **Yes.** A banned seller **cannot create or publish** a new ad. Ban enforcement covers **relisting**, not only login. | The write path (create/publish) refuses a banned seller. This is a **phase-06 follow-on** on the `SRCH-008` write boundary. Anywhere in the plan set that "a banned seller can still relist" is recorded as an accepted known gap, that gap is **closed** and the documenting test becomes a positive control asserting the block. | R4 |
 
 ## Cross-References
 
@@ -51,3 +53,27 @@ anywhere else.
   [`../01-spec/technical-specification.md` §H](../01-spec/technical-specification.md) (the
   `is_banned` operator contract) and in the `apps/moderation/admin_actions.py` docstrings. Do not
   duplicate it into this table — a second copy becomes a second source of truth.
+
+## Ban enforcement — ad visibility (phase-08 handoff)
+
+The **Q7** and **Q7′** rulings above were taken by the Product Owner on **2026-10-03** and are
+recorded here so the moderation decision has one findable home. They are **moderation** decisions:
+a ban is a seller-relationship sanction, and hiding inventory and refusing new listings are part of
+that sanction. They are **not** consent rulings — `is_declined` and `consent_version` are separate
+concepts with separate semantics, and a change that implements Q7/Q7′ must be argued and recorded
+as ban enforcement, never as fixing a consent violation.
+
+**Handoff to phase 06 (`SRCH-004` / `06-PII-104`).** Phase 06 landed `account_state_q()` and applied
+it to the **alert** path. `SRCH-004` is absorbed by `06-PII-104` verbatim and phase 08 does not edit
+`apps/search/services/alert_query.py`. Two obligations remain with phase 06:
+
+1. **Read boundary (Q7).** Exclude a banned seller's ads from the **public** ad-visibility
+   predicate on all four surfaces. Phase 08 implemented this read-boundary predicate using the
+   existing `account_state_q()` helper on `apps/ads/services/listings_query.py` and
+   `apps/ads/views/listings.py` because the ruling had no owning phase and the exposure was live.
+2. **Write boundary (Q7′), OPEN — owner: phase 06.** The write path must refuse a banned seller
+   from creating or publishing an ad. This is a phase-06 follow-on and is **not** implemented by
+   phase 08; it is recorded here as an open obligation.
+
+Also: any `TRUSTED_PROXY_NETWORKS`-style "known gap" language recording that a banned seller can
+still relist is **closed** by Q7′ — do not record it as accepted.
