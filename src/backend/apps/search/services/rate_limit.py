@@ -4,14 +4,16 @@ Rate limiting utility for search endpoints (autocomplete and search).
 Uses Django's cache framework with atomic increment to enforce
 a per-IP request limit within a sliding time window. Each consumer
 uses an independent ``namespace`` so their counters do not interfere.
+The window bump is delegated to
+``apps.core.utils.cache.bump_rate_limit_window``.
 """
 
 import logging
 from typing import Final
 
-from django.core.cache import cache
 from django.http import HttpRequest
 
+from apps.core.utils.cache import bump_rate_limit_window
 from apps.core.utils.client_ip import get_client_ip
 
 logger = logging.getLogger(__name__)
@@ -33,10 +35,10 @@ def rate_limit_check(
     """
     Check whether the given request is within the rate limit.
 
-    Uses an atomic increment pattern via ``cache.add`` followed by
-    ``cache.incr`` to initialise the counter at 1 and atomically
-    increment on each subsequent request.  Returns ``True`` if the
-    request is allowed, ``False`` if the caller has exceeded the limit.
+    Delegates the atomic ``cache.add`` + ``cache.incr`` window bump to
+    ``apps.core.utils.cache.bump_rate_limit_window``. Returns ``True`` if the
+    request is allowed, ``False`` if the caller has exceeded the limit, and
+    ``True`` (fail-open) when the cache is unreachable.
 
     Each caller passes a distinct ``namespace`` so that autocomplete and
     search keep independent per-IP counters (default ``autocomplete``).
@@ -50,20 +52,5 @@ def rate_limit_check(
     """
     ip = get_client_ip(request)
     key = _RATE_LIMIT_KEY_PATTERN.format(namespace=namespace, ip=ip)
-
-    try:
-        # cache.add returns True if the key was created (first request).
-        added = cache.add(key, 1, timeout=RATE_LIMIT_PERIOD)
-        if added:
-            current = 1
-        else:
-            # Atomic increment on existing key.
-            current = cache.incr(key)
-
-        return current <= RATE_LIMIT_REQUESTS
-
-    except ValueError:
-        # Key expired between the add/incr calls — treat as a fresh start.
-        cache.set(key, 1, timeout=RATE_LIMIT_PERIOD)
-        return True
+    return bump_rate_limit_window(key, RATE_LIMIT_REQUESTS, RATE_LIMIT_PERIOD)
 

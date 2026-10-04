@@ -4,11 +4,14 @@ Tests for the web deep-link render rate limiter (contact-us anti-spam, CR-10).
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock, patch
+
 import pytest
 from django.core.cache import cache
 from django.http import HttpRequest
 from django.test import Client
 from django.urls import reverse
+from django_redis.exceptions import ConnectionInterrupted
 
 from apps.core.services.contact_rate_limit import check_deep_link_render_rate_limit
 
@@ -49,6 +52,27 @@ class TestDeepLinkRenderRateLimit:
             check_deep_link_render_rate_limit(_make_request(ip="10.0.0.1"))
         # 10.0.0.2 is untouched
         assert check_deep_link_render_rate_limit(_make_request(ip="10.0.0.2")) is True
+
+    def test_fails_open_on_cache_outage(self) -> None:
+        """A cache outage allows the render instead of raising.
+
+        The failing cache is applied at the guard module's own ``cache`` name
+        while it exists, and at ``apps.core.utils.cache.cache`` once the guard
+        delegates to the shared helper — so this single test is genuinely RED
+        before the fail-open change and GREEN after it.
+        """
+        import apps.core.services.contact_rate_limit as guard_module
+
+        mock_cache = MagicMock()
+        mock_cache.add.side_effect = ConnectionInterrupted(None)
+
+        target = (
+            patch.object(guard_module, "cache", mock_cache)
+            if hasattr(guard_module, "cache")
+            else patch("apps.core.utils.cache.cache", mock_cache)
+        )
+        with target:
+            assert check_deep_link_render_rate_limit(_make_request()) is True
 
     def test_untrusted_peer_ignores_x_forwarded_for(self) -> None:
         """An untrusted public peer keeps its own key; X-Forwarded-For is ignored.
@@ -91,7 +115,7 @@ class TestDeepLinkRenderRateLimit:
         # Second call: cache.add fails (key exists), cache.incr raises ValueError
         # (simulating the key expiring between add and incr)
         with patch(
-            "apps.core.services.contact_rate_limit.cache.incr",
+            "apps.core.utils.cache.cache.incr",
             side_effect=ValueError("missing key"),
         ):
             result = check_deep_link_render_rate_limit(request)

@@ -917,7 +917,7 @@ class TestLoginRateLimitCheck:
         # Second call: cache.add fails (key exists), cache.incr raises ValueError
         # (simulating the key expiring between add and incr)
         with patch(
-            "apps.users.services.login_rate_limit.cache.incr",
+            "apps.core.utils.cache.cache.incr",
             side_effect=ValueError("missing key"),
         ):
             result = login_rate_limit_check(request)
@@ -925,3 +925,33 @@ class TestLoginRateLimitCheck:
         assert result is True
         # Counter was reset to 1 by the except ValueError branch
         assert cache.get("login_rl:127.0.0.1") == 1
+
+    def test_login_rate_limit_check_fails_open_on_cache_outage(self) -> None:
+        """A cache outage allows the login request instead of raising.
+
+        The failing cache is applied at the guard module's own ``cache`` name
+        while it exists, and at ``apps.core.utils.cache.cache`` once the guard
+        delegates — so this single test is genuinely RED before the fail-open
+        change and GREEN after it.
+        """
+        from unittest.mock import MagicMock, patch
+
+        from django.http import HttpRequest
+        from django_redis.exceptions import ConnectionInterrupted
+
+        import apps.users.services.login_rate_limit as guard_module
+        from apps.users.services.login_rate_limit import login_rate_limit_check
+
+        request = HttpRequest()
+        request.META = {"REMOTE_ADDR": "127.0.0.1"}
+
+        mock_cache = MagicMock()
+        mock_cache.add.side_effect = ConnectionInterrupted(None)
+
+        target = (
+            patch.object(guard_module, "cache", mock_cache)
+            if hasattr(guard_module, "cache")
+            else patch("apps.core.utils.cache.cache", mock_cache)
+        )
+        with target:
+            assert login_rate_limit_check(request) is True

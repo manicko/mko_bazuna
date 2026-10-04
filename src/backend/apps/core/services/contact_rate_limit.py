@@ -1,17 +1,18 @@
 """
 Rate limiting for Telegram deep-link page renders (Contact-Us anti-spam).
 
-Per-IP cap on pages that render Telegram contact deep-links, using the atomic
-``cache.add`` + ``cache.incr`` idiom shared with the search autocomplete and
-login rate limiters. Mirrors ``apps/search/services/rate_limit.py``.
+Per-IP cap on pages that render Telegram contact deep-links, delegating the
+atomic ``cache.add`` + ``cache.incr`` window bump shared with the search
+autocomplete, login and bot rate limiters to
+``apps.core.utils.cache.bump_rate_limit_window``.
 """
 
 import logging
 from typing import Final
 
-from django.core.cache import cache
 from django.http import HttpRequest
 
+from apps.core.utils.cache import bump_rate_limit_window
 from apps.core.utils.client_ip import get_client_ip
 
 logger = logging.getLogger(__name__)
@@ -26,22 +27,10 @@ _RATE_LIMIT_KEY_PATTERN: Final[str] = "telegram_dl_rl:{ip}"
 def check_deep_link_render_rate_limit(request: HttpRequest) -> bool:
     """Return True if the requesting IP is within the deep-link render limit.
 
-    Mirrors ``apps.search.services.rate_limit.rate_limit_check``. Returns True
-    if the page may render its Telegram contact links, False if the IP has
-    exceeded 60 renders in the last 600 seconds. The calling view is
-    responsible for producing the 429 response.
+    Returns True if the page may render its Telegram contact links, False if the
+    IP has exceeded 60 renders in the last 600 seconds, and True (fail-open) when
+    the cache is unreachable. The calling view is responsible for producing the
+    429 response.
     """
     key = _RATE_LIMIT_KEY_PATTERN.format(ip=get_client_ip(request))
-
-    try:
-        added = cache.add(key, 1, timeout=RATE_LIMIT_PERIOD)
-        if added:
-            current = 1
-        else:
-            current = cache.incr(key)
-
-        return current <= RATE_LIMIT_REQUESTS
-
-    except ValueError:
-        cache.set(key, 1, timeout=RATE_LIMIT_PERIOD)
-        return True
+    return bump_rate_limit_window(key, RATE_LIMIT_REQUESTS, RATE_LIMIT_PERIOD)

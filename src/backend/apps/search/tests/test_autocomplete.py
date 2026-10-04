@@ -656,6 +656,36 @@ class TestRateLimitService:
         # 31st request should be blocked
         assert not rate_limit_check(request), "Request 31 should be rate limited"
 
+    def test_rate_limit_check_fails_open_on_cache_outage(self) -> None:
+        """A cache outage allows the request rather than raising.
+
+        The failing cache is applied at the guard module's own ``cache`` name
+        while it exists, and at ``apps.core.utils.cache.cache`` once the guard
+        delegates — so this single test is genuinely RED before the fail-open
+        change and GREEN after it.
+        """
+        from unittest.mock import MagicMock, patch
+
+        from django.http import HttpRequest
+        from django_redis.exceptions import ConnectionInterrupted
+
+        import apps.search.services.rate_limit as guard_module
+        from apps.search.services.rate_limit import rate_limit_check
+
+        request = HttpRequest()
+        request.META["REMOTE_ADDR"] = "127.0.0.1"
+
+        mock_cache = MagicMock()
+        mock_cache.add.side_effect = ConnectionInterrupted(None)
+
+        target = (
+            patch.object(guard_module, "cache", mock_cache)
+            if hasattr(guard_module, "cache")
+            else patch("apps.core.utils.cache.cache", mock_cache)
+        )
+        with target:
+            assert rate_limit_check(request) is True
+
 
 # ---------------------------------------------------------------------------
 # Search view recording
