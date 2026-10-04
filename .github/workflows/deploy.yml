@@ -33,7 +33,7 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
       - name: Set image tag
         id: set_tag
@@ -52,7 +52,9 @@ jobs:
 
       - name: Deploy to production via SSH
         id: deploy
-        uses: appleboy/ssh-action@v1.2.0
+        # appleboy/ssh-action receives the production SSH private key; pinning it
+        # to a full commit SHA keeps that trust boundary immutable (12-OPS-017).
+        uses: appleboy/ssh-action@7eaf76671a0d7eec5d98ee897acda4f968735a17 # v1.2.0
         env:
           IMAGE_TAG: ${{ steps.set_tag.outputs.image_tag }}
         with:

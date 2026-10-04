@@ -10,6 +10,7 @@ not on running security tools.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -299,3 +300,118 @@ def test_bandit_has_config_section() -> None:
     """pyproject.toml contains a [tool.bandit] configuration section."""
     content = _read("pyproject.toml")
     assert "[tool.bandit]" in content
+
+
+# ---------------------------------------------------------------------------
+# Supply-chain pinning of every workflow action (12-OPS-017)
+# ---------------------------------------------------------------------------
+# A third-party `uses:` reference written as a tag (e.g. `actions/checkout@v4`)
+# is a mutable pointer: the tag can be moved under the pipeline, and the step
+# that receives the production SSH private key or runs in the job holding
+# `security-events: write` and a GITHUB_TOKEN would move with it. The guard
+# asserts every third-party action is pinned to a full 40-hex commit SHA and
+# carries the version in a trailing comment (so Dependabot bumps stay auditable).
+
+# Matches a `uses:` reference: `owner/repo(/path)@ref`. Local actions (`./...`)
+# and container actions (`docker://...`) carry no remote trust boundary and are
+# out of scope.
+_USES_REFERENCE_RE = re.compile(
+    r"(?m)^\s*(?:-\s*)?uses:\s*(?P<ref>[^\s#]+)(?P<comment>\s*#.*)?$"
+)
+_COMMIT_SHA_RE = re.compile(r"^[0-9a-f]{40}$")
+
+
+def _unpinned_uses_refs(text: str) -> list[str]:
+    """Return every third-party ``uses:`` reference not pinned to a full commit SHA.
+
+    Given a workflow file's text, returns one entry per offending reference. A
+    pinned reference is ``owner/repo@<40-hex> # vX.Y.Z``. Local (``./``) and
+    container (``docker://``) references are skipped deliberately: they carry no
+    remote trust boundary.
+    """
+    offenders: list[str] = []
+    for match in _USES_REFERENCE_RE.finditer(text):
+        ref = match.group("ref")
+        comment = match.group("comment") or ""
+        if ref.startswith("./") or ref.startswith("docker://"):
+            continue
+        repo, sep, pin = ref.partition("@")
+        if not sep:
+            offenders.append(f"{ref} (no ref)")
+            continue
+        if not _COMMIT_SHA_RE.match(pin):
+            offenders.append(f"{ref} (mutable ref, not a 40-hex commit SHA)")
+        elif not comment.strip():
+            offenders.append(f"{ref} (pinned but no version comment)")
+    return offenders
+
+
+def test_every_workflow_action_is_pinned_to_a_commit_sha() -> None:
+    """Every third-party `uses:` in every workflow is a pinned commit SHA.
+
+    A tag or branch is a pointer that can be moved under the pipeline, so the
+    trust boundary — including the step that receives the production SSH private
+    key and the security job's SARIF uploads — is only immutable when pinned to
+    the commit SHA with the version recorded in a trailing comment (12-OPS-017).
+    """
+    workflows_dir = _PROJECT_ROOT / ".github" / "workflows"
+    workflow_files = sorted(workflows_dir.glob("*.yml"))
+    assert workflow_files, f"no workflow files found under {workflows_dir}"
+
+    offenders: list[str] = []
+    for path in workflow_files:
+        text = path.read_text(encoding="utf-8")
+        for offender in _unpinned_uses_refs(text):
+            offenders.append(f"{path.name}: {offender}")
+
+    assert not offenders, (
+        "every third-party action must be pinned to a full commit SHA with the "
+        "version in a trailing comment (12-OPS-017):\n" + "\n".join(offenders)
+    )
+
+
+def test_unpinned_uses_guard_detects_a_mutable_tag() -> None:
+    """The pin guard fails on a mutable tag and on a blank version comment.
+
+    A guard that only passes today's file is not a guard. This exercises the
+    detector on representative inputs so a newly added unpinned reference turns
+    ``test_every_workflow_action_is_pinned_to_a_commit_sha`` red.
+    """
+    assert _unpinned_uses_refs("        uses: actions/checkout@v4\n")
+    assert _unpinned_uses_refs("        uses: appleboy/ssh-action@main\n")
+    assert _unpinned_uses_refs(
+        "        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262\n"
+    )
+    # A pinned reference with its version comment is clean.
+    assert not _unpinned_uses_refs(
+        "        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0\n"
+    )
+    # Local and container references carry no remote trust boundary.
+    assert not _unpinned_uses_refs("      - uses: ./.github/actions/local\n")
+    assert not _unpinned_uses_refs("      - uses: docker://alpine:3.20\n")
+
+
+def test_dockerfile_downloads_are_pinned() -> None:
+    """The image build's toolchain downloads are pinned, not fetched from `latest`.
+
+    ``syft`` was installed from the moving ``main`` branch of an install script
+    and the Tailwind CLI from ``releases/latest`` — neither is a pin. The syft
+    tarball is now pinned to a version and verified against its sha256; Tailwind
+    is pinned to a released version (12-OPS-017).
+    """
+    content = _read("docker", "Dockerfile")
+    assert "releases/latest/download" not in content, (
+        "Dockerfile must not download from a mutable `latest` release path"
+    )
+    assert "raw.githubusercontent.com/anchore/syft/main" not in content, (
+        "Dockerfile must not install syft from a branch of install.sh"
+    )
+    assert "syft_1.54.0_linux_amd64.tar.gz" in content, (
+        "Dockerfile must install syft from a pinned release tarball"
+    )
+    assert "sha256sum -c -" in content, (
+        "Dockerfile must verify the pinned syft tarball's checksum"
+    )
+    assert "tailwindcss/releases/download/v4.3.3/" in content, (
+        "Dockerfile must pin the Tailwind CLI to a released version"
+    )

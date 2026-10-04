@@ -48,8 +48,12 @@ RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev --no-default-groups && \
     rm -f /opt/venv/bin/tailwindcss
 
-# Install Tailwind CSS CLI (standalone binary)
-RUN curl -L -o /usr/local/bin/tailwindcss https://github.com/tailwindlabs/tailwindcss/releases/latest/download/tailwindcss-linux-x64 && \
+# Install Tailwind CSS CLI (standalone binary).
+# Pinned to a released version (12-OPS-017): the previous form fetched the
+# repository's `latest` release, a mutable pointer. Tailwind does not publish an
+# upstream checksum file for the standalone binary, so the version pin — not a
+# self-generated checksum — is the verifiable treatment here.
+RUN curl -L -o /usr/local/bin/tailwindcss https://github.com/tailwindlabs/tailwindcss/releases/download/v4.3.3/tailwindcss-linux-x64 && \
     chmod +x /usr/local/bin/tailwindcss && \
     tailwindcss --version
 
@@ -84,12 +88,16 @@ RUN tailwindcss -i src/theme/static/theme/css/input.css -o src/theme/static/them
 
 # Generate CycloneDX SBOM of the Python venv for supply-chain vulnerability
 # correlation. Trivy image scan in CI uses this SBOM for package-level
-# CVE-to-package mapping. Syft installed via official install script (same
-# curl-based pattern as the Tailwind CLI above; python:3.14-slim base image
-# provides tar, builder stage provides curl + coreutils).
+# CVE-to-package mapping. syft is installed from a PINNED release tarball and
+# its sha256 checked against the upstream-published release digest before use
+# (12-OPS-017): the previous `install.sh` from the `main` branch was a mutable
+# pointer whose provenance could not be verified.
 RUN --mount=type=cache,target=/root/.cache/syft \
-    curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh \
-    | sh -s -- -b /usr/local/bin && \
+    curl -sSfL -o /tmp/syft.tar.gz \
+      https://github.com/anchore/syft/releases/download/v1.54.0/syft_1.54.0_linux_amd64.tar.gz && \
+    echo "54a87372498168b2d033e876fd41fa4e8035b872699e525a57046e1f2f09c860  /tmp/syft.tar.gz" | sha256sum -c - && \
+    tar -xzf /tmp/syft.tar.gz -C /usr/local/bin syft && \
+    rm -f /tmp/syft.tar.gz && \
     syft /opt/venv -o cyclonedx-json=sbom.cyclonedx.json
 
 
