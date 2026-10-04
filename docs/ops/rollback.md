@@ -146,13 +146,16 @@ a new `IMAGE_TAG` introduced a runtime error, 500s, or bot crashes.
    # Use --pull to force a fresh image pull (avoid stale cached layers)
    docker compose --env-file .env.prod \
      -f docker-compose.yml -f docker-compose.prod.yml \
-     up -d --pull always web bot
+     --profile scheduler --profile backup --profile pgbouncer \
+     up -d --pull always web bot scheduler backup
    ```
 
-   > `up -d` with no service names recreates **all** services. Targeting `web bot`
-   > is sufficient for a code-only rollback (the one-shot services `migrate`,
-   > `load_catalog`, etc. are not long-lived and will only re-run if their image
-   > hash changed and you omit the service filter). If the rollback also reverts
+   > Every long-lived service is named: `web`, `bot`, `scheduler` and `backup`
+   > all carry `restart: unless-stopped` in `docker-compose.prod.yml` and would
+   > otherwise keep running whatever image they started with (12-OPS-007). The
+   > one-shot services (`migrate`, `load_catalog`, `create_admin`,
+   > `load_cities`, `seed`) are not long-lived and only re-run if their image
+   > changed and you omit the service filter. If the rollback also reverts
    > migration files, include the one-shot services (see
    > [Schema Rollback](#schema-rollback-considerations)).
 
@@ -172,7 +175,8 @@ difference (same `IMAGE_TAG` string but different digest), force recreation:
 ```bash
 docker compose --env-file .env.prod \
   -f docker-compose.yml -f docker-compose.prod.yml \
-  up -d --force-recreate --pull always web bot
+  --profile scheduler --profile backup --profile pgbouncer \
+  up -d --force-recreate --pull always web bot scheduler backup
 ```
 
 ## 2. Config Rollback
@@ -593,11 +597,14 @@ On health-check failure the workflow performs three steps:
 2. **Force-recreate** the long-lived containers so Docker does not reuse
    containers keyed on the old image digest:
    ```bash
-   IMAGE_TAG="${PREVIOUS_IMAGE_TAG}" docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate --remove-orphans web bot
+   IMAGE_TAG="${PREVIOUS_IMAGE_TAG}" docker compose --profile scheduler --profile backup --profile pgbouncer -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate --remove-orphans web bot scheduler backup
    ```
-   Only `web` and `bot` are recreated — the one-shot bootstrap services
-   (`migrate`, `load_catalog`, etc.) do not need re-running for a code-only
-   rollback, and skipping them avoids touching the database schema.
+   Every long-lived service is recreated — `web`, `bot`, `scheduler` and
+   `backup`. A rollback that leaves the scheduler on the image just judged
+   faulty is not a rollback (12-OPS-007). The one-shot bootstrap services
+   (`migrate`, `load_catalog`, etc.) are not long-lived, so they do not need
+   re-running for a code-only rollback, and skipping them avoids touching the
+   database schema.
 3. **Re-run the health check** with a **30-second** validation timeout to confirm
    the rolled-back image restored a healthy state (curl still runs inside
    `web`, since port 8000 is not published on the host):
@@ -621,7 +628,7 @@ for a manual rollback and database restore.
 
 | Scenario | Recommended procedure |
 |----------|----------------------|
-| Health-check failure after deploy (new image won't become ready) | **Automated** — deploy.yml reverts `IMAGE_TAG`, force-recreates `web bot`, re-validates |
+| Health-check failure after deploy (new image won't become ready) | **Automated** — deploy.yml reverts `IMAGE_TAG`, force-recreates `web bot scheduler backup`, re-validates |
 | Config regression (`DJANGO_SECRET_KEY`, `ALLOWED_HOSTS`, invalid `BOT_TOKEN`, …) | [2. Config Rollback](#2-config-rollback) — the automated flow only reverts image tags, not `.env.prod` |
 | Schema migration failure (`migrate` one-shot exits non-zero, `no such column`, …) | [3. Schema Rollback Considerations](#3-schema-rollback-considerations) + [1. Image-Tag Rollback](#1-image-tag-rollback) |
 | Automated rollback failed (rollback re-check also returns `503`) | [6. Rollback Failure Escalation Path](#6-rollback-failure-escalation-path) |

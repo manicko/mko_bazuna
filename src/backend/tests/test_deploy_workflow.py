@@ -194,3 +194,111 @@ def test_web_service_has_stop_grace_period() -> None:
         f"stop_grace_period must be >= 30s to avoid truncating gunicorn graceful_timeout (30s), "
         f"got {value}{unit}"
     )
+
+
+# --- production long-lived service set, declared once (12-OPS-007) ----------
+# The production service set is declared by docker-compose.prod.yml itself: a
+# long-lived service is one that carries `restart:`. This guard DERIVES that set
+# from the manifest rather than restating it, so adding a restart:-carrying
+# service without naming it on the deploy path turns the guard red — the drift
+# that left the scheduler on a stale image and the daily backup job never
+# started (12-OPS-005 / 12-OPS-007).
+
+
+def _restart_carrying_prod_services() -> set[str]:
+    """Return the service names in docker-compose.prod.yml that set ``restart:``.
+
+    Parses the prod manifest with ruamel so the set is the manifest's own
+    declaration, never a hand-maintained list.
+    """
+    from ruamel.yaml import YAML
+
+    data = YAML(typ="safe").load(_PROD_COMPOSE.read_text(encoding="utf-8")) or {}
+    services = data.get("services", {}) or {}
+    return {name for name, svc in services.items() if "restart" in (svc or {})}
+
+
+def _deploy_recreate_service_filters() -> list[set[str]]:
+    """Return the service-name filters on the deploy `up -d` commands.
+
+    The deploy workflow consumes the manifest rather than restating the service
+    set, so its recreate commands must carry no service filter. Any bare
+    (non-flag, non-path) token after `--remove-orphans` on an `up -d` line is a
+    filter; a filter that omits a long-lived service is the defect (12-OPS-007).
+    """
+    text = _DEPLOY_YML.read_text(encoding="utf-8")
+    filters: list[set[str]] = []
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if stripped.startswith("#") or "up -d" not in stripped:
+            continue
+        tail = stripped.split("--remove-orphans", 1)
+        if len(tail) != 2:
+            continue
+        names = {
+            token
+            for token in tail[1].split()
+            if not token.startswith("-") and not token.startswith("${")
+        }
+        filters.append(names)
+    return filters
+
+
+def test_deploy_recreate_does_not_filter_out_a_long_lived_service() -> None:
+    """The deploy path consumes the manifest set; it never filters a service out.
+
+    The set is derived from ``docker-compose.prod.yml`` (the single declaration).
+    If a deploy `up -d` command carries a service filter, every restart:-carrying
+    service must be in it — otherwise a new long-lived service (or `scheduler`,
+    or `backup`) would be left on a stale image and the daily backup job never
+    started (12-OPS-005 / 12-OPS-007).
+    """
+    required = _restart_carrying_prod_services()
+    assert required, "docker-compose.prod.yml declares no restart:-carrying service"
+    for names in _deploy_recreate_service_filters():
+        if not names:
+            # No service filter: `up -d --remove-orphans` plus the active
+            # profiles starts every service the manifest declares.
+            continue
+        missing = required - names
+        assert not missing, (
+            "a deploy `up -d` service filter omits a long-lived production "
+            "service (12-OPS-007): " + ", ".join(sorted(missing))
+        )
+
+
+def test_deploy_invocations_activate_every_profile_gated_service() -> None:
+    """Every deploy compose invocation carries the explicit profile flags.
+
+    `up -d` with no profile flags does not activate a profile-gated service —
+    that is the whole defect. The deploy path activates scheduler, backup and
+    pgbouncer explicitly (12-OPS-007).
+    """
+    text = _DEPLOY_YML.read_text(encoding="utf-8")
+    match = re.search(r'COMPOSE_PROFILES="([^"]*)"', text)
+    assert match, "deploy.yml must declare COMPOSE_PROFILES (12-OPS-007)"
+    profiles = match.group(1)
+    for profile in ("--profile scheduler", "--profile backup", "--profile pgbouncer"):
+        assert profile in profiles, (
+            f"deploy COMPOSE_PROFILES must include {profile!r} (12-OPS-007)"
+        )
+    # Every state-changing service-lifecycle invocation (`pull`, `up -d`, and
+    # the pre-deploy `exec -T db pg_dump`) must consume it. Read-only probes
+    # (`images`, the `exec -T web curl` health check) and comment/echo lines
+    # need no profile flags.
+    for line in text.split("\n"):
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or stripped.startswith("echo "):
+            continue
+        if "docker compose" not in stripped:
+            continue
+        state_changing = (
+            "up -d" in stripped
+            or " pull" in stripped
+            or "exec -T db pg_dump" in stripped
+        )
+        if not state_changing:
+            continue
+        assert "${COMPOSE_PROFILES}" in stripped, (
+            f"deploy compose invocation must consume ${{COMPOSE_PROFILES}}: {stripped}"
+        )
