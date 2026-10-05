@@ -298,6 +298,70 @@ class TestRollupDailyMetricsIdempotency:
 
 
 # ---------------------------------------------------------------------------
+# Tests: chunked bulk upsert against the unique constraint (13-PERF-003)
+# ---------------------------------------------------------------------------
+
+
+class TestRollupDailyMetricsBulkUpsert:
+    """The write path is a chunked ``bulk_create(update_conflicts=True)``.
+
+    A re-run must update the existing row in place — no duplicate and no
+    silently dropped update — and a pre-existing stale value must be overwritten
+    by the fresh aggregate rather than left behind.
+    """
+
+    def test_second_run_updates_existing_row_in_place(self, rollup_data) -> None:
+        """A stale pre-existing row is overwritten in place, not duplicated."""
+        ad1 = rollup_data["ad1"]
+        yesterday = timezone.now().date() - timedelta(days=1)
+
+        # Pre-seed a stale row for ad1 with wrong counts.
+        DailyAdMetrics.objects.create(
+            ad=ad1,
+            date=yesterday,
+            views_count=99,
+            contacts_count=99,
+        )
+
+        call_command("rollup_daily_metrics")
+
+        rows = DailyAdMetrics.objects.filter(ad=ad1, date=yesterday)
+        assert rows.count() == 1, "upsert must update in place, not duplicate"
+        metrics = rows.get()
+        assert metrics.views_count == 3
+        assert metrics.contacts_count == 2
+
+    def test_rerun_overwrites_changed_aggregate(self, rollup_data) -> None:
+        """A subsequent run reflects the new aggregate over the same ad+date."""
+        ad1 = rollup_data["ad1"]
+        yesterday = timezone.now().date() - timedelta(days=1)
+
+        call_command("rollup_daily_metrics")
+        first = DailyAdMetrics.objects.get(ad=ad1, date=yesterday)
+        assert first.views_count == 3
+
+        # A new view event for the same ad and target date.
+        _make_event(ad1, AnalyticsEventType.AD_VIEWED, hours_ago=7)
+
+        call_command("rollup_daily_metrics")
+
+        rows = DailyAdMetrics.objects.filter(ad=ad1, date=yesterday)
+        assert rows.count() == 1
+        assert rows.get().views_count == 4
+
+    def test_created_row_carries_timestamps(self, rollup_data) -> None:
+        """``bulk_create`` bypasses ``auto_now``; the command sets both stamps."""
+        ad1 = rollup_data["ad1"]
+        yesterday = timezone.now().date() - timedelta(days=1)
+
+        call_command("rollup_daily_metrics")
+
+        metrics = DailyAdMetrics.objects.get(ad=ad1, date=yesterday)
+        assert metrics.created_at is not None
+        assert metrics.updated_at is not None
+
+
+# ---------------------------------------------------------------------------
 # Tests: seed-source exclusion
 # ---------------------------------------------------------------------------
 
