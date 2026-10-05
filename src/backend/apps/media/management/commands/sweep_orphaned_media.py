@@ -46,6 +46,7 @@ from apps.ads.models import AdImage
 from apps.core.enums import AdvisoryLockId
 from apps.core.utils.advisory_lock import advisory_lock
 from apps.media.services.filesystem import STAGING_PREFIX, STAGING_SUBDIR, delete_photo
+from apps.media.storage_keys import KEY_COLUMNS
 
 logger = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ _STAGING_TTL_SECONDS = 2 * 60 * 60
 def _collect_referenced_keys() -> set[str]:
     """Return the set of all storage keys currently referenced by AdImage rows."""
     keys: set[str] = set()
-    fields = ("image", "thumbnail_small", "thumbnail_medium", "thumbnail_large")
+    fields = KEY_COLUMNS
     for chunk in AdImage.objects.values(*fields).iterator():
         for field in fields:
             val = chunk[field]
