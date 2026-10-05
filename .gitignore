@@ -252,3 +252,9 @@ _step3_*.txt
 
 # Stale root entrypoint stubs (CFG-006: canonical scripts live in docker/)
 /entrypoint*.sh
+
+# collectstatic output (DEBUG=True container writes here; whitenoise scans it)
+staticfiles/
+
+# Agent scratch files (probe scripts, captured command output, commit messages)
+.ai/tmp/
