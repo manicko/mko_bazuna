@@ -38,6 +38,61 @@ loglevel = "info"
 accesslog = "-"
 errorlog = "-"
 
+# Structured access log with named fields instead of a raw request line
+# (12-OPS-012). The atoms are gunicorn's own (`%(h)s` remote address, `%(r)s`
+# request line, `%(s)s` status, ...); the record is rendered by the redacting
+# formatter configured below, so a sensitive-looking parameter in a request path
+# (`?token=...`) comes back redacted instead of in the clear.
+access_log_format = (
+    '%(h)s %(l)s %(u)s %(t)s "%(r)s" %(s)s %(b)s "%(f)s" "%(a)s" %(L)s'
+)
+
+# Route gunicorn's own loggers through the application's redacting JSON
+# formatter (12-OPS-012). Gunicorn emits its access/error records through its OWN
+# handlers, which never pass through Django's `LOGGING` tree, so the redactor had
+# no effect on the highest-volume record type. `RedactingJsonFormatter` is a
+# pure-stdlib class (no Django import), so a `dictConfig` factory reference
+# resolves it here without `django.setup()`; this keeps `preload_app`'s
+# config-parse-time promise intact. Gunicorn merges this dict over its own
+# defaults with a SHALLOW update, so every sub-dict (`formatters`, `handlers`,
+# `loggers`) is supplied whole. `accesslog`/`errorlog` above stay SET: if this
+# config ever failed to load, a diagnostic plaintext line is far better than
+# silence. A malformed config crashes the arbiter before the bind, so this dict
+# is verified in a throwaway container (12-OPS-012).
+logconfig_dict = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "formatters": {
+        "json": {
+            "()": "apps.core.utils.json_logging.RedactingJsonFormatter",
+        },
+    },
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "stream": "ext://sys.stdout",
+        },
+        "error_console": {
+            "class": "logging.StreamHandler",
+            "formatter": "json",
+            "stream": "ext://sys.stderr",
+        },
+    },
+    "loggers": {
+        "gunicorn.error": {
+            "level": "INFO",
+            "handlers": ["error_console"],
+            "propagate": False,
+        },
+        "gunicorn.access": {
+            "level": "INFO",
+            "handlers": ["console"],
+            "propagate": False,
+        },
+    },
+}
+
 # Load the Django application in the master process before forking workers.
 # Safe here because this module contains only pure Python values and performs
 # no Django imports at parse time.

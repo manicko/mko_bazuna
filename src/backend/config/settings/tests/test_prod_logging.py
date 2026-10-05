@@ -7,11 +7,13 @@ These tests use subprocess isolation with controlled os.environ.
 
 from __future__ import annotations
 
+import importlib.util
 import os
 import subprocess
 import sys
 import tomllib
 from pathlib import Path
+from types import ModuleType
 
 import pytest
 
@@ -239,3 +241,127 @@ def test_prod_settings_email_accessible() -> None:
     assert "email_port=587" in result.stdout
     assert "email_backend=django.core.mail.backends.smtp.EmailBackend" in result.stdout
     assert "default_from_email=noreply@example.com" in result.stdout
+
+
+# ---------------------------------------------------------------------------
+# gunicorn log routing (12-OPS-012)
+# ---------------------------------------------------------------------------
+# Gunicorn emits its access/error records through its OWN handlers, which never
+# pass through Django's `LOGGING` tree — so `RedactingJsonFormatter` never saw
+# the highest-volume record type in production, and a query string carrying PII
+# in a request path was logged in the clear. gunicorn.conf.py now supplies a
+# `logconfig_dict` routing `gunicorn.access` and `gunicorn.error` through the
+# existing formatter. These guards load the real config by file path (it is not
+# importable as a package module) and assert a RENDERED record, not merely that
+# the key is present.
+
+_GUNICORN_CONF_PATH = _ROOT / "gunicorn.conf.py"
+
+
+def _load_gunicorn_conf() -> ModuleType:
+    """Load gunicorn.conf.py from the repository root by file path."""
+    spec = importlib.util.spec_from_file_location("gunicorn_conf", _GUNICORN_CONF_PATH)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_gunicorn_routes_logs_through_redacting_formatter() -> None:
+    """gunicorn.access and gunicorn.error route through RedactingJsonFormatter.
+
+    A `dictConfig` factory reference is resolved by class path, so the test
+    instantiates the handler's formatter exactly as gunicorn's startup does and
+    asserts its type (12-OPS-012).
+    """
+    conf = _load_gunicorn_conf()
+    logconfig = conf.logconfig_dict
+    formatter_path = logconfig["formatters"]["json"]["()"]
+    assert formatter_path == (
+        "apps.core.utils.json_logging.RedactingJsonFormatter"
+    ), f"the json formatter must be the redacting formatter, got {formatter_path!r}"
+
+    handler_formatters = {
+        handler_name: handler["formatter"]
+        for handler_name, handler in logconfig["handlers"].items()
+    }
+    for logger_name in ("gunicorn.access", "gunicorn.error"):
+        logger_cfg = logconfig["loggers"][logger_name]
+        for handler_name in logger_cfg["handlers"]:
+            assert handler_formatters[handler_name] == "json", (
+                f"{logger_name} must use the json (redacting) formatter via "
+                f"handler {handler_name!r} (12-OPS-012)"
+            )
+
+
+def test_gunicorn_rendered_access_record_is_redacted() -> None:
+    """A rendered gunicorn access record carrying PII comes back redacted.
+
+    The record is built the way gunicorn builds it (the access format string
+    with an atoms mapping) and rendered through the formatter the config
+    installs. The assertions are on the OBSERVABLE output: it is JSON, the
+    sensitive parameter is redacted, and the raw value is absent (12-OPS-012).
+    """
+    import json as json_module
+    import logging
+    import logging.config
+
+    from apps.core.utils.json_logging import RedactingJsonFormatter
+
+    conf = _load_gunicorn_conf()
+    logging.config.dictConfig(conf.logconfig_dict)
+
+    access_logger = logging.getLogger("gunicorn.access")
+    formatter = None
+    for handler in access_logger.handlers:
+        if isinstance(handler.formatter, RedactingJsonFormatter):
+            formatter = handler.formatter
+            break
+    assert formatter is not None, (
+        "gunicorn.access must have a handler using RedactingJsonFormatter after "
+        "dictConfig (12-OPS-012)"
+    )
+
+    record = logging.LogRecord(
+        name="gunicorn.access",
+        level=logging.INFO,
+        pathname=__file__,
+        lineno=0,
+        msg=conf.access_log_format,
+        args={
+            "h": "127.0.0.1",
+            "l": "-",
+            "u": "-",
+            "t": "[05/Oct/2026:00:43:16 +0000]",
+            "r": "GET /search/?token=SUPERSECRET123&q=hello HTTP/1.1",
+            "s": "200",
+            "b": "2",
+            "f": "-",
+            "a": "curl/8.14.1",
+            "L": "0.001180",
+        },
+        exc_info=None,
+    )
+    rendered = formatter.format(record)
+
+    payload = json_module.loads(rendered)
+    assert payload["logger"] == "gunicorn.access"
+    assert "SUPERSECRET123" not in rendered, (
+        "the rendered access record must not contain the raw sensitive value "
+        "(12-OPS-012)"
+    )
+    assert "token=REDACTED" in payload["message"], (
+        "a sensitive-looking query parameter must be redacted in the rendered "
+        f"access record (12-OPS-012): {payload['message']!r}"
+    )
+
+
+def test_gunicorn_keeps_access_and_error_logs_set() -> None:
+    """accesslog and errorlog must stay set — silence is a failure mode.
+
+    A broken `logconfig_dict` should surface as a diagnostic plaintext line, not
+    as silence (12-OPS-012).
+    """
+    conf = _load_gunicorn_conf()
+    assert conf.accesslog == "-", "accesslog must stay set (12-OPS-012)"
+    assert conf.errorlog == "-", "errorlog must stay set (12-OPS-012)"
