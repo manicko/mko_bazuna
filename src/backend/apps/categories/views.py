@@ -18,6 +18,7 @@ from apps.categories.cache import (
     get_tree_version,
 )
 from apps.categories.models import Category
+from apps.core.enums import LanguageLocale
 from apps.core.utils.swr_cache import get_with_stale_revalidate
 
 logger = logging.getLogger(__name__)
@@ -49,7 +50,7 @@ def category_submenu(request: HttpRequest, slug: str) -> HttpResponse:
     if category is None:
         raise Http404("Category not found")
 
-    cache_key = f"category:submenu:{get_tree_version()}:{category.slug}:{request.LANGUAGE_CODE or 'ru'}"
+    cache_key = f"category:submenu:{get_tree_version()}:{category.slug}:{request.LANGUAGE_CODE or LanguageLocale.RUSSIAN.value}"
 
     def _render_submenu_fragment() -> str:
         children = list(

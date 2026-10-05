@@ -1,11 +1,14 @@
 """
 Core enum types for Mko Bazuna.
 
-All fixed value sets are modeled as Enum or StrEnum per project rule 10.
-No inline string literals for constants anywhere in the codebase.
+All fixed value sets are modeled as Enum or StrEnum per project rule 10, and
+every mapping keyed on a fixed value set is keyed on the enum members rather
+than on their bare string literals. Read a member's persisted or wire form
+through ``member.value`` at the boundary that genuinely needs a plain ``str``.
 """
 
 from enum import IntEnum, StrEnum
+from typing import Final
 
 from django.utils.functional import Promise
 from django.utils.translation import gettext_lazy as _
@@ -333,20 +336,31 @@ class LanguageLocale(StrEnum):
     @property
     def fts_config(self) -> str:
         """PostgreSQL text search config for this language."""
-        return {
-            "ru": "russian",
-            "bs": "simple",
-            "en": "english",
-        }[self.value]
+        return _FTS_CONFIGS[self]
 
     @property
     def fts_vector_field(self) -> str:
         """Ads search vector column name for this language."""
-        return {
-            "ru": "search_vector_ru",
-            "bs": "search_vector_bs",
-            "en": "search_vector_en",
-        }[self.value]
+        return _FTS_VECTOR_FIELDS[self]
+
+
+# The FTS pairings are declared as post-class ``Final`` mappings, not as dicts
+# inside the class body: ``RUSSIAN``/``BOSNIAN``/``ENGLISH`` are StrEnum members
+# defined in that same body, so an in-class dict keyed on them is a construction
+# order trap. The values match the search trigger's ``to_tsvector`` configs and
+# the generated ``search_vector_*`` columns exactly (pinned by
+# ``apps/ads/tests/test_search_triggers.py``).
+_FTS_CONFIGS: Final[dict[LanguageLocale, str]] = {
+    LanguageLocale.RUSSIAN: "russian",
+    LanguageLocale.BOSNIAN: "simple",
+    LanguageLocale.ENGLISH: "english",
+}
+
+_FTS_VECTOR_FIELDS: Final[dict[LanguageLocale, str]] = {
+    LanguageLocale.RUSSIAN: "search_vector_ru",
+    LanguageLocale.BOSNIAN: "search_vector_bs",
+    LanguageLocale.ENGLISH: "search_vector_en",
+}
 
 
 class PriceStep(StrEnum):

@@ -23,12 +23,14 @@ import logging
 
 from django.core.management.base import BaseCommand
 
+from apps.core.enums import LanguageLocale
+
 logger = logging.getLogger(__name__)
 
 # Target languages for backfill translation
 TARGET_LOCALES: list[tuple[str, str, str]] = [
-    ("en", "title_en", "description_en"),
-    ("bs", "title_bs", "description_bs"),
+    (LanguageLocale.ENGLISH.value, "title_en", "description_en"),
+    (LanguageLocale.BOSNIAN.value, "title_bs", "description_bs"),
 ]
 
 
@@ -48,7 +50,7 @@ def _translate_for_backfill(text: str, target: str) -> str | None:
     # Lazy import avoids circular dependency during management-command discovery.
     from apps.core.services.translation import translate_text
 
-    translated = translate_text(text, "ru", target)
+    translated = translate_text(text, LanguageLocale.RUSSIAN.value, target)
     # ``translate_text`` falls back to the unmodified source on failure; equality
     # is the observable side-channel (its ``-> str`` signature is unchanged).
     if translated == text:
@@ -150,7 +152,7 @@ class Command(BaseCommand):
 
             # Mark the original language as Russian for all backfilled ads
             if ad.original_language is None:
-                updates["original_language"] = "ru"
+                updates["original_language"] = LanguageLocale.RUSSIAN.value
 
             try:
                 Ad.objects.filter(pk=ad.pk).update(**updates)

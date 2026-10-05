@@ -123,12 +123,24 @@ async def process_preview(message: types.Message, state: FSMContext) -> None:
             result = await sync_to_async(submit_ad)(
                 SubmitAdInput(
                     ad_id=data["ad_id"],
-                    title_ru=title_translations.get("ru", original_title),
-                    desc_ru=desc_translations.get("ru", original_desc),
-                    title_bs=title_translations.get("bs", original_title),
-                    desc_bs=desc_translations.get("bs", original_desc),
-                    title_en=title_translations.get("en", original_title),
-                    desc_en=desc_translations.get("en", original_desc),
+                    title_ru=title_translations.get(
+                        LanguageLocale.RUSSIAN.value, original_title
+                    ),
+                    desc_ru=desc_translations.get(
+                        LanguageLocale.RUSSIAN.value, original_desc
+                    ),
+                    title_bs=title_translations.get(
+                        LanguageLocale.BOSNIAN.value, original_title
+                    ),
+                    desc_bs=desc_translations.get(
+                        LanguageLocale.BOSNIAN.value, original_desc
+                    ),
+                    title_en=title_translations.get(
+                        LanguageLocale.ENGLISH.value, original_title
+                    ),
+                    desc_en=desc_translations.get(
+                        LanguageLocale.ENGLISH.value, original_desc
+                    ),
                     original_language=LanguageLocale.from_code(
                         message.from_user.language_code,
                         fallback=LanguageLocale.BOSNIAN,

@@ -58,8 +58,9 @@ class Category(MPTTModel):
         if name_i18n:
             if locale in name_i18n:
                 return name_i18n[locale]
-            if "ru" in name_i18n:
-                return name_i18n["ru"]
+            fallback_locale = LanguageLocale.RUSSIAN.value
+            if fallback_locale in name_i18n:
+                return name_i18n[fallback_locale]
         return str(self.name)
 
     def __str__(self) -> str:

@@ -13,6 +13,7 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render
 
+from apps.core.enums import LanguageLocale
 from apps.core.utils.sanitize import redact_free_text
 from apps.search.models import SavedSearch
 
@@ -73,7 +74,7 @@ def save_search(request: HttpRequest) -> HttpResponse:
         category_id=_int_or_none("category_id"),
         min_price=_int_or_none("min_price"),
         max_price=_int_or_none("max_price"),
-        language=request.LANGUAGE_CODE or "bs",
+        language=request.LANGUAGE_CODE or LanguageLocale.BOSNIAN.value,
         is_active=True,
     )
     logger.info("Saved search %s created for user %s", saved_search.pk, request.user.pk)

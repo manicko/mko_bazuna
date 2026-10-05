@@ -8,7 +8,7 @@ import secrets
 
 from django.db import models
 
-from apps.core.enums import AdSource
+from apps.core.enums import AdSource, LanguageLocale
 
 
 class PopularSearch(models.Model):
@@ -121,7 +121,7 @@ class SavedSearch(models.Model):
         max_length=5,
         blank=True,
         null=True,
-        default="bs",
+        default=LanguageLocale.BOSNIAN.value,
         help_text="LanguageLocale code ('ru', 'bs' or 'en') used to search ads",
     )
     created_at = models.DateTimeField(
