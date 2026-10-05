@@ -529,13 +529,24 @@ jobs:
             --users 50 --spawn-rate 10 --run-time 60s \
             -L info \
             --csv=/tmp/locust-results 2>&1 | tee /tmp/locust-run.log
-          # Positive control: the hook must have emitted its success verdict. If
-          # the event never fired (a locust API change) the gate is dead, and
-          # this assertion turns that into a loud failure instead of a silent
-          # pass. Only the within-SLO line is accepted; the "exceeds SLO" line
+          # Positive control: the hooks must have emitted both verdicts. If an
+          # event never fired (a locust API change) the gate is dead, and this
+          # assertion turns that into a loud failure instead of a silent pass.
+          # Only the within-SLO and zero-failure lines are accepted; a breach
           # would already have failed the step via pipefail.
+          #
+          # The failure verdict is what makes the run measure a site that
+          # exists: a request to a non-existent route returns 404, which is
+          # FAST, so it passes the p95 gate while discovering nothing. The
+          # `_assert_no_failures` hook fails the job on any recorded failure,
+          # so a slug that stops resolving cannot hide behind a good p95.
+          # (PERF-012a validated 2026-09.)
           if ! grep -q "p95 response time .* is within SLO" /tmp/locust-run.log; then
             echo "::error::p95 gate did not report a within-SLO verdict"
+            exit 1
+          fi
+          if ! grep -q "recorded no failed requests" /tmp/locust-run.log; then
+            echo "::error::load test did not report a zero-failure verdict"
             exit 1
           fi
 
