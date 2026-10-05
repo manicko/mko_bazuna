@@ -886,20 +886,52 @@ False`), which retires the finding's premise that the value "falls back to the
 
 - **The exposure window is unchanged at 14 days** — the declared value matches
   the inherited Django default, so no session lives longer or shorter than before.
-- **No product decision has been taken on the value.** The number is a named,
-  owned decision that still belongs to the coordinator / product owner, not to a
-  code commit. Do not record the finding as fixed.
+- **The code change is shipped and verified; the section's old denial was false.**
+  `base.py` ships `SESSION_COOKIE_AGE = 60 * 60 * 24 * 14` (1209600 s, 14 days)
+  and `SESSION_SAVE_EVERY_REQUEST = False`, so the finding this section exists to
+  track **is** fixed in code. The earlier text here claimed no product decision
+  had been taken on the value and instructed readers not to record the finding as
+  fixed; that text no longer described the tree and has been removed.
+- **The value is a recorded Product Owner decision, dated 2026-10-03.** Plan 16
+  §`G-10a` and its *PROPAGATION OBLIGATION* (raised 2026-10-03) record that the
+  Product Owner ruled the session lifetime to be **14 days, declared explicitly in
+  settings**, and withdrew the earlier "owed product decision with a named owner"
+  framing (`known-gap #1` closed as a decision). Options (ii) 7 d and (iii) 24 h
+  were declined on cost, not taste; that refusal rationale is retained in plan 16
+  §`G-10a`. This section records that decision with attribution — it does not
+  independently re-rule it.
 - **The HIGH residual belongs to phase 15, `15-AUTHZ-001`.** A `django_session`
   janitor would **not** help: `clear_expired()` deletes only rows already past
   `expire_date` and cannot shorten a live session, so it does not bound the
   exposure window (see the `04-AUT-002` section above).
 
 The policy is **write-triggered, not a sliding idle window**: Django re-stamps
-`expire_date` only on a real save. An authenticated session is written at
-`auth_login` and again only on a `?lang=` language switch (pinned by
-`config/settings/tests/test_session_policy.py`); an anonymous session is refreshed
-by each recorded non-empty search. See
+`expire_date` only on a real save (`modified or SESSION_SAVE_EVERY_REQUEST`, and
+non-empty), **never on a read**. An authenticated session is written at
+`auth_login` and again **only** on a `?lang=` language switch — the one documented
+exception, which re-stamps the row and is pinned by
+`test_lang_switch_re_stamps_authenticated_session` in
+`config/settings/tests/test_session_policy.py`; its counterpart
+`test_authenticated_session_is_not_refreshed_by_read_only_requests` pins that an
+ordinary read-only request does **not** extend the session. An anonymous session is
+refreshed by each recorded non-empty search. The number is therefore **not** a
+sliding idle window in either reading. See
 [`technical-specification.md` §H](../01-spec/technical-specification.md).
+
+**Reversal cost.** The value is a **single literal** in `config/settings/base.py`
+(`SESSION_COOKIE_AGE = 60 * 60 * 24 * 14`); re-opening it is a small, reviewable
+change (one settings line, a paired `technical-specification.md` §H edit, and the
+value-agnostic tests in `test_session_policy.py` stay green because none pins the
+literal). The product record is the plan-16 decision cited above, not this literal.
+
+**What is still open.** That the *code* ships and is verified is settled above;
+that the *section's old claim* is false is settled above; the **product
+ratification of the value** is recorded in plan 16 §`G-10a`/the propagation
+obligation (Product Owner, 2026-10-03) and is **not** this document's to make or
+re-make. This section's job is to stop denying the shipped code, which it now does.
+Nothing here closes `04-AUT-002`: session **revocation** at account-state
+transitions is a separate, still-open matter (see
+[Account-State and Session Revocation (04-AUT-002)](#account-state-and-session-revocation-04-aut-002)).
 
 **Known gap: anonymous `django_session` growth.** A non-empty `?q=` search
 request performs **one write per request** against the 30 req/60 s/IP search rate
@@ -914,6 +946,20 @@ deliberately **not** added to
 gate `G-10a`: a long-lived session means an unsubmitted ad-edit form can be lost
 when the session expires. This is UX friction, **not data loss**. Owner:
 **product**.
+
+## Marker-Sweep Reservation (phase 03, plan 16 §D item 14)
+
+**Decision record — the legacy `EXT-` / `AUT-` / `SRH-` marker sweeps are
+reserved by phase 03.** Plan 03 §5.2, under the heading *"The convention phases
+04–15 must adopt (decided — `Q14`, first half)"*, forbids phases 04–15 from
+starting sweeps of their own: *"Phases 04–15 must not start BLOCK 11-style legacy
+sweeps of their own. One sweep, in BLOCK 11, under the coordinator's chosen
+option."* Plan 16 §B-11 restates the reservation and terminates it explicitly.
+Phase 04 performed **no** marker sweep: the `EXT-` / `AUT-` / `SRH-` identifiers
+it touched were phase-qualified to the cycle-scoped `NN-PREFIX-00N` form, and the
+bare `AUT-00N` references that plan 16 §G.2 flagged were later qualified to
+`04-AUT-007` in `src/backend/apps/users/services/login_token.py` (commit
+`86d2f0ce`). No later phase inherits a sweep obligation from this reservation.
 
 ## Login-Issuance Rate-Limit Keying (04-AUT-003)
 
