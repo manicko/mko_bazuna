@@ -10,7 +10,7 @@ One-word queries trigger fuzzy category detection.
 import logging
 import re
 from difflib import get_close_matches
-from typing import Final
+from typing import Final, cast
 
 from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.core.paginator import Paginator
@@ -157,6 +157,10 @@ def search(request: HttpRequest) -> HttpResponse:
     # a search query is present (08-SRH-002).
     total_count = 0
     results_truncated = False
+    # Full ordered cached id list on a non-empty cache hit: drives pagination
+    # metadata while the rendered rows come from the page-scoped rank queryset
+    # (13-PERF-010 validated 2026-09).
+    cached_ranked_ids: list[int] | None = None
 
     # The single-word fuzzy category narrowing is a hard filter (Q8 ruling
     # 2026-10-03). The default path signals it and offers an undo; the buyer can
@@ -181,23 +185,27 @@ def search(request: HttpRequest) -> HttpResponse:
             filtered_qs = _apply_fts_filtering(
                 ads, query, params, request, all_categories=all_categories
             )
-            return list(
-                filtered_qs.values_list("id", flat=True)
-            )[:SEARCH_CACHE_MAX_HITS]
+            # Push the cache cap into SQL (13-PERF-006 #1 validated 2026-09):
+            # the LIMIT bounds the top-N result set in the database instead of
+            # materialising every matching id and slicing the Python list.
+            bounded_ids = filtered_qs.values_list("id", flat=True)[
+                :SEARCH_CACHE_MAX_HITS
+            ]
+            return cast("list[int]", list(bounded_ids))
 
         cached_ids = get_cached_search_ids(cache_key, producer)
 
         if cached_ids is not None:
             if cached_ids:
                 # Cache hit (fresh or stale-served): filter base queryset to
-                # cached IDs and restore FTS rank order via Case/When.
-                ads = ads.filter(pk__in=cached_ids).order_by(
-                    Case(
-                        *[When(pk=pk, then=pos) for pos, pk in enumerate(cached_ids)],
-                        default=len(cached_ids),
-                        output_field=IntegerField(),
-                    )
-                )
+                # the cached IDs and restore FTS rank order via Case/When.
+                # The rank arms are scoped to the page window (13-PERF-010
+                # validated 2026-09): the full cached list (up to
+                # SEARCH_CACHE_MAX_HITS = 1000) is kept to drive pagination
+                # metadata, but only this page's ids enter the statement, so
+                # statement size and bind count scale with ``per_page``.
+                cached_ranked_ids = cached_ids
+                ads = _rank_cache_hit_page(ads, cached_ids, params)
             else:
                 # Cached empty result — no DB round-trip needed.
                 ads = ads.none()
@@ -211,14 +219,10 @@ def search(request: HttpRequest) -> HttpResponse:
         _record_search_analytics(query, request)
 
         # Decouple display count from the 1000-row cache cap (08-SRH-002).
-        # The cached ID list is capped at SEARCH_CACHE_MAX_HITS. To avoid
-        # re-running the expensive FTS filter just to count, the true match
-        # count is derived from the cache outcome: the cached list length when
-        # it is below the cap, a dedicated COUNT(*) only at/over the cap, and
-        # the already-built FTS queryset on the cold-miss loser fallback.
-        total_count, results_truncated = _resolve_search_count(
-            cached_ids, ads, query, params, request, all_categories=all_categories
-        )
+        # 13-PERF-006 #1 (validated 2026-09): the cached ID list is already
+        # bounded by SQL, so the at/over-cap path derives its count from that
+        # bounded list and never re-runs the FTS filter to count.
+        total_count, results_truncated = _resolve_search_count(cached_ids, ads)
 
     # Resolve category-constrained filter options (F4/F5).
     resolved_purposes, resolved_features, resolved_conditions = ListingsQuery.resolve_filter_options(breadcrumb_category)
@@ -239,9 +243,17 @@ def search(request: HttpRequest) -> HttpResponse:
     # Active price range for filter summary (§6.6)
     active_price_min, active_price_max = ListingsQuery.active_price_range(params)
 
-    # Paginate results
-    paginator = Paginator(ads, params.per_page)
-    page_obj = paginator.get_page(params.page)
+    # Paginate results.  On a non-empty cache hit the ordered id list drives
+    # the pagination metadata (so page counts and links are unchanged) while the
+    # rendered rows come from the page-scoped rank queryset built above
+    # (13-PERF-010 validated 2026-09).
+    if cached_ranked_ids is not None:
+        paginator = Paginator(range(len(cached_ranked_ids)), params.per_page)
+        page_obj = paginator.get_page(params.page)
+        page_obj.object_list = list(ads)
+    else:
+        paginator = Paginator(ads, params.per_page)
+        page_obj = paginator.get_page(params.page)
     if not query:
         total_count = int(paginator.count)
         results_truncated = False
@@ -382,50 +394,58 @@ def _apply_fts_filtering(
 def _resolve_search_count(
     cached_ids: list[int] | None,
     ads: QuerySet,
-    query: str,
-    params: ListingsQueryParams,
-    request: HttpRequest,
-    *,
-    all_categories: bool = False,
 ) -> tuple[int, bool]:
-    """Resolve the true match count and truncation flag for a query search.
+    """Resolve the display count and truncation flag for a query search.
 
-    Three outcomes based on the cache outcome of ``cached_ids``:
+    Two outcomes based on the cache outcome of ``cached_ids``:
 
-    - ``cached_ids is not None`` and below ``SEARCH_CACHE_MAX_HITS`` (common
-      hot path): the count is simply ``len(cached_ids)`` and results are not
-      truncated. No ``COUNT(*)`` and no second FTS evaluation.
-    - ``cached_ids is not None`` and at the cap: the display queryset ``ads``
-      is ``pk__in``-capped to the slice, so a fresh FTS-filtered queryset is
-      built to compute the true count via ``COUNT(*)``.
+    - ``cached_ids is not None``: the cached id list is bounded by SQL to
+      ``SEARCH_CACHE_MAX_HITS`` (13-PERF-006 #1 validated 2026-09), so the
+      count is simply its length and no second FTS evaluation is run.  When the
+      length reaches the cap the result set is truncated (more rows may exist
+      beyond what was cached).
     - ``cached_ids is None`` (cold-miss loser, lock held): ``ads`` is already
       the FTS-filtered queryset, so its count is reused directly.
-
-    ``all_categories`` is threaded through to the count rebuild so a whole-tree
-    search counts the same rows the display path renders (O8).
 
     Returns:
         A ``(total_count, results_truncated)`` tuple.
     """
-    if cached_ids is not None and len(cached_ids) < SEARCH_CACHE_MAX_HITS:
-        # Common non-truncated hot path: the cached ID list is authoritative.
-        return len(cached_ids), False
-
     if cached_ids is not None:
-        # At/over the cap: recompute the true count from a fresh FTS queryset.
-        fts_count_qs = _apply_fts_filtering(
-            ListingsQuery.build_queryset(params),
-            query,
-            params,
-            request,
-            all_categories=all_categories,
-        )
-        total_count = fts_count_qs.count()
-        return total_count, total_count > SEARCH_CACHE_MAX_HITS
+        total_count = len(cached_ids)
+        return total_count, total_count >= SEARCH_CACHE_MAX_HITS
 
     # Cold-miss loser fallback: ads is already the FTS-filtered queryset.
     total_count = ads.count()
     return total_count, total_count > SEARCH_CACHE_MAX_HITS
+
+
+def _rank_cache_hit_page(
+    ads: QuerySet,
+    cached_ids: list[int],
+    params: ListingsQueryParams,
+) -> QuerySet:
+    """Return the cache-hit page queryset with page-scoped rank restore.
+
+    ``cached_ids`` is the full ordered id list (up to ``SEARCH_CACHE_MAX_HITS``)
+    and preserves the FTS rank order.  Only the requested page's window enters
+    the ``Case``/``When`` rank statement, so statement size and bind count scale
+    with ``per_page`` rather than with the cache cap (13-PERF-010 validated
+    2026-09).  The window is resolved with ``Paginator``'s own arithmetic so an
+    out-of-range page clamps to the last page exactly as it did before; the
+    rendered order of the rows on the page is byte-identical.
+    """
+    paginator = Paginator(range(len(cached_ids)), params.per_page)
+    page = paginator.get_page(params.page)
+    window_ids = cached_ids[page.start_index() - 1 : page.end_index()]
+    if not window_ids:
+        return ads.none()
+    return ads.filter(pk__in=window_ids).order_by(
+        Case(
+            *[When(pk=pk, then=pos) for pos, pk in enumerate(window_ids)],
+            default=len(window_ids),
+            output_field=IntegerField(),
+        )
+    )
 
 
 def _all_categories_requested(request: HttpRequest) -> bool:

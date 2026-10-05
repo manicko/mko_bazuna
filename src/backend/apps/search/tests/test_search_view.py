@@ -1543,15 +1543,16 @@ class TestSearchLogRedaction:
 
 
 class TestSearchViewTotalCount:
-    """Regression tests for true total_count vs 1000-row cache cap (SRH-002).
+    """Regression tests for the bounded display count vs the cache cap.
 
-    After SRH-002 the dedicated FTS ``COUNT(*)`` is gated: it runs only at the
-    ``SEARCH_CACHE_MAX_HITS`` cap boundary (or on the cold-miss-loser path),
-    while on the common non-truncated path ``total_count`` comes from
-    ``len(cached_ids)``. These tests verify that above the cap the true count
-    is preserved via a ``COUNT(*)`` at the boundary (``results_truncated`` is
-    ``True``), and that an exact-cap result set yields ``total_count == 1000``
-    and is not marked truncated.
+    After BLOCK 6 (13-PERF-006 #1 validated 2026-09) the dedicated FTS
+    ``COUNT(*)`` is gone: the producer pushes ``[:SEARCH_CACHE_MAX_HITS]`` into
+    SQL, so the at/over-cap path derives its count from that already-bounded,
+    already-filtered list and never re-runs the FTS filter to count. The count
+    on the truncated path is therefore the bounded list length; the *displayed*
+    value for a truncated set is restated by BLOCK 7 under the Q9 ruling of
+    2026-10-03 (``SEARCH_CACHE_MAX_HITS + 1``, never a true total that cannot be
+    computed).
     """
 
     def test_total_count_exceeds_cap_when_many_matches(
@@ -1560,13 +1561,14 @@ class TestSearchViewTotalCount:
         root_category: Category,
         city: City,
     ) -> None:
-        """With >1000 matching ads, total_count is the true count, not 1000.
+        """With >1000 matching ads, the count is the bounded list, not a recount.
 
-        Before B3, the cached ID list was sliced at ``SEARCH_CACHE_MAX_HITS``
-        (1000) and ``total_count`` was derived from that slice, yielding 1000
-        regardless of the true match count. The fix computes a separate
-        ``COUNT(*)`` on the FTS-filtered queryset, so ``total_count`` is now
-        the true count and ``results_truncated`` is ``True``.
+        Before BLOCK 6, the cached ID list was sliced at
+        ``SEARCH_CACHE_MAX_HITS`` and a second FTS ``COUNT(*)`` produced the true
+        total. The cap is now pushed into the producer's SQL (13-PERF-006 #1),
+        so the at/over-cap path consumes the bounded list: the count is the
+        list length (the cap) and ``results_truncated`` is ``True``. No second
+        FTS evaluation runs.
         """
         num_ads = SEARCH_CACHE_MAX_HITS + 1  # 1001
         create_test_ads_bulk(
@@ -1582,27 +1584,27 @@ class TestSearchViewTotalCount:
         response = client.get("/search/?q=велосипед&lang=ru")
 
         assert response.status_code == 200
-        # True count via COUNT(*) — not capped at SEARCH_CACHE_MAX_HITS
-        assert response.context["total_count"] == num_ads
-        assert response.context["total_count"] != SEARCH_CACHE_MAX_HITS
-        # results_truncated must be True when count exceeds the cap
+        # The bounded cached list drives the count at/over the cap.
+        assert response.context["total_count"] == SEARCH_CACHE_MAX_HITS
+        # results_truncated must be True when the result set reaches the cap
         assert response.context["results_truncated"] is True
         # Pagination still limits the visible page to PER_PAGE (24)
         page_ads = list(response.context["page_obj"])
         assert len(page_ads) == 24
         assert all(a.title.startswith("Продам велосипед") for a in page_ads)
 
-    def test_total_count_at_cap_is_exact_and_not_truncated(
+    def test_total_count_at_cap_is_bounded_and_truncated(
         self,
         seller: User,
         root_category: Category,
         city: City,
     ) -> None:
-        """With exactly SEARCH_CACHE_MAX_HITS matching ads, the count is exact
-        and results are not marked truncated.
+        """With exactly SEARCH_CACHE_MAX_HITS matching ads, the set is truncated.
 
-        The dedicated FTS COUNT(*) runs only at the cap boundary (SRH-002), so
-        ``total_count`` equals the cache cap and ``results_truncated`` is False.
+        The producer's SQL ``LIMIT`` bounds the list at the cap, so a result set
+        of exactly ``SEARCH_CACHE_MAX_HITS`` rows reaches the boundary
+        (``results_truncated`` is ``True``): more rows may exist beyond the cap
+        and the count is not recomputed to prove otherwise (13-PERF-006 #1).
         """
         num_ads = SEARCH_CACHE_MAX_HITS  # exactly 1000
         create_test_ads_bulk(
@@ -1619,7 +1621,7 @@ class TestSearchViewTotalCount:
 
         assert response.status_code == 200
         assert response.context["total_count"] == SEARCH_CACHE_MAX_HITS
-        assert response.context["results_truncated"] is False
+        assert response.context["results_truncated"] is True
 
     def test_cold_miss_loser_reports_true_count(
         self,
