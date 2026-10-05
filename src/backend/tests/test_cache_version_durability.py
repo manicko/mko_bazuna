@@ -8,7 +8,16 @@ contract is "written with ``timeout=None``" and it lives in
 ``noeviction`` (no ``maxmemory`` / ``maxmemory-policy`` in any compose file),
 so a TTL-less key is retained.
 
-Two guards keep the invariant honest:
+**Phase-13 limb discharged by this contract.** The phase-13 handbook routed
+the relationship between a freshness token's lifetime and the entries it
+retires to phase 13 (handbook block 4; see the phase-13 plan). Phase 08
+BLOCK 6 shipped the durable ``timeout=None`` contract, and because the counter
+never expires the inequality is satisfied by construction: there is no window
+in which the key can be evicted while entries depend on it. The 300 s-versus-
+360 s gap is gone. The phase-13 limb is therefore **discharged by this
+contract, not by a separate TTL change** — no TTL was reintroduced or re-tuned.
+
+Three guards keep the invariant honest:
 
 1. **Static (grep-shaped)** — no module in ``src/backend`` may write a
    version key through ``cache.set`` or ``cache.touch`` with anything other
@@ -19,17 +28,25 @@ Two guards keep the invariant honest:
 2. **Behavioural** — a key written through ``bump_version_key`` carries no
    expiry; because the counter never expires it never resets, so a key built
    before and a key built after a bump always differ.
+3. **Lifetime relationship** — the version-key lifetime is **strictly
+   greater** than the entry lifetime (``ttl + stale_ttl``) for both the search
+   and submenu surfaces, asserted against the *settings values* rather than a
+   comment. ``timeout=None`` models an unbounded lifetime, so the inequality
+   holds by construction.
 """
 
 from __future__ import annotations
 
 import ast
+import time
 from pathlib import Path
 
 import pytest
 from django.core.cache import cache
 
+from apps.categories.cache import SUBMENU_CACHE_STALE_TTL, SUBMENU_CACHE_TTL
 from apps.core.utils.cache import bump_version_key
+from apps.search.services.cache import SEARCH_CACHE_STALE_TTL, SEARCH_CACHE_TTL
 
 # A version key is any cache-key expression whose source mentions "version".
 # Writers name them as ``*_VERSION_KEY`` constants or string literals.
@@ -290,3 +307,82 @@ class TestVersionKeyIsDurable:
             "the counter reset (a bounded TTL self-evicted it)."
         )
         assert self._expire_at(key) is None
+
+
+def _version_lifetime_outlives_entries(
+    version_lifetime: float | None,
+    entry_lifetime: float,
+) -> bool:
+    """Return True when the version key outlives the entries it retires.
+
+    Invariant: ``version_key_lifetime > entry_lifetime``. A version key is a
+    correctness mechanism — if it can be evicted while entries that embed it
+    are still live, the counter resets, re-issues ``1``, and a retired key
+    becomes byte-identical to a live one. ``None`` models ``timeout=None`` (an
+    unbounded lifetime) and outlives any finite entry. This helper is the
+    relationship as executable code so a retune that inverts it fails a test.
+    """
+    if version_lifetime is None:
+        return True
+    return version_lifetime > entry_lifetime
+
+
+class TestVersionKeyLifetimeRelationship:
+    """The version-key lifetime must exceed the entries it retires (08-SRCH-007).
+
+    The relationship is asserted against the **settings values**, not a
+    comment: the shipped counters are written with ``timeout=None`` (an
+    unbounded lifetime), and the entry lifetime is ``ttl + stale_ttl`` for
+    each surface. Because the counter never expires, the inequality holds by
+    construction.
+    """
+
+    pytestmark = pytest.mark.unit
+
+    def test_search_version_key_outlives_search_entries(self) -> None:
+        """search:content_version outlives SEARCH_CACHE_TTL + STALE_TTL."""
+        entry_lifetime = SEARCH_CACHE_TTL + SEARCH_CACHE_STALE_TTL
+        key = "test:search_lifetime"
+        bump_version_key(key)
+        version_lifetime = self._observed_lifetime(key)
+        assert _version_lifetime_outlives_entries(version_lifetime, entry_lifetime)
+
+    def test_submenu_version_key_outlives_submenu_entries(self) -> None:
+        """category:tree_version outlives SUBMENU_CACHE_TTL + STALE_TTL."""
+        entry_lifetime = SUBMENU_CACHE_TTL + SUBMENU_CACHE_STALE_TTL
+        key = "test:tree_lifetime"
+        bump_version_key(key)
+        version_lifetime = self._observed_lifetime(key)
+        assert _version_lifetime_outlives_entries(version_lifetime, entry_lifetime)
+
+    def test_retune_that_inverts_the_relationship_fails(self) -> None:
+        """A bounded version lifetime at or below the entry lifetime fails.
+
+        Demonstrates the guard failing: if a version key carried the entry
+        lifetime it would be evicted at the same moment (or before) the
+        entries, re-opening the window this contract closes.
+        """
+        entry_lifetime = SEARCH_CACHE_TTL + SEARCH_CACHE_STALE_TTL
+        assert not _version_lifetime_outlives_entries(entry_lifetime, entry_lifetime)
+        assert not _version_lifetime_outlives_entries(
+            entry_lifetime - 1, entry_lifetime
+        )
+
+    def test_durable_counter_models_an_unbounded_lifetime(self) -> None:
+        """``timeout=None`` is the invariant: an unbounded version lifetime."""
+        assert _version_lifetime_outlives_entries(None, 10**9)
+
+    @staticmethod
+    def _observed_lifetime(key: str) -> float | None:
+        """Return the observed remaining lifetime for *key*.
+
+        ``None`` means the key carries no expiry (``timeout=None``, the
+        invariant). LocMemCache stores an **absolute** expiry deadline in
+        ``_expire_info``, so the remaining seconds are ``deadline - now``:
+        comparing the raw deadline to an entry lifetime would be meaningless
+        (an absolute timestamp is always larger than a duration).
+        """
+        deadline = cache._expire_info.get(cache.make_key(key))
+        if deadline is None:
+            return None
+        return deadline - time.time()
