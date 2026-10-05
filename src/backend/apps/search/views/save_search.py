@@ -12,10 +12,14 @@ import logging
 from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseBadRequest
 from django.shortcuts import render
+from django.utils.translation import gettext as _
+from pydantic import ValidationError
 
+from apps.categories.models import Category
 from apps.core.enums import LanguageLocale
 from apps.core.utils.sanitize import redact_free_text
 from apps.search.models import SavedSearch
+from apps.search.schemas import SavedSearchInput
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +40,11 @@ def save_search(request: HttpRequest) -> HttpResponse:
     Redaction never lengthens a value, so it can never turn a legal query into
     an over-cap one.
 
+    The four optional filters are validated through ``SavedSearchInput``
+    (10-CQ-004), the shared boundary the cabinet edit view also uses. A value
+    it rejects — e.g. a negative price — re-renders this modal with an error
+    and the submitted values preserved, and stores nothing.
+
     ``redact_free_text`` is used rather than ``redact_search_query`` because the
     latter truncates to 100 characters, which would silently change what the
     saved search matches and contradict the ``max_length=200`` column bound this
@@ -43,7 +52,8 @@ def save_search(request: HttpRequest) -> HttpResponse:
 
     Returns:
         The ``save_search_success.html`` fragment (or 405 for non-POST, 400 for
-        an over-cap query).
+        an over-cap query, or the modal re-rendered with an error for a filter
+        the DTO rejects).
     """
     if request.method != "POST":
         return HttpResponse(status=405)
@@ -58,22 +68,27 @@ def save_search(request: HttpRequest) -> HttpResponse:
         )
         return HttpResponseBadRequest()
 
-    def _int_or_none(name: str) -> int | None:
-        raw = (request.POST.get(name) or "").strip()
-        if not raw:
-            return None
-        try:
-            return int(raw)
-        except ValueError:
-            return None
+    try:
+        filters = SavedSearchInput(
+            city_id=request.POST.get("city_id"),
+            category_id=request.POST.get("category_id"),
+            min_price=request.POST.get("min_price"),
+            max_price=request.POST.get("max_price"),
+        )
+    except ValidationError:
+        logger.warning(
+            "Refused invalid saved-search filters for user %s (10-CQ-004)",
+            request.user.pk,
+        )
+        return _render_modal_error(request, query)
 
     saved_search = SavedSearch.objects.create(
         user=request.user,
         query=query or None,
-        city_id=_int_or_none("city_id"),
-        category_id=_int_or_none("category_id"),
-        min_price=_int_or_none("min_price"),
-        max_price=_int_or_none("max_price"),
+        city_id=filters.city_id,
+        category_id=filters.category_id,
+        min_price=filters.min_price,
+        max_price=filters.max_price,
         language=request.LANGUAGE_CODE or LanguageLocale.BOSNIAN.value,
         is_active=True,
     )
@@ -83,4 +98,26 @@ def save_search(request: HttpRequest) -> HttpResponse:
         request,
         "search/partials/save_search_success.html",
         {"saved_search": saved_search},
+    )
+
+
+def _render_modal_error(request: HttpRequest, query: str) -> HttpResponse:
+    """Re-render the save-search modal with an error and the posted values.
+
+    Error shape (ii): the surface is re-rendered rather than returning a bare
+    400, so the user keeps what they typed.  The response is 200 because HTMX
+    swaps the modal only on a successful response.
+    """
+    return render(
+        request,
+        "search/partials/save_search_modal.html",
+        {
+            "query": query,
+            "categories": Category.objects.filter(is_active=True).order_by("name"),
+            "selected_city": request.POST.get("city_id") or "",
+            "selected_category": request.POST.get("category_id") or "",
+            "min_price": request.POST.get("min_price") or "",
+            "max_price": request.POST.get("max_price") or "",
+            "error": _("Price must not be negative."),
+        },
     )

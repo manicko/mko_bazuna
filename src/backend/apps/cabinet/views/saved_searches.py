@@ -12,8 +12,11 @@ from django.contrib.auth.decorators import login_required
 from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, render
 from django.urls import reverse
+from django.utils.translation import gettext as _
+from pydantic import ValidationError
 
 from apps.search.models import SavedSearch
+from apps.search.schemas import SavedSearchInput
 
 logger = logging.getLogger(__name__)
 
@@ -61,7 +64,20 @@ def saved_search_edit(request: HttpRequest, pk: int) -> HttpResponse:
     saved_search = _user_search(request, pk)
 
     if request.method == "POST":
-        _apply_filters(request, saved_search)
+        filters = _parse_filters(request)
+        if filters is None:
+            # Error shape (ii): re-render the edit form with an error and the
+            # submitted values preserved, and store nothing.
+            logger.warning(
+                "Refused invalid saved-search filters for search %s (10-CQ-004)",
+                saved_search.pk,
+            )
+            return _render_edit_form(
+                request,
+                saved_search,
+                error=_("Price must not be negative."),
+            )
+        _apply_filters(saved_search, filters, request.POST.get("query") or "")
         saved_search.language = request.LANGUAGE_CODE or saved_search.language
         saved_search.save(
             update_fields=[
@@ -76,15 +92,7 @@ def saved_search_edit(request: HttpRequest, pk: int) -> HttpResponse:
         )
         return HttpResponseRedirect(reverse("cabinet:saved-searches"))
 
-    return render(
-        request,
-        "cabinet/saved_search_edit.html",
-        {
-            "saved_search": saved_search,
-            "cities": _cities(),
-            "categories": _categories(),
-        },
-    )
+    return _render_edit_form(request, saved_search, error=None)
 
 
 @login_required
@@ -110,34 +118,87 @@ def saved_search_delete(request: HttpRequest, pk: int) -> HttpResponse:
 # ---------------------------------------------------------------------------
 
 
-def _apply_filters(request: HttpRequest, saved_search: SavedSearch) -> None:
-    """Copy the posted query + optional filters onto the saved search."""
+def _parse_filters(request: HttpRequest) -> SavedSearchInput | None:
+    """Validate the posted filters through the shared boundary (10-CQ-004).
+
+    Returns ``None`` when the DTO rejects the input (e.g. a negative price), so
+    the caller re-renders the form instead of persisting.
+    """
+    try:
+        return SavedSearchInput(
+            city_id=request.POST.get("city_id"),
+            category_id=request.POST.get("category_id"),
+            min_price=request.POST.get("min_price"),
+            max_price=request.POST.get("max_price"),
+        )
+    except ValidationError:
+        return None
+
+
+def _apply_filters(
+    saved_search: SavedSearch, filters: SavedSearchInput, query: str
+) -> None:
+    """Copy the posted query + validated filters onto the saved search."""
     from apps.categories.models import Category
     from apps.locations.models import City
 
-    query = (request.POST.get("query") or "").strip()
+    saved_search.query = query.strip() or None
 
-    def _int_or_none(name: str) -> int | None:
-        raw = (request.POST.get(name) or "").strip()
-        if not raw:
-            return None
-        try:
-            return int(raw)
-        except ValueError:
-            return None
-
-    saved_search.query = query or None
-
-    city_id = _int_or_none("city_id")
-    saved_search.city = City.objects.filter(pk=city_id).first() if city_id else None
-
-    category_id = _int_or_none("category_id")
+    saved_search.city = (
+        City.objects.filter(pk=filters.city_id).first() if filters.city_id else None
+    )
     saved_search.category = (
-        Category.objects.filter(pk=category_id).first() if category_id else None
+        Category.objects.filter(pk=filters.category_id).first()
+        if filters.category_id
+        else None
     )
 
-    saved_search.min_price = _int_or_none("min_price")
-    saved_search.max_price = _int_or_none("max_price")
+    saved_search.min_price = filters.min_price
+    saved_search.max_price = filters.max_price
+
+
+def _render_edit_form(
+    request: HttpRequest,
+    saved_search: SavedSearch,
+    error: str | None,
+) -> HttpResponse:
+    """Render the edit form, preferring posted values over the stored ones.
+
+    On a POST the form shows what the user submitted (so a rejected value is
+    not lost); on a GET it shows the saved search's current values.
+    """
+    if request.method == "POST":
+        form_query = request.POST.get("query") or ""
+        form_city_id = request.POST.get("city_id") or ""
+        form_category_id = request.POST.get("category_id") or ""
+        form_min_price = request.POST.get("min_price") or ""
+        form_max_price = request.POST.get("max_price") or ""
+    else:
+        form_query = saved_search.query or ""
+        form_city_id = saved_search.city_id or ""
+        form_category_id = saved_search.category_id or ""
+        form_min_price = (
+            saved_search.min_price if saved_search.min_price is not None else ""
+        )
+        form_max_price = (
+            saved_search.max_price if saved_search.max_price is not None else ""
+        )
+
+    return render(
+        request,
+        "cabinet/saved_search_edit.html",
+        {
+            "saved_search": saved_search,
+            "cities": _cities(),
+            "categories": _categories(),
+            "form_query": form_query,
+            "form_city_id": form_city_id,
+            "form_category_id": form_category_id,
+            "form_min_price": form_min_price,
+            "form_max_price": form_max_price,
+            "error": error,
+        },
+    )
 
 
 def _cities():

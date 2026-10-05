@@ -1791,3 +1791,8 @@ msgstr "Prikazani su samo oglasi u kategoriji „%(category)s”"
 #: src/backend/templates/ads/partials/ad_list.html
 msgid "Browse all listings"
 msgstr "Pregledaj sve oglase"
+
+#: src/backend/apps/search/views/save_search.py
+#: src/backend/apps/cabinet/views/saved_searches.py
+msgid "Price must not be negative."
+msgstr "Cijena ne može biti negativna."

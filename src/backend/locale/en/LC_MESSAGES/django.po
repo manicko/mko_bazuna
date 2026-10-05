@@ -1585,3 +1585,8 @@ msgstr ""
 #: src/backend/templates/ads/partials/ad_list.html
 msgid "Browse all listings"
 msgstr ""
+
+#: src/backend/apps/search/views/save_search.py
+#: src/backend/apps/cabinet/views/saved_searches.py
+msgid "Price must not be negative."
+msgstr ""

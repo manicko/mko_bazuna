@@ -22,6 +22,10 @@ LANGUAGE_CODE on save. {% endcomment %}
         <main class="container mx-auto px-4 py-6 max-w-2xl">
             <h2 class="text-xl font-semibold mb-4">{% trans "Edit saved search" %}</h2>
             {% include "components/cabinet_nav.html" %}
+            {% if error %}
+                <p class="mb-4 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
+                   role="alert">{{ error }}</p>
+            {% endif %}
             <form method="post"
                   action="{% url 'cabinet:saved-search-edit' saved_search.id %}"
                   class="bg-white rounded-lg shadow p-6 space-y-4">
@@ -30,7 +34,7 @@ LANGUAGE_CODE on save. {% endcomment %}
                     <label class="block text-sm font-medium mb-1">{% trans "Search query" %}</label>
                     <input type="text"
                            name="query"
-                           value="{{ saved_search.query|default:'' }}"
+                           value="{{ form_query|default:'' }}"
                            class="w-full px-3 py-2 border rounded-lg">
                 </div>
                 <div>
@@ -39,7 +43,7 @@ LANGUAGE_CODE on save. {% endcomment %}
                         <option value="">{% trans "Any city" %}</option>
                         {% for city in cities %}
                             <option value="{{ city.id }}"
-                                    {% if saved_search.city_id == city.id %}selected{% endif %}>
+                                    {% if form_city_id|stringformat:"s" == city.id|stringformat:"s" %}selected{% endif %}>
                                 {{ city|get_city_name:LANGUAGE_CODE }}
                             </option>
                         {% endfor %}
@@ -51,7 +55,7 @@ LANGUAGE_CODE on save. {% endcomment %}
                         <option value="">{% trans "Any category" %}</option>
                         {% for category in categories %}
                             <option value="{{ category.id }}"
-                                    {% if saved_search.category_id == category.id %}selected{% endif %}>
+                                    {% if form_category_id|stringformat:"s" == category.id|stringformat:"s" %}selected{% endif %}>
                                 {{ category|get_category_name:LANGUAGE_CODE }}
                             </option>
                         {% endfor %}
@@ -62,7 +66,7 @@ LANGUAGE_CODE on save. {% endcomment %}
                         <label class="block text-sm font-medium mb-1">{% trans "Min price (EUR)" %}</label>
                         <input type="number"
                                name="min_price"
-                               value="{{ saved_search.min_price|default:'' }}"
+                               value="{{ form_min_price|default:'' }}"
                                class="w-full px-3 py-2 border rounded-lg"
                                min="0">
                     </div>
@@ -70,7 +74,7 @@ LANGUAGE_CODE on save. {% endcomment %}
                         <label class="block text-sm font-medium mb-1">{% trans "Max price (EUR)" %}</label>
                         <input type="number"
                                name="max_price"
-                               value="{{ saved_search.max_price|default:'' }}"
+                               value="{{ form_max_price|default:'' }}"
                                class="w-full px-3 py-2 border rounded-lg"
                                min="0">
                     </div>
