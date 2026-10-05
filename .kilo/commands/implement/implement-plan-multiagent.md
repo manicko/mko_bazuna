@@ -54,22 +54,29 @@ Provide:
 Save the result as `Execution plan`: `.ai\plans\{next-number}-{plan-name}.md`.
 ----------------------------------
 
-## 2. Ask user as the Product Owner
-Skip this step unless there are business uncertainty.
+## 2. Ask the user as the Product Owner
 
-Ask user as the Product Owner only the questions required to resolve business uncertainty.
-Provide questions with options to choose basing on the best practices and highlight recommended options. 
+Skip this step unless there is business uncertainty.
 
-Questions should focus on:
-- product behavior
-- business rules
-- priorities
-- user expectations
-- acceptance criteria
+Do not ask about technical implementation or architecture — that is your task.
 
-Do not ask about technical implementation.
+Focus questions on:
 
-Collect answers for the the specification.
+* **User goals and problems** — what users need to achieve and why
+* **User journey and experience** — how users expect the flow to work, including key scenarios and edge cases
+* **Product behavior** — what the product should do from the user's perspective
+* **Business rules and policies** — constraints, conditions, and exceptions
+* **Expected outcomes and success criteria** — what should happen when the feature works correctly
+* **Priorities and trade-offs** — what matters most when requirements conflict
+* **Permissions and responsibilities** — who can do what and who owns each decision
+* **Data and content expectations** — what information users need to see, enter, or receive
+* **Failure and recovery experience** — what users should see and be able to do when something goes wrong
+* **Examples and acceptance scenarios** — concrete examples of expected behavior
+
+Provide concise multiple-choice options based on best practices, **highlight the recommended option**, and ask only questions needed to resolve business uncertainty.
+
+Use the answers to complete the specification.
+
 
 
 ## 3. Execute Blocks

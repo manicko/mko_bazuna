@@ -2919,61 +2919,1299 @@ uv run basedpyright src/
 
 **Risk and rollback.** **Irreversible.** A revert of the retention command does **not** restore purged rows. Rollback = stop scheduling the command; already-purged rows stay purged. `--dry-run` first is mandatory operational practice and is stated in the commit body. Retention is index-backed (`created_at` and `error_type` are both indexed), so the plan's "seq-scans an unbounded table" argument does **not** apply to this query.
 
+### Planner task — BLOCK 8 execution plan
+
+> **Template decision (recorded).** BLOCK 8 ships an **irreversible** purge and allocates a lock id from a band a second phase is also allocating from, and the block's own agent list mandates "**Validator — mandatory**". The **verification** variant is therefore emitted **in addition to** the primary `task_template.yaml` shape.
+
+#### Ground truth settled by this Planner (do not re-derive)
+
+| Question | Answer | Evidence |
+|---|---|---|
+| **OC-5 — `HOURLY_COMMANDS` or `DAILY_COMMANDS`?** | **`HOURLY_COMMANDS`, appended LAST** | see "OC-5 decision" below |
+| **Next free `AdvisoryLockId`?** | **`15`** | `enums.py` at `81dd644` holds `1-9, 11, 12, 13, 14, 100, 101, 102, 103, 104, 110, 111`. `CONSENT_RECORD_SWEEP = 14` (`fd5201d`) consumed the id the plan still calls free. `15` is free — verified by reading the live enum, **not** the plan |
+| **`makemigrations --check` before starting?** | **CLEAN** | run this Planner: `docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps --entrypoint "" -e DJANGO_SETTINGS_MODULE=config.settings.test_migrations test python src/backend/manage.py makemigrations --check --dry-run` → **`No changes detected`**. The orphan `.pyc` artefacts (`0002_dedup_media_deletion_errors`, `0003_mediadeletionerror_uq_media_deletion_error_key_type`) have no `.py` and are inert; `MIGRATION_MODULES = DisableMigrations()` under `config.settings.test` is why a plain check would have lied |
+| **`apps.media` admin autodiscovery?** | **Works** | `config/settings/base.py::INSTALLED_APPS` contains `apps.media`; `AdminConfig.autodiscover_modules()` imports `apps/media/admin.py` with no further wiring |
+| **Staff/admin fixture for the reader tests?** | **None exists** — build one locally | `src/backend/conftest.py` has `make_user(telegram_id, *, is_staff=False, consent_revoked=False)` and **no** staff/permission fixture, and `conftest.py` is do-not-touch. Mirror `apps/core/tests/test_support_admin.py::_local_staff_user` + `_local_changelist_request` |
+
+**🔴 Three corrections to the block text above, made by this Planner.**
+
+1. **"Next free id is `14`" is stale.** It says "confirmed at `b7ba213`"; phase 06's `fd5201d` has since taken **14** as `CONSENT_RECORD_SWEEP`. The verified value is **15**. The block's own constraint 2 ("re-read at the allocation moment") remains binding — `15` is what the live file says **today**, and the Implementor must re-read once more immediately before editing.
+2. **Constraint 12 ("all new admin strings are appended to the locale files") is VACUOUS — do not touch `django.po`.** `list_display` / `list_filter` entries name **model fields**, so Django derives their labels from auto-generated `verbose_name`s (`"created_at" → "created at"`, `"error_type" → "error type"`) which are **not** `gettext`-wrapped. If the admin declares no `verbose_name`, no `short_description`, and no `changelist_view` template override, it introduces **zero translatable strings** and the `ru` / `bs` completeness gate is unaffected. The uncommitted locale lines belong to other agents and stay untouched.
+3. **A file missing from the Surface list must be edited: `src/backend/apps/core/tests/test_scheduler.py`.** `TestSchedulerConstants::test_hourly_commands_match_spec` asserts `HOURLY_COMMANDS == [ …9 names… ]` and `test_daily_commands_include_send_alerts` asserts `DAILY_COMMANDS == [ …3 names… ]` — both **exact list equality**. Whichever list OC-5 picks, this file's pinned literal must gain the new name. This is the **same class** of pin as `EXPECTED_SWEEP_COMMANDS` and is committed with it.
+
+#### OC-5 decision — `HOURLY_COMMANDS` (appended last)
+
+The source plan contradicts itself: its surface table says `HOURLY_COMMANDS`, its correction register says `DAILY_COMMANDS`. **Decided: `HOURLY_COMMANDS`, appended at the END of the list.** Five reasons, in decisive order.
+
+1. **Decisive — a daily command's exit code is load-bearing for the durable daily marker, and an hourly one is not.** `scheduler.run_one_cycle` calls `daily_marker.record_daily(day)` **only** when `daily_ok` (every daily command exited 0) **and** `_stop_event` is clear. A non-zero exit from any daily command leaves the day unrecorded, so the **entire** daily set is re-dispatched on the next hourly tick — bounded at ~16 attempts/day — re-sending search-alert digests (`send_alerts`) and re-running the analytics rollup. An hourly command's exit code touches only `_write_liveness_marker`. This block introduces an **irreversible** purge whose natural failure mode *is* a DB error, so putting it in the daily set would let a media-retention hiccup suppress `CONSENT_RECORD_SWEEP` for the rest of the day and spam sellers with duplicate alert digests. That blast radius is unacceptable and is a consequence of *placement alone*.
+2. **Phase 06's precedent is not transferable — the precedent's own reasoning excludes this command.** `purge_consent_records` sits in `DAILY_COMMANDS` because it **never deletes** ("anonymises, never deletes", per its docstring) and "returns 0 on every non-exceptional outcome" — that sentence exists *precisely* so the daily marker is safe. `purge_media_deletion_errors` **does** delete, so it inherits the same coupling while losing the property that made the coupling harmless. "Follow the comparable purge" would copy the slot and invert the reason it was chosen.
+3. **The "hourly clears diagnostics faster" argument is weak, and I do not claim it.** With a **30-day** TTL, hourly vs daily shifts the effective deletion instant by at most 24 h inside a 720 h window. The diagnostic window is set by the **TTL**, not the cadence. Neither cadence makes a fresh row disappear sooner.
+4. **The per-run cost is negligible and the cadence is already this subsystem's habit.** The query is a single index-backed `DELETE … WHERE created_at < cutoff` on `idx_media_del_err_created` (the source plan's "seq-scans an unbounded table" argument does not apply), the command is idempotent, and 24 extra subprocess dispatches per day is the same shape as the nine existing hourly commands — including `sweep_orphaned_media`, **the very command whose failure path writes these rows**, whose own internal TTL is `_STAGING_TTL_SECONDS = 2h`. The media subsystem demonstrably runs on an hourly clock.
+5. **Contention is EQUAL, so it does not break the tie — it only has to be recorded.** Both lists are pinned by exact equality in `test_scheduler.py` (see correction 3), and `DAILY_COMMANDS`'s leading comment was rewritten by phase 06 in `fd5201d`. So **yes** — DAILY would land in a list another phase also owns, and so does HOURLY; neither is exclusive. The tie is broken on blast radius alone (reason 1), not on file ownership.
+
+**Consequences of choosing HOURLY, all binding.**
+- **Append at the END. Never insert.** `apps/core/tests/test_scheduler_error_handling.py` indexes these lists **positionally** — `HOURLY_COMMANDS[0]`, `HOURLY_COMMANDS[2]` (×4), `DAILY_COMMANDS[0]` (×4), `DAILY_COMMANDS[1]` — and `apps/core/tests/test_scheduler.py` does the same. Appending at index 9 preserves indices 0-8 exactly. Inserting anywhere else is an unrequested edit to those tests.
+- **The command must exit 0 on every non-exceptional outcome**, including an empty eligible set and `--dry-run`, so a routine no-op never ages the liveness marker into an `unhealthy` scheduler container. It must still raise on a genuine failure (a stale liveness marker is the correct signal there).
+- `_validate_commands(HOURLY_COMMANDS + DAILY_COMMANDS)` runs in `run_scheduler` **before** the loop. It raises `CommandError` on an **unreachable** name, so a misspelled command is caught at start-up. ⚠ But it does **not** validate that a *listed* command is *dispatched* correctly beyond membership, and a **forgotten** dispatch entry (the command never added to the list) fails **silently** — `test_scheduler.py::test_hourly_commands_match_spec` is the only thing that catches it, which is why correction 3 is not optional.
+
+#### Doc-drift routed out of BLOCK 8 (`docs/**` is do-not-touch here)
+
+This block makes three documentation statements false. **Do not edit them.** Record each in the commit body and route:
+
+| File | What goes stale | Route |
+|---|---|---|
+| `docs/01-spec/architecture-structure.md` — the hourly command list and the lock-id allocation table (row `15` is absent) | new hourly command + new lock id | **BLOCK 10** (already in its Surface) |
+| `docs/ops/docker-deployment.md` — the scheduled-commands table | new hourly command | **BLOCK 10** (already in its Surface; append-only, file is dirty with another phase's edits) |
+| `docs/02-database/db-retention.md` — the retention table, the command census, and the sentence *"All retention values are hardcoded in the respective management command source files. **No environment variables or CLI arguments (beyond `--dry-run`) are read for retention durations**"* | `--older-than` **is** a CLI argument that **is** a retention duration, so that sentence becomes **false** | ⚠ **UNROUTED.** BLOCK 10 constraint 9 says this file is "not touched". **Raise on the board to `main`; do not edit.** |
+
+**Accepted residual in code.** `apps/media/services/filesystem.py::_record_deletion_error`'s docstring still cites the unresolvable `ME-003`. That file is do-not-touch for this block, so the id survives in one place. Recorded, not fixed.
+
+```yaml
+id: task_07m08_media_deletion_error_reader_and_retention
+
+title: Add a read-only MediaDeletionError admin reader and a 30-day retention purge
+
+priority: high
+
+status: pending
+
+depends_on: []          # nothing in-plan; phase 06's fd5201d only shifts the id band
+
+source_reference: .ai\plans\20-media-remediation-execution.md
+source_section: BLOCK 8 — Deletion-error reader + retention
+source_blocks:
+  - "BLOCK 8 — Deletion-error reader + retention"
+
+description: >
+  MediaDeletionError rows are written by delete_photo's failure path and are
+  reachable nowhere — apps/media/admin.py does not exist, so "a file we could
+  not delete" has no operator surface and the condition is invisible until
+  someone reads the table by hand. There is also no retention, so the table grows
+  unbounded under a persistent condition.
+
+  Ship two new read-only surfaces and nothing else:
+
+  1. apps/media/admin.py — MediaDeletionErrorAdmin, fully read-only
+     (readonly_fields = [], has_add_permission False, has_change_permission
+     False, no has_view_permission override so view access requires the
+     media.view_mediadeletionerror permission AND staff status via
+     AdminSite.has_permission). list_display and list_filter cover created_at
+     and error_type; ordering is ("-created_at",) because the reader's primary
+     use is "what failed recently" and the column is already indexed.
+  2. apps/media/management/commands/purge_media_deletion_errors.py — bounded
+     retention. --older-than takes DAYS and defaults to 30; --dry-run reports
+     and deletes nothing. The command takes a transaction-scoped advisory lock
+     inside transaction.atomic() on the production path (including the
+     --dry-run path is NOT required — the branch happens after the lock, as in
+     purge_consent_records), so the entry in test_sweep_lock_structure.py's
+     three lists is satisfied.
+
+  Also: allocate AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS = 15 (three files,
+  one commit), append "purge_media_deletion_errors" to HOURLY_COMMANDS, pin the
+  new name into the two exact-list test literals, and reconcile models.py's
+  unresolvable (ME-003) traceability citation to the resolvable 07-MEDIA-010.
+
+goals:
+  - A staff user can open the MediaDeletionError changelist and filter by error_type and created_at
+  - The reader exposes no editable field: Django refuses to build a change form for it at all
+  - MediaDeletionError rows older than the TTL (30 days by default) are deleted; rows inside it survive with error_message intact
+  - --dry-run deletes nothing and reports what it would remove
+  - A second run is a no-op (idempotent)
+  - The purge is serialised by its own transaction-scoped advisory lock (15), and the lock takes a value no other member holds
+  - No alerting ships; the phase-12 predicate is recorded in the commit body instead
+  - No migration, no new model field, no new index, no dependency, no new translatable string
+
+extra_context: >
+  Ground truth the Implementor must not re-derive:
+
+  - VERIFIED LOCK ID = 15. apps/core/enums.py::AdvisoryLockId currently holds
+    1,2,3,4,5,6,7,8,9,11,12,13,14,100,101,102,103,104,110,111. The plan's
+    "next free id is 14" is STALE — phase 06's fd5201d allocated
+    CONSENT_RECORD_SWEEP = 14. Re-read the live enum immediately before editing
+    anyway: other agents commit in parallel and two phases computing "the next
+    free integer" concurrently means one command silently never takes its lock.
+    test_advisory_lock_ids.py does NOT catch reuse.
+  - Reuse is INVISIBLE by default and must be asserted relationally. Assigning a
+    value an existing member holds makes IntEnum create an ALIAS: the new
+    attribute resolves, but its .name is the OLD member's name and
+    list(AdvisoryLockId) does not grow. So assert
+    AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS.name ==
+    "PURGE_MEDIA_DELETION_ERRORS" (an alias flips this), and
+    len({m.value for m in AdvisoryLockId}) == len(list(AdvisoryLockId))
+    (no alias anywhere). Pin SWEEP_ORPHANED_MEDIA == 103 and
+    CONSENT_HARD_DELETE == 3 as non-renumbered.
+  - OC-5 is DECIDED: HOURLY_COMMANDS, appended LAST (never inserted —
+    test_scheduler_error_handling.py indexes HOURLY_COMMANDS[0] and [2]
+    positionally, and test_scheduler.py does the same). The full rationale is in
+    "OC-5 decision" above; do not re-open it.
+  - test_scheduler.py must be edited too — its Surface omission is corrected in
+    "Three corrections" above. TestSchedulerConstants::test_hourly_commands_match_spec
+    asserts HOURLY_COMMANDS == [exactly 9 names].
+  - test_sweep_lock_structure.py asserts THREE things at once:
+    {name for name, _ in SWEEP_COMMANDS} == EXPECTED_SWEEP_COMMANDS (an exact
+    frozenset), len(lock_calls) == len(EXPECTED_SWEEP_COMMANDS) (one lock site
+    per listed command), and monkeypatch.setattr(f"{module}.advisory_lock", spy)
+    for every module in _LOCK_TARGET_MODULES. Miss any one of the three lists and
+    the test fails. Note the spy REPLACES advisory_lock, so call_command runs the
+    command's real body with a no-op lock — the command must therefore handle an
+    empty table and return 0.
+  - CRITICAL TEST TRAP: MediaDeletionError.created_at is auto_now_add=True, so
+    MediaDeletionError.objects.create(created_at=...) SILENTLY IGNORES the
+    argument. Every retention test must create the row and then
+    MediaDeletionError.objects.filter(pk=row.pk).update(created_at=<value>).
+    Otherwise every row is "now", nothing is ever past the TTL, and the delete
+    assertions pass vacuously.
+  - No Ad, AdImage or user row is needed for any new test: MediaDeletionError has
+    no foreign keys by design ("the row is self-contained"). Add ZERO
+    create_test_ad / create_test_adbulk calls — the ad-factory contract test
+    walks the whole repo, and any call without a literal status= (or a
+    status-declaring **kwargs forwarder) fails the ENTIRE repository gate.
+  - conftest.py is do-not-touch and has no staff fixture. Build the reader's
+    staff actor locally with
+    make_user(<distinct telegram_id>, is_staff=True) plus
+    user.user_permissions.add(*Permission.objects.filter(content_type__app_label="media", codename="view_mediadeletionerror"))
+    and a changelist request with RequestFactory + reverse("admin:media_mediadeletionerror_changelist")
+    + CookieStorage messages, exactly as
+    apps/core/tests/test_support_admin.py::_local_staff_user /
+    _local_changelist_request do. Use a telegram_id no other media test uses.
+  - "No editable field" is proven by get_form(request) INTROSPECTION, not by
+    reading source. With has_add_permission False and has_change_permission
+    False, ModelAdmin.get_form raises ImproperlyConfigured for BOTH
+    change=False and change=True (Django 5.2 raises when
+    `not can_add and not can_change`). That raise IS the assertion: Django
+    refuses to build a change form at all. Also pin
+    list(MediaDeletionErrorAdmin.readonly_fields) == [] as metadata introspection.
+  - Staff-only view access is enforced by AdminSite.has_permission (which
+    requires user.is_active and user.is_staff), NOT by ModelAdmin. Do NOT add a
+    has_view_permission override. Test the site-level gate: a non-staff user
+    holding the view permission still gets admin.site.has_permission(...) is False.
+  - Do NOT add has_delete_permission, search_fields or date_hierarchy. They are
+    outside the settled surface; a manual delete cannot violate the TTL. Recorded
+    as a deliberate omission, not an oversight.
+  - i18n: this admin introduces ZERO translatable strings (labels come from
+    auto-generated field verbose_names, which are not gettext-wrapped). Do NOT
+    edit src/backend/locale/**/django.po — the uncommitted lines there belong to
+    other agents. The i18n completeness gate must stay green untouched.
+  - Precondition already verified by the Planner:
+    makemigrations --check under DJANGO_SETTINGS_MODULE=config.settings.test_migrations
+    prints "No changes detected". The orphan __pycache__/0002_*.pyc and 0003_*.pyc
+    have no matching .py and are inert. A pending migration appearing later is a
+    scope error — this block creates none.
+  - Command shape follows apps/core/management/commands/purge_consent_records.py:
+    module docstring naming the TTL and the lock id, _RETENTION_DAYS constant
+    for the default, add_arguments with --older-than (type=int, default=30) and
+    --dry-run, handle() opening transaction.atomic() then advisory_lock(...)
+    before any branch, CommandError for --older-than < 1 (a 0 or negative TTL
+    would delete the whole table including rows written a second ago), and a
+    return of None / exit code 0 on every non-exceptional outcome including an
+    empty set and --dry-run. Keep the existing
+    `# pyright: ignore[reportGeneralTypeIssues]` comment on the transaction.atomic()
+    line — django-stubs is not installed.
+  - delete_photo's three-attempt backoff, its logger.error and its never-raise
+    contract are UNCHANGED. _record_deletion_error keeps swallowing its own
+    errors. apps/media/services/filesystem.py is not edited at all.
+  - Working tree: other agents have uncommitted work (locale files,
+    src/backend/apps/users/services/deactivation.py, docs/**, staticfiles/,
+    .ai/tmp/, the .ai/audit/** deletions, the untracked plan file). Stage by
+    EXPLICIT PATH only — never `git add -A`, never `.`, never a directory.
+
+files:
+
+  - path: src/backend/apps/media/admin.py
+    targets:
+      - type: class
+        name: MediaDeletionErrorAdmin
+    semantic_anchors:
+      insert_after:
+        type: decorator
+        value: "@admin.register(MediaDeletionError)"
+
+  - path: src/backend/apps/media/management/commands/purge_media_deletion_errors.py
+    targets:
+      - type: class
+        name: Command
+      - type: method
+        name: handle
+      - type: method
+        name: add_arguments
+    semantic_anchors: []
+
+  - path: src/backend/apps/core/enums.py
+    targets:
+      - type: class
+        name: AdvisoryLockId
+    semantic_anchors:
+      insert_after:
+        type: assignment
+        value: "CONSENT_RECORD_SWEEP = 14"
+
+  - path: src/backend/apps/core/utils/advisory_lock.py
+    targets:
+      - type: function
+        name: advisory_lock
+      - type: docstring_section
+        name: "Lock ID allocation (transaction-scoped table)"
+    semantic_anchors:
+      insert_after:
+        type: docstring_line
+        value: "14  CONSENT_RECORD_SWEEP         consent-record retention sweep"
+    note: >
+      Docstring table ONLY. No executable line in this module changes.
+
+  - path: src/backend/apps/core/tests/test_advisory_lock_ids.py
+    targets:
+      - type: class
+        name: TestAdvisoryLockIdMembers
+    semantic_anchors:
+      insert_after:
+        type: class
+        name: TestAdvisoryLockIdMembers
+
+  - path: src/backend/apps/core/tests/test_sweep_lock_structure.py
+    targets:
+      - type: constant
+        name: SWEEP_COMMANDS
+      - type: constant
+        name: EXPECTED_SWEEP_COMMANDS
+      - type: constant
+        name: _LOCK_TARGET_MODULES
+    semantic_anchors: []
+    note: >
+      THREE lists, one commit. Missing any one fails the suite.
+
+  - path: src/backend/apps/core/tests/test_scheduler.py
+    targets:
+      - type: class
+        name: TestSchedulerConstants
+      - type: method
+        name: test_hourly_commands_match_spec
+    semantic_anchors:
+      insert_after:
+        type: method
+        name: test_hourly_commands_match_spec
+
+  - path: src/backend/apps/core/utils/scheduler.py
+    targets:
+      - type: constant
+        name: HOURLY_COMMANDS
+    semantic_anchors:
+      insert_after:
+        type: list_entry
+        value: purge_deleted_ads
+
+  - path: src/backend/apps/media/models.py
+    targets:
+      - type: module_docstring
+        name: Media models for Mko Bazuna
+    semantic_anchors: []
+    note: >
+      ONE citation only: the opening line's "(ME-003)" -> "(07-MEDIA-010)".
+      Nothing else in this file changes. No new field, no new index, no Meta edit.
+
+  - path: src/backend/apps/media/tests/test_purge_media_deletion_errors.py
+    targets:
+      - type: class
+        name: TestPurgeMediaDeletionErrors
+    semantic_anchors: []
+
+  - path: src/backend/apps/media/tests/test_media_admin.py
+    targets:
+      - type: class
+        name: TestMediaDeletionErrorAdmin
+    semantic_anchors: []
+
+  - path: src/backend/apps/media/tests/test_filesystem.py
+    targets:
+      - type: class
+        name: TestDeletePhoto
+    semantic_anchors:
+      insert_after:
+        type: method
+        name: test_delete_photo_logs_media_deletion_error_on_retry_exhaustion
+    note: >
+      ADDITIVE ONLY — one new method at the end of the class. Zero existing line
+      in this 812-line file is modified. This file carries BLOCK 3's and BLOCK
+      6's landed tests; do not reflow or reformat it.
+
+changes:
+
+  - action: add_code
+    description: >
+      NEW src/backend/apps/media/admin.py. A single registered, fully read-only
+      reader for MediaDeletionError.
+
+        - @admin.register(MediaDeletionError) on MediaDeletionErrorAdmin.
+        - list_display = ("created_at", "storage_key", "error_type", "attempts")
+          — created_at and error_type first and last, so the reader answers
+          "what failed, and how".
+        - list_filter = ["error_type", "created_at"] — both columns are already
+          indexed (idx_media_del_err_type / idx_media_del_err_created), so both
+          filters are index-backed.
+        - readonly_fields = [] — literally empty, per the settled constraint.
+        - ordering = ("-created_at",) — newest-first is the reader's primary use
+          (the phase-12 predicate is created_at__gt=now()-1h) and the column is
+          indexed.
+        - has_add_permission(self, request) -> False and
+          has_change_permission(self, request, obj=None) -> False, each with a
+          one-line docstring saying the rows are written by delete_photo.
+        - NO has_view_permission override (staff-only is enforced by
+          AdminSite.has_permission), NO has_delete_permission, NO search_fields,
+          NO date_hierarchy, NO @admin.display description, NO changelist_view
+          override, NO module-level logger that is never used.
+        - A module docstring naming 07-MEDIA-010 and stating the retention
+          command that bounds the table. English only, no print().
+    code_hint: |
+      """
+      Read-only Django admin surface for ``MediaDeletionError`` (07-MEDIA-010).
+
+      ``delete_photo`` writes a row whenever a deletion exhausts its retries,
+      and until now nothing could read them. Rows are never created, edited or
+      deleted here — this is a diagnostic reader only. Bounded by
+      ``purge_media_deletion_errors``.
+      """
+
+      import logging
+
+      from django.contrib import admin
+
+      from apps.media.models import MediaDeletionError
+
+      logger = logging.getLogger(__name__)
+
+
+      @admin.register(MediaDeletionError)
+      class MediaDeletionErrorAdmin(admin.ModelAdmin):
+          """Changelist-only reader for recorded deletion failures."""
+
+          list_display = ["created_at", "storage_key", "error_type", "attempts"]
+          list_filter = ["error_type", "created_at"]
+          readonly_fields = []
+          ordering = ("-created_at",)
+
+          def has_add_permission(self, request) -> bool:
+              """Rows are written by delete_photo, never by an operator."""
+              return False
+
+          def has_change_permission(self, request, obj=None) -> bool:
+              """The reader is diagnostic; nothing here is editable."""
+              return False
+
+  - action: add_code
+    description: >
+      NEW src/backend/apps/media/management/commands/purge_media_deletion_errors.py.
+
+        - Module docstring: the TTL is 30 days and is the reason the table is
+          bounded; the lock id is 15; the command is IRREVERSIBLE and
+          --dry-run is the mandatory first run. Name 07-MEDIA-010.
+        - _RETENTION_DAYS = 30 module constant (the --older-than default), with a
+          comment that both needed columns are already indexed so the predicate
+          is an index scan, not the seq scan the source plan feared.
+        - add_arguments: --older-than, type=int, default=_RETENTION_DAYS, help
+          text stating DAYS; and --dry-run (store_true, dest="dry_run"). Both
+          are NOT mutually exclusive with anything else.
+        - handle():
+            1. older_than = options["older_than"]; if older_than < 1 raise
+               CommandError("--older-than must be at least 1 day; 0 or negative
+               would delete every row including one written a second ago").
+            2. with transaction.atomic(): with
+               advisory_lock(AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS):
+               — THE LOCK IS TAKEN BEFORE ANY BRANCH, on both the dry-run and the
+               destructive path, so the lock-structure spy reaches it either way
+               and two schedulers never race even a report.
+            3. cutoff = timezone.now() - timedelta(days=older_than);
+               eligible = MediaDeletionError.objects.filter(created_at__lt=cutoff)
+            4. if dry_run: log and self.stdout.write the count, then return
+               (deletes nothing — not a queryset that is built and abandoned,
+               not a flag checked after .delete()).
+            5. deleted_count, _per_model = eligible.delete(); log.info; one
+               self.stdout.write(self.style.SUCCESS(...)).
+            6. Return None -> exit code 0 on every non-exceptional outcome,
+               including an empty eligible set.
+        - Keep the `# pyright: ignore[reportGeneralTypeIssues]` comment on the
+          transaction.atomic() line exactly as the sibling commands do
+          (django-stubs is not installed).
+        - ONE DELETE statement. No batching, no keyset pagination, no loop: the
+          predicate is a single indexed range and the table is small by
+          construction (rule 5).
+    code_hint: |
+      _RETENTION_DAYS = 30
+
+      class Command(BaseCommand):
+          """Delete MediaDeletionError rows older than the retention window."""
+
+          help = "Delete recorded media deletion failures older than N days (default 30)"
+
+          def add_arguments(self, parser) -> None:
+              """Add the retention window (days) and the non-destructive mode."""
+              parser.add_argument(
+                  "--older-than",
+                  type=int,
+                  default=_RETENTION_DAYS,
+                  help="Retention window in days (default: %(default)s)",
+              )
+              parser.add_argument(
+                  "--dry-run",
+                  action="store_true",
+                  dest="dry_run",
+                  default=False,
+                  help="Report the count that would be deleted without deleting",
+              )
+
+          def handle(self, *args, **options) -> None:
+              """Purge aged MediaDeletionError rows under the retention lock."""
+              older_than: int = options["older_than"]
+              dry_run: bool = options["dry_run"]
+
+              if older_than < 1:
+                  raise CommandError(
+                      f"--older-than must be at least 1 day; got {older_than}. "
+                      "A non-positive window would delete every row, including "
+                      "one written a second ago."
+                  )
+
+              cutoff = timezone.now() - timedelta(days=older_than)
+
+              with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
+                  with advisory_lock(AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS):
+                      eligible = MediaDeletionError.objects.filter(created_at__lt=cutoff)
+
+                      if dry_run:
+                          count = eligible.count()
+                          logger.info("DRY RUN: would delete %d rows older than %d days", count, older_than)
+                          self.stdout.write(
+                              self.style.WARNING(
+                                  f"DRY RUN: {count} deletion-error rows would be deleted."
+                              )
+                          )
+                          return
+
+                      deleted_count, _per_model = eligible.delete()
+                      logger.info("Purged %d deletion-error rows older than %d days", deleted_count, older_than)
+
+              self.stdout.write(self.style.SUCCESS(f"Purged {deleted_count} deletion-error rows."))
+
+  - action: modify
+    description: >
+      apps/core/enums.py::AdvisoryLockId — add ONE member,
+      PURGE_MEDIA_DELETION_ERRORS = 15, immediately after
+      CONSENT_RECORD_SWEEP = 14. No existing member is renumbered, reordered
+      or removed; SWEEP_ORPHANED_MEDIA stays 103 and CONSENT_HARD_DELETE stays 3.
+
+      RE-READ THE LIVE FILE IMMEDIATELY BEFORE THIS EDIT. Another agent may have
+      taken 15. If 15 is taken, stop and report on the board rather than picking
+      the next integer yourself — two phases guessing the same free id is the
+      exact failure this constraint exists to prevent.
+
+      The coordinator (main) must be notified on the board BEFORE this file is
+      touched.
+    code_hint: |
+          CONSENT_RECORD_SWEEP = 14
+          PURGE_MEDIA_DELETION_ERRORS = 15
+
+  - action: modify
+    description: >
+      apps/core/utils/advisory_lock.py — the transaction-scoped allocation table
+      in advisory_lock's docstring, one new row directly under the
+      "14  CONSENT_RECORD_SWEEP" line. No executable line in the module changes.
+      The trailing prose ("IDs 14-99 are reserved for future scheduled jobs")
+      stays as written — 15 is inside the reserved band, so it remains true.
+    code_hint: |
+                14  CONSENT_RECORD_SWEEP         consent-record retention sweep
+                15  PURGE_MEDIA_DELETION_ERRORS  deletion-error retention purge
+
+  - action: modify
+    description: >
+      apps/core/tests/test_advisory_lock_ids.py — the allocation record. Add ONE
+      test method to TestAdvisoryLockIdMembers that pins the new member AND
+      proves non-reuse relationally (an IntEnum value collision creates a silent
+      ALIAS, which is the failure mode this test exists to catch):
+
+        - AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS.value == 15
+        - AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS.name ==
+          "PURGE_MEDIA_DELETION_ERRORS"  (an alias resolves the OLD name)
+        - len({m.value for m in AdvisoryLockId}) == len(list(AdvisoryLockId))
+          (no alias exists anywhere on the enum)
+        - AdvisoryLockId.SWEEP_ORPHANED_MEDIA == 103
+        - AdvisoryLockId.CONSENT_HARD_DELETE == 3
+
+      And ONE test that the advisory_lock docstring's transaction-scoped table
+      contains a row naming the new member, so the three-file one-commit
+      constraint cannot be satisfied by two files.
+
+      No existing test in this file is edited.
+    code_hint: |
+          def test_purge_media_deletion_errors_lock_is_not_a_reuse(self) -> None:
+              """Lock 15 is allocated to the media retention purge and aliases nothing."""
+              member = AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS
+
+              assert member.value == 15
+              # A value collision makes IntEnum an ALIAS: the attribute resolves
+              # but .name is the pre-existing member's name.
+              assert member.name == "PURGE_MEDIA_DELETION_ERRORS"
+              # No alias anywhere on the enum (distinct values == distinct members).
+              assert len({m.value for m in AdvisoryLockId}) == len(list(AdvisoryLockId))
+
+          def test_existing_lock_ids_are_not_renumbered(self) -> None:
+              """Ids other blocks depend on keep their values."""
+              assert AdvisoryLockId.SWEEP_ORPHANED_MEDIA == 103
+              assert AdvisoryLockId.CONSENT_HARD_DELETE == 3
+
+  - action: modify
+    description: >
+      apps/core/tests/test_sweep_lock_structure.py — THREE lists, one commit,
+      or the suite goes red:
+
+        1. SWEEP_COMMANDS — append ("purge_media_deletion_errors",
+           AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS). APPEND; the set assertion
+           is order-insensitive but keep the file's existing order.
+        2. EXPECTED_SWEEP_COMMANDS — add "purge_media_deletion_errors" to the
+           frozenset literal. This is an EXACT frozenset compared with `==`
+           against {name for name, _ in SWEEP_COMMANDS}, AND its length drives
+           `assert len(lock_calls) == len(EXPECTED_SWEEP_COMMANDS)`. Omitting it
+           breaks both; adding it without the other two breaks the spy loop.
+        3. _LOCK_TARGET_MODULES — append
+           "apps.media.management.commands.purge_media_deletion_errors". Without
+           it, monkeypatch.setattr raises AttributeError because the command
+           module binds advisory_lock at import time.
+
+      The new command must be safe to run bare under the spy (call_command with
+      no arguments, advisory_lock replaced by a no-op): handle() must tolerate an
+      empty table and exit 0. No existing entry in the three lists is modified,
+      reordered or removed.
+    code_hint: |
+          ("purge_consent_records", AdvisoryLockId.CONSENT_RECORD_SWEEP),
+          ("purge_media_deletion_errors", AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS),
+          # ... and in EXPECTED_SWEEP_COMMANDS:
+              "purge_media_deletion_errors",
+          # ... and in _LOCK_TARGET_MODULES:
+          "apps.media.management.commands.purge_media_deletion_errors",
+
+  - action: modify
+    description: >
+      apps/core/tests/test_scheduler.py::TestSchedulerConstants — the pinned
+      HOURLY_COMMANDS literal in test_hourly_commands_match_spec gains
+      "purge_media_deletion_errors" as the TENTH and LAST entry.
+
+      This is NOT in the block's original Surface list; the Planner found it by
+      reading the live file. test_hourly_commands_match_spec asserts
+      `HOURLY_COMMANDS == [ ...9 names... ]` by exact list equality, so omitting
+      it turns the full gate red.
+
+      No other test in this 831-line file is edited. In particular, do NOT touch
+      the positional uses of HOURLY_COMMANDS[0] / [2] or DAILY_COMMANDS[0] / [1]
+      — appending at the end preserves every index.
+    code_hint: |
+              "purge_rejected_ads",
+              "purge_deleted_ads",
+              "purge_media_deletion_errors",
+              ]
+
+  - action: modify
+    description: >
+      apps/core/utils/scheduler.py::HOURLY_COMMANDS — append
+      "purge_media_deletion_errors" as the LAST entry (OC-5, decided).
+      APPEND, never insert: test_scheduler_error_handling.py indexes
+      HOURLY_COMMANDS[0] and HOURLY_COMMANDS[2] positionally.
+
+      Add a short comment in the existing leading block explaining WHY this purge
+      is hourly rather than daily: an hourly command's exit code cannot suppress
+      the durable daily marker, so a media-retention failure never re-dispatches
+      send_alerts or rollup_daily_metrics. That is the whole reason for the
+      placement and it must survive in the file.
+
+      DAILY_COMMANDS is NOT touched. HOURLY_COMMANDS / DAILY_COMMANDS / the
+      dispatch loop / _validate_commands / _write_liveness_marker are otherwise
+      unchanged.
+    code_hint: |
+      # Phase 4 hourly sweeps + Phase 2 purges + the media deletion-error
+      # retention purge (07-MEDIA-010, AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS).
+      # The purge is hourly, not daily, because a DAILY command's exit code is
+      # load-bearing for the durable daily marker: a non-zero exit would leave the
+      # day unrecorded and re-dispatch send_alerts / rollup_daily_metrics on every
+      # subsequent hourly tick. An hourly command only gates the liveness marker.
+      HOURLY_COMMANDS: list[str] = [
+          ...
+          "purge_deleted_ads",
+          "purge_media_deletion_errors",
+      ]
+
+  - action: modify
+    description: >
+      apps/media/models.py — ONE citation, nothing else. The module docstring's
+      opening line currently reads "... enabling operational escalation (ME-003)."
+      and ME-003 resolves to nothing in this repository. Reconcile it to the
+      cycle-scoped id this block actually closes: "(07-MEDIA-010)".
+
+      Restore, do not drop: the observable gap the citation names — a deletion
+      failure with no operator surface — is what 07-MEDIA-010 closes, so dropping
+      the id would discard real traceability while restoring an unresolvable one
+      replaces it with a resolvable one.
+
+      Accepted residual: apps/media/services/filesystem.py::_record_deletion_error's
+      docstring carries the same stale ME-003 and that file is do-not-touch for
+      this block. Record it; do not fix it.
+
+      No new field, no new index, no Meta edit, no __str__ edit in this file.
+    code_hint: |
+      """
+      Media models for Mko Bazuna.
+
+      ``MediaDeletionError`` records filesystem deletion failures that exhausted
+      all retries in ``delete_photo``. It has an operator surface
+      (``apps.media.admin.py``) and a bounded retention window
+      (``purge_media_deletion_errors``, 30 days) as of 07-MEDIA-010.
+      """
+
+  - action: add_code
+    description: >
+      NEW src/backend/apps/media/tests/test_purge_media_deletion_errors.py.
+      pytestmark = [pytest.mark.django_db]. A module-local
+      _aged_row(**overrides) helper that creates the row and then forces
+      created_at with .filter(pk=...).update(created_at=...) — the auto_now_add
+      trap, named in extra_context, must be visible in the helper's docstring so
+      it cannot be reintroduced. No Ad is ever created.
+
+      Required behaviour:
+        - test_dry_run_deletes_nothing — two aged rows; --dry-run; both still
+          present; the reported/expected count is 1 (the past-TTL one).
+        - test_row_inside_ttl_survives_with_message_intact — a 29-day-old row
+          with a distinctive error_message survives the default run AND its
+          storage_key, error_type, error_message and attempts are unchanged
+          (refresh_from_db, not just a count).
+        - test_row_past_ttl_is_deleted — a 31-day-old row is gone.
+        - test_default_retention_window_is_30_days — omit --older-than; a
+          29-day-old row survives and a 31-day-old row does not. Pins the
+          default without reading the argparse declaration.
+        - test_second_run_is_a_no_op — run twice; the first deletes 1, the
+          second deletes 0 and the table count is unchanged. Idempotence.
+        - test_older_than_must_be_at_least_one_day — --older-than 0 and -1 both
+          raise CommandError and delete nothing.
+        - test_command_exits_zero_on_an_empty_table — call_command on an empty
+          table raises nothing (this is the state the lock-structure spy runs it
+          in).
+
+      Assert on querysets and the command's exit behaviour, not on log text.
+    code_hint: |
+      pytestmark = [pytest.mark.django_db]
+
+      def _aged_row(*, age_days: int, **overrides) -> MediaDeletionError:
+          """Create a row whose ``created_at`` is *age_days* in the past.
+
+          ``created_at`` is ``auto_now_add=True``, so passing it to ``create()``
+          is SILENTLY IGNORED — the argument must be forced with an ``UPDATE``
+          afterwards, or every row reads as "now" and the delete assertions pass
+          vacuously.
+          """
+          fields = {
+              "storage_key": f"{uuid4()}.jpg",
+              "error_type": "PermissionError",
+              "error_message": "denied by the filesystem",
+              "attempts": DELETE_PHOTO_MAX_ATTEMPTS,
+          }
+          fields.update(overrides)
+          row = MediaDeletionError.objects.create(**fields)
+          MediaDeletionError.objects.filter(pk=row.pk).update(
+              created_at=timezone.now() - timedelta(days=age_days)
+          )
+          row.refresh_from_db()
+          return row
+
+      def test_row_inside_ttl_survives_with_message_intact() -> None:
+          row = _aged_row(age_days=29, error_message="distinct message body")
+
+          call_command("purge_media_deletion_errors")
+
+          row.refresh_from_db()
+          assert row.error_message == "distinct message body"
+          assert row.attempts == DELETE_PHOTO_MAX_ATTEMPTS
+
+  - action: add_code
+    description: >
+      NEW src/backend/apps/media/tests/test_media_admin.py.
+      pytestmark = [pytest.mark.unit] for the metadata/permission tests and
+      django_db only where a row or a staff actor is needed (see extra_context
+      for the local staff actor and changelist request).
+
+      Required behaviour:
+        - test_media_deletion_error_is_registered_in_admin.
+        - test_get_form_refuses_to_build_a_change_form — get_form(request)
+          raises ImproperlyConfigured for change=False AND change=True. This is
+          the "no editable field" proof and it is INTROSPECTION, never a source
+          read.
+        - test_readonly_fields_is_empty — list(...readonly_fields) == [].
+        - test_list_display_and_list_filter_cover_created_at_and_error_type.
+        - test_changelist_resolves_both_filters — build the real changelist via
+          model_admin.get_changelist_instance(request) and assert both entries
+          appear in ChangeList.list_filter with the expected field paths, so the
+          filters are proven RESOLVABLE against the queryset rather than merely
+          named. Needs django_db.
+        - test_add_and_change_permissions_are_false; test_view_permission_follows
+          the view perm; test_non_staff_with_the_view_perm_is_refused_by_the_site
+          (admin.site.has_permission(request) is False for a non-staff actor
+          holding the perm, True for the staff actor).
+        - test_changelist_renders_for_staff — a real changelist render for a
+          staff actor, mirroring
+          apps/core/tests/test_support_admin.py::test_support_ticket_changelist_renders_masked_identifiers.
+          This is the reachability assertion for the block's whole premise.
+    code_hint: |
+      from django.contrib.admin.sites import AlreadyRegistered  # noqa: F401  (doc only)
+      from django.core.exceptions import ImproperlyConfigured
+
+      def _staff_actor(telegram_id: int) -> User:
+          """Build a staff user holding only the changelist permission."""
+          actor = make_user(telegram_id, is_staff=True)
+          actor.user_permissions.add(
+              *Permission.objects.filter(
+                  content_type__app_label="media",
+                  codename="view_mediadeletionerror",
+              )
+          )
+          return actor
+
+      def test_get_form_refuses_to_build_a_change_form() -> None:
+          """No editable field: Django will not build a change form at all (07-MEDIA-010)."""
+          model_admin = MediaDeletionErrorAdmin(MediaDeletionError, admin.site)
+          request = MagicMock()
+
+          # Introspection, not a source read: with add and change both denied,
+          # ModelAdmin.get_form raises for change=False AND change=True.
+          with pytest.raises(ImproperlyConfigured):
+              model_admin.get_form(request)
+          with pytest.raises(ImproperlyConfigured):
+              model_admin.get_form(request, change=True)
+
+      @pytest.mark.django_db
+      def test_changelist_resolves_both_filters() -> None:
+          """Both declared filters resolve against the real queryset."""
+          model_admin = MediaDeletionErrorAdmin(MediaDeletionError, admin.site)
+          request = _local_changelist_request(_staff_actor(941000001))
+
+          changelist = model_admin.get_changelist_instance(request)
+
+          assert {"error_type", "created_at"} <= {
+              entry.field_path for entry in changelist.list_filter
+          }
+
+  - action: add_code
+    description: >
+      src/backend/apps/media/tests/test_filesystem.py — ADDITIVE: one new method
+      at the END of TestDeletePhoto, immediately after
+      test_delete_photo_logs_media_deletion_error_on_retry_exhaustion. Zero
+      existing line in the file is modified.
+
+      test_delete_photo_swallows_a_failed_deletion_error_record: patch
+      apps.media.models.MediaDeletionError.objects.create with
+      side_effect=OperationalError("db down"), patch os.remove with
+      PermissionError and filesystem time.sleep (so no real backoff), call
+      delete_photo("locked.jpg"). Assert it does NOT raise, that remove was
+      attempted DELETE_PHOTO_MAX_ATTEMPTS times, and that caplog contains
+      "Failed to persist MediaDeletionError". This is the component
+      interaction: the retention table's writer is unchanged and still cannot
+      break a delete path.
+    code_hint: |
+          @pytest.mark.django_db
+          def test_delete_photo_swallows_a_failed_deletion_error_record(self, caplog) -> None:
+              """A DB failure while recording the failure never propagates (07-MEDIA-010)."""
+              from django.db import OperationalError
+
+              from apps.media.models import MediaDeletionError
+
+              with (
+                  patch(
+                      "apps.media.services.filesystem.os.remove",
+                      side_effect=PermissionError("denied"),
+                  ) as mock_remove,
+                  patch("apps.media.services.filesystem.time.sleep"),
+                  patch.object(
+                      MediaDeletionError.objects,
+                      "create",
+                      side_effect=OperationalError("db down"),
+                  ),
+              ):
+                  delete_photo("locked.jpg")  # must not raise
+
+              assert mock_remove.call_count == DELETE_PHOTO_MAX_ATTEMPTS
+              assert "Failed to persist MediaDeletionError" in caplog.text
+
+acceptance_criteria:
+  - MediaDeletionError is reachable through the admin changelist with working
+    created_at and error_type filters and NO editable field — proven by
+    get_form(request) raising ImproperlyConfigured for both change=False and
+    change=True, NOT by reading the source file
+  - --dry-run deletes nothing and reports the eligible count
+  - A row inside the TTL survives with its storage_key, error_type, error_message
+    and attempts byte-intact; a row past it is deleted
+  - The default window is 30 days, proven by behaviour with no --older-than flag
+  - A second run is a no-op (idempotent)
+  - --older-than 0 and --older-than -1 raise CommandError and delete nothing
+  - The command takes advisory_lock(AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS)
+    inside transaction.atomic() on the production path, proven by the existing
+    spy test in test_sweep_lock_structure.py
+  - purge_media_deletion_errors appears in HOURLY_COMMANDS (LAST), in
+    SWEEP_COMMANDS, in EXPECTED_SWEEP_COMMANDS and in _LOCK_TARGET_MODULES — all
+    three structure-test lists, plus the exact HOURLY_COMMANDS literal in
+    test_scheduler.py
+  - AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS is 15, its .name is itself (no
+    IntEnum alias), SWEEP_ORPHANED_MEDIA is still 103 and CONSENT_HARD_DELETE is
+    still 3
+  - The advisory_lock.py docstring table records the new allocation row
+  - _record_deletion_error still swallows a DB failure and delete_photo's
+    three-attempt backoff, logger.error and never-raise contract are unchanged
+  - The reader introduces ZERO translatable strings and
+    src/backend/locale/**/django.po is untouched
+  - makemigrations --check under config.settings.test_migrations reports no
+    changes — this block creates NO migration
+  - uv run ruff check src/ exits 0; uv run basedpyright src/ reports zero NEW
+    diagnostics — the baseline is 3 pre-existing errors in
+    apps/search/tests/test_immediate_alerts.py and apps/users/tests/test_login.py
+  - every new create_test_ad / create_test_adbulk call is status-grounded with a
+    literal status=; this block adds ZERO such calls
+  - three commits, explicit paths only; the lock allocation lands as its own
+    three-file commit before any test-list pin moves
+  - the coordinator (main) was notified on the board BEFORE enums.py was edited
+
+gate: |
+  $dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'
+  $dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS="src/backend/apps/core/tests/test_advisory_lock_ids.py src/backend/apps/core/tests/test_sweep_lock_structure.py src/backend/apps/core/tests/test_scheduler.py src/backend/apps/core/tests/test_scheduler_error_handling.py src/backend/apps/core/tests/test_scheduler_daily_marker.py src/backend/apps/core/tests/test_scheduler_wiring.py src/backend/apps/media/tests/test_purge_media_deletion_errors.py src/backend/apps/media/tests/test_media_admin.py src/backend/apps/media/tests/test_filesystem.py --tb=short" test
+  .\Makefile.ps1 test
+  uv run ruff check src/
+  uv run basedpyright src/
+
+  # Migration precondition — must print "No changes detected". A pending
+  # migration is a SCOPE ERROR, not a pre-existing condition (verified clean at
+  # 81dd644 by the Planner).
+  docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps --entrypoint "" -e DJANGO_SETTINGS_MODULE=config.settings.test_migrations test python src/backend/manage.py makemigrations --check --dry-run
+
+do_not_touch: >
+  delete_photo and _record_deletion_error in
+  apps/media/services/filesystem.py (including its stale ME-003 docstring) ·
+  apps/media/signals.py · apps/media/services/** (incl. references.py and
+  thumbnails.py) · AdAdmin's field set and permission predicates ·
+  apps/ads/** · apps/media/models.py beyond the single ME-003 citation ·
+  MediaDeletionError.Meta (no new field, no new index) ·
+  src/backend/conftest.py · src/backend/locale/** · docs/** (route, never edit) ·
+  .ai/** · DELETE_PHOTO_MAX_ATTEMPTS / DELETE_PHOTO_BASE_DELAY.
+
+commit:
+  - message: "feat(core): allocate the media deletion-error retention lock"
+    paths:
+      - src/backend/apps/core/enums.py
+      - src/backend/apps/core/utils/advisory_lock.py
+      - src/backend/apps/core/tests/test_advisory_lock_ids.py
+    note: >
+      Three files, one commit, BEFORE any test list moves. Notify the
+      coordinator on the board before editing enums.py. Message body must record
+      that 15 was taken from the "IDs 14-99 are reserved" band after phase 06
+      consumed 14, and that the plan's "next free id is 14" was stale.
+  - message: "test(core): pin the retention command into the lock and scheduler lists"
+    paths:
+      - src/backend/apps/core/tests/test_sweep_lock_structure.py
+      - src/backend/apps/core/tests/test_scheduler.py
+    note: >
+      Three lists in the first file, one exact HOURLY_COMMANDS literal in the
+      second. Both files are list-assertion pins, not behaviour.
+  - message: "feat(media): add a deletion-error reader and a 30-day retention purge"
+    paths:
+      - src/backend/apps/media/admin.py
+      - src/backend/apps/media/management/commands/purge_media_deletion_errors.py
+      - src/backend/apps/media/models.py
+      - src/backend/apps/core/utils/scheduler.py
+      - src/backend/apps/media/tests/test_purge_media_deletion_errors.py
+      - src/backend/apps/media/tests/test_media_admin.py
+      - src/backend/apps/media/tests/test_filesystem.py
+    note: >
+      Stage by explicit path. Never `git add -A`, never `.`, never a directory —
+      the working tree holds other agents' uncommitted work (locale files,
+      docs/**, users/services/deactivation.py, staticfiles/, .ai/tmp/, the
+      untracked plan file, and the deleted .ai/audit/** tree).
+```
+
+**Commit body — mandatory content for commit 3**, in this order:
+1. The reader and the retention window, and that the purge is **irreversible**: `--dry-run` is the mandatory first run, and a revert does not restore purged rows.
+2. **OC-5 = `HOURLY_COMMANDS`, appended last**, with the decisive reason: a daily command's exit code gates the durable daily marker, so a media-purge failure would re-dispatch `send_alerts` and `rollup_daily_metrics` on every subsequent tick; phase 06's `purge_consent_records` earns that slot precisely because it never deletes and always exits 0. An hourly command only gates the liveness marker.
+3. **No alerting ships.** Recorded for phase 12: the predicate
+   `MediaDeletionError.objects.filter(created_at__gt=now() - 1h).exists()`.
+4. The retention query is **index-backed** on `created_at`; the source plan's
+   "seq-scans an unbounded table" argument does not apply.
+5. The plan's "next free id is `14`" was **stale** — phase 06's `fd5201d` took
+   `CONSENT_RECORD_SWEEP = 14`; this block verified **15** against the live enum
+   immediately before allocating.
+6. **Doc drift routed, not edited** (see the routing table above), including the
+   `db-retention.md` sentence that `--older-than` falsifies, which is currently
+   **unrouted** and raised on the board.
+7. Accepted residual: `filesystem.py::_record_deletion_error`'s docstring still
+   cites the unresolvable `ME-003` (do-not-touch file).
+8. Deliberate omissions: no `search_fields`, no `date_hierarchy`, no
+   `has_delete_permission` override, no `has_view_permission` override.
+
+```yaml
+id: verify_task_07m08_media_deletion_error_reader_and_retention
+
+title: "Verify — MediaDeletionError reader + 30-day retention purge"
+
+type: verification
+
+status: pending
+
+depends_on:
+  - task_07m08_media_deletion_error_reader_and_retention
+
+verifies:
+  - task_07m08_media_deletion_error_reader_and_retention
+
+verification_steps:
+  - build: uv run ruff check src/
+  - typecheck: uv run basedpyright src/
+  - targeted: $dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS="src/backend/apps/core/tests/test_advisory_lock_ids.py src/backend/apps/core/tests/test_sweep_lock_structure.py src/backend/apps/core/tests/test_scheduler.py src/backend/apps/core/tests/test_scheduler_error_handling.py src/backend/apps/core/tests/test_scheduler_daily_marker.py src/backend/apps/core/tests/test_scheduler_wiring.py src/backend/apps/media/tests/test_purge_media_deletion_errors.py src/backend/apps/media/tests/test_media_admin.py src/backend/apps/media/tests/test_filesystem.py --tb=short" test
+  - full_suite: $dc run --rm test
+  - fast_gate: .\Makefile.ps1 test
+  - migration_precondition: >
+      docker compose --project-name mko-bazuna-test --env-file .env.test
+      -f docker-compose.yml -f docker-compose.test.yml run --rm --no-deps
+      --entrypoint "" -e DJANGO_SETTINGS_MODULE=config.settings.test_migrations
+      test python src/backend/manage.py makemigrations --check --dry-run
+      Must print "No changes detected". Verified clean at 81dd644 by the
+      Planner; a pending migration here is a SCOPE ERROR introduced by this
+      block, not a pre-existing condition.
+  - smoke_check: >
+      Read by symbol, never by line number. (a) apps/media/admin.py declares
+      MediaDeletionErrorAdmin with readonly_fields == [] and overrides ONLY
+      has_add_permission and has_change_permission — there is no
+      has_view_permission, has_delete_permission, search_fields, date_hierarchy
+      or changelist_view override. (b) The command takes
+      advisory_lock(AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS) INSIDE
+      transaction.atomic() and BEFORE the --dry-run branch. (c) The command has
+      exactly ONE delete statement and no loop. (d)
+      AdvisoryLockId.PURGE_MEDIA_DELETION_ERRORS == 15, CONSENT_RECORD_SWEEP ==
+      14, SWEEP_ORPHANED_MEDIA == 103, CONSENT_HARD_DELETE == 3, and no other
+      id moved. (e) purge_media_deletion_errors is the LAST entry of
+      HOURLY_COMMANDS (not inserted), and DAILY_COMMANDS is byte-identical to
+      its pre-block content. (f) The name appears in all THREE
+      test_sweep_lock_structure.py lists and in the pinned HOURLY_COMMANDS
+      literal in test_scheduler.py. (g) apps/media/models.py differs from its
+      pre-block content in the ME-003 citation ONLY — no field, index, Meta or
+      __str__ edit. (h) apps/media/services/filesystem.py is byte-identical to
+      its pre-block content (delete_photo, _record_deletion_error and the two
+      DELETE_PHOTO_* constants). (i) src/backend/locale/** is untouched and
+      apps/media/admin.py contains no gettext call and no user-visible string.
+      (j) git diff --stat shows no docs/** and no .ai/** path.
+  - negatives: >
+      Tripwires that must each be demonstrated red against the shipped body and
+      reverted byte-identically (confirm with SHA256): (1) remove the entry from
+      EXPECTED_SWEEP_COMMANDS only -> the exact-frozenset assertion fails;
+      (2) remove the entry from _LOCK_TARGET_MODULES only -> monkeypatch
+      AttributeError; (3) drop "purge_media_deletion_errors" from
+      test_scheduler.py's pinned HOURLY_COMMANDS literal -> that exact-equality
+      assertion fails; (4) move the lock acquisition AFTER the --dry-run branch,
+      or outside atomic() -> the spy test fails on in_atomic/session; (5) set
+      --older-than default to 0 -> test_default_retention_window_is_30_days
+      fails; (6) give has_change_permission a True path -> the get_form
+      ImproperlyConfigured assertion fails. Also confirm the command exits 0 on
+      an empty table, so a routine no-op does not age the scheduler liveness
+      marker into an unhealthy container.
+  - diff_scope: >
+      Three commits. Commit 1 stages exactly
+      src/backend/apps/core/enums.py,
+      src/backend/apps/core/utils/advisory_lock.py and
+      src/backend/apps/core/tests/test_advisory_lock_ids.py. Commit 2 stages
+      exactly src/backend/apps/core/tests/test_sweep_lock_structure.py and
+      src/backend/apps/core/tests/test_scheduler.py. Commit 3 stages the seven
+      reader/retention/test paths. Any other path — docs/**, .ai/**,
+      src/backend/locale/**, src/backend/apps/moderation/**,
+      src/backend/apps/users/**, staticfiles/ — is another agent's work or a
+      scope error. Verify with `git show --stat` on each of the three commits.
+
+pass_criteria:
+  - ruff exits 0
+  - basedpyright reports no NEW diagnostic — the baseline is 3 pre-existing
+    errors in apps/search/tests/test_immediate_alerts.py and
+    apps/users/tests/test_login.py, not 0
+  - the targeted 9-path run is green
+  - .\Makefile.ps1 test is green, including test_ad_factory_contract.py (the
+    repo-wide status-grounding gate) and the i18n completeness test
+  - makemigrations --check under config.settings.test_migrations prints "No
+    changes detected"
+  - every smoke_check and negatives assertion holds
+  - the three commits staged exactly their listed paths, in order, with the
+    prescribed subjects
+  - the coordinator was notified on the board before enums.py was edited, and
+    15 was re-verified against the live enum at that moment
+  - every red observation was re-run SERIALLY and reproduced TWICE before being
+    reported; a wall of setup errors (DuplicateDatabase, ObjectInUse,
+    DeadlockDetected, "terminating connection due to administrator command") is
+    another agent's concurrent run, not a defect
+  - test_search_slo is NOT in this gate (known environmental flake under host
+    load) — if it fails, confirm it is the flake and attribute it, do not fix it
+
+failure_action: return task_07m08_media_deletion_error_reader_and_retention to rework
+```
+
 ---
 
 ## BLOCK 9 — nginx script-execution block + `/media/` rate limit
 
 **Findings owned.** `07-MEDIA-006`.
-**Depends on.** Nothing in-plan. **Risk.** MEDIUM — a config typo is a site-wide image outage; green-field, no shipped behaviour changes.
+**Depends on.** Nothing in-plan. **Risk.** MEDIUM on paper, **LOW after research** — see "Corrected residual" in the RESEARCH DECISIONS section: `KEY_FORMAT_REGEX` proves the legitimate keyspace is disjoint from the deny set, so a regex typo cannot 403 a conforming photo. Green-field, no shipped behaviour changes.
 
 **Required agents.**
 - **Auditor** — confirm neither config has a script-execution location, that `deny all` appears once (only on `= /metrics`), and that both `/media/` locations are `proxy_pass http://web:8000` with no `limit_req`.
-- **Researcher** — nginx `location` matching semantics (prefix vs `~*` regex precedence) and `limit_req` burst behaviour for an image-heavy path.
-- **Planner** — placement of the new `location` relative to existing blocks, and the assertion strategy that avoids shadowing.
-- **Implementor** — add both blocks to both configs and extend the harness.
-- **Validator** — mandatory: the deployed-stack real-key smoke check is **irreducible** and cannot be replaced by a test.
+- **Researcher + Planner** — **merged and complete.** nginx `location` matching semantics, `deny`/`return` phase ordering, `limit_req` burst semantics for an image-heavy `no-store` path, block placement, and the shadow-proof assertion strategy are all settled with doc/source/live-nginx evidence in the RESEARCH DECISIONS section below. **Do not re-open them.**
+- **Implementor** — insert the exact text from D4 into both configs and add the three tests from D4. No design decisions remain.
+- **Validator** — mandatory: `nginx -t` for both configs via the corrected compose commands, **plus** the deployed-stack real-key smoke check (constraint 9). The smoke check is now a *confirmation* of the in-test regex model rather than the sole defence, but it is **not** optional — Python `re` is not PCRE.
 
-**What is wrong.** Neither shipped nginx site declares a script-execution `location` for `/media/`. `deny all` appears exactly once in each config, on `= /metrics` only. `MEDIA_ROOT` is nginx-served, so a `.php`/`.py`/`.cgi`/`.pl`/`.sh` file landing under the media volume would be **executed or served** by the server. Separately, both `/media/` locations proxy to the web app with **no `limit_req`**, while `browse_limit` already exists in **both** configs at `10m rate=20r/s` — the in-pattern control is already defined and simply not applied to the media path.
+**What is wrong.** Neither shipped nginx site declares a script-execution `location` for `/media/`. `deny all` appears exactly once in each config, on `= /metrics` only. `MEDIA_ROOT` is nginx-served, so **a `.php`/`.py`/`.cgi`/`.pl`/`.sh` file landing under the media volume would be served** by the server. Separately, both `/media/` locations proxy to the web app with **no `limit_req`**, while `browse_limit` already exists in **both** configs at `10m rate=20r/s` — the in-pattern control is already defined and simply not applied to the media path.
+
+> **Corrected for honesty (D5.1).** The word *executed* was overstated and is dropped above. Under the **shipped** configs `/media/` is `proxy_pass` only — no `root`, no `alias`, no `fastcgi_pass`, no `ssi on` — and the only `alias` lives in the `internal` `/protected-media/`, so nginx never touches the filesystem for `/media/`. Django's `media_gate` resolves the key against an `AdImage` row and 404s anything unreferenced. `07-MEDIA-006` is therefore a **latent / defence-in-depth** control: a name-based tripwire that becomes load-bearing the moment anyone adds `root`/`alias`/`fastcgi_pass`/`ssi on` to the media path. That is a legitimate reason to ship it. It is **not** a live RCE today, and no document may claim otherwise.
+
+**Surface (semantic units only).**
+- `docker/nginx/nginx.conf` — `location /media/` gains `limit_req`; a new `location ~* ^/media/.*\.(?:php|py|cgi|pl|sh)(?:/|$) { deny all; return 403; }` is inserted **immediately before** it
+- `docker/nginx/nginx.dev.conf` — the identical two additions, byte for byte
+- `src/backend/tests/test_nginx_config.py` — extend using the existing `_PROXIED_CONFIGS` parametrization and helpers; add only the two local selectors `_header` / `_by_header_prefix` from D4
+- `docs/01-spec/architecture-structure.md` — **routed to BLOCK 10**, never edited here
 
 **Q07-13 ANSWERED: DELIBERATE, and documented.** `test_nginx_config.py`'s own module docstring states that both shipped sites must satisfy the client-IP trust invariant and that *"the dev site has fewer locations (no `/health/`, `/csp-report/` or `= /metrics` block), so every new assertion is written to be location-agnostic."* That committed statement of intent is the documentary evidence for the decision: **duplicate** the block into both configs; add **no** shared `include` fragment, because an unmounted include **silently disables** the control. Quote the docstring into the commit body.
 
-**Surface (semantic units only).**
-- `docker/nginx/nginx.conf` — `location /media/` and the new `location ~* /media/.*\.(php|…)$`
-- `docker/nginx/nginx.dev.conf` — the same two additions
-- `src/backend/tests/test_nginx_config.py` — extend using the existing `_PROXIED_CONFIGS` parametrization and helpers
-- `docs/01-spec/architecture-structure.md` — **routed to BLOCK 10**, never edited here
-
-**Binding constraints.**
-1. **Reuse `browse_limit`. Add NO new `limit_req_zone`.** The zone already exists in both configs.
-2. The new block is a **`~*` (regex) match, not a prefix** — a prefix location would shadow `location /media/`'s `proxy_pass` and stop all image proxying. Test 3 asserts the `~*` form: a real nginx semantic, not a substring check.
-3. The new block carries **`deny all`** and **`return 403`**, and **must NOT carry a `proxy_pass`** — `test_proxied_locations_overwrite_x_real_ip` would fail otherwise.
-4. `_location_block` matches the **first** line containing the search string; the new location is **positioned and asserted** so it cannot shadow an earlier match, and no assertion's search string may appear on an earlier line.
-5. `location /protected-media/` is **untouched**.
+**Binding constraints.** *(Settled wording; see the RESEARCH DECISIONS section below for the evidence behind each.)*
+1. **Reuse `browse_limit`. Add NO new `limit_req_zone`.** The zone already exists in both files at `10m rate=20r/s` (`nginx.conf:26`, `nginx.dev.conf:29`). The directive is **`limit_req zone=browse_limit burst=40 nodelay;`**, placed **directly above `proxy_pass`** inside `location /media/` — identical in both files and identical to `/moderation/` and `/`. Do **not** write `limit_req_status` (both files already set `429` at `http` level) and do **not** use `limit_req_dry_run` (it leaves `07-MEDIA-006` unclosed).
+2. The new block is a **`~*` (regex) match, not a prefix**, and its pattern is exactly **`^/media/.*\.(?:php|py|cgi|pl|sh)(?:/|$)`** — `\.` escaped, `~*` caseless, **no trailing `$` anchor**, the five spec extensions and nothing more. A prefix location either hard-fails (`duplicate location`) or silently 403s every photo; an unescaped `.` inverts the control and 403s every photo. Test 1 pins all of this semantically, not by substring.
+3. The new block carries **`deny all`** and **`return 403`** (`deny all` first), and **must NOT carry a `proxy_pass`** — `test_proxied_locations_overwrite_x_real_ip` would fail otherwise. It must also carry **no `limit_req`**: `return` short-circuits in the rewrite phase, so `limit_req` in this block would be dead config.
+4. **Assert via `_iter_location_blocks` and the block's first line — not `_location_block`.** `_brace_block` starts at the `location` line, so leading comments are excluded and the header is exact; this makes every new assertion order-independent and immune to the first-match hazard `_location_block`'s docstring warns about. No new assertion's search string may appear on an earlier line or inside the new comment.
+5. `location /protected-media/` is **untouched**. Both files end **without a trailing newline** — insert in the middle and leave the final byte alone.
 6. Use the existing `_PROXIED_CONFIGS` parametrization over **both** files — do **not** introduce a new mechanism. Every new assertion is **location-agnostic**, per the module's own docstring.
-7. The three existing `/metrics` assertions pass **unchanged**.
+7. The three existing `/metrics` assertions pass **unchanged**; neither new comment line contains `= /metrics`, so `_location_block` still resolves only the metrics block.
 8. **No application-level rate limiter on `media_gate`** — a second policy in a different language is the wrong shape. `media_gate` is untouched.
-9. **One irreducible manual gate:** a real-key smoke check in a **deployed** stack, recorded as **done** in the commit body **with the date**. It is an operator step, not a test, because no HTTP hop exists in the dev environment.
-10. `nginx -t` passes for **both** configs.
+9. **One irreducible manual gate:** a real-key smoke check in a **deployed** stack, recorded as **done** in the commit body **with the date**. The Python-`re` model in test 1 is a faithful but *non-PCRE* stand-in for nginx's matching; the deployed check confirms the model. It is now a confirmation step, not the sole defence. It must assert, on a **24-thumbnail listing page**, that every `<img>` renders and the access log contains **no 429 on any `/media/` request**.
+10. `nginx -t` passes for **both** configs, via the corrected compose commands in the gate below. Record honestly that `nginx -t` **does not** detect the silent prefix-replacement outage — it only catches the duplicate-prefix variant.
 
-**Required tests.**
-1. **Both** configs declare a script-execution `location` for `/media/` containing `deny all` **and** `return 403`, as a **`~*`** match (not a prefix).
-2. Both `/media/` locations carry a `limit_req` **reusing `browse_limit`**; **no new `limit_req_zone`** exists in either file.
+**Required tests.** *(Concretised in D4; all three are parametrized over `_PROXIED_CONFIGS`.)*
+1. **Both** configs declare **exactly one** location whose header modifier is **`~*`** and whose body contains `deny all` **and** `return 403` **and no `proxy_pass`**; its extracted regex, compiled caseless, **denies** the 10 hostile URIs (including `/media/x.php/a.jpg`, `/media/x.PHP`, `/media/x.jpg.php`) and **allows** the 9 genuine key shapes (including `/media/<uuid>.jpg`, `/media/<uuid>-small.jpg`, `/media/seed/kvartiry_01.jpg`, `/media/a.jpg?x=.php`). Failure messages name the offending URI and the word `OUTAGE`.
+2. Both `/media/` locations carry **`limit_req zone=browse_limit`** with **`nodelay`**; the file contains **exactly three** `limit_req_zone` directives and `browse_limit` is defined **exactly once** — a census assertion, so it cannot pass on a file with no zones at all.
 3. The three existing `/metrics` assertions pass unchanged; `/protected-media/` is unchanged.
 
 **Keep green / do not edit.**
-All seven existing tests in `src/backend/tests/test_nginx_config.py` · `_PROXIED_CONFIGS` · `_brace_block` / `_location_block` / `_iter_location_blocks` / `_proxied_locations` · `browse_limit` · `location /protected-media/` · `apps/ads/views/media.py` (does not exist) · `src/backend/conftest.py`.
+All seven existing tests in `src/backend/tests/test_nginx_config.py` · `_PROXIED_CONFIGS` · `_brace_block` / `_location_block` / `_iter_location_blocks` / `_proxied_locations` · `browse_limit` · `limit_req_status 429;` (already at `http` level in both files — do **not** duplicate it inside `/media/`) · `location /protected-media/` · `apps/ads/views/listings.py` (`_serve_image` / `media_gate` — the block is nginx-only, no application change) · `KEY_FORMAT_REGEX` in `apps/media/services/filesystem.py` (the residual argument in "Corrected residual" depends on it — **do not widen the key format without re-running this analysis**) · `generate_storage_key()` · `ThumbnailService` suffixes · `ListingsQuery.PER_PAGE = 24` and `templates/ads/partials/ad_list.html` (the `burst=40` sizing depends on one image per card and 24 per page) · `src/backend/conftest.py`.
 
 **Gate (exact).**
 ```
 $dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'
 $dc run --rm --env PYTEST_SKIP_MARKERS=seed -e PYTEST_OPTS="src/backend/tests/test_nginx_config.py --tb=short" test
 .\Makefile.ps1 test
-# plus, outside pytest:
-nginx -t -c docker/nginx/nginx.conf
-nginx -t -c docker/nginx/nginx.dev.conf
+
+# nginx -t — CORRECTED (see D5). There is no nginx binary on the Windows host
+# (`Get-Command nginx` returns nothing) and the bare-image route fails:
+# `proxy_pass http://web:8000` is resolved at CONFIG-PARSE time, so a throwaway
+# container without `web` in DNS dies with
+#   [emerg] host not found in upstream "web" in /etc/nginx/nginx.conf:62
+# and `ssl_certificate /etc/nginx/certs/fullchain.pem` is absent (no openssl in
+# nginx:alpine to mint one). The working route is the compose network, which
+# resolves `web` and mounts ./docker/nginx/certs (dev) — VERIFIED, both configs
+# return "syntax is ok / test is successful":
+$dev = 'docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml --project-name mko-bazuna-dev'
+& $dev run --rm --no-deps --entrypoint nginx nginx -t                                             # nginx.dev.conf (default mount)
+& $dev run --rm --no-deps --entrypoint nginx -v "${PWD}/docker/nginx/nginx.conf:/etc/nginx/nginx.conf:ro" nginx -t   # nginx.conf (prod), bind-swapped
+```
+`docker compose` **can** reach the nginx registry — the first run pulled `nginx:alpine` (74.5 MB) successfully.
+
+**Risk and rollback.** A regex typo in the script-execution block **403s every genuine photo** — a site-wide image outage. Rollback = revert both config files; no data effect and no DB effect. See the corrected residual below.
+
+---
+
+## BLOCK 9 — RESEARCH DECISIONS (Researcher + Planner, 2026-10-03)
+
+Every claim below is backed by the official nginx docs, nginx source, or a **running nginx/1.27.5** measured in this environment. Confidence is stated per item.
+
+### D1 — the regex form, and why a prefix is catastrophic
+
+**Location matching order (HIGH — nginx.org/en/docs/http/request_processing.html, verbatim):**
+> "nginx first searches for the most specific prefix location given by literal strings **regardless of the listed order**. … Then nginx checks locations given by regular expression **in the order listed in the configuration file**. The first matching expression stops the search and nginx will use this location. If no regular expression matches a request, then nginx uses the most specific prefix location found earlier."
+
+**Why a prefix would be catastrophic.** A prefix `location /media/` is not shadowed by the regex — it *competes for the same slot*. Two outcomes, both bad, both **confirmed by measurement**:
+- **Add** a second `location /media/` → nginx refuses to start: `[emerg] duplicate location "/media/" in /etc/nginx/nginx.conf:18`. Loud, caught by `nginx -t`.
+- **Replace / convert** the existing block to the deny block → `nginx -t` **passes** and `/media/a.jpg` returns **403**. Silent, site-wide image outage. Measured.
+
+**The form to write (this exact line, in both files):**
+```nginx
+location ~* ^/media/.*\.(?:php|py|cgi|pl|sh)(?:/|$) {
 ```
 
-**Risk and rollback.** A regex typo in the script-execution block **403s every genuine photo** — a site-wide image outage, likelihood MEDIUM, impact HIGH, residual **MEDIUM accepted**. This is irreducible without the deployed-stack check, which is why it is a mandatory recorded operator step and not a test. Rollback = revert both config files; no data effect and no DB effect. The second control against shadowing is test 3's `~*` assertion.
+| Decision | Rationale |
+|---|---|
+| `~*`, not `~` | nginx uses **PCRE**; `~*` sets `NGX_REGEX_CASELESS`. Measured: `/media/a.PHP` → 403, `/media/a.Php` → 403. A case-sensitive `~` would serve both. Filenames come from Telegram and from operator-restore paths, so case must not be a bypass. |
+| `\.` **not** `.` | PCRE `.` matches any character, so `^/media/.*.(?:jpg\|…)$` matches `/media/<uuid>.jpg`. **MEASURED: that typo returns 403 for `/media/a.jpg` and 200 for `/media/a.php` — the control inverted.** This is the single highest-consequence typo in the block. |
+| `^/media/` anchored at the head | Confines the deny to the media path. Measured: `/static/a.php` → 200 (untouched). Keeps the change in scope and stops the block from silently becoming a global script ban. |
+| `.*` **and no `$` anchor** | `location ~*` is an **unanchored search over the whole normalised URI**. A trailing `$` is exactly what breaks the path-info form. **MEASURED with `$` anchored: `/media/x.php/a.jpg` → 200.** The regex must stay unanchored at the end. |
+| `(?:/\|$)` after the extension | Tightens without anchoring: requires the extension to end a path segment. Measured: `/media/a.phpx` → 200 (not over-blocked), `/media/a.php/a.jpg` → 403, `/media/a.jpg.php` → 403. |
+| `(?:…)` non-capturing | Avoids consuming `$1`..`$9` in a block that needs none. |
+| No quoting | The pattern contains no `{`, `}`, or `;`, so nginx's tokenizer needs none. The nginx doc's own example, `location ~* \.(gif\|jpg\|png)$`, is unquoted. |
+
+**Percent-encoding cannot bypass it (MEASURED).** `/media/a.p%68p` → **403**. nginx matches locations against the *decoded* URI, so encoding the extension does not help. Query strings are not matched at all (`"locations of all types test only a URI part of request line without arguments"` — verified: `/media/a.jpg?x=.php` → 200).
+
+**Live end-to-end matrix on the real patched `nginx.dev.conf`**, with the real Django upstream (`403` = deny block, `404` = proxied to Django and the proxy is intact):
+
+| URI | Status | Meaning |
+|---|---|---|
+| `/media/<uuid>.jpg` | 404 | proxied — **no shadowing** |
+| `/media/<uuid>-small.jpg` | 404 | proxied |
+| `/media/seed/kvartiry_01.jpg` | 404 | proxied |
+| `/media/<uuid>.php` | **403** | denied |
+| `/media/<uuid>.PHP` | **403** | denied (case) |
+| `/media/<uuid>.php/a.jpg` | **403** | denied (path-info) |
+| `/media/<uuid>.jpg.php` | **403** | denied |
+| `/media/<uuid>.phpx` | 404 | proxied — not over-blocked |
+| `/protected-media/<uuid>.jpg` | 404 | still `internal`, untouched |
+
+### D2 — `deny all` **and** `return 403` in the same block
+
+**Phase ordering (HIGH — nginx source).** `ngx_http_core_module.h`:
+```c
+NGX_HTTP_FIND_CONFIG_PHASE, NGX_HTTP_REWRITE_PHASE,   /* index 3 */
+NGX_HTTP_PREACCESS_PHASE,
+NGX_HTTP_ACCESS_PHASE,                                 /* index 6 */
+```
+`ngx_http_rewrite_init()` pushes `ngx_http_rewrite_handler` into `phases[NGX_HTTP_REWRITE_PHASE]`; `ngx_http_access_init()` pushes `ngx_http_access_handler` into `phases[NGX_HTTP_ACCESS_PHASE]`. The handler returns 403, the REWRITE-phase checker calls `ngx_http_finalize_request(r, 403)` — the request ends before ACCESS runs.
+
+**MEASURED, decisively.** `location /x/ { deny all; return 200 "RETURN-REACHED\n"; }` → **HTTP 200, body `RETURN-REACHED`**. No `access forbidden by rule` in the error log. Same shape with `return 404` → 404, not 403. **`return` always wins; `deny all` is unreachable dead config in this block.**
+
+**No config error and no startup warning.** `ngx_http_access_rule()` only errors on an invalid CIDR and only warns on `"low address bits … are meaningless"` — neither applies to `deny all`. `nginx -t` on the patched configs emitted no warning.
+
+**Decision — keep both, and say honestly why.** The spec and its tests require both, so shipping both is right; the redundancy is defence in depth against a future edit that drops the `return` line, which would leave `deny all` as the only control. But the plan must not imply both are active: **`return 403` is the load-bearing directive and `deny all` is a belt-and-braces fallback.** Order `deny all` first, matching the in-file `= /metrics` precedent (`allow` / `deny` before `proxy_pass`). Block body, exactly:
+```nginx
+            deny all;
+            return 403;
+```
+No `allow` — `allow 127.0.0.1` would be actively wrong here and would weaken the block if `return` were ever dropped.
+
+### D3 — `limit_req` on the media path
+
+`browse_limit` is defined identically in both files — `nginx.conf:26`, `nginx.dev.conf:29`:
+```nginx
+    limit_req_zone $binary_remote_addr zone=browse_limit:10m rate=20r/s;
+```
+and both files set `limit_req_status 429;` at `http` level (`nginx.conf:29`, `nginx.dev.conf:32`) with the comment *"Return 429 (Too Many Requests) instead of nginx default 503 on rate limit."*
+
+**Directive (identical in both files, first line inside `location /media/`, above `proxy_pass`):**
+```nginx
+            limit_req zone=browse_limit burst=40 nodelay;
+```
+
+| Sub-decision | Decision | Rationale |
+|---|---|---|
+| **burst value** | **`burst=40`** | Matches `/moderation/` and `/` **exactly** (`limit_req zone=browse_limit burst=40 nodelay`) — rule 7, follow existing patterns, and the whole framing of this block is "the in-pattern control is defined and simply not applied". **Measured:** 41 concurrent `/media/` requests all pass, the 42nd+ is rejected. Real ceiling is **24**: `ListingsQuery.PER_PAGE = 24` and `templates/ads/partials/ad_list.html:108` renders exactly **one** `loading="lazy"` image per card. Headroom 1.7×. **`burst=20` would have been wrong:** measured 21 pass / 24 rejected for a 45-request burst — a 24-thumbnail page loses images. |
+| **`nodelay`** | **required** | Docs: *"If delaying of excessive requests while requests are being limited is not desired, the parameter nodelay should be used."* Measured: `burst=20` **without** `nodelay` produced the same 21/24 split but took **1147 ms** wall vs **148 ms** with `nodelay` — accepted thumbnails are *delayed*, which is worse than a fast 429 for an image grid. |
+| **`limit_req_status 403`?** | **NO — omit it.** | The *directive* default is 503, but the **effective** value is already **429**: both files set `limit_req_status 429;` at `http` level, and `limit_req_status` is a normal inheritable directive. Measured: rejections come back **429**. Writing an explicit `403` here would (a) contradict the file's own stated intent, (b) collide with the deny block's 403 so a rate-limited image is indistinguishable from a denied script in access logs, and (c) put a *cache* status on a *throttle*. **429 for a hotlinked image is right and 403 for a missing one is unrelated** — the media path's 404s come from Django and are untouched by this change. |
+| **`limit_req_dry_run`** | **NO — do not use it** | Directive confirmed to exist (appeared 1.17.1; default `limit_req_dry_run off`; verified accepted by nginx/1.27.5). It is a *diagnostic* mode: *"requests processing rate is not limited, however … excessive requests is accounted as usual"*, and rejections surface as `$limit_req_status = REJECTED_DRY_RUN` with the response **delayed, not refused**. Shipping it would leave `07-MEDIA-006` **unclosed** while looking closed. Keep it available as a one-line rollback lever if the deployed smoke check ever shows 429s on legitimate browsing — that is the honest use. |
+| **new `limit_req_zone`?** | **NO** | `browse_limit` already exists in both files at `10m rate=20r/s`. Binding constraint 1. |
+| **placement** | inside `location /media/`, **directly above `proxy_pass`** | `limit_req` context is `http, server, location`, and it runs in PREACCESS — which is *after* REWRITE. **MEASURED consequence:** a location with `limit_req … ; return 200 "…"` served **45/45 with zero 429s** — `return` short-circuits before `limit_req` ever evaluates. So (a) the deny block must **not** carry `limit_req`, it would be dead; and (b) `limit_req` is only effective in a **proxying** location, which `/media/` is. |
+
+**Realistic page-turn measurement** (`burst=40 nodelay`, 24 images per page, no inter-request pacing): page 1 → 24×200, page 2 at +2 s → 24×200, page 3 at +0.5 s → 24×200. **Zero 429s.**
+
+### D4 — placement and the assertion strategy
+
+**Placement: immediately BEFORE `location /media/`, after `location /static/`.** Functionally order-independent (regexes are consulted *after* the longest prefix regardless of position, and neither config has another regex location), but adjacency makes the guard and the guarded path readable as a pair, and it is the defensive order if a regex location is ever added later.
+
+**Exact config text to insert into BOTH files** (identical bytes; the only pre-existing difference between the two files around this region is the surrounding comment set):
+
+```nginx
+        # Script-execution deny for the nginx-served MEDIA_ROOT (07-MEDIA-006).
+        # A ~* regex location is mandatory: a prefix /media/ block would replace
+        # the proxying block below and 403 every genuine photo. `return` is
+        # evaluated in the rewrite phase and wins; `deny all` is defence in depth.
+        location ~* ^/media/.*\.(?:php|py|cgi|pl|sh)(?:/|$) {
+            deny all;
+            return 403;
+        }
+
+        # Media files proxied to Django for per-request access control
+        location /media/ {
+            limit_req zone=browse_limit burst=40 nodelay;
+            proxy_pass http://web:8000;
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+            proxy_set_header X-Forwarded-Proto $scheme;
+        }
+```
+
+**Assertion strategy.** Use `_iter_location_blocks` + the block's own **first line** as the selector. `_brace_block` starts at the `location` line, so comments above it are excluded and the header is exact. This makes every assertion **order-independent and immune to the `_location_block` first-match hazard** the module docstring warns about — no search string is ever matched against a comment or an earlier block.
+
+Shared local helpers (no new mechanism, no change to the four existing helpers):
+```python
+_SCRIPT_DENY_EXTS = ("deny all", "return 403")
+
+
+def _header(block: str) -> str:
+    """The `location ... {` line of a block, normalised (leading comments excluded)."""
+    return block.splitlines()[0].strip()
+
+
+def _by_header_prefix(text: str, prefix: str) -> list[str]:
+    """Every location block whose header line starts with *prefix*."""
+    return [b for b in _iter_location_blocks(text) if _header(b).startswith(prefix)]
+```
+`_by_header_prefix(text, "location /media/")` matches `location /media/ {` and correctly rejects `location ~* ^/media/…`, `location /protected-media/ {`, and `location / {`. All three were confirmed against the real files.
+
+**Test 1 — `~*` script-execution location with `deny all` + `return 403` (parametrized over `_PROXIED_CONFIGS`):**
+```python
+deny = [b for b in _iter_location_blocks(text)
+        if all(m in b for m in _SCRIPT_DENY_EXTS)]
+assert len(deny) == 1, f"{conf_path.name}: expected exactly one script-deny location, got {len(deny)}"
+assert "proxy_pass" not in deny[0], "deny block must not proxy (would break X-Real-IP invariant)"
+match = re.match(r"^location\s+(?P<mod>[~*^=]*)\s*(?P<rx>\S.*?)\s*\{$", _header(deny[0]))
+assert match, "unparsable location header"
+assert match.group("mod") == "~*", f"must be a ~* regex match, got {match.group('mod')!r}"
+```
+Then the **semantic** half — this is what actually defends against the outage. Extract the regex out of the config and exercise it, rather than substring-matching it:
+```python
+uri_only = lambda u: u.split("?", 1)[0]          # nginx matches the URI, not arguments
+denied = re.compile(match.group("rx"), re.IGNORECASE)   # ~* -> PCRE caseless
+must_allow = ["/media/<uuid>.jpg", "/media/<uuid>-small.jpg", "/media/<uuid>-medium.jpg",
+              "/media/<uuid>-large.jpg", "/media/seed/kvartiry_01.jpg",
+              "/media/staging/<uuid>.jpg", "/media/a.phpx", "/media/a.notphp.jpg",
+              "/media/a.jpg?x=.php"]
+must_deny = ["/media/x.php", "/media/x.PHP", "/media/x.Php", "/media/x.py",
+             "/media/x.cgi", "/media/x.pl", "/media/x.sh",
+             "/media/x.php/a.jpg", "/media/x.jpg.php", "/media/sub/dir/x.php"]
+outage = [u for u in must_allow if denied.search(uri_only(u))]
+assert not outage, f"OUTAGE: deny regex would 403 genuine photos: {outage}"
+missed = [u for u in must_deny if not denied.search(uri_only(u))]
+assert not missed, f"deny regex does not deny: {missed}"
+```
+Every `must_allow` entry is a real key shape from `generate_storage_key()` (`filesystem.py:260-262`), `ThumbnailService` (`-small` / `-medium` / `-large`), `staging/`, and the `seed/<slug>` convention — not invented strings.
+
+**Test 2 — `limit_req` reusing `browse_limit`, and no new zone:**
+```python
+zones = [l.strip() for l in text.split("\n") if l.strip().startswith("limit_req_zone")]
+assert len(zones) == 3, f"{conf_path.name}: no new limit_req_zone may be added; found {len(zones)}"
+assert sum("zone=browse_limit:" in z for z in zones) == 1, "browse_limit must be defined exactly once"
+media = _by_header_prefix(text, "location /media/")
+assert len(media) == 1, f"expected exactly one `location /media/`, got {len(media)}"
+assert "limit_req zone=browse_limit" in media[0], "must reuse browse_limit"
+assert "nodelay" in media[0], "must use nodelay so thumbnails are never delayed"
+assert "proxy_pass" in media[0], "limit_req must sit in the proxying location"
+```
+**Why the negative assertion cannot pass vacuously:** it is a **census**, not an absence check. `len(zones) == 3` is a positive equality — the block is deleted, a 4th zone is added, or `browse_limit` is renamed, and the test fails. An `assert "media_limit" not in text`-style check would pass on a config with no `limit_req_zone` at all. The cost is that a *legitimate* future zone now fails this test; that is the intended trade for BLOCK 9's binding constraint and is the same shape BLOCK 10 needs for its doc census.
+
+**Test 3 — the three existing `/metrics` assertions and `/protected-media/` unchanged.** Already satisfied: the new block contains no `proxy_pass` (so `_proxied_locations` skips it), `/protected-media/` is not edited, and `_location_block(text, "= /metrics")` still matches only the metrics block — neither new comment contains `= /metrics`.
+
+**Non-vacuousness, measured.** The strategy was executed against 8 configs with the four existing helpers copied verbatim. Result: **PASSES** on both patched real configs; **FAILS** on both unpatched real configs; **FAILS** with `must be a ~* regex match, got ''` on the prefix-deny catastrophe; **FAILS** with `OUTAGE: deny regex would 403 genuine photos: ['/media/<uuid>.jpg', …]` on the unescaped-dot typo; **FAILS** with `regex does not deny: ['/media/x.php/a.jpg']` on the `$`-anchored counterfeit; **FAILS** with `expected exactly one script-deny location, got 0` when the block is absent. Every failure names the concrete offending URI.
+
+### D5 — corrections to the spec
+
+1. **"would be executed or served by the server" is overstated for the shipped configs** — state the honest impact. `location /media/` is `proxy_pass` only: no `root`, no `alias`, no `fastcgi_pass`, no `ssi on`, and `location /protected-media/` (the only `alias`) is `internal`. nginx therefore **never touches the filesystem** for `/media/` — it proxies to Django, whose `media_gate` resolves the key against an `AdImage` row and returns `X-Accel-Redirect: /protected-media/<key>` with `Cache-Control: no-store` (`views/listings.py:191-193`). An unreferenced `.php` gets **404**. So `07-MEDIA-006` is a **latent / defence-in-depth** control: it is a name-based tripwire that becomes load-bearing the moment anyone adds `root`/`alias`/`fastcgi_pass`/`ssi on` to the media path. That is a legitimate reason to ship it; it is not a live RCE today, and the plan must not claim otherwise.
+2. **The gate command is wrong and cannot work.** `nginx -t -c docker/nginx/nginx.conf` needs a host nginx binary (none installed) and, even in `nginx:alpine`, fails at config-parse time on `host not found in upstream "web"` plus a missing `ssl_certificate` (`nginx:alpine` ships no openssl to mint one). Replaced with the two verified `docker compose … run --rm --no-deps --entrypoint nginx nginx -t` invocations above. `--entrypoint nginx` is required — the default `docker-entrypoint.sh` runs `/docker-entrypoint.d/` scripts first.
+3. **`nginx -t` does NOT catch the catastrophic mistake.** Measured: the prefix-deny config passes `nginx -t` cleanly and then 403s every photo. `nginx -t` only catches the *duplicate*-prefix variant, via `[emerg] duplicate location`. This must be said explicitly, because the gate line is the block's only mechanical anti-outage check.
+4. **Extension list kept at exactly the spec's five** (`php`, `py`, `cgi`, `pl`, `sh`). Deliberate: `KEY_FORMAT_REGEX` (`filesystem.py:45-48`) proves the legitimate keyspace is `[A-Za-z0-9._-]` segments **terminated by `.jpg`**, so every extra extension is pure typo surface for zero present-day gain. Recorded residual: `.phtml`, `.phar`, `.shtml`, `.htaccess` are **not** covered. That is acceptable precisely because nothing in the shipped config can execute them (point 1) — and it is the first thing to revisit if anyone ever adds `ssi on` or a `root` to `/media/`.
+5. **`deny all` is dead config, not an active control** (D2). Keep it; do not document it as active.
+6. **Trailing-newline artefact.** Both files currently end without a newline. An `edit`-based insertion that rewrites the file end will produce a spurious `+}` diff line. Insert in the middle of the file and leave the final byte alone.
+
+### Corrected residual (replaces the MEDIUM-accepted line above)
+
+The plan's *"likelihood MEDIUM, impact HIGH, residual MEDIUM accepted"* is **over-conservative and should be downgraded to LOW**, on evidence:
+
+- **The legitimate keyspace is provably disjoint from the deny set.** `generate_storage_key()` returns `f"{uuid.uuid4()}.jpg"`; `ThumbnailService` appends `-small` / `-medium` / `-large`; seed keys are `seed/<slug>.jpg`; staging keys are `staging/<uuid>.jpg`. `KEY_FORMAT_REGEX` requires the URI to end in `.jpg`, and the deny regex requires `.<script-ext>` followed by `/` or end-of-URI. A conforming key **cannot** match. So a typo can only ever deny files that were *already* outside the conforming keyspace — never a genuine photo.
+- **Test 1's semantic half is now a mechanical gate, not a mitigation.** It is the third control and it is *redundant with `nginx -t`* on the duplicate case and *superior to it* on the silent-replacement case. The plan's line *"the second control against shadowing is test 3's `~*` assertion"* should be restated: the controls are (i) the `~*` + extracted-regex semantic assertion, (ii) `nginx -t`, and (iii) the deployed smoke check.
+- **What is genuinely irreducible:** the Python `re` model is not PCRE. For this pattern shape (`^` anchor, `~*` caseless, `(?:)`, `\.`, alternation) the two engines agree, and every case was confirmed against a running nginx/1.27.5 — but the model is a model. Binding constraint 9's deployed-stack check therefore **stays mandatory**; it is now a confirmation step rather than the sole defence.
+- **Rollback:** `git revert` of both config files. No data effect, no DB effect, no migration.
 
 ---
 

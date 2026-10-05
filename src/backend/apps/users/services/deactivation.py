@@ -24,12 +24,16 @@ is unset in ``src/backend/config/settings/``, so Django uses exactly one backend
 backend that does not consult ``user_can_authenticate()`` would weaken it, so
 **anyone adding an auth backend must re-read this note**.
 
-The Telegram bot tier is **not** revoked by ``is_active``: the bot holds no
-session and resolves identity per message from ``chat_id``, and its
-``AccountStateMiddleware`` gate reads ``is_banned`` / ``is_deleted`` /
-``is_declined`` / ``consent_revoked`` — **never** ``is_active``. A deactivated
-user can still reach every bot handler. Enforcement there belongs to phase 15
-``15-AUTHZ-001`` and is deliberately **not** implemented here.
+The Telegram bot tier is **also** enforced, as of plan 19 (``B-1``/``B-2``):
+the bot holds no session and resolves identity per message from ``chat_id``,
+but its ``AccountStateMiddleware`` gate now reads ``is_active`` (via the shared
+``get_account_state`` predicate, which carries all of ``is_banned``,
+``is_deleted``, ``is_declined``, ``consent_revoked`` and ``is_active``) and
+refuses a deactivated account every path **except** the support restoration
+carve-out (no-argument ``/start``, the ``SUPPORT_START`` callback, and
+free-text in the support-intake FSM). The remaining three flags
+(``is_banned`` / ``is_deleted`` / ``is_declined``) still have no bot-tier gate;
+that residual belongs to phase 15 ``15-AUTHZ-001``.
 
 Target scope (``18-D1`` + ``18-Q7``)
 ------------------------------------
