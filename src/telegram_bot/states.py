@@ -23,17 +23,6 @@ class AdCreateState(StrEnum):
     PREVIEW = "preview"
 
 
-class SavedSearchState(StrEnum):
-    """FSM states for saved search alert management."""
-
-    IDLE = "alerts_idle"
-    QUERY = "alerts_query"
-    CITY = "alerts_city"
-    CATEGORY = "alerts_category"
-    PRICE = "alerts_price"
-    CONFIRM = "alerts_confirm"
-
-
 class ContactUsState(StrEnum):
     """FSM states for the support message intake flow."""
 

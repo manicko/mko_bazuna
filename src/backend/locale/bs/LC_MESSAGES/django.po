@@ -314,10 +314,11 @@ msgstr "bilo koje"
 
 msgid ""
 "\n"
-"Reply with number to toggle, or /cancel to exit."
+"Use the buttons on an alert notification to disable or "
+"re-enable that search."
 msgstr ""
 "\n"
-"Odgovori brojem da prebaciš, ili /cancel da izadješ."
+"Koristite dugmad u obaveštenju o pretrazi da isključite ili ponovo uključite tu pretragu."
 
 msgid "Failed to disable notifications"
 msgstr "Ne uslovi isključivanje obaveštenja"

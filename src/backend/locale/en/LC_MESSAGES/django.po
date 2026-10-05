@@ -261,7 +261,8 @@ msgstr ""
 
 msgid ""
 "\n"
-"Reply with number to toggle, or /cancel to exit."
+"Use the buttons on an alert notification to disable or "
+"re-enable that search."
 msgstr ""
 
 msgid "Failed to disable notifications"

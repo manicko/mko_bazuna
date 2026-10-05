@@ -322,10 +322,11 @@ msgstr "любое"
 
 msgid ""
 "\n"
-"Reply with number to toggle, or /cancel to exit."
+"Use the buttons on an alert notification to disable or "
+"re-enable that search."
 msgstr ""
 "\n"
-"Ответьте номером для переключения, или /cancel для выхода."
+"Используйте кнопки в уведомлении о поиске, чтобы отключить или снова включить его."
 
 msgid "Failed to disable notifications"
 msgstr "Не удалось отключить уведомления"

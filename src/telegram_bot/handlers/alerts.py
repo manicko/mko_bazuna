@@ -86,7 +86,12 @@ async def cmd_alerts(message: types.Message, state: FSMContext) -> None:
             f"{_('Price:')} {price_display}"
         )
 
-    lines.append(_("\nReply with number to toggle, or /cancel to exit."))
+    lines.append(
+        _(
+            "\nUse the buttons on an alert notification to disable or "
+            "re-enable that search."
+        )
+    )
     await message.answer("\n".join(lines))
 
 
