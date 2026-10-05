@@ -420,11 +420,39 @@ extra_context: >
      and that this logs one WARN and writes **no** `MediaDeletionError` row
      (`FileNotFoundError` returns before `_record_deletion_error`), so there is
      no BLOCK 8 escalation.
-  6. The **deferred** note: `sweep_orphaned_media._collect_referenced_keys` and
-     `media_gate`'s `key_q` still duplicate the four column names and do **not**
-     yet consume `KEY_COLUMNS`. They perform *different* predicates and BLOCKS 7,
-     8 and 10 have file edges on those modules, so consolidation is deferred to
-     the **BLOCK 10 census**.
+  6. The **deferred** note, **corrected by plan 23 Phase 3** (the deferral is
+     retired; this entry is kept as the record of what was believed):
+     `sweep_orphaned_media._collect_referenced_keys` and `media_gate`'s `key_q`
+     still duplicate the four column names and do **not** yet consume
+     `KEY_COLUMNS`. The framing "They perform *different* predicates" is **half
+     right, and the half it gets wrong** is what made this look like a predicate
+     problem instead of a vocabulary-ownership problem. These are **not** three
+     semantically independent predicates: they are **one shared key-membership
+     predicate, expressed three times, plus two independent site-specific
+     semantics.** For a single non-empty key `k` the key-membership half is a
+     **tautology across sites** — `Q(col__in=[k])` ≡ `Q(col=k)` for a singleton,
+     and the falsy-candidate filter is inert because `media_gate`'s path converter
+     requires a non-empty segment, so an empty key can never reach it. What
+     genuinely differs is:
+
+     | Independent semantic | Site | What it is |
+     |---|---|---|
+     | **Authorisation** | `media_gate` | An *orthogonal* predicate (`account_state_q("ad__user__")`, `ad__status=AdStatus.PUBLISHED`). Site 1 has no notion of it. |
+     | **Census vs probe** | `sweep_orphaned_media` | A *whole-table* projection consumed as a filesystem set-difference (`on_disk - referenced`), not a per-candidate answer. |
+
+     **⚠ The three must NOT be merged, and both failure modes are named:**
+     folding the **authorisation** filter into a shared helper would make
+     **unpublished/declined ads' images publicly readable**; replacing the
+     **census** with a candidate-filtered query would **delete every file outside
+     the candidate list**. Anyone revisiting this deferral must not re-attempt the
+     merge. The original rationale — *"BLOCKS 7, 8 and 10 have file edges on those
+     modules"* — is now **stale**: BLOCKS 7, 8 and 10 have all **shipped**.
+     **⚠ Homonym warning:** "census" names two different things — a **code** census
+     (enumerate the sites that enumerate key columns) and a **documentation** census
+     (enumerate stale doc sentences). This deferral pointed at a *code* census, but
+     BLOCK 10 was a *documentation* census; **BLOCK 10 did not discharge this**. The
+     consolidation was delivered separately by plan 23 (commits `c514a8ca`,
+     `3d908f3b`, `0a00f3a9`, `0efa6314`, `6de51f40`).
   7. The **mandatory D2 refinement** recorded in `extra_context` above:
      a per-key projection instead of `.exists()`, and why `.exists()` cannot
      answer a per-key question.
