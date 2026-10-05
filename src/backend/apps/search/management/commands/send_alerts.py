@@ -20,7 +20,7 @@ still deliver them.
 
 import asyncio
 import logging
-from typing import Final
+from typing import Final, cast
 
 from aiogram import Bot
 from aiogram.exceptions import (
@@ -32,8 +32,10 @@ from aiogram.exceptions import (
     TelegramServerError,
 )
 from django.conf import settings
+from django.contrib.postgres.search import SearchQuery, SearchRank
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
+from django.db.models import Exists, F, OuterRef, QuerySet
 from django.utils import timezone
 from django.utils.html import escape
 from django.utils.translation import gettext as _, override as translation_override
@@ -41,7 +43,8 @@ from django.utils.translation import gettext as _, override as translation_overr
 from apps.ads.models import Ad
 from apps.ads.templatetags.price_tags import format_price_value
 from apps.analytics.models import AnalyticsEvent
-from apps.core.enums import AdvisoryLockId, AnalyticsEventType, LanguageLocale
+from apps.categories.models import Category
+from apps.core.enums import AdStatus, AdvisoryLockId, AnalyticsEventType, LanguageLocale
 from apps.core.utils.advisory_lock import advisory_lock
 from apps.search.models import SavedSearch, SavedSearchNotification
 from apps.search.services.alert_query import find_matching_ads
@@ -64,6 +67,116 @@ RETRY_AFTER_CEILING: Final[float] = 30.0
 # Maximum unique ads rendered in a single user's daily digest. Applied at
 # collection time so the notification set and the rendered set are the same set.
 _DIGEST_AD_LIMIT: Final[int] = 10
+
+
+def _group_key(saved_search: SavedSearch) -> tuple[str, str]:
+    """Return the FTS-evaluation key for a saved search.
+
+    ``find_matching_ads`` runs one FTS evaluation per saved search. The FTS
+    evaluation depends only on the persisted ``language`` (which selects the
+    vector column + text-search config) and the ``query`` text; every other
+    filter it applies (city, category subtree, price range) is a structural
+    filter layered on top of the shared evaluation. Two saved searches that
+    share ``(language, query)`` therefore repeat the same FTS scan, and the
+    group key is exactly that pair (13-PERF-005).
+    """
+    return (str(saved_search.language or ""), str(saved_search.query or ""))
+
+
+def _evaluate_group_fts(language: str, query: str) -> QuerySet[Ad]:
+    """Evaluate the shared FTS stage once for a ``(language, query)`` group.
+
+    Mirrors the FTS stage of ``find_matching_ads`` (status + owner account-state
+    + language-aware vector match + ``SearchRank`` ordering) without applying
+    any per-search structural filter or the per-search ad cap. Returns an
+    ordered queryset that each member then filters and caps independently.
+
+    ``find_matching_ads`` itself is unchanged and remains the source of truth;
+    this helper exists only so the repeated FTS scan can be shared across the
+    members of one group, and its output is proven equivalent to
+    ``find_matching_ads`` by the per-member composition (see
+    ``_apply_member_filters``).
+    """
+    queryset: QuerySet[Ad] = (
+        Ad.objects.filter(status=AdStatus.PUBLISHED)
+        .filter(account_state_q("user__"))
+        .select_related("category", "city")
+    )
+    if not query:
+        return queryset
+
+    locale = LanguageLocale.from_code(
+        language,
+        fallback=LanguageLocale.RUSSIAN,
+    )
+    vector_field = locale.fts_vector_field
+    search_query = SearchQuery(
+        query,
+        search_type="websearch",
+        config=locale.fts_config,
+    )
+    return (
+        queryset.annotate(rank=SearchRank(F(vector_field), search_query))
+        .filter(**{vector_field: search_query})
+        .order_by("-rank")
+    )
+
+
+def _member_filter_signature(saved_search: SavedSearch) -> tuple:
+    """Return the structural filters that distinguish members of one FTS group.
+
+    Two members with the same signature would still differ in their per-search
+    delivered-state dedup, so this is used only to bucket members, never to
+    share a result set.
+    """
+    return (
+        saved_search.city_id,
+        saved_search.category_id,
+        saved_search.min_price,
+        saved_search.max_price,
+    )
+
+
+def _apply_member_filters(
+    candidates: QuerySet[Ad], saved_search: SavedSearch
+) -> list[Ad]:
+    """Apply one member's structural filters, dedup and 10-ad cap.
+
+    Reproduces the non-FTS stages of ``find_matching_ads`` for a single saved
+    search over the group's shared, still-lazy candidate queryset: city,
+    category subtree and price range, then the delivered-state ``NOT EXISTS``,
+    then the per-search ``[:10]`` cap. Applied per member so two saved searches
+    sharing a query but differing in a structural filter never share results,
+    and so a member's cap is its own.
+    """
+    queryset = candidates
+
+    if saved_search.city_id:
+        queryset = queryset.filter(city_id=saved_search.city_id)
+
+    if saved_search.category_id:
+        category = saved_search.category
+        if category is not None:
+            descendant_ids: list[int] = list(
+                Category.objects.get(pk=category.pk)
+                .get_descendants(include_self=True)
+                .values_list("pk", flat=True)
+            )
+            queryset = queryset.filter(category_id__in=descendant_ids)
+
+    if saved_search.min_price is not None:
+        queryset = queryset.filter(price_normalized_eur__gte=saved_search.min_price)
+    if saved_search.max_price is not None:
+        queryset = queryset.filter(price_normalized_eur__lte=saved_search.max_price)
+
+    notified_ads = SavedSearchNotification.objects.filter(
+        saved_search=saved_search,
+        ad_id=OuterRef("pk"),
+        delivered_at__isnull=False,
+    )
+    queryset = queryset.filter(~Exists(notified_ads))
+
+    return cast(list[Ad], list(queryset[:10]))
 
 
 def _select_digest_ads(bucket: list[Ad], matching_ads: list[Ad], limit: int) -> list[Ad]:
@@ -228,6 +341,14 @@ class Command(BaseCommand):
         path stops messaging identities the site and bot already gate
         (06-PII-104). It composes with ``is_active`` rather than replacing it.
 
+        Grouping (13-PERF-005): the active searches are bucketed by distinct
+        ``(language, query)`` and the shared FTS scan runs once per group
+        (``_evaluate_group_fts``). Each member then applies its own structural
+        filters, delivered-state dedup and per-search 10-ad cap
+        (``_apply_member_filters``), so digest composition is identical to a
+        per-search ``find_matching_ads`` call for the same data. ``find_matching_ads``
+        is unchanged and still the source of truth for the non-FTS stages.
+
         Must be called inside a transaction with the advisory lock held.
 
         Returns:
@@ -237,37 +358,58 @@ class Command(BaseCommand):
         notifications_to_create: list[SavedSearchNotification] = []
         analytics_events: list[AnalyticsEvent] = []
 
-        for saved_search in (
+        active_searches = list(
             SavedSearch.objects.filter(is_active=True)
             .filter(account_state_q("user__"))
             .select_related("user", "city", "category")
-        ):
-            matching_ads = find_matching_ads(saved_search)
-            if not matching_ads:
-                continue
+        )
 
-            # Cap the per-user digest at collection time, so the notification
-            # rows and the rendered message contain the SAME ads. Previously a
-            # notification row was written for every collected ad while the
-            # digest rendered only the first 10, so the surplus was permanently
-            # suppressed by find_matching_ads' NOT EXISTS with no record and no
-            # way to deliver it later.
-            bucket = user_ads.setdefault(saved_search.user_id, [])
-            selected_ads = _select_digest_ads(bucket, matching_ads, _DIGEST_AD_LIMIT)
-            if not selected_ads:
-                continue
+        # Group by distinct (language, query) so the FTS scan runs once per
+        # group instead of once per saved search. The FTS evaluation depends
+        # only on the persisted language and the query text; every other filter
+        # is applied per member below, so digest composition is unchanged
+        # (13-PERF-005).
+        groups: dict[tuple[str, str], list[SavedSearch]] = {}
+        for saved_search in active_searches:
+            groups.setdefault(_group_key(saved_search), []).append(saved_search)
 
-            bucket.extend(selected_ads)
-            notifications_to_create.extend(
-                SavedSearchNotification(saved_search=saved_search, ad=ad)
-                for ad in selected_ads
-            )
-            analytics_events.append(
-                AnalyticsEvent(
-                    event_type=AnalyticsEventType.SEARCH_ALERT_MATCHED,
-                    user_id=saved_search.user_id,
+        logger.info(
+            "Collecting alerts: %d active searches in %d distinct (language, query) groups",
+            len(active_searches),
+            len(groups),
+        )
+
+        for (language, query), members in groups.items():
+            candidates = _evaluate_group_fts(language, query)
+            for saved_search in members:
+                matching_ads = _apply_member_filters(candidates, saved_search)
+                if not matching_ads:
+                    continue
+
+                # Cap the per-user digest at collection time, so the
+                # notification rows and the rendered message contain the SAME
+                # ads. Previously a notification row was written for every
+                # collected ad while the digest rendered only the first 10, so
+                # the surplus was permanently suppressed by find_matching_ads'
+                # NOT EXISTS with no record and no way to deliver it later.
+                bucket = user_ads.setdefault(saved_search.user_id, [])
+                selected_ads = _select_digest_ads(
+                    bucket, matching_ads, _DIGEST_AD_LIMIT
                 )
-            )
+                if not selected_ads:
+                    continue
+
+                bucket.extend(selected_ads)
+                notifications_to_create.extend(
+                    SavedSearchNotification(saved_search=saved_search, ad=ad)
+                    for ad in selected_ads
+                )
+                analytics_events.append(
+                    AnalyticsEvent(
+                        event_type=AnalyticsEventType.SEARCH_ALERT_MATCHED,
+                        user_id=saved_search.user_id,
+                    )
+                )
 
         return user_ads, notifications_to_create, analytics_events
 

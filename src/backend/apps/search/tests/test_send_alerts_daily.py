@@ -277,3 +277,169 @@ class TestDeliveryOutcome:
             ),
         ):
             call_command("send_alerts")  # must not raise
+
+
+# ---------------------------------------------------------------------------
+# Grouping by distinct (language, query) — 13-PERF-005
+# ---------------------------------------------------------------------------
+
+
+class TestCollectAlertsGrouping:
+    """The daily collection groups by distinct (language, query)."""
+
+    def test_fts_evaluation_count_equals_distinct_group_count(
+        self,
+        seller: User,
+        buyer: User,
+        category: Category,
+        city,
+    ) -> None:
+        """The shared FTS scan runs once per (language, query), not per search.
+
+        Four active searches share two queries (two with 'велосипед', two with
+        'мебель') under the same language, so the distinct-group count is 2
+        while the saved-search count is 4.
+        """
+        for ad_i in range(4):
+            create_test_ad(
+                seller, category, city, status=AdStatus.PUBLISHED,
+                title=f"Красный велосипед {ad_i}",
+            )
+        for ad_i in range(4):
+            create_test_ad(
+                seller, category, city, status=AdStatus.PUBLISHED,
+                title=f"Мебель деревянная {ad_i}",
+            )
+
+        for query in ["велосипед", "велосипед", "мебель", "мебель"]:
+            SavedSearch.objects.create(
+                user=buyer, category=category, query=query,
+                language="ru", is_active=True,
+            )
+
+        from apps.search.management.commands.send_alerts import (
+            Command,
+            _evaluate_group_fts,
+        )
+
+        cmd = Command()
+        with patch(
+            f"{_MODULE}._evaluate_group_fts", wraps=_evaluate_group_fts
+        ) as spy:
+            cmd._collect_alerts()
+
+        assert spy.call_count == 2, (
+            "FTS must run once per distinct (language, query) group, "
+            f"not per saved search; saw {spy.call_count}"
+        )
+
+    def test_members_sharing_query_but_differing_filter_do_not_share_results(
+        self,
+        seller: User,
+        buyer: User,
+        category: Category,
+        city,
+    ) -> None:
+        """Two searches with the same query but different categories get their own ads.
+
+        Each receives exactly the ads its own structural filter admits — the
+        grouping must not apply the filter once for the whole group.
+        """
+        cat_b = Category.objects.create(name="Мебель", slug="furniture-group-b")
+
+        cat_a_ads = [
+            create_test_ad(
+                seller, category, city, status=AdStatus.PUBLISHED,
+                title=f"Красный велосипед alpha {i}",
+            )
+            for i in range(3)
+        ]
+        cat_b_ads = [
+            create_test_ad(
+                seller, cat_b, city, status=AdStatus.PUBLISHED,
+                title=f"Красный велосипед beta {i}",
+            )
+            for i in range(3)
+        ]
+
+        search_a = SavedSearch.objects.create(
+            user=buyer, category=category, query="велосипед",
+            language="ru", is_active=True,
+        )
+        search_b = SavedSearch.objects.create(
+            user=buyer, category=cat_b, query="велосипед",
+            language="ru", is_active=True,
+        )
+
+        mock_bot = MagicMock()
+        mock_bot.send_message = AsyncMock(return_value=None)
+        mock_bot.session.close = AsyncMock()
+
+        with (
+            patch(f"{_MODULE}.Bot", return_value=mock_bot),
+            patch.object(User.objects, "aget", new=AsyncMock(return_value=buyer)),
+        ):
+            call_command("send_alerts")
+
+        notified_for_a = set(
+            SavedSearchNotification.objects.filter(saved_search=search_a)
+            .values_list("ad_id", flat=True)
+        )
+        notified_for_b = set(
+            SavedSearchNotification.objects.filter(saved_search=search_b)
+            .values_list("ad_id", flat=True)
+        )
+
+        assert notified_for_a == {ad.id for ad in cat_a_ads}
+        assert notified_for_b == {ad.id for ad in cat_b_ads}
+        assert not (notified_for_a & notified_for_b)
+
+    def test_grouped_composition_matches_find_matching_ads(
+        self,
+        seller: User,
+        buyer: User,
+        category: Category,
+        city,
+    ) -> None:
+        """The grouped per-member result is byte-identical to find_matching_ads.
+
+        This is the tripwire: for the same data, the shared-FTS + per-member
+        filter path must yield exactly the same ads, in the same order, as the
+        unchanged per-search evaluator.
+        """
+        from apps.search.management.commands.send_alerts import (
+            Command,
+            _apply_member_filters,
+            _evaluate_group_fts,
+        )
+
+        cat_b = Category.objects.create(name="Мебель", slug="furniture-group-c")
+        for i in range(12):
+            create_test_ad(
+                seller,
+                category if i % 2 == 0 else cat_b,
+                city,
+                status=AdStatus.PUBLISHED,
+                title=f"Красный велосипед item {i}",
+            )
+
+        search = SavedSearch.objects.create(
+            user=buyer, category=category, query="велосипед",
+            language="ru", is_active=True,
+        )
+
+        # Materialize the group candidates once, then compare the member result.
+        candidates = _evaluate_group_fts(
+            search.language or "", search.query or ""
+        )
+        grouped = [ad.id for ad in _apply_member_filters(candidates, search)]
+        direct = [ad.id for ad in find_matching_ads(search)]
+
+        assert direct, "fixture must actually match, or the tripwire is vacuous"
+        assert grouped == direct
+
+        # And the full collection path agrees with the per-search evaluator.
+        cmd = Command()
+        user_ads, notifications, _events = cmd._collect_alerts()
+        assert [ad.id for ad in user_ads[search.user_id]] == direct
+        assert [n.ad_id for n in notifications] == direct
