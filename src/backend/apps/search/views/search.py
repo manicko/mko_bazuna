@@ -309,8 +309,12 @@ def search(request: HttpRequest) -> HttpResponse:
         "suggested_category": suggested_category,
         "suggested_city": suggested_city,
         "breadcrumb_category": breadcrumb_category,
-        # Save-search modal context (FT-002)
-        "cities": City.objects.order_by("name"),
+        # Save-search modal context (FT-002). The city list is NOT set here:
+        # ``context_processors.header_context`` already publishes ``cities`` on
+        # every request, so re-setting it here ran a second identical
+        # ``SELECT ... FROM cities ORDER BY name`` and shadowed the processor's
+        # value. The header/modal render from the processor's list instead
+        # (13-PERF-008 validated 2026-09).
         "categories": Category.objects.filter(is_active=True).order_by("name"),
         "selected_city": selected_city_id,
         "selected_category": selected_category_id,

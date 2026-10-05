@@ -178,6 +178,44 @@ def test_view_hits_real_orm_and_renders_list_template(
     assert len(ctx.captured_queries) <= 16
 
 
+def test_search_header_city_list_renders_once(
+    seller: Any, category: Any, city: Any
+) -> None:
+    """The header city dropdown renders from the context processor, once.
+
+    ``context_processors.header_context`` publishes ``cities`` on every
+    request, and ``search()`` used to set the same key independently — a
+    second identical ``SELECT ... FROM cities ORDER BY name`` that shadowed
+    the processor's value (13-PERF-008). Removing the duplicate key must keep
+    the dropdown complete (asserted, not assumed) while issuing the query
+    exactly once.
+    """
+    create_test_ad(
+        user=seller,
+        category=category,
+        city=city,
+        title="Search Header Ad",
+        status=AdStatus.PUBLISHED,
+    )
+
+    client = Client()
+    with CaptureQueriesContext(connection) as ctx:
+        response = client.get(reverse("search:search") + "?q=Search")
+
+    assert response.status_code == 200
+    # The processor's value renders: the header carries the fixture city's
+    # option, so the key was not blanked by the removal.
+    assert f'data-city-option="{city.slug}"' in response.content.decode("utf-8")
+
+    city_queries = [
+        query["sql"] for query in ctx.captured_queries if 'FROM "cities"' in query["sql"]
+    ]
+    assert len(city_queries) == 1, (
+        "the cities query must run exactly once per search request; the search "
+        f"view's duplicate key re-ran it (13-PERF-008): {city_queries}"
+    )
+
+
 def test_listings_excludes_deactivated_category_ads(
     seller: Any, category: Any, city: Any
 ) -> None:
