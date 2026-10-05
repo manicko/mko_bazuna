@@ -26,6 +26,7 @@ from unittest.mock import patch
 import pytest
 from django.core.management import CommandError, call_command
 
+from apps.core.enums import AdStatus
 from apps.core.management.commands import profile_queries as profile_module
 from apps.core.management.commands.profile_queries import Command
 
@@ -46,7 +47,7 @@ class TestSkipIsLoud:
         """Below ``--min-rows`` the command raises (non-zero exit)."""
         from conftest import create_test_ad
 
-        create_test_ad(seller, category, city)
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         out = StringIO()
         with pytest.raises(CommandError) as exc:
             call_command("profile_queries", stdout=out, min_rows=10_000)
@@ -58,7 +59,7 @@ class TestSkipIsLoud:
         """The skip path must not emit the success line (the old lie)."""
         from conftest import create_test_ad
 
-        create_test_ad(seller, category, city)
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         out = StringIO()
         with pytest.raises(CommandError):
             call_command("profile_queries", stdout=out, min_rows=10_000)
@@ -70,7 +71,7 @@ class TestSkipIsLoud:
         """The message states the required and actual counts."""
         from conftest import create_test_ad
 
-        create_test_ad(seller, category, city)
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         out = StringIO()
         with pytest.raises(CommandError) as exc:
             call_command("profile_queries", stdout=out, min_rows=10_000)
@@ -86,7 +87,7 @@ class TestAboveThreshold:
         """A plan with no Seq Scan on the target table exits 0."""
         from conftest import create_test_ad
 
-        create_test_ad(seller, category, city)
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         with patch.object(
             Command, "_has_seq_scan", return_value=False
         ):
@@ -97,7 +98,7 @@ class TestAboveThreshold:
         """A detected Seq Scan raises ``CommandError`` naming the query."""
         from conftest import create_test_ad
 
-        create_test_ad(seller, category, city)
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         with patch.object(Command, "_has_seq_scan", return_value=True):
             with pytest.raises(CommandError) as exc:
                 _call(min_rows=1)
@@ -107,7 +108,7 @@ class TestAboveThreshold:
         """``--dry-run`` prints SQL only and never asserts, so it succeeds."""
         from conftest import create_test_ad
 
-        create_test_ad(seller, category, city)
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         output = _call(min_rows=10_000, dry_run=True)
         assert "EXPLAIN" in output
 
@@ -121,7 +122,7 @@ class TestResolvedIds:
         """The city/category filters carry the resolved ids, not literals."""
         from conftest import create_test_ad
 
-        ad = create_test_ad(seller, category, city)
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
         command = Command()
         city_id, category_id = command._resolve_filter_ids()
         assert city_id == ad.city_id
