@@ -27,7 +27,10 @@ from django.views.decorators.vary import vary_on_headers
 from pydantic import ValidationError
 
 from apps.ads.models import Ad, AdImage
-from apps.ads.services.listings_query import ListingsQuery, ListingsQueryParams
+from apps.ads.services.listings_query import (
+    ListingsQuery,
+    build_listings_context,
+)
 from apps.categories.models import Category
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
 from apps.core.enums import AdSort, AdStatus, AnalyticsEventType, RateLimitBudget
@@ -279,41 +282,44 @@ def listings(
             suggested_category = _suggest_category(category_slug)
     elif request.GET.get("category"):
         suggested_category = _suggest_category(request.GET.get("category", ""))
-    # Params DTO + shared queryset
+    # Shared DTO + filter context (10-CQ-015)
     try:
-        params = ListingsQueryParams(
+        built = build_listings_context(
             category_slug=category_slug, city_slug=effective_city,
+            breadcrumb_category=breadcrumb_category,
+            sort=request.GET.get("sort", AdSort.DATE_NEW),
             min_price=request.GET.get("min_price"), max_price=request.GET.get("max_price"),
             purpose_slug=request.GET.get("listing_purpose"), condition_slug=request.GET.get("condition"),
-            feature_slugs=request.GET.getlist("features"), sort=request.GET.get("sort", AdSort.DATE_NEW),
+            feature_slugs=request.GET.getlist("features"),
             user_id=request.user.id if request.user.is_authenticated else None,
-            page=request.GET.get("page", 1), per_page=ListingsQuery.PER_PAGE,
+            page=request.GET.get("page", 1),
         )
     except ValidationError:
         # A ?features= list over MAX_FEATURE_FILTER_SLUGS is rejected at the DTO
         # boundary (08-SRCH-001). A bare 400 has no body, so no i18n surface is
         # added; it is not a coercion or truncation.
         return HttpResponseBadRequest()
+    params = built.params
     ads = ListingsQuery.build_queryset(params)
-    # Filter options (F4/F5)
-    resolved_purposes, resolved_features, resolved_conditions = ListingsQuery.resolve_filter_options(breadcrumb_category)
     # Pagination
     paginator = Paginator(ads, params.per_page)
     page_obj = paginator.get_page(params.page)
     if not paginator.count:
         logger.info("Empty listing results")
-    active_price_lo, active_price_hi = ListingsQuery.active_price_range(params)
-    return render(request, "ads/partials/ad_list.html" if request.headers.get("HX-Request") else "ads/list.html", {
-        "page_obj": page_obj, "query": None, "suggested_category": suggested_category,
-        "suggested_city": suggested_city, "breadcrumb_category": breadcrumb_category,
-        "current_category": category_slug, "current_city": effective_city, "current_sort": params.sort,
-        "min_price": request.GET.get("min_price"), "max_price": request.GET.get("max_price"),
-        "active_price_min": active_price_lo, "active_price_max": active_price_hi,
-        "current_listing_purpose": request.GET.get("listing_purpose"),
-        "current_features": request.GET.getlist("features"), "current_condition": request.GET.get("condition"),
-        "resolved_purposes": resolved_purposes, "resolved_features": resolved_features,
-        "resolved_conditions": resolved_conditions, "has_results": paginator.count > 0, "show_filters": True,
-    })
+    context = {
+        **built.filter_context,
+        "page_obj": page_obj,
+        "query": None,
+        "suggested_category": suggested_category,
+        "suggested_city": suggested_city,
+        "breadcrumb_category": breadcrumb_category,
+        "has_results": paginator.count > 0,
+    }
+    return render(
+        request,
+        "ads/partials/ad_list.html" if request.headers.get("HX-Request") else "ads/list.html",
+        context,
+    )
 
 
 def _suggest_category(slug: str) -> str | None:

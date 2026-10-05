@@ -20,7 +20,7 @@ from __future__ import annotations
 
 import logging
 from decimal import Decimal
-from typing import Annotated, Any, Final
+from typing import Annotated, Any, Final, NamedTuple
 
 from django.db.models import Count, F, Q, QuerySet
 from pydantic import Field, field_validator
@@ -343,3 +343,82 @@ class ListingsQuery:
                 ).order_by("sort_order")
             ),
         )
+
+
+class ListingsContext(NamedTuple):
+    """A built ``ListingsQueryParams`` plus the shared filter-context fragment.
+
+    Returned by :func:`build_listings_context`. ``params`` drives the queryset
+    each browse view builds; ``filter_context`` carries the template keys the
+    listings and search views publish with *identical* values. Each view merges
+    its own view-specific keys (pagination, did-you-mean suggestions, FTS state)
+    on top.
+    """
+
+    params: ListingsQueryParams
+    filter_context: dict[str, Any]
+
+
+def build_listings_context(
+    *,
+    category_slug: str | None,
+    city_slug: str | None,
+    breadcrumb_category: Category | None,
+    sort: str | None,
+    min_price: str | None,
+    max_price: str | None,
+    purpose_slug: str | None,
+    condition_slug: str | None,
+    feature_slugs: list[str],
+    page: str | None,
+    user_id: int | None,
+    per_page: int = ListingsQuery.PER_PAGE,
+) -> ListingsContext:
+    """Build the shared listings/search DTO and context from raw request values.
+
+    Single entry point for the two browse views: it constructs the validated
+    ``ListingsQueryParams``, resolves the category-constrained filter options
+    and the active price range once, and assembles the template keys both views
+    publish with identical values. The raw query-string values are passed in
+    unchanged, so the DTO's field validators do the coercion; a rejected value
+    raises ``ValidationError`` here and each view keeps its own 400 response.
+
+    View-specific keys stay in the views: ``listings()`` and ``search()`` differ
+    on ``query`` (``None`` vs the search term), ``page_obj`` (plain paginator vs
+    the cache-hit re-rank), ``has_results`` and the did-you-mean suggestions, so
+    those are deliberately not produced here.
+    """
+    params = ListingsQueryParams(
+        category_slug=category_slug,
+        city_slug=city_slug,
+        min_price=min_price,
+        max_price=max_price,
+        purpose_slug=purpose_slug,
+        condition_slug=condition_slug,
+        feature_slugs=feature_slugs,
+        sort=sort,
+        user_id=user_id,
+        page=page,
+        per_page=per_page,
+    )
+    resolved_purposes, resolved_features, resolved_conditions = (
+        ListingsQuery.resolve_filter_options(breadcrumb_category)
+    )
+    active_price_min, active_price_max = ListingsQuery.active_price_range(params)
+    filter_context: dict[str, Any] = {
+        "current_category": category_slug,
+        "current_city": city_slug,
+        "current_sort": params.sort,
+        "min_price": min_price,
+        "max_price": max_price,
+        "active_price_min": active_price_min,
+        "active_price_max": active_price_max,
+        "current_listing_purpose": purpose_slug,
+        "current_features": feature_slugs,
+        "current_condition": condition_slug,
+        "resolved_purposes": resolved_purposes,
+        "resolved_features": resolved_features,
+        "resolved_conditions": resolved_conditions,
+        "show_filters": True,
+    }
+    return ListingsContext(params=params, filter_context=filter_context)

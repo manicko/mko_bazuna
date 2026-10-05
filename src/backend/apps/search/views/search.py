@@ -23,7 +23,11 @@ from django.http import (
 from django.shortcuts import render
 from pydantic import ValidationError
 
-from apps.ads.services.listings_query import ListingsQuery, ListingsQueryParams
+from apps.ads.services.listings_query import (
+    ListingsQuery,
+    ListingsQueryParams,
+    build_listings_context,
+)
 from apps.categories.models import Category
 from apps.core.enums import AdSort, AnalyticsEventType, LanguageLocale
 from apps.core.services.analytics import record_event
@@ -124,26 +128,28 @@ def search(request: HttpRequest) -> HttpResponse:
         except Category.DoesNotExist:
             suggested_category = current_category
 
-    # Build validated params and delegate queryset construction to the shared
-    # ListingsQuery service (filter + sort + annotate_favorites).
+    # Build the validated params and the shared filter context through the one
+    # entry point both browse views use (10-CQ-015), then delegate queryset
+    # construction to the shared ListingsQuery service (filter + sort +
+    # annotate_favorites).
     min_price = request.GET.get("min_price")
     max_price = request.GET.get("max_price")
     listing_purpose_slug = request.GET.get("listing_purpose")
     condition_slug = request.GET.get("condition")
     feature_slugs = request.GET.getlist("features")
     try:
-        params = ListingsQueryParams(
+        built = build_listings_context(
             category_slug=current_category,
             city_slug=current_city,
+            breadcrumb_category=breadcrumb_category,
+            sort=request.GET.get("sort", AdSort.DATE_NEW),
             min_price=min_price,
             max_price=max_price,
             purpose_slug=listing_purpose_slug,
             condition_slug=condition_slug,
             feature_slugs=feature_slugs,
-            sort=request.GET.get("sort", AdSort.DATE_NEW),
             user_id=request.user.id if request.user.is_authenticated else None,
             page=request.GET.get("page", 1),
-            per_page=ListingsQuery.PER_PAGE,
         )
     except ValidationError:
         # The only bounded field is ``feature_slugs`` (08-SRCH-001): a list over
@@ -151,6 +157,7 @@ def search(request: HttpRequest) -> HttpResponse:
         # carries no body, so no new i18n surface is introduced; it is not a
         # coercion or truncation, which would silently change result semantics.
         return HttpResponseBadRequest()
+    params = built.params
     ads = ListingsQuery.build_queryset(params)
 
     # Defaults for the no-query path; overridden by the FTS COUNT(*) path when
@@ -224,9 +231,6 @@ def search(request: HttpRequest) -> HttpResponse:
         # bounded list and never re-runs the FTS filter to count.
         total_count, results_truncated = _resolve_search_count(cached_ids, ads)
 
-    # Resolve category-constrained filter options (F4/F5).
-    resolved_purposes, resolved_features, resolved_conditions = ListingsQuery.resolve_filter_options(breadcrumb_category)
-
     # Resolve the current city/category filters to object ids so the
     # save-search modal can prefill its selects (FT-002).
     selected_city_id: int | None = None
@@ -239,9 +243,6 @@ def search(request: HttpRequest) -> HttpResponse:
     selected_category_id: int | None = (
         breadcrumb_category.id if breadcrumb_category else None
     )
-
-    # Active price range for filter summary (§6.6)
-    active_price_min, active_price_max = ListingsQuery.active_price_range(params)
 
     # Paginate results.  On a non-empty cache hit the ordered id list drives
     # the pagination metadata (so page counts and links are unchanged) while the
@@ -290,22 +291,10 @@ def search(request: HttpRequest) -> HttpResponse:
         )
 
     context = {
+        **built.filter_context,
         "page_obj": page_obj,
         "query": query,
         "has_results": has_results,
-        "current_category": current_category,
-        "current_city": current_city,
-        "current_sort": params.sort,
-        "min_price": min_price,
-        "max_price": max_price,
-        "active_price_min": active_price_min,
-        "active_price_max": active_price_max,
-        "current_listing_purpose": listing_purpose_slug,
-        "current_features": feature_slugs,
-        "current_condition": condition_slug,
-        "resolved_purposes": resolved_purposes,
-        "resolved_features": resolved_features,
-        "resolved_conditions": resolved_conditions,
         "suggested_category": suggested_category,
         "suggested_city": suggested_city,
         "breadcrumb_category": breadcrumb_category,
@@ -326,7 +315,6 @@ def search(request: HttpRequest) -> HttpResponse:
         "search_cache_max_hits": SEARCH_CACHE_MAX_HITS,
         "narrowed_category": narrowed_category,
         "all_categories": all_categories,
-        "show_filters": True,
     }
 
     # HTMX partial rendering support
