@@ -186,6 +186,37 @@ def test_nginx_metrics_restricted_to_localhost() -> None:
     assert "deny all" in block, "`location = /metrics` must deny all other addresses"
 
 
+def test_nginx_health_restricted_to_localhost() -> None:
+    """The /health/ location must restrict access the way /metrics does (12-OPS-020).
+
+    The readiness body names every dependency and, when degraded, exactly which
+    one failed — reconnaissance an anonymous caller must not have. The
+    restriction is expressed at nginx, matching the ``= /metrics`` block one
+    block below, so no Django view, route or alias contract changes. The
+    container healthcheck and the deploy gate both run inside the ``web``
+    container and never traverse nginx, so they are unaffected (verified, not
+    assumed).
+
+    The match string ``location /health/ {`` is used (not ``/health/``) because
+    the block's own comment names ``/health/`` in prose; ``_location_block``
+    matches the first line containing the substring.
+    """
+    text = _NGINX_CONF.read_text()
+    block = _location_block(text, "location /health/ {")
+    assert block, "nginx.conf must define a `location /health/` block"
+    assert "allow 127.0.0.1" in block, (
+        "`location /health/` must allow 127.0.0.1 (12-OPS-020)"
+    )
+    assert "deny all" in block, (
+        "`location /health/` must deny all other addresses so the dependency "
+        "graph is not disclosed to an anonymous caller (12-OPS-020)"
+    )
+    assert "proxy_pass" in block, (
+        "`location /health/` must still proxy the allowed callers to Django "
+        "(12-OPS-020)"
+    )
+
+
 @pytest.mark.parametrize("conf_path", _PROXIED_CONFS)
 def test_proxied_locations_overwrite_x_real_ip(conf_path: Path) -> None:
     """Every proxying location must overwrite ``X-Real-IP`` with the socket peer.
