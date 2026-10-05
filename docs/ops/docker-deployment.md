@@ -210,12 +210,15 @@ correct hostname (`db`) is used for inter-container communication.
 builds are significantly faster when only source code changes (the uv dependency layer is
 the primary win). Run `make fullclean` to clear the build cache if builds behave unexpectedly.
 
-**Bind-mount scope in dev:** The `.:/app` source bind-mount (hot-reload) is applied to
-`web`, `bot`, `load_catalog`, `seed`, and `nginx` via `docker-compose.dev.override.yml`.
-The one-shot services `migrate` and `create_admin` (defined in the base `docker-compose.yml`)
-only receive `./.env.dev:/app/src/.env:ro` — **no source code bind-mount**. Model changes,
-new migration files, and source code edits to these one-shot services are NOT picked up
-at runtime; `make build` is still required after changing code that affects them.
+**Bind-mount scope in dev:** The `.:/app` source bind-mount (hot-reload) is applied to the
+six services `web`, `bot`, `load_catalog`, `load_cities`, `create_admin`, and `seed` via
+`docker-compose.dev.override.yml`. Model changes, new migration files, and source code edits
+to these services are picked up at runtime. `migrate` has **no `volumes:` key at all** in the
+override — it inherits only the base service's `.env.dev` file, so it receives **no source
+code bind-mount**. `nginx` is **not** `.:/app`-bound either: it binds `media_volume` read-only
+at `/media_volume`, the dev configuration `nginx.dev.conf` at `/etc/nginx/nginx.conf`, and the
+`certs/` directory at `/etc/nginx/certs`. A source code change that affects any service without
+a bind-mount still requires `make build`.
 
 Secret-validation bypass is split across two distinct flags:
 - **`DJANGO_BUILD=1`** — set **only** in the Dockerfile during the image build stage (build-time `collectstatic --noinput`) and in `Makefile`'s `restore-test` target, so the build-placeholder `SECRET_KEY` passes. It is **never** set for runtime one-shot services, and `config.settings.prod` honours it unconditionally (the build stage has no `.env` and cannot be distinguished by a settings module).
@@ -292,6 +295,10 @@ docker compose --project-name mko-bazuna-dev --env-file .env.dev -f docker-compo
 
 **Note:** Running with `--profile use-nginx` requires TLS certificates. Follow the mkcert setup
 guide for local HTTPS development.
+
+Once nginx is up, verify the dev `/media/` rate-limit gate with
+[`dev-nginx-media-gate.md`](dev-nginx-media-gate.md) — it runs the read-only
+`.\Makefile.ps1 verify-nginx` command and never starts the container itself.
 
 ## Production Deployment
 
@@ -968,15 +975,20 @@ The nginx configuration (`docker/nginx/nginx.conf`) includes:
 
 ### Rate Limiting
 
-Three `limit_req_zone`s are declared in `http{}`, all keyed on `$binary_remote_addr`
-(see [Client IP Trust Model](#client-ip-trust-model)): `login_limit` 10r/s, `search_limit`
-20r/s, `browse_limit` 20r/s. `limit_req_status 429` is set once in `http{}`, so every
-limited location answers **429**, not nginx's default 503.
+Four `limit_req_zone`s are declared in `http{}`, all keyed on `$binary_remote_addr`:
+`login_limit` 10r/s, `search_limit` 20r/s, `browse_limit` 20r/s, and `csp_report_limit` 1r/s
+(dedicated sink budget, added by 09-API-015). `limit_req_status 429` is set once in `http{}`,
+so every limited location answers **429**, not nginx's default 503.
+
+> The zone key is the nginx-observed peer address (`$binary_remote_addr`). That is a
+> **different** mechanism from the Django-side peer gate described in
+> [Client IP Trust Model](#client-ip-trust-model), which governs how *Django* resolves a
+> client IP from forwarding headers — see that section for the application-side rules.
 
 | Location | Zone | Rate | Burst |
 |----------|------|------|-------|
 | `/login/` | `login_limit` | 10 req/s | 20 |
-| `/csp-report/` | `login_limit` | 10 req/s | 10 |
+| `/csp-report/` | `csp_report_limit` | 1 req/s | 5 |
 | `/search/` | `search_limit` | 20 req/s | 40 |
 | `/` (catch-all) | `browse_limit` | 20 req/s | 40 |
 | `/media/` | `browse_limit` | 20 req/s | 40 |
@@ -990,6 +1002,11 @@ thumbnails fits the burst without a 429 (07-MEDIA-006).
 Unrated by design: `/health/`, `/static/`, `/protected-media/` (nginx `internal`; reachable
 only after Django's access check issues an `X-Accel-Redirect`), the `~*` script-deny regex
 (403 before any limit applies) and `= /metrics` (localhost-only via `allow 127.0.0.1; deny all`).
+
+To measure the **deployed** stack's `/media/` limiting, follow
+[`ops-nginx-rate-limit-gate.md`](ops-nginx-rate-limit-gate.md): it aggregates an nginx log capture
+into counts for a human to rule on. The ratifying criterion is not restated here — it lives in
+[`../99-agent/nginx-rate-limit-attribution-record.md`](../99-agent/nginx-rate-limit-attribution-record.md).
 
 ### Security Headers
 

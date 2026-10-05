@@ -245,6 +245,10 @@ docker compose logs nginx
 # Ensure docker-compose.dev.override.yml has the volume mount configured
 ```
 
+If the container is present but not running, [`dev-nginx-media-gate.md`](dev-nginx-media-gate.md)
+documents the exact start command (the `use-nginx` profile) and the read-only gate that reports the
+container state without starting it.
+
 ### mkcert Command Not Found (Windows)
 
 After Chocolatey installation, you may need to restart PowerShell or your terminal session. The Chocolatey bin directory must be in your PATH.

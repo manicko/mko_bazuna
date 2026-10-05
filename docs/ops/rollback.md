@@ -777,6 +777,8 @@ Use this table to select the rollback dimension based on the failure mode:
 - [PostgreSQL 18 Docker Volume Migration](postgres-18-docker-volume-migration.md)
   — DB volume path configuration
 - [Local HTTPS with mkcert](local-https-mkcert.md) — local TLS setup
+- [nginx Rate-Limit Measurement Gate](ops-nginx-rate-limit-gate.md) — deployed-stack
+  `/media/` rate-limit capture and aggregation; a human applies the criterion
 - [Architecture Guidelines](../99-agent/architecture.md) — two-process/one-DB
   model, advisory lock allocation
 - [.env.prod.example](../../.env.prod.example) — production environment variable template
