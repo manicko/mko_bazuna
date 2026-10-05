@@ -21,6 +21,25 @@ code context is cited as `C-*` (claims), `X-*` (plan-vs-tree contradictions),
 
 > **A block with an open gate does not start.** See §H.
 
+> ### ⚠️ SHIPPED-RECORD ANNOTATION (2026-10-05, `B-12`) — read before acting on any block below
+>
+> **This plan is a shipped record, not a live brief.** All **11** blocks `B-01`…`B-11` have
+> shipped; **none of them is re-planned, re-verified or re-opened here.** The commit map for
+> all eleven is preserved and must stay intact.
+>
+> This annotation corrects sections that would otherwise **mislead an Implementor or a
+> reader** — most dangerously `B-06`'s required test 1, which mandates a test that is
+> **explicitly FORBIDDEN** (a 2026-10-03 Product Owner ruling, `09-API-009`, made a missing
+> `EMAIL_HOST` a loud startup **warning, not a boot gate**). Following `B-06`'s test 1 as
+> written would write that forbidden test; item 1 below makes that impossible to do by
+> reading the file. Each correction is an **in-place annotation or strikethrough**, never a
+> rewrite: the surrounding analysis, rationale and rejected-alternative tables stand.
+>
+> **Status.** `04-AUT-002` remains **NOT closed** (nothing here closes it). The remaining
+> outstanding items are **documentation debts** — `B-10`'s propagation obligation in
+> `docs/99-agent/architecture.md` and `B-11`'s decision record — and they are **owned by a
+> separate block**, not by this annotation.
+
 ## Contents
 
 - **§A** Provenance, drift control, re-cut of the decomposition, CORRECTIONS table
@@ -959,6 +978,19 @@ Both additive. Recovering an account after a failed bootstrap is an operational 
 `test_env_allowlist_reverse.py`, `test_env_allowlist.py` green · the `ADMIN_PASSWORD`
 resolution expression and `docker/entrypoint-create-admin.sh` unchanged ·
 `ruff`/`basedpyright` clean · `04-VAL-004` recorded: `B-01` landed first.
+
+> **📌 SHIPPED, with an outstanding i18n obligation (annotated 2026-10-05 by `B-12`).**
+> `B-02` shipped. The enforcement it added raises a **new, deliberately untranslated msgid** in
+> `src/backend/apps/core/management/commands/create_admin_user.py::Command.handle`:
+> `_("Password does not meet the password policy: %(errors)s")` (via `gettext_lazy as _`), with an
+> inline comment stating the string is **not** covered by the i18n completeness gate and pointing at a
+> recorded deferral in `docs/99-agent/architecture.md` —
+> `### Deferred: Untranslated create_admin_user Password-Policy Msgid (04-AUT-005)`.
+> **The obligation is real and outstanding:** the msgid has no catalog entry in any of `ru`, `bs` or
+> `en`, so a Russian or Bosnian operator sees English text. Plan 16 forbade `.po` edits by phase 04
+> (§A.2, and `B-06`'s "Out of scope"), which is exactly why the debt is recorded rather than paid here.
+> This is a documentation/i18n debt, owned by a separate block — **not** a defect this annotation fixes.
+> (Verified 2026-10-05: `create_admin_user.py:138-144`; `docs/99-agent/architecture.md:973`.)
 
 **Implementor brief.**
 
@@ -3094,6 +3126,12 @@ hardest — a green suite would not evidence the capability.
    `ImproperlyConfigured` — satisfiable by the `SITE_URL` guard. Test 1 is therefore **new code in
    `config/settings/tests/test_settings_secrets.py`** (**not** `test_settings_defaults.py` as this
    block recorded), and it must assert the message **names `EMAIL_HOST`** or it is vacuous.
+   **🔴 CORRECTION (2026-10-05, `B-12`) — this correction is itself now wrong.** It rests on the
+   pre-2026-10-03 premise that a missing `EMAIL_HOST` is a boot gate. The Product Owner ruling
+   (`09-API-009`) inverted that: the import **succeeds** and warns loudly, so there is **no
+   `ImproperlyConfigured` to assert** and the test it calls "new" is **FORBIDDEN**. The shipped test
+   is `test_prod_email_host_missing_warns_but_imports` (asserts `returncode == 0`, names `EMAIL_HOST`
+   and `silently`). The sentence above stands only as the record of the pre-ruling reading.
 6. **Django's catalogs are per-app, and password coverage is partial.** `django/conf/locale/` is
    *core only* (349 msgids in `ru`; even `Home` is absent). Admin strings live in
    `contrib/admin/locale/{ru,bs}` and `contrib/auth/locale/{ru,bs}`, both `.mo` compiled. Absent in
@@ -3127,7 +3165,11 @@ hardest — a green suite would not evidence the capability.
   `telegram_bot/services/support_delivery_email.py` is the **only** mail sender in `src/`, reached from
   the Telegram `/support` handler via `SUPPORT_NOTIFICATION_RECIPIENTS` or EMAIL-channel
   `SupportContact` rows. It fails open at runtime, so the boot guard is what turns a misconfigured
-  SMTP host into a boot failure instead of a silent support black hole. **`B-06` edits `prod.py`
+  SMTP host into a boot failure instead of a silent support black hole. **🔴 CORRECTION (2026-10-05,
+  `B-12`):** the 2026-10-03 Product Owner ruling (`09-API-009`) changed this. A missing `EMAIL_HOST`
+  is **not** a boot gate: `prod.py`'s import **succeeds** and logs a **loud `WARNING`** naming the
+  setting and the lost support escalations; the accepted cost is that a host that never notices the
+  warning loses escalations silently. It is **not** "a boot failure". `B-06` edits `prod.py`
   comments only; the guard expression is byte-unchanged** — and its parenthetical list is corrected
   too, because `send_mail`'s only real recipient is the support desk: "alert notifications" and
   "seller confirmations" are not senders either.
@@ -3204,13 +3246,25 @@ hardest — a green suite would not evidence the capability.
 
 #### Tests required
 
-1. **`config/settings/tests/test_settings_secrets.py::test_prod_requires_email_host`** *(new)* — import
+1. **~~`config/settings/tests/test_settings_secrets.py::test_prod_requires_email_host`~~ — 🔴 DO NOT
+   WRITE THIS TEST. IT IS EXPLICITLY FORBIDDEN.** *(Struck 2026-10-05 by `B-12`; the mandate below
+   is kept only as the record of what was planned, so a reader can see why it is forbidden.)* ~~import
    `config.settings.prod` with **only** `EMAIL_HOST=""` and every other guard satisfied
    (`DJANGO_SECRET_KEY`, `BOT_TOKEN`, `GOOGLE_TRANSLATE_API_KEY`, `SITE_URL`, `REDIS_URL`,
    `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`), assert `ImproperlyConfigured` **and** that stderr names
    `EMAIL_HOST`. **Anti-vacuity is the whole point:** a bare `ImproperlyConfigured` assertion is
    satisfiable by `SITE_URL`'s guard and is not a test. **This is the guard-weakening gate for the
-   comment correction.**
+   comment correction.**~~
+   **Why it is forbidden and what actually shipped.** A 2026-10-03 Product Owner ruling (`09-API-009`)
+   decided a missing `EMAIL_HOST` is a **loud warning at startup, not a boot gate** — `prod.py`'s import
+   succeeds and logs a loud `WARNING` naming the setting. Asserting `ImproperlyConfigured` here would
+   pin the **opposite** of the ruled behaviour. The **shipped opposite test** is
+   `config/settings/tests/test_settings_secrets.py::test_prod_email_host_missing_warns_but_imports`,
+   which asserts `returncode == 0` and that the output names `EMAIL_HOST` **and** `silently`; its own
+   docstring names the inversion and states that the `ImproperlyConfigured` shape is forbidden.
+   **Point at that shipped test and the ruling — do not write a new one.**
+   (Verified 2026-10-05: `test_settings_secrets.py:202-211`; ruling `09-API-009` recorded in
+   `docs/ops/docker-deployment.md:392,606` and `docs/99-agent/architecture.md:1121,1132`.)
 2. **`apps/users/tests/test_password_recovery.py::test_documented_password_change_procedure_works`**
    *(new module)* — **execute** the documented procedure: create a staff user with a known password,
    patch `getpass.getpass` inside the `changepassword` command module, `call_command("changepassword",
@@ -3279,8 +3333,10 @@ password login) are all verified above and re-runnable in one search each.
 
 #### Risks
 
-Correcting the claim while weakening the guard (mitigated by test 1, which asserts the guard message
-names `EMAIL_HOST`) · rewording the `EMAIL_BACKEND` comment colliding with phase 02's ownership (§D
+Correcting the claim while weakening the guard (~~mitigated by test 1, which asserts the guard message
+names `EMAIL_HOST`~~ — **corrected 2026-10-05 by `B-12`: there is no boot guard to weaken, per the
+2026-10-03 ruling `09-API-009`; the shipped `test_prod_email_host_missing_warns_but_imports` pins the
+warn-and-import behaviour**) · rewording the `EMAIL_BACKEND` comment colliding with phase 02's ownership (§D
 item 16) · editing `docker-deployment.md`/`rollback.md` on a stale read and clobbering phase 01's,
 02's, 08's or 09's work (§D item 18 — **re-read both files immediately before editing**) · the
 runbook documenting a command the operator cannot execute (mitigated by tests 2 and 3, which run it) ·
@@ -3295,7 +3351,10 @@ a docstring, and the two new tests assert against *pre-existing* behaviour (`pro
 
 #### Definition of done
 
-Tests 1–3 green · `test_admin_change_form.py`, `test_i18n_completeness.py` and
+Tests 1–3 green *(🔴 corrected 2026-10-05 by `B-12`: test 1 is the FORBIDDEN
+`test_prod_requires_email_host` and is **not** written — the shipped opposite,
+`test_prod_email_host_missing_warns_but_imports`, is the evidence; "green" therefore means tests 2
+and 3 plus that shipped test)* · `test_admin_change_form.py`, `test_i18n_completeness.py` and
 `test_create_admin_user.py` unchanged and green · **a tree-wide search finds no surviving
 password-reset claim the code does not support — verified by searching the tree, not by trusting this
 document** · the `EMAIL_HOST` guard expression, the `EMAIL_BACKEND` pin expression, all four
@@ -3327,7 +3386,12 @@ description: >
   docs/ops/rollback.md, and has no reset URL, view, form or template. The documented
   "Password Change" procedure is broken as printed (make shell is bash, not a Django
   shell) and its stated alternative is a verified no-op. Correct all six claims, replace
-  the recipe with manage.py changepassword, and pin the EMAIL_HOST guard with a test.
+  the recipe with manage.py changepassword, and pin the EMAIL_HOST behaviour with the
+  test described in the prose. DO NOT write test_prod_requires_email_host - it is FORBIDDEN
+  by the 2026-10-03 Product Owner ruling (09-API-009): a missing EMAIL_HOST is a loud
+  startup WARNING, not a boot gate. The shipped opposite test is
+  test_prod_email_host_missing_warns_but_imports (returncode == 0, names EMAIL_HOST and
+  silently). See B-12's annotation on this block.
   Do NOT build the admin password-change view and do NOT build a self-service reset flow.
   The rendered "Reset password" button stays a known gap owned by phase 15 15-AUTHZ-003.
 goals:
@@ -3367,7 +3431,11 @@ files:
   - path: src/backend/config/settings/tests/test_settings_secrets.py
     targets:
       - type: function
-        name: test_prod_requires_email_host
+        name: test_prod_email_host_missing_warns_but_imports
+        note: >
+          SHIPPED — do NOT write test_prod_requires_email_host (FORBIDDEN: 09-API-009).
+          This file is the right home; the assertion is the OPPOSITE of the pre-2026-10-03
+          plan text: returncode == 0, output names EMAIL_HOST and silently.
   - path: src/backend/apps/users/tests/test_password_recovery.py
     targets:
       - type: function
@@ -3403,10 +3471,14 @@ changes:
       get_urls. The button did not exist before B-01.
   - action: add_test
     description: >
-      test_prod_requires_email_host: import config.settings.prod with ONLY EMAIL_HOST=""
-      and every other guard satisfied, assert ImproperlyConfigured AND that stderr names
-      EMAIL_HOST. A bare ImproperlyConfigured assertion is satisfiable by SITE_URL's guard
-      and is not a test.
+      DO NOT write test_prod_requires_email_host. It is FORBIDDEN by the 2026-10-03 Product
+      Owner ruling (09-API-009): a missing EMAIL_HOST is a loud startup WARNING, not a boot
+      gate. Asserting ImproperlyConfigured would pin the opposite of the ruled behaviour.
+      The SHIPPED test is test_prod_email_host_missing_warns_but_imports: import
+      config.settings.prod with ONLY EMAIL_HOST="" and every other guard satisfied, assert
+      returncode == 0 AND that the output names EMAIL_HOST and silently. It is already in
+      src/backend/config/settings/tests/test_settings_secrets.py - point at it, do not
+      duplicate it.
   - action: add_test
     description: >
       test_documented_password_change_procedure_works: create a staff user with a known
@@ -3417,7 +3489,8 @@ changes:
       failing AUTH_PASSWORD_VALIDATORS, assert CommandError and that the stored hash is
       byte-identical.
 acceptance_criteria:
-  - "all three new tests green; the four tripwire files unedited and green"
+  - "the two new test_password_recovery tests green; the four tripwire files unedited and green"
+  - "test_prod_email_host_missing_warns_but_imports (already shipped) still green - the FORBIDDEN test_prod_requires_email_host is NOT written"
   - "the EMAIL_HOST guard expression, the EMAIL_BACKEND pin expression, all four has_*_permission bodies and the single fieldsets on UserAdmin are byte-unchanged"
   - "a tree-wide search finds no surviving password-reset claim the code does not support"
   - "no .po file is modified and no new msgid is introduced"
@@ -3443,7 +3516,7 @@ tests_to_run:
 | **Depends on** | `B-01` (soft — `G-B`'s decision cites its retired form writes) · `B-05` (soft — same file) · `B-03` (hard — same file) · **`G-7`, `G-7b`, `G-A`, `G-B`, `G-D`, `G-E`, `G-F` — ALL SEVEN CLOSED 2026-10-02 by the `B-07` Planner** |
 | **Blocks** | phase 15 `15-AUTHZ-001` (**the named owner of every residual below**) |
 | **Priority** | P2 · **Risk LOW for the code, HIGH for the residual** |
-| **Gates** | **`G-7` CLOSED** (option (b), zero production code) · **`G-7b` CLOSED** (option (b), do not ship) · **`G-A` CLOSED** (out) · **`G-B` CLOSED** (do not register) · **`G-D` CLOSED** (known-gap test) · **`G-E` CLOSED** (re-file) · **`G-F` CLOSED** (phase 15's migration) |
+| **Gates** | **`G-7` CLOSED** (option (b), zero production code) · **`G-7b` CLOSED** (option (b), do not ship) · **`G-A` CLOSED** (out) · **`G-B` CLOSED** (~~do not register~~ → **OVERTURNED by phase 06, which registered it with `permissions=["delete"]`; the gate held at the time — see the annotated `G-B` below**) · **`G-D` CLOSED** (known-gap test) · **`G-E` CLOSED** (re-file) · **`G-F` CLOSED** (phase 15's migration) |
 
 > **B-07 SHIPS NO PRODUCTION CODE. This is the decision, and it is recorded here so it
 > cannot be read as an omission.** The Researcher's findings **refuted the block's premise**:
@@ -3474,7 +3547,7 @@ reachable** — and the reachable one is unreachable *for this block's subject*.
 | `users/views/consent.py::consent_withdraw` | the subject's (`@login_required @require_POST`) | `request.user` | **CLOSED** — `withdraw_consent(user)` then `logout(request)`, comment naming `AUT-002`. Pinned by `test_withdraw_flushes_session_and_redirects` and `test_withdraw_workflow_returns_anonymous` |
 | `users/views/consent.py::consent_accept` | the subject's | `request.user` | **CORRECT — no logout belongs here.** Accept restores capability; `give_consent` clears a prior decline. Untouched |
 | `users/views/consent.py::consent_decline` | the subject's (`@require_POST`, anonymous-accessible) | `request.user` — *the requester is the changed identity* | open — **REACHABLE, and `G-7b` decides NOT to ship** (verified one-way door; see the gate) |
-| `users/admin.py::UserAdmin.withdraw_consent_action` | a **moderator's** | in `queryset`, never `request.user` | open — **UNREACHABLE, and never registered** — see "Correction applied" below; `G-B` decides **do not register** |
+| `users/admin.py::UserAdmin.withdraw_consent_action` | a **moderator's** | in `queryset`, never `request.user` | open — **UNREACHABLE, and never registered** — see "Correction applied" below; `G-B` decides ~~**do not register**~~ → **OVERTURNED by phase 06, which registered it with `permissions=["delete"]` (annotated 2026-10-05 by `B-12`)** |
 | `moderation/views/review.py::ban_user` | **the moderator's** (`@staff_required`) | `ad.user` | open — **REACHABLE, and this is the concrete harm. `G-D` decides NO CODE, because `logout(request)` here logs out the *moderator*.** See the wrong-target trap below |
 
 **The reachability count is 1 of 5, not 3. The plan's "3 of 5" is REFUTED and withdrawn.**
@@ -3603,17 +3676,20 @@ explicitly, and if it decides to register it, **both** of the following are requ
 | 2 | **amend** the decorator to `@admin.action(permissions=["change"], description=…)` | `UserAdmin.has_change_permission` is `is_staff` **and ignores `obj`** (`15-AUTHZ-003` owns the predicate). Without an explicit `permissions` list the action is offered to **every** `is_staff` holder, so registration alone would widen the blast radius to the whole staff population |
 
 **The test that would have been written (`G-7` = register) is NOT written — `G-B` chose
-do-not-register, and this test is therefore out of scope.** Recorded so the omission is
+do-not-register, and this test is therefore out of scope.** *(This was true of `B-07`. **⚠ `G-B` was
+later OVERTURNED by phase 06, which registered the action — annotated 2026-10-05 by `B-12`; the
+"out of scope" decision still held for `B-07` because phase 06 owned it.)* Recorded so the omission is
 traceable: assert `"withdraw_consent_action" in UserAdmin(User, admin.site).get_actions(request)`.
 **Do NOT assert on `UserAdmin.actions`** — a previous attempt at exactly that test was
 deleted from `B-01` as a defect, because it pinned the defect as the expected state and
 pointed the tripwire the wrong way. `get_actions` is the observable; the class attribute
 is the implementation. **And do not assert the *absence* of the action** — that would pin an
 intentional decision as an invariant and would have to be deleted the moment phase 06
-reverses `G-B`.
+reverses `G-B`. *(Phase 06 did reverse it. Annotated 2026-10-05 by `B-12`.)*
 
 **File surface — RESOLVED by `G-B` (do-not-register): `src/backend/apps/users/admin.py` is
-NOT touched at all.** No `actions` attribute is added and the decorator is not amended. The
+NOT touched at all.** *(True of `B-07`, which shipped zero code. **⚠ Phase 06 later did touch the file,
+registering the action — see the annotated `G-B` below; annotated 2026-10-05 by `B-12`.**)* No `actions` attribute is added and the decorator is not amended. The
 method **body** is byte-unchanged — phase 06 `PII-107` owns the `ConsentRecord` write (§D
 item 8). See `G-B` for the two reasons, the second of which is new and decisive.
 
@@ -3642,7 +3718,8 @@ exist.** Four facts, recorded so phase 06 cannot read more into the state than i
    `transaction.atomic()`, the PII nulling, the `LoginToken` deletion and the
    `bump_search_cache_version` on commit).
 4. **The gap is `B-07`'s to record, phase 06's to accept — and `G-B` has now decided it.**
-   `G-B` = **do-not-register**, so the operator erasure capability is **absent by decision**,
+   `G-B` = **do-not-register** *(⚠ OVERTURNED by phase 06, which registered the action — annotated
+   2026-10-05 by `B-12`. This paragraph records the 2026-10-02 decision; do not re-litigate.)*, so the operator erasure capability is **absent by decision**,
    and that decision — **not the absence** — is what phase 06's `PII-107` note must cite.
    **Add the second reason, because it is the one that actually decides it:** registering the
    action while `G-A` is out would hand a moderator a reachable erasure path whose subject's
@@ -3737,9 +3814,21 @@ enumerate another user's sessions). `withdraw_consent_action` remains unreachabl
 unrelated prior reason that it was **never registered in `actions`** — a product decision
 `G-B` can change, not a Django limitation.
 
-#### `G-B` — CLOSED: **DO NOT REGISTER `withdraw_consent_action`**
+#### `G-B` — ~~CLOSED: **DO NOT REGISTER `withdraw_consent_action`**~~ → **OVERTURNED by phase 06 (annotated 2026-10-05 by `B-12`)**
 
-**`src/backend/apps/users/admin.py` is not touched at all.** Two reasons, and the second is
+> **🔴 OVERTURNED — record, not re-litigation.** The `G-B` gate held at the time it was closed
+> (2026-10-02) and **phase 06 `PII-107` is the declared owner** of this decision. Phase 06 later
+> **registered** the action: `apps/users/admin.py::UserAdmin` declares
+> `actions = ["deactivate_user", "reactivate_user", "withdraw_consent_action"]`, and
+> `withdraw_consent_action` carries `@admin.action(description="Withdraw consent for selected users",
+> permissions=["delete"])` — i.e. the superuser-only predicate (`has_delete_permission`), **not**
+> `permissions=["change"]`. This is the pre-registration reason 1's own condition satisfied.
+> **Do not re-open `G-B`; the argument below stands as the record of the 2026-10-02 decision.**
+> (Verified 2026-10-05: `admin.py:204` `actions = …`; `admin.py:321-324` decorator
+> `permissions=["delete"]`.)
+
+**`src/backend/apps/users/admin.py` is not touched at all.** *(This was true of `B-07`, which shipped
+zero code; phase 06 later edited the file — see the overturn note above.)* Two reasons, and the second is
 new:
 
 1. **The plan's own reason, unchanged.** Registering is a **new, irreversible** operator
@@ -3905,8 +3994,8 @@ red-to-green target. Every one must carry a docstring naming the gap, its owner
 |---|---|---|---|---|
 | 1 | `test_ban_leaves_the_banned_sellers_session_usable` | `apps/moderation/tests/test_moderation_views.py` (new class `TestBanUserSessionKnownGap`) | `G-A` / `G-D` — the banned seller's session survives `ban_user` | a session-revocation mechanism lands |
 | 2 | `test_ban_does_not_log_out_the_moderator` | same class | `G-D` — the **wrong-target trap**. Asserts the moderator's session still works after banning | someone adds `logout(request)` to `ban_user` — **this is the tripwire for the trap the existing five tests cannot see** |
-| 3 | `test_banned_seller_can_still_reach_the_dashboard` | same class | `G-A` — the web tier has zero per-request account-state enforcement | phase 15's gate lands |
-| 4 | `test_banned_seller_cannot_relist_an_ad` — **inverted 2026-10-03. It was `test_banned_seller_can_archive_and_reactivate_an_ad`, a known-gap test pinning the harm; it is now a POSITIVE CONTROL asserting the block** | `apps/ads/tests/test_edit.py` (class `TestBannedSellerRelistKnownGap` → **`TestBannedSellerRelistPositiveControl`**) | ~~`G-A` — the concrete harm~~ → **`G-A` / the 2026-10-03 Product Owner ruling: a banned seller cannot create or publish a new ad.** Drives `ad_archive` then `ad_reactivate` on a `PUBLISHED` ad owned by an `is_banned=True` seller, with the real `auto_moderate` (not mocked), and **asserts the ad does NOT end `PUBLISHED`** | **always — it is a control, not a gap. It is red only on a regression that lets a banned seller relist** |
+| 3 | ~~`test_banned_seller_can_still_reach_the_dashboard`~~ → **`test_banned_seller_is_now_refused_the_dashboard`** *(SUPERSEDED and INVERTED 2026-10-05 by `B-12`; shipped in `apps/moderation/tests/test_moderation_views.py`. This is the shipped opposite: a later phase added per-request account-state enforcement, so the seller is now refused rather than admitted. The `G-A` gap is **not re-opened** — the record is that the test which pinned the gap was inverted into a positive refusal control. Verified `test_moderation_views.py:831`.)* | same class | `G-A` — the web tier has zero per-request account-state enforcement | phase 15's gate lands |
+| 4 | ~~`test_banned_seller_cannot_relist_an_ad`~~ → **moved and renamed: `apps/ads/tests/test_edit.py::TestBannedSellerRelistNowRefused::test_banned_seller_is_refused_on_archive_and_reactivate`** *(SUPERSEDED 2026-10-05 by `B-12`; the intermediate `TestBannedSellerRelistPositiveControl` was itself replaced by `TestBannedSellerRelistNowRefused`. **It asserts 403 on BOTH POSTs — `ad_archive` and `ad_reactivate` — and that the ad is unchanged (`status` stays `PUBLISHED`).** The `G-A` gap is **not re-opened**; this only records the final shipped name/class and assertion. Verified `test_edit.py:1306-1342`.)* — **inverted 2026-10-03. It was `test_banned_seller_can_archive_and_reactivate_an_ad`, a known-gap test pinning the harm; it is now a POSITIVE CONTROL asserting the block** | `apps/ads/tests/test_edit.py` (class `TestBannedSellerRelistKnownGap` → **`TestBannedSellerRelistPositiveControl`** → **`TestBannedSellerRelistNowRefused`**) | ~~`G-A` — the concrete harm~~ → **`G-A` / the 2026-10-03 Product Owner ruling: a banned seller cannot create or publish a new ad.** Drives `ad_archive` then `ad_reactivate` on a `PUBLISHED` ad owned by an `is_banned=True` seller, with the real `auto_moderate` (not mocked), and **asserts the ad does NOT end `PUBLISHED`** (shipped form: both POSTs return 403) | **always — it is a control, not a gap. It is red only on a regression that lets a banned seller relist** |
 | 5 | `test_consent_decline_keeps_the_session_and_is_reversible` | `apps/users/tests/test_consent.py` (new class `TestConsentDeclineSessionKnownGap`) | `G-7b` — decline leaves the session usable **and** the user can re-accept through the authenticated `consent_accept`. Guards the one-way door: if a decline logout ever shipped, this goes red | a decline logout is added |
 | 6 | `test_withdraw_consent_leaves_other_sessions_intact` | `apps/users/tests/test_deletion.py` or `test_consent.py` | `G-A` — `consent_withdraw` flushes **only the current** session; a second session for the same user keeps up to 50 raw search queries (`search_history.py::_MAX_HISTORY = 50`) | multi-session revocation lands |
 
@@ -3936,11 +4025,16 @@ state *after* the login, not in a fixture.
 
 **Not written, and why — so the absence is traceable:** `test_consent_decline_flushes_the_session`
 and `test_anonymous_decline_is_unaffected` (both `G-7b` = (a) only — not chosen);
-`test_withdraw_consent_action_is_registered` (`G-B` = do-not-register); and **any** assertion
+`test_withdraw_consent_action_is_registered` *(~~`G-B` = do-not-register~~ — **note the overturn:
+phase 06 later registered the action with `permissions=["delete"]`; `B-07` still wrote no such test, but
+the "do-not-register" ground no longer holds — see the annotated `G-B` above. Annotated 2026-10-05 by
+`B-12`.**)*; and **any** assertion
 on the *absence* of `withdraw_consent_action` (would pin a decision as an invariant).
 
 **Gates.** `G-7`, `G-7b`, `G-A`, `G-B`, `G-D`, `G-E`, `G-F` — **all CLOSED 2026-10-02 by the
-`B-07` Planner.** The block may start.
+`B-07` Planner.** The block may start. **⚠ `G-B` later OVERTURNED by phase 06 (annotated 2026-10-05 by
+`B-12`): phase 06 registered `withdraw_consent_action` with `permissions=["delete"]`. The gate held when
+it was closed; recorded, not re-litigated.**
 
 **Agents.** Reduced from five to three, and the reduction is itself a finding. **Researcher
 and Auditor are discharged** — the reachability question they were engaged to answer has been
@@ -4075,6 +4169,7 @@ files:
         name: test_ban_does_not_log_out_the_moderator
       - type: function
         name: test_banned_seller_can_still_reach_the_dashboard
+        note: "SUPERSEDED 2026-10-05 by B-12: the shipped test is test_banned_seller_is_now_refused_the_dashboard (a later phase added per-request account-state enforcement and inverted the pin). The G-A gap is NOT re-opened."
     semantic_anchors:
       insert_after:
         type: class
@@ -4084,9 +4179,10 @@ files:
     targets:
       - type: class
         name: TestBannedSellerRelistPositiveControl
-        note: "NEW class. Highest-value deliverable in the block. RENAMED from TestBannedSellerRelistKnownGap on 2026-10-03 - it is a positive control asserting the ban, not a gap pinning a harm."
+        note: "NEW class. Highest-value deliverable in the block. RENAMED from TestBannedSellerRelistKnownGap on 2026-10-03 - it is a positive control asserting the ban, not a gap pinning a harm. SUPERSEDED 2026-10-05 by B-12: the FINAL shipped class is TestBannedSellerRelistNowRefused."
       - type: function
         name: test_banned_seller_cannot_relist_an_ad
+        note: "SUPERSEDED 2026-10-05 by B-12: the FINAL shipped test is TestBannedSellerRelistNowRefused::test_banned_seller_is_refused_on_archive_and_reactivate, asserting 403 on BOTH POSTs (ad_archive and ad_reactivate) with the ad unchanged. Verified test_edit.py:1306-1342."
     semantic_anchors:
       insert_after:
         type: function
@@ -4131,7 +4227,7 @@ acceptance_criteria:
   - "git diff --stat -- src/ lists ONLY test files. Zero production files changed."
   - "config/settings/base.py MIDDLEWARE byte-unchanged at 15 entries; no new decorator; no middleware; no migration; no new module; no new dependency"
   - "moderation/views/review.py::ban_user byte-unchanged - it does NOT contain logout( or any session call"
-  - "apps/users/admin.py byte-unchanged - no actions attribute added, decorator not amended (G-B)"
+  - "apps/users/admin.py byte-unchanged - no actions attribute added, decorator not amended (G-B) [NOTE: true of B-07; phase 06 LATER registered the action, overturning G-B - annotated 2026-10-05 by B-12]"
   - "apps/users/views/consent.py byte-unchanged - consent_decline untouched (G-7b); consent_accept untouched; consent_withdraw's existing logout untouched"
   - "apps/moderation/admin_actions.py byte-unchanged - no select_for_update, no OperationalError boundary (D-8)"
   - "apps/users/services/deletion.py byte-unchanged - withdraw_consent's transaction shape and no-op path intact"
@@ -4172,7 +4268,7 @@ known_gaps_handed_off:
     owner: "phase 12 (production-ops) / db-retention.md"
     gate: G-E
     severity: MEDIUM
-  - gap: "no operator-reachable withdraw_consent trigger on the User admin, absent BY DECISION under G-B - not because registration was overlooked"
+  - gap: "no operator-reachable withdraw_consent trigger on the User admin, absent BY DECISION under G-B - not because registration was overlooked [SUPERSEDED 2026-10-05 by B-12: phase 06 later registered it with permissions=[delete], overturning G-B. Original decision recorded, not re-litigated.]"
     owner: "phase 06 - PII-107 must cite the decision, not the absence"
     gate: G-B
     severity: MEDIUM
@@ -4329,8 +4425,9 @@ say; each correction changes what the Implementor must do.
    `docker/nginx/nginx.dev.conf`. `proxy_set_header` overwrites, so a client cannot influence
    it through nginx. A tree-wide search finds **zero** Python reads of `HTTP_X_REAL_IP`. The
    clean header already exists; the fix is a Python-only change.
-2. **`X-Forwarded-For` is appended, so `XFF[0]` is attacker-controlled end to end.** All 15
-   sites use `$proxy_add_x_forwarded_for`. A client sending `XFF: 1.2.3.4` produces
+2. **`X-Forwarded-For` is appended, so `XFF[0]` is attacker-controlled end to end.** ~~All 15~~
+   **All 16** sites use `$proxy_add_x_forwarded_for` *(corrected 2026-10-05 by `B-12`: 9 in
+   `nginx.conf`, 7 in `nginx.dev.conf`)*. A client sending `XFF: 1.2.3.4` produces
    `1.2.3.4, <real client>`; `split(",")[0]` returns `1.2.3.4` — the attacker's own value.
 3. **`web` is not published in production.** Verified: `docker-compose.yml` publishes only
    `nginx` (`80:80`, `443:443`); `docker-compose.prod.yml` adds only `db` (`6432:6432`) and
@@ -4494,9 +4591,10 @@ exists, a code-level `()` plus a documented operator procedure is the honest flo
   presented as if it were.
 - **`dev.py` and `test.py` are explicit** (`TRUSTED_PROXY_NETWORKS: tuple[str, ...] = ()` in
   both), keeping the transport-parity habit. The new name **is not** added to
-  `test_settings_defaults.py::_TRANSPORT_SETTINGS` — that tuple is a six-member
-  `==`-compared **transport-security** contract and a trust-network list is not a transport
-  setting. Tests that need a non-default value use `override_settings`.
+  `test_settings_defaults.py::_TRANSPORT_SETTINGS` — that tuple is a ~~six-member~~ **seven-member**
+  `==`-compared **transport-security** contract (`LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX` was added by
+  commit `a0bd928`; verified 2026-10-05 in `test_settings_defaults.py:45-53`) and a trust-network list
+  is not a transport setting. Tests that need a non-default value use `override_settings`.
 
 ### `G-8e` — where the helper lives: **`apps/core/utils/client_ip.py`**
 
@@ -4565,7 +4663,7 @@ solve in `B-09`, not a reason to delay `B-08`.**
 | **Setting** | `TRUSTED_PROXY_NETWORKS: tuple[str, ...]`, CIDR strings, `()` by default. **Present and honoured in `B-08`.** `B-09` does **not** add, rename or change it |
 | **Header precedence** (gate open only) | `HTTP_X_REAL_IP` → `HTTP_X_FORWARDED_FOR` right-to-left, first non-private entry → socket peer. **`B-09` must not change this order** |
 | **Return contract** | `str`: the canonical form of a valid IP, or the literal `"unknown"`. Never `None`, never raises, never verbatim header text |
-| **nginx must guarantee (1)** | `proxy_set_header X-Real-IP $remote_addr;` on **every** `location` that proxies to `web`. **Already true**: 9 of 9 in `nginx.conf`, 6 of 6 in `nginx.dev.conf`. If a `location` is added without it, that location silently falls back to the `X-Forwarded-For` walk — which is still correct, but is a behaviour change nobody would notice |
+| **nginx must guarantee (1)** | `proxy_set_header X-Real-IP $remote_addr;` on **every** `location` that proxies to `web`. **Already true**: 9 of 9 in `nginx.conf`, ~~6 of 6~~ **7 of 7** in `nginx.dev.conf` *(corrected 2026-10-05 by `B-12`; verified 7 in `nginx.dev.conf`)*. If a `location` is added without it, that location silently falls back to the `X-Forwarded-For` walk — which is still correct, but is a behaviour change nobody would notice |
 | **nginx must guarantee (2)** | **`web` is not published to the host in production.** Already true: `docker-compose.yml` publishes only nginx; `docker-compose.prod.yml` adds only `db`. **If anyone ever publishes `web`, the peer gate is the only thing still holding** — and a public peer is refused, so the site degrades to `X-Forwarded-For` resolution rather than to a bypass |
 | **nginx must guarantee (3)** | The `real_ip` module must **not** rewrite `$remote_addr` without a matching `set_real_ip_from`. Verified absent today. If added, `$remote_addr` becomes the *forwarded* address and the gate's premise changes silently — this is the single nginx change that could silently invalidate the whole design |
 | **nginx must guarantee (4)** | `X-Forwarded-For` continues to be a **list**. `B-09`'s `$remote_addr` substitution is compatible (a one-element list) and the walk handles it |
@@ -4602,9 +4700,10 @@ for `TRUSTED_PROXY_NETWORKS`. **A section that does not exist must not be refere
 - `apps/core/services/__init__.py` — the package **does** re-export its siblings, but
   `apps/core/utils/__init__.py` is a bare comment with **no** re-exports, so there is nothing
   to add and nothing to keep consistent. Import by full path.
-- `config/settings/tests/test_settings_defaults.py::_TRANSPORT_SETTINGS` — a six-member
-  `==`-compared **transport-security** contract. `TRUSTED_PROXY_NETWORKS` is not a transport
-  setting; adding it would put a trust list inside a TLS assertion.
+- `config/settings/tests/test_settings_defaults.py::_TRANSPORT_SETTINGS` — a ~~six-member~~
+  **seven-member** `==`-compared **transport-security** contract (corrected 2026-10-05 by `B-12`;
+  `LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX` was added by commit `a0bd928`). `TRUSTED_PROXY_NETWORKS` is not
+  a transport setting; adding it would put a trust list inside a TLS assertion.
 - `ALLOWED_ENV_VARS` and the four `.env.*.example` templates — the setting is **not**
   env-driven (`G-8c`), and `B-8d` established no gate requires the template edits.
 - Any `.po` file — **owned by another agent.** This block adds **no** user-visible string.
@@ -4928,6 +5027,16 @@ commit_body_must_state:
 
 ### B-09 — nginx `X-Forwarded-For` + rollout (`04-AUT-003`, edge half) — **PLANNED 2026-10-02 · `G-9a`…`G-9e` ALL CLOSED · EDGE CONFIG EDIT DEFERRED**
 
+> **✅ SHIPPED, and the deferral is STILL IN FORCE (confirmed 2026-10-05 by `B-12`).** The
+> `G-9a`…`G-9e` "EDGE CONFIG EDIT DEFERRED" status is **correct and unchanged** — the
+> container-level `X-Forwarded-For` directive change and the `real_ip` module remain deferred with
+> owner and trigger recorded below; no `.conf` file is edited by phase 04. **What this annotation adds:**
+> the block's **three invariant tests DID land** in `src/backend/tests/test_nginx_config.py` —
+> `test_proxied_locations_overwrite_x_real_ip` (`:221`),
+> `test_no_proxied_location_forwards_a_client_echo_variable` (`:243`), and
+> `test_real_ip_trust_is_never_wildcard` (`:264`). (Verified 2026-10-05 by grep in
+> `src/backend/tests/test_nginx_config.py`.)
+
 | | |
 |---|---|
 | **Findings owned** | `04-AUT-003` (edge half) |
@@ -4964,10 +5073,10 @@ input *description*, *"Git SHA from the CI build to deploy"*), and the rollback 
 
 | Fact | Value | Verified by |
 |---|---|---|
-| `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` | **9** in `nginx.conf`, **6** in `nginx.dev.conf` — **15 total** | `nginx.conf`: `/static/`, `/media/`, `/login/`, `/search/`, `/health/`, `/moderation/`, `/csp-report/`, `= /metrics`, `/` · `nginx.dev.conf`: the same minus `/health/`, `/csp-report/`, `= /metrics` |
-| `proxy_set_header X-Real-IP $remote_addr;` | **9/9** and **6/6** — `proxy_set_header` **overwrites**, so unforgeable *through nginx* | both files, every proxied location |
-| `limit_req_zone` keys | **3 zones** (`login_limit`, `search_limit`, `browse_limit`), all on `$binary_remote_addr` — **unforgeable** | both files |
-| `location` blocks | 10 in `nginx.conf`, 7 in `nginx.dev.conf`; the extra one in each is `/protected-media/` (`internal; alias /media_volume/`) — **no proxy, no headers** | both files |
+| `proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;` | **9** in `nginx.conf`, ~~**6**~~ **7** in `nginx.dev.conf` — ~~**15 total**~~ **16 total** *(corrected 2026-10-05 by `B-12`; verified `Select-String … 'proxy_set_header X-Forwarded-For'` ⇒ 9/7)* | `nginx.conf`: `/static/`, `/media/`, `/login/`, `/search/`, `/health/`, `/moderation/`, `/csp-report/`, `= /metrics`, `/` · `nginx.dev.conf`: the same minus `/health/`, `/csp-report/`, `= /metrics`. **Count, don't trust this list — `nginx.dev.conf` now has 7 (the list above omits `/login/`-adjacent and `/search/` sites; re-derive from the file)** |
+| `proxy_set_header X-Real-IP $remote_addr;` | **9/9** and ~~**6/6**~~ **7/7** *(corrected 2026-10-05 by `B-12`; verified 9 in `nginx.conf`, 7 in `nginx.dev.conf`)* — `proxy_set_header` **overwrites**, so unforgeable *through nginx* | both files, every proxied location |
+| `limit_req_zone` keys | ~~**3 zones** (`login_limit`, `search_limit`, `browse_limit`)~~ **4 zones** (`login_limit`, `search_limit`, `browse_limit`, **`csp_report_limit`** — added by phase 09), all on `$binary_remote_addr` — **unforgeable** *(corrected 2026-10-05 by `B-12`; verified 4 `limit_req_zone` lines in each file)* | both files |
+| `location` blocks | ~~10~~ **11** in `nginx.conf`, ~~7~~ **9** in `nginx.dev.conf` *(corrected 2026-10-05 by `B-12`; verified `^\s*location` ⇒ 11 in `nginx.conf`, 9 in `nginx.dev.conf`)*; the extra one in each is `/protected-media/` (`internal; alias /media_volume/`) — **no proxy, no headers** | both files |
 | `set_real_ip_from` / `real_ip_header` | **ABSENT — zero matches tree-wide under `docker/nginx/`** | `grep real_ip docker/nginx/` |
 | `REMOTE_ADDR` seen by Django in production | **always nginx's private container IP** (no compose file declares `networks:`, so the bridge subnet is per-deployment) | `C-6` |
 | `TRUSTED_PROXY_NETWORKS` | **`()`** in `base.py`, `dev.py`, `test.py` | `G-8d` |
@@ -5245,7 +5354,7 @@ search/autocomplete 30/60 s) plus `ConsentRecord.ip_address`.
 
 **What remains at the edge.**
 
-1. **`XFF[0]` is still attacker-controlled end to end** — 15 sites still append. **Currently
+1. **`XFF[0]` is still attacker-controlled end to end** — ~~15~~ **16** sites still append *(corrected 2026-10-05 by `B-12`: 9 in `nginx.conf`, 7 in `nginx.dev.conf`)*. **Currently
    harmless, and the reason is structural:** `X-Real-IP` is set at every proxied location and
    `get_client_ip` returns on it, so **`X-Forwarded-For` is never read in production**. This
    becomes live the moment any consumer reads `XFF[0]` naively — the exact defect `B-08`
@@ -5867,10 +5976,10 @@ any `.po` file (`G-10e` condition 4).
 
 ---
 
-#### Tests required — **5 new in one new module · 0 changed · 0 deleted**
+#### Tests required — ~~**5 new**~~ **6 new** in one new module · 0 changed · 0 deleted *(corrected 2026-10-05 by `B-12`: the block shipped SIX — `test_lang_switch_re_stamps_authenticated_session` was added beyond the plan's five)*
 
-All five live in **one new module**, `src/backend/config/settings/tests/test_session_policy.py`.
-The home is `config/settings/tests/` and not `apps/users/tests/` because two of the five
+All ~~five~~ **six** live in **one new module**, `src/backend/config/settings/tests/test_session_policy.py`.
+The home is `config/settings/tests/` and not `apps/users/tests/` because two of the ~~five~~ **six**
 are *settings-declaration* tests and the block's production diff is a settings diff; that
 directory is also where `B-06` put its two new modules, and `test_settings_defaults.py` is
 **not** the right file for these (it owns the transport-tuple and staticfiles harnesses —
@@ -5880,9 +5989,13 @@ this is a different subject, and the plan's earlier suggestion to extend it was 
 |---|---|---|---|
 | **1** | `test_session_lifetime_is_declared_in_base` | `config.settings.base` — **the project's own module** — has `SESSION_COOKIE_AGE` and `SESSION_SAVE_EVERY_REQUEST` as module attributes; the age is a positive `int`; `SESSION_SAVE_EVERY_REQUEST is False` | **The "declared, not inherited" assertion, and it is exact:** a Django default is not an attribute of `config.settings.base`, so *presence in that module* **is** the claim. This is the same shape as `test_settings_defaults.py::_THEME_STATICFILES_BACKEND` ("assert the resolved value, not the absence of the dead key, because absence passes on a build where the setting silently reverted to the default"). **The number itself is NOT asserted** — see `G-10h` rule 2 |
 | **2** | `test_declared_age_bounds_a_real_sessions_expiry` | under `override_settings(SESSION_COOKIE_AGE=<small positive value>)`, a session created through a **real request cycle** has `expire_date` within a tolerance of `now + <small>`; and after the value has passed, `client.session` is empty | This is `04-VAL-002`'s **required** test gap (*"`settings.SESSION_COOKIE_AGE` value asserted; a session created after the change expires at the configured age"*) — satisfied **without** pinning 14 days, because the value under test is supplied by the test |
-| **3** | `test_authenticated_session_is_written_once_at_login_and_never_refreshed` | **the authenticated half.** After an authenticated session exists, N **read-only** requests (no `?lang=`, no search, no consent write) leave the persisted `expire_date` **byte-identical** | **The half the plan's single test would have missed, and the half the finding is about.** It is the machine-checked form of *"a seller's session is 14 days from login, not from last activity"* — and it is the test that turns red if anyone later enables `SESSION_SAVE_EVERY_REQUEST` (`G-10b`) |
+| **3** | ~~`test_authenticated_session_is_written_once_at_login_and_never_refreshed`~~ → **`test_authenticated_session_is_not_refreshed_by_read_only_requests`** *(title REFINED 2026-10-05 by `B-12`: it SHIPPED under the scoped name; the original title's "never refreshed" is **FALSE for `?lang=`** — see test 6. The shipped title is **more accurate** than the plan's: it claims only the read-only path.)* | **the authenticated half.** After an authenticated session exists, N **read-only** requests (no `?lang=`, no search, no consent write) leave the persisted `expire_date` **byte-identical** | **The half the plan's single test would have missed, and the half the finding is about.** It is the machine-checked form of *"a seller's session is 14 days from login, not from last activity"* — and it is the test that turns red if anyone later enables `SESSION_SAVE_EVERY_REQUEST` (`G-10b`) |
 | **4** | `test_anonymous_session_is_refreshed_by_each_recorded_search` | **the anonymous half.** An anonymous visitor submitting a non-empty `?q=` gets a session whose `expire_date` is **strictly later** after a second recorded search than after the first | Proves the *other* half of the write-triggered semantics, and it is the only production path that refreshes an anonymous session. Without it, test 3's "never refreshed" reads as a general claim about all sessions, which is **false** |
 | **5** | `test_no_per_session_expiry_override_exists` | (a) no `set_expiry(` call in any non-test `src/**/*.py`; (b) after a real authenticated request cycle the session dict contains **no** `_session_expiry` key | `G-10c`'s live consequence. It pins the fact that today `_session_expiry` is **never** set, so `get_expiry_age()` always falls through to the declared age. A future editor who adds a targeted `set_expiry` **trips this test** instead of silently introducing a per-session policy that diverges from the declared one. Same anti-vacuity discipline as `test_login_issue_template.py` and `test_handshake_ownership` |
+| **6** | **`test_lang_switch_re_stamps_authenticated_session`** *(ADDED 2026-10-05 by `B-12` — a **sixth** test the plan did not list; the block shipped six, not five)* | A `?lang=` request from an **authenticated** user **DOES** re-stamp `expire_date` (language middleware writes `request.session["django_language"]`, so the row is saved again and the window moves) | **The counterpart that makes test 3's "not refreshed" precise.** Without it, "never refreshed" reads as a general claim about all authenticated sessions — which is **false for `?lang=`**. It pins the spec's "again only on a `?lang=` language switch" clause as an executable fact. Number-independent (compares two observed expiries). (Verified 2026-10-05: `test_session_policy.py:182-209`; six `def test_` functions in the shipped module.) |
+
+**Shipped count (corrected 2026-10-05 by `B-12`): the module shipped SIX tests, not five** — tests
+1–5 above plus the sixth, `test_lang_switch_re_stamps_authenticated_session`.
 
 **Explicitly NOT tests, and why — so an Implementor does not "helpfully" add them:**
 
@@ -5987,7 +6100,7 @@ change, no state to unwind — the declaration is inert, which is the point. Rol
 restores the *undeclared* default, so it is a step backwards against the finding and is
 recorded as such.
 
-**Definition of done.** Tests **1–5** green in the one new module · tests 2 and 3 execute
+**Definition of done.** Tests **1–5** *(plus the shipped sixth, `test_lang_switch_re_stamps_authenticated_session` — see `B-12`'s correction to the count above)* green in the one new module · tests 2 and 3 execute
 real request cycles and read the **persisted** `expire_date` · the two settings are
 **declared** in `base.py` inside the existing `# Security settings (TLS/SSL ready)` block
 with a comment stating the write-triggered semantics and the population split · **zero**
@@ -6134,11 +6247,17 @@ files:
              by a REAL request through the test client has a persisted expire_date within
              a small tolerance of now + that value; and once the value has passed,
              client.session is empty. Number-independent by construction.
-          3. test_authenticated_session_is_written_once_at_login_and_never_refreshed — the
-             AUTHENTICATED half. Establish an authenticated session, read the PERSISTED
+          3. test_authenticated_session_is_not_refreshed_by_read_only_requests — the
+             AUTHENTICATED half. (SHIPPED title; the plan's draft title was the broader and
+             inaccurate test_authenticated_session_is_written_once_at_login_and_never_refreshed,
+             corrected 2026-10-05 by B-12 because "never refreshed" is false for ?lang=.)
+             Establish an authenticated session, read the PERSISTED
              django_session.expire_date, issue N read-only requests (no ?lang=, no search,
              no consent write), re-read expire_date, assert it is unchanged. Read the row
              from the DB, not a session-dict value in memory.
+          3b. test_lang_switch_re_stamps_authenticated_session — the ?lang= counterpart
+             (SIXTH shipped test, added 2026-10-05 by B-12). An authenticated ?lang= request
+             DOES re-stamp expire_date; it pins the exception so test 3's scope is exact.
           4. test_anonymous_session_is_refreshed_by_each_recorded_search — the ANONYMOUS
              half. An anonymous client submitting a NON-EMPTY ?q= gets a session; a second
              recorded search yields a strictly later expire_date. A non-empty query is
@@ -6813,8 +6932,8 @@ keep passing after a fix has destroyed its only purpose.**
 |---|---|---|---|---|
 | 1 | `test_ban_leaves_the_banned_sellers_session_usable` | `apps/moderation/tests/test_moderation_views.py` (new `TestBanUserSessionKnownGap`) | `G-A`/`G-D` | a session-revocation mechanism lands |
 | 2 | `test_ban_does_not_log_out_the_moderator` | same class | `G-D` — the wrong-target trap | someone adds `logout(request)` to `ban_user` |
-| 3 | `test_banned_seller_can_still_reach_the_dashboard` | same class | `G-A` | phase 15's gate lands |
-| 4 | `test_banned_seller_cannot_relist_an_ad` — **inverted 2026-10-03 into a POSITIVE CONTROL** (was `test_banned_seller_can_archive_and_reactivate_an_ad`) | `apps/ads/tests/test_edit.py` (`TestBannedSellerRelistPositiveControl`) | **The 2026-10-03 Product Owner ruling — a banned seller cannot create or publish a new ad** | **a regression lets a banned seller relist** |
+| 3 | ~~`test_banned_seller_can_still_reach_the_dashboard`~~ → **`test_banned_seller_is_now_refused_the_dashboard`** *(INVERTED 2026-10-05 by `B-12`; shipped in this module. The gap is not re-opened.)* | same class | `G-A` | phase 15's gate lands |
+| 4 | ~~`test_banned_seller_cannot_relist_an_ad`~~ → **`TestBannedSellerRelistNowRefused::test_banned_seller_is_refused_on_archive_and_reactivate`** *(SUPERSEDED 2026-10-05 by `B-12`; final shipped name/class. Asserts 403 on BOTH POSTs, ad unchanged. The gap is not re-opened.)* — **inverted 2026-10-03 into a POSITIVE CONTROL** (was `test_banned_seller_can_archive_and_reactivate_an_ad`) | `apps/ads/tests/test_edit.py` (`TestBannedSellerRelistPositiveControl` → **`TestBannedSellerRelistNowRefused`**) | **The 2026-10-03 Product Owner ruling — a banned seller cannot create or publish a new ad** | **a regression lets a banned seller relist** |
 | 5 | `test_consent_decline_keeps_the_session_and_is_reversible` | `apps/users/tests/test_consent.py` (new `TestConsentDeclineSessionKnownGap`) | `G-7b` — the one-way door | a decline logout is added |
 | 6 | `test_withdraw_consent_leaves_other_sessions_intact` | `apps/users/tests/test_deletion.py` | `G-A` — `consent_withdraw` flushes only the current session; the other keeps ≤50 raw search queries | multi-session revocation lands |
 
@@ -6829,9 +6948,10 @@ Assert on the ad's **final status**, never on moderation internals.
 **`B-07`'s tests that must NOT be written** — recorded so the omission is traceable and not
 re-derived as an oversight: `test_consent_decline_flushes_the_session` and
 `test_anonymous_decline_is_unaffected` (both `G-7b` = (a) only); and
-`test_withdraw_consent_action_is_registered` (`G-B` = do-not-register). **Nor may any test
+`test_withdraw_consent_action_is_registered` (~~`G-B` = do-not-register~~ — **⚠ phase 06 later registered
+the action; see the annotated `G-B`. Annotated 2026-10-05 by `B-12`.**). **Nor may any test
 assert the *absence* of `withdraw_consent_action`** — that pins a decision as an invariant and
-would have to be deleted the moment phase 06 reverses `G-B`.
+would have to be deleted the moment phase 06 reverses `G-B`. *(Phase 06 did reverse it — 2026-10-05 annotation by `B-12`.)*
 
 **`B-07`'s tripwires — unchanged, unedited, green (5).** Four are already in `E.3`
 (`test_bulk_ban_users_not_locked`, `TestConsentWithdrawIdempotency`, `TestCanLogin`,
@@ -6864,8 +6984,8 @@ finding. Keep `-n 4` on the fast gate.**
 
 | File | Tests | Status | Why it is here |
 |---|---|---|---|
-| `src/backend/config/settings/tests/test_password_recovery.py` | `test_documented_password_change_procedure_works`, `test_documented_procedure_refuses_a_policy_violating_password` | **new module** | **These two are the block's entire evidence base.** Test 1 *executes* the documented procedure against a real user through `call_command("changepassword", …)` with `getpass.getpass` patched in the command module, then asserts `check_password(new, user.password)` and that the stored hash changed — the procedure is run, never pattern-matched. Test 2 supplies a value failing `AUTH_PASSWORD_VALIDATORS` and asserts `CommandError` **plus** a byte-identical hash, which is what pins `G-6g`'s tightening claim: `changepassword` refuses values the old raw-`set_password` recipe accepted |
-| `src/backend/config/settings/tests/test_settings_secrets.py` | `test_prod_requires_email_host` | **new** | The anti-vacuity gate for the `prod.py` comment correction. **It does not exist today and must go in this file, not in `test_settings_defaults.py`** (a plan correction): the file already owns the `_prod_env_overrides` helper and the subprocess-import harness, and `test_redis_url_required_in_production` *sets* `EMAIL_HOST="smtp.example.com"` merely to get past the guard. **It must set only `EMAIL_HOST=""` with every other guard satisfied, and assert stderr names `EMAIL_HOST`** — a bare `ImproperlyConfigured` is satisfiable by the `SITE_URL` guard and is not a test |
+| ~~`src/backend/config/settings/tests/test_password_recovery.py`~~ → **`src/backend/apps/users/tests/test_password_recovery.py`** *(path corrected 2026-10-05 by `B-12`; the shipped module is under `apps/users/tests/`, not `config/settings/tests/` — verified `src/backend/apps/users/tests/test_password_recovery.py` exists and no such file exists under `config/settings/tests/`)* | `test_documented_password_change_procedure_works`, `test_documented_procedure_refuses_a_policy_violating_password` | **new module** | **These two are the block's entire evidence base.** Test 1 *executes* the documented procedure against a real user through `call_command("changepassword", …)` with `getpass.getpass` patched in the command module, then asserts `check_password(new, user.password)` and that the stored hash changed — the procedure is run, never pattern-matched. Test 2 supplies a value failing `AUTH_PASSWORD_VALIDATORS` and asserts `CommandError` **plus** a byte-identical hash, which is what pins `G-6g`'s tightening claim: `changepassword` refuses values the old raw-`set_password` recipe accepted |
+| `src/backend/config/settings/tests/test_settings_secrets.py` | ~~`test_prod_requires_email_host`~~ → **`test_prod_email_host_missing_warns_but_imports`** *(corrected and de-mandated 2026-10-05 by `B-12`)* | **new** | 🔴 **`test_prod_requires_email_host` is FORBIDDEN — do not write it.** The 2026-10-03 Product Owner ruling (`09-API-009`) made a missing `EMAIL_HOST` a loud startup **warning, not a boot gate**. The **shipped** test is `test_prod_email_host_missing_warns_but_imports`, asserting `returncode == 0` and that output names `EMAIL_HOST` and `silently`. This file is still the right home (it owns `_prod_env_overrides` and the subprocess-import harness), but the assertion is the **opposite** of what the old row mandated. ~~The anti-vacuity gate for the `prod.py` comment correction … **It must set only `EMAIL_HOST=""` with every other guard satisfied, and assert stderr names `EMAIL_HOST`** — a bare `ImproperlyConfigured` is satisfiable by the `SITE_URL` guard and is not a test~~ (Verified 2026-10-05: `test_settings_secrets.py:202-211`.) |
 
 **Changed: 0. Deleted: 0.** Verified: grepping `src/` for `Reset password|Set password|\.\./password/|auth_user_password_change|password_change`
 returns only `has_usable_password` and `make_password(None)` — **no existing test encodes the dead-button
@@ -6912,7 +7032,7 @@ behaviour — and `C-B10-2` is *why* that is knowable in advance rather than dis
 
 | File | Tests | Status | Why it is here |
 |---|---|---|---|
-| `src/backend/config/settings/tests/test_session_policy.py` | `test_session_lifetime_is_declared_in_base`, `test_declared_age_bounds_a_real_sessions_expiry`, `test_authenticated_session_is_written_once_at_login_and_never_refreshed`, `test_anonymous_session_is_refreshed_by_each_recorded_search`, `test_no_per_session_expiry_override_exists` | **new module** | **The block's entire evidence base.** A **new module in `config/settings/tests/`**, not an extension of `test_settings_defaults.py` (which owns the transport-tuple and staticfiles harnesses — a different subject) and not in `apps/users/tests/` (two of the five are settings-declaration tests and the production diff is a settings diff). Same precedent as `B-06`'s two new modules in the same directory. **The `_THEME_STATICFILES_BACKEND` shape is the template for test 1: assert the resolved value, not the absence of the dead key, because absence passes on a build where the setting silently reverted to the default** — here, `getattr(config.settings.base, "SESSION_COOKIE_AGE")` **is** the "declared, not inherited" claim, because a Django default is not an attribute of the project's own settings module |
+| `src/backend/config/settings/tests/test_session_policy.py` | `test_session_lifetime_is_declared_in_base`, `test_declared_age_bounds_a_real_sessions_expiry`, ~~`test_authenticated_session_is_written_once_at_login_and_never_refreshed`~~ → **`test_authenticated_session_is_not_refreshed_by_read_only_requests`**, `test_anonymous_session_is_refreshed_by_each_recorded_search`, `test_no_per_session_expiry_override_exists`, **`test_lang_switch_re_stamps_authenticated_session`** *(sixth test, added 2026-10-05 by `B-12` — the block shipped SIX, not five; title refined because "never refreshed" is false for `?lang=`)* | **new module** | **The block's entire evidence base.** A **new module in `config/settings/tests/`**, not an extension of `test_settings_defaults.py` (which owns the transport-tuple and staticfiles harnesses — a different subject) and not in `apps/users/tests/` (two of the five are settings-declaration tests and the production diff is a settings diff). Same precedent as `B-06`'s two new modules in the same directory. **The `_THEME_STATICFILES_BACKEND` shape is the template for test 1: assert the resolved value, not the absence of the dead key, because absence passes on a build where the setting silently reverted to the default** — here, `getattr(config.settings.base, "SESSION_COOKIE_AGE")` **is** the "declared, not inherited" claim, because a Django default is not an attribute of the project's own settings module |
 
 **Changed: 0. Deleted: 0.** Three verifications, all run live, that make this knowable
 rather than hoped for — each of them is a trap this block would otherwise fall into:
@@ -7135,19 +7255,19 @@ code context's contradictions that re-priced an option. Merged and renumbered as
 | **`G-7`** the session-revocation option (a)/(b)/(c) | `Q7` | **`B-07`** | ~~decision gate~~ | ~~`B-07` does not start~~ **✅ CLOSED by the B-07 Planner (2026-10-02) — option (b), re-scoped to ZERO production code.** Options (b) and (c) collapse into one shape once the reachability correction lands: there is no path where adding a `logout()` is correct. **The reachability count is 1 of 5 open paths, not 3** — the plan's 2026-10-01 `C-17` correction was itself wrong: `moderation/views/review.py::ban_user` does have a `request`, but it is `@staff_required` so `request.user` is **the moderator**, and the changed identity is `ad.user`; `django.contrib.auth.logout(request)` has **no target-user parameter**. So "has a `request`" is satisfied and the change is still impossible. Full argument, the five gates this opened, and the resulting zero-code scope in **`### B-07`** |
 | **`G-7b`** `Q8` — the decline-path logout | `Q8` | **`B-07`** | ~~HARD gate on the decline path only~~ | ~~`consent_decline` is untouched~~ **✅ CLOSED by the B-07 Planner (2026-10-02) — option (b): `consent_decline` is left untouched, and NOT merely deferred.** The plan and the code context both recorded only the weak reason (*"it pre-empts phase 06 `PII-105`"*). **The decisive reason is stronger and code-verified: decline + `logout()` is a PERMANENT ONE-WAY DOOR.** `can_login(is_declined=True) is False` (pinned by `TestCanLogin::test_declined_user_cannot_login` **and** `::test_banned_and_declined_cannot_login`); the only production writer of `is_declined = False` is `give_consent`, reachable only from an **authenticated** `consent_accept`; `consent_accept` is anonymous-accessible and an anonymous POST performs **no DB mutation**. So after decline+logout the user cannot log in and cannot clear the decline. The harm it would buy is near-zero — a declined user is **self-restricting** (`decline_consent` already sets `ads_auto_publish=False`, and listings already filter `user__is_declined=False` live). **Revisit only if `PII-105` makes DECLINE reversible AND restores web login for a declined user** |
 | **`G-A`** (new) is the decode-scan revocation service in or out? | — | **`B-07` → `15-AUTHZ-001`** | ~~Planner~~ | ~~the ban path ships unrecorded~~ **✅ CLOSED by the B-07 Planner (2026-10-02) — OUT, with a loud named known-gap and a named owner (phase 15 `15-AUTHZ-001`). ⚠ AMENDED 2026-10-03 (Product Owner): the RELIST limb of that known gap is CLOSED — a banned seller cannot create or publish a new ad; ban enforcement covers relisting, not only login. Test 4 is inverted into a positive control and the `15-AUTHZ-001` hand-off for that gap is WITHDRAWN. The scan remains out of `B-07`'s scope, and the SESSION-REVELATION limb is untouched and still HIGH.** The only two mechanisms that could revoke a *banned* user's sessions are an O(live sessions) decode scan and a per-request account-state check, and **both are owned by other blocks**: the scan would run inside `ban_user`'s already-locked window (phase 03 `DB-004`), duplicates phase 15's `15-AUTHZ-001` mechanism, and has no index to make it cheap — `ConsentRecord.session_key` is unindexed **and semantically wrong**, because `auth_login` calls `cycle_key()` on the anonymous→authenticated transition. The per-request check is forbidden here by `04-VAL-001` and is phase 15's by design. **Honest consequence, as filed and as now partly retired: a banned seller kept a working session and could relist — `ad_edit` and `ad_reactivate` had no account-state check, `ad_reactivate` called `auto_moderate(ad)` inline, and `auto_moderate` never read `is_banned`. The relist half is now a control; the session-revival half remains HIGH and knowingly accepted, `04-AUT-002` **NOT closed** |
-| **`G-B`** (new) register `withdraw_consent_action`, or not? | — (closes `G-7`'s mandatory sub-decision) | **`B-07` → phase 06 `PII-107`** | ~~Planner~~ | ~~the operator-erasure decision goes unrecorded~~ **✅ CLOSED by the B-07 Planner (2026-10-02) — DO NOT REGISTER. `src/backend/apps/users/admin.py` is not touched at all, and no test is written.** Reason 1 (the plan's): it is a **new, irreversible** operator capability — PII nulling, user *and* ad soft-delete, `LoginToken` deletion, no inverse — and `has_change_permission` is `is_staff` and ignores `obj`, so both `actions = (...)` **and** `permissions=["change"]` would be mandatory. **Reason 2 (new, and decisive): registering it while `G-A` is out would *increase* `04-AUT-002`'s residual** — the action is moderator-invoked about other users in a `queryset`, so it has the **identical wrong-target problem** as `ban_user`, and it is the one path that erases PII. The real choice is *capability* vs. *capability-plus-a-new-reachable-session-gap*. **Do not assert the action's absence** — that would pin a decision as an invariant. `PII-107` keeps its MEDIUM band and must cite **the decision, not the absence** |
+| **`G-B`** (new) register `withdraw_consent_action`, or not? | — (closes `G-7`'s mandatory sub-decision) | **`B-07` → phase 06 `PII-107`** | ~~Planner~~ | ~~the operator-erasure decision goes unrecorded~~ **✅ CLOSED by the B-07 Planner (2026-10-02) — DO NOT REGISTER. `src/backend/apps/users/admin.py` is not touched at all, and no test is written.** Reason 1 (the plan's): it is a **new, irreversible** operator capability — PII nulling, user *and* ad soft-delete, `LoginToken` deletion, no inverse — and `has_change_permission` is `is_staff` and ignores `obj`, so both `actions = (...)` **and** `permissions=["change"]` would be mandatory. **Reason 2 (new, and decisive): registering it while `G-A` is out would *increase* `04-AUT-002`'s residual** — the action is moderator-invoked about other users in a `queryset`, so it has the **identical wrong-target problem** as `ban_user`, and it is the one path that erases PII. The real choice is *capability* vs. *capability-plus-a-new-reachable-session-gap*. **Do not assert the action's absence** — that would pin a decision as an invariant. `PII-107` keeps its MEDIUM band and must cite **the decision, not the absence** — **⚠ OVERTURNED 2026-10-05 by `B-12`: phase 06 later REGISTERED the action (`admin.py:204` `actions = […]`; `admin.py:321-324` `permissions=["delete"]`). `G-B` held at the time and phase 06 owns the decision; recorded, not re-litigated** |
 | **`G-D`** (new) where is the `ban_user` wrong-target trap recorded? | — | **`B-07`** | ~~Planner~~ | ~~the trap is left to the next editor~~ **✅ CLOSED by the B-07 Planner (2026-10-02) — as a NAMED KNOWN-GAP TEST in `apps/moderation/tests/test_moderation_views.py`, not handed to the next editor.** A hand-off note is insufficient here because the plan's *existing brief* named that exact `logout(request)` edit in its `changes` block and its `acceptance_criteria` did not exclude it. **The trap is worse than the plan assumed: FIVE tests would stay green, not four** — `TestBanUserView`'s four (each `force_login(staff_user)`, asserting only `status_code == 302` and `seller.is_banned`) **plus `TestModerationReviewLocking::test_ban_user_uses_select_for_update_and_atomic`**, which is an `inspect.getsource` **substring** check and is entirely indifferent to an added statement. This is a **plan correction** (the `ban_user` reachability premise is refuted), not a second mechanism — `04-VAL-001` forbids filing the same mechanism twice |
 | **`G-E`** (new) is the missing session janitor re-filed? | — | **`B-07` → phase 12 / `db-retention.md`** | ~~Planner~~ | ~~the janitor is neither shipped nor recorded~~ **✅ CLOSED by the B-07 Planner (2026-10-02) — RE-FILED as a retention/ops finding against `docs/02-database/db-retention.md`; explicitly NOT `04-AUT-002`'s scope.** Mechanism, not convenience: `clearsessions` is discoverable (`django.contrib.sessions` is in `INSTALLED_APPS` and `SessionMiddleware` is in `MIDDLEWARE`, so it needs no new file, no `AdvisoryLockId` and no migration) **but `clear_expired()` deletes only rows past `expire_date`, so it cannot shorten a live session and does nothing for `04-AUT-002`.** And the cost is not zero: `HOURLY_COMMANDS` 9→10 breaks `TestSchedulerConstants::test_hourly_commands_match_spec` and `DAILY_COMMANDS` 2→3 breaks `::test_daily_commands_include_send_alerts` — **both exact-`==`-pinned, in a phase-owned file `B-07` does not own.** `db-retention.md` has **no session row** and would need one |
 | **`G-F`** (new) the `test_banner_hidden_for_deleted_user` handoff | — | **`B-07` → `15-AUTHZ-001`** | ~~Planner~~ | ~~phase 15 discovers the rewrite itself, unbudgeted~~ **✅ CLOSED by the B-07 Planner (2026-10-02) — phase 15's migration, named and budgeted.** `apps/users/tests/test_consent.py::TestConsentBannerGuard::test_banner_hidden_for_deleted_user` **encodes the defect**: the `deleted_user` fixture sets `is_deleted=True` **at creation**, then `force_login` + `GET /dashboard/` → **asserts 200**, under a class docstring saying soft-deleted users *"never see the consent banner, even when they briefly pass through a view before any redirect."* **"Briefly pass through a view" is the defect, asserted as expected.** `B-07`'s migration cost is **zero** (no transition ever runs); **a per-request gate turns it red.** `15-AUTHZ-001` must budget the rewrite in its own commit; it is a rewrite, not a deletion, and `test_banner_shown_for_active_user` stays green |
 | **`G-8`** the client-IP trust-model shape | — | `B-08` | ~~Researcher + Planner~~ | ~~`B-08` does not start~~ **✅ CLOSED by the B-08 Planner (2026-10-01).** Superseded by `G-8b`…`G-8g`, which answer the same question with the Researcher's verified topology. The plan's own option list was written before `C-6` was established and none of its three options survive it unchanged |
 | **`G-8a`** is `consent_record.py`'s fourth client-IP read in scope? | `U-8`, `C-4` | `B-08` | ~~Planner~~ | ~~the phase would ship **two** inconsistent client-IP policies~~ **✅ CLOSED — IN SCOPE.** `record_consent_action` routes its IP through the same helper. **Cost is 0 test rewrites**: `TestAnonymizeIp`'s three tests call `_anonymize_ip` directly and are untouched, and `test_ip_is_anonymized_and_ua_truncated` is **permissive by design** (accepts `None` or any value ending in `.0`; `127.0.0.1` → `127.0.0.0`). **Gain: the latent `AddressValueError` → HTTP 500 is fixed**, because the helper validates before the value reaches `ipaddress.IPv6Address` inside `_anonymize_ip` — a value with no `.` that is not valid IPv6 is currently a 500. **Citation corrected (`B-8e`): the owner is phase 06's `06-PII-107` BLOCK 6 (`Q-D7`), whose file surface names `record_consent_action` and `_anonymize_ip` — NOT `PII-104`, which is the unrelated alert-audience finding.** BLOCK 6 binding constraint 5 (*"`_anonymize_ip`'s behaviour is unchanged"*) is **satisfied by design**: only its input changes, never its body. Blast radius: one function body, one import line, no model change, no migration, no template, no `.po` |
-| **`G-8b`** trust model: trusted set / boolean flag / none | `Q2` (**answered** by `C-6`) | `B-08` | ~~Researcher + Planner~~ | ~~`B-08` does not start~~ **✅ CLOSED — PEER-GATED `X-Real-IP`, with a rightmost-untrusted `X-Forwarded-For` fallback.** The gate is **mandatory and load-bearing**: `X-Real-IP` is read, but **only** when `REMOTE_ADDR` is loopback/private (or inside `TRUSTED_PROXY_NETWORKS`). **Trusting `X-Real-IP` unconditionally is the one variant strictly worse than the status quo** — it would replace an attacker-controlled *prefix* (`XFF[0]`) with an attacker-controlled *whole value*, and that is a regression, not a refinement. The gate is what makes (c) safe: `docker-compose.dev.override.yml` publishes `web` on `8000:8000` with nginx behind `profiles: ["use-nginx"]`, so in the **default dev stack Django takes the connection directly** and a direct client can set `X-Real-IP` itself. Through nginx it is unforgeable — `proxy_set_header X-Real-IP $remote_addr` **overwrites** at 9 of 9 sites in `nginx.conf` and 6 of 6 in `nginx.dev.conf`, and **verified: `web` is not published in production** (`docker-compose.yml` publishes only nginx; `docker-compose.prod.yml` adds only `db`). **(a) alone is rejected**: no compose file declares `networks:`, so a literal trusted IP is not operable — and critically, the plan's feared failure mode (an unset set collapsing every client into one bucket) **does not apply here**, because the private-peer half of the gate stays operative when the set is empty, so an empty set **collapses rather than bypasses**. **(b) alone is rejected** as a resolver: a Docker sibling (`bot`, `scheduler`) is also private and is a different principal; (b) is kept as the **gate**. **Failure direction is recorded as a feature**: a future CDN/LB collapses every client onto the CDN's address — a self-inflicted DoS that is immediately visible, i.e. the safe direction. **Known cost, recorded not hidden: in the default dev stack the gate is always open, so dev never exercises the untrusted branch** — unit tests only, and the docs subsection must say so |
+| **`G-8b`** trust model: trusted set / boolean flag / none | `Q2` (**answered** by `C-6`) | `B-08` | ~~Researcher + Planner~~ | ~~`B-08` does not start~~ **✅ CLOSED — PEER-GATED `X-Real-IP`, with a rightmost-untrusted `X-Forwarded-For` fallback.** The gate is **mandatory and load-bearing**: `X-Real-IP` is read, but **only** when `REMOTE_ADDR` is loopback/private (or inside `TRUSTED_PROXY_NETWORKS`). **Trusting `X-Real-IP` unconditionally is the one variant strictly worse than the status quo** — it would replace an attacker-controlled *prefix* (`XFF[0]`) with an attacker-controlled *whole value*, and that is a regression, not a refinement. The gate is what makes (c) safe: `docker-compose.dev.override.yml` publishes `web` on `8000:8000` with nginx behind `profiles: ["use-nginx"]`, so in the **default dev stack Django takes the connection directly** and a direct client can set `X-Real-IP` itself. Through nginx it is unforgeable — `proxy_set_header X-Real-IP $remote_addr` **overwrites** at 9 of 9 sites in `nginx.conf` and ~~6 of 6~~ **7 of 7** in `nginx.dev.conf` *(corrected 2026-10-05 by `B-12`)*, and **verified: `web` is not published in production** (`docker-compose.yml` publishes only nginx; `docker-compose.prod.yml` adds only `db`). **(a) alone is rejected**: no compose file declares `networks:`, so a literal trusted IP is not operable — and critically, the plan's feared failure mode (an unset set collapsing every client into one bucket) **does not apply here**, because the private-peer half of the gate stays operative when the set is empty, so an empty set **collapses rather than bypasses**. **(b) alone is rejected** as a resolver: a Docker sibling (`bot`, `scheduler`) is also private and is a different principal; (b) is kept as the **gate**. **Failure direction is recorded as a feature**: a future CDN/LB collapses every client onto the CDN's address — a self-inflicted DoS that is immediately visible, i.e. the safe direction. **Known cost, recorded not hidden: in the default dev stack the gate is always open, so dev never exercises the untrusted branch** — unit tests only, and the docs subsection must say so |
 | **`G-8c`** env-driven or literal | `D-6` | `B-08` | ~~Planner~~ | ~~if env-driven and unset, `test_env_allowlist_reverse.py` fails~~ **✅ CLOSED — LITERAL `tuple[str, ...]` of CIDRs, default `()`.** Decided on the merits, and the merits changed once `B-8d` was verified: **the four `.env.*.example` edits were never gate-binding** (both allowlist tests are one-directional subset assertions; `test_python_consumed_vars_in_allowlist` is a hardcoded 8-name subset), so the contention argument the plan leaned on **does not exist**. The real reason is that **there is no correct value to put in an env var**: no compose file declares `networks:`, so nginx's bridge subnet is per-deployment, and shipping an operator-facing knob whose correct value cannot be determined from inside the repository is shipping a trap **with a config surface** — and a mis-set value is the self-inflicted DoS the plan itself identifies. Secondary: the `# env-contract:` opt-out is documented for *"not a deployment variable"* and this **is** one, so using it violates the contract in spirit. Tertiary: the invariant that matters — **no public peer is trusted unless an operator lists a network containing it** — is **additive-only** (`()` in `base.py`, `dev.py` and `test.py`, undeclared in `prod.py`, so the shipped gate is exactly `is_loopback or is_private`), so a setting that cannot narrow it is documentation, and documentation belongs in a comment and in `docs/`. **Promotion path named so it is not lost**: env-backing is a follow-up gated on a compose `networks:` declaration giving nginx a stable address |
-| **`G-8d`** the setting's name and type | — | `B-08` | ~~Researcher, against installed Django 5.2~~ | ~~a name may shadow a real Django setting~~ **✅ CLOSED — `TRUSTED_PROXY_NETWORKS: tuple[str, ...] = ()`, in `base.py`, `dev.py` and `test.py`.** Verified against installed Django 5.2.17: **no** Django setting concerns client IP, `SECURE_PROXY_SSL_HEADER` governs **scheme** not identity, and nothing in Django reads `X-Forwarded-For` — so the name shadows nothing. The `TRUSTED_PROXY_*` prefix follows the nearest in-repo trust-naming precedent, `CSRF_TRUSTED_ORIGINS`, and deliberately avoids a `SECURE_`/`CSRF_` prefix that would be mistaken for a Django global. **Type is networks, not IPs** (`tuple[str, ...]` of CIDR strings), annotated to match the only annotated settings in `base.py` (`LOCK_TIMEOUT_SECONDS: int`, `_MAX_LOCK_TIMEOUT_SECONDS: int`); membership is `ipaddress.ip_address(peer) in ipaddress.ip_network(cidr)` per request over a 0–2 element tuple — no import-time parsing, no `lru_cache`, no new abstraction (rule 5). **No `StrEnum`**, with the reason recorded: `apps/core/enums.py` holds named *value sets* and a member per network would be absurd; the three limiters use `Final` for keys and caps, and this is one tuple. The trust *mode* has two branches but they are **the algorithm, not a setting**, and a mode that is not configurable must not be presented as if it were. **`_TRANSPORT_SETTINGS` is deliberately NOT extended** — it is a six-member `==`-compared transport-security contract, and a trust-network list is not a transport setting |
+| **`G-8d`** the setting's name and type | — | `B-08` | ~~Researcher, against installed Django 5.2~~ | ~~a name may shadow a real Django setting~~ **✅ CLOSED — `TRUSTED_PROXY_NETWORKS: tuple[str, ...] = ()`, in `base.py`, `dev.py` and `test.py`.** Verified against installed Django 5.2.17: **no** Django setting concerns client IP, `SECURE_PROXY_SSL_HEADER` governs **scheme** not identity, and nothing in Django reads `X-Forwarded-For` — so the name shadows nothing. The `TRUSTED_PROXY_*` prefix follows the nearest in-repo trust-naming precedent, `CSRF_TRUSTED_ORIGINS`, and deliberately avoids a `SECURE_`/`CSRF_` prefix that would be mistaken for a Django global. **Type is networks, not IPs** (`tuple[str, ...]` of CIDR strings), annotated to match the only annotated settings in `base.py` (`LOCK_TIMEOUT_SECONDS: int`, `_MAX_LOCK_TIMEOUT_SECONDS: int`); membership is `ipaddress.ip_address(peer) in ipaddress.ip_network(cidr)` per request over a 0–2 element tuple — no import-time parsing, no `lru_cache`, no new abstraction (rule 5). **No `StrEnum`**, with the reason recorded: `apps/core/enums.py` holds named *value sets* and a member per network would be absurd; the three limiters use `Final` for keys and caps, and this is one tuple. The trust *mode* has two branches but they are **the algorithm, not a setting**, and a mode that is not configurable must not be presented as if it were. **`_TRANSPORT_SETTINGS` is deliberately NOT extended** — it is a ~~six-member~~ **seven-member** `==`-compared transport-security contract (corrected 2026-10-05 by `B-12`: `LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX` was added by commit `a0bd928`), and a trust-network list is not a transport setting |
 | **`G-8e`** (new) where the helper lives | `C-21` (re-derived) | `B-08` | **Planner** — the plan's justification was false | ~~`apps/core/services/` on `site_config.py`'s docstring~~ **✅ CLOSED — `src/backend/apps/core/utils/client_ip.py`.** `B-8c` removed the stated reason: `site_config.py`'s docstring reads *"Used by the web context processor (sync) and the Telegram bot (async)"* and says **nothing** about hosting cross-app shared services. Decided on structure: the helper is a **pure function** (`META` in, `str` out) touching no cache, connection or model, and `apps/core/utils/` has **zero model imports**; `sanitize.py` is the structural template (pure transform over untrusted input, same `Final` + `Args:`/`Returns:` style, same security rationale). `apps/core/services/` holds writers — `contact.py`, `analytics.py`, cached `site_config.py`, and `contact_rate_limit.py` itself. The dependency direction passes either way (`telegram_bot` imports **from** `apps.*`, never the reverse). **`apps/core/utils/__init__.py` is a bare comment with no re-exports**, so there is no re-export decision to make. `apps/core/middleware/` remains a false lead (`MIDDLEWARE` is a pinned 15-entry list, `04-VAL-001`). `apps/users/services/` inverts the dependency. **This path is part of the outbound contract to phase 09's `API-005`** |
 | **`G-8f`** (new) is the return value validated? | — | `B-08` | **Planner** — it changes the cache key and must not be implicit | ~~undocumented key-shape change~~ **✅ CLOSED — YES, for well-formedness only.** The chosen value is parsed with `ipaddress` and returned **canonically**, so two spellings of one IPv6 address share a bucket; unparseable ⇒ fall back to the socket peer; socket peer unparseable ⇒ `"unknown"`. The helper **never returns header text verbatim and never raises**. **Canonicalisation changes the key for IPv6 only**, and the three key-asserting tests all use `127.0.0.1`, which canonicalises to itself — so they survive **by luck, not by design**, which is why an explicit IPv6 key-stability test (test 8) is mandatory. **The validator does NOT reject private or reserved addresses**: that is the **gate's** job and it is a trust decision, not a syntax one; rejecting here would make the dev/test path (peer `127.0.0.1` → resolved `127.0.0.1`) fall through and change every key. One place decides trust, one place decides syntax |
 | **`G-8g`** (new) is `B-09` mandatory for `B-08`? | — | `B-08` → `B-09` | **Planner** — corrects §C's `B-08 → B-09` hard edge | ~~`B-08` waits for `B-09`~~ **✅ CLOSED — NO. `B-08` is complete and correct on its own.** With the peer gate, the `X-Real-IP` preference and the right-to-left walk, Django is correct against today's `$proxy_add_x_forwarded_for` with **no nginx edit at all**; §C's hard `B-08 → B-09` edge is **superseded by this row**. The reverse was never true: `B-09` landing alone changes nothing, since no Python code reads the header today. `B-09` is **optional hardening**. **And `B-09` cannot currently be delivered, validated or rolled back by this repository's pipeline** — `deploy.yml` never `git pull`s, the nginx config is a **bind mount** so `docker compose up -d` will not recreate an unchanged service, the health gate runs **inside the web container bypassing nginx**, and rollback (`up -d --force-recreate web bot`) **excludes nginx**. No `nginx -t`, no reload path, no `docker compose config` gate exists. That is `B-09`'s problem to solve, **not a reason to delay `B-08`** |
-| **`G-9a`** the nginx file reservation vs phase 09 | `U-7` | `B-09` | ~~Planner~~ | ~~`B-09` does not start~~ **✅ CLOSED by the `B-09` Planner (2026-10-02) — `B-09` TAKES **NO** NGINX CONFIG EDIT. The conflict is resolved by NON-CLAIMING, not by negotiation.** Phase 09 keeps both `.conf` files and its BLOCKS 10/11/12, which are the blocks that already carry the `nginx -t`-before-rolling discipline (`09-external-api-remediation.md` §4.4 item 7, rollout gate §8.4). Phase 04 takes only `src/backend/tests/test_nginx_config.py`. Options (i) *"take the header lines"* and (iii) *"phase 09 lands first"* are both **withdrawn**: (i) buys a change that cannot be delivered (see `G-9b`) and changes nothing observable (see `G-9c`), and (iii) requires coordinating with a phase this block does not own. **Recorded, because the deferral is a decision and not an omission:** the two files are **unmodified by phase 04**, and `docs/ops/docker-deployment.md::Client IP Trust Model` stays accurate as written because `$proxy_add_x_forwarded_for` genuinely is still used at all 15 sites |
+| **`G-9a`** the nginx file reservation vs phase 09 | `U-7` | `B-09` | ~~Planner~~ | ~~`B-09` does not start~~ **✅ CLOSED by the `B-09` Planner (2026-10-02) — `B-09` TAKES **NO** NGINX CONFIG EDIT. The conflict is resolved by NON-CLAIMING, not by negotiation.** Phase 09 keeps both `.conf` files and its BLOCKS 10/11/12, which are the blocks that already carry the `nginx -t`-before-rolling discipline (`09-external-api-remediation.md` §4.4 item 7, rollout gate §8.4). Phase 04 takes only `src/backend/tests/test_nginx_config.py`. Options (i) *"take the header lines"* and (iii) *"phase 09 lands first"* are both **withdrawn**: (i) buys a change that cannot be delivered (see `G-9b`) and changes nothing observable (see `G-9c`), and (iii) requires coordinating with a phase this block does not own. **Recorded, because the deferral is a decision and not an omission:** the two files are **unmodified by phase 04**, and `docs/ops/docker-deployment.md::Client IP Trust Model` stays accurate as written because `$proxy_add_x_forwarded_for` genuinely is still used at all ~~15~~ **16** sites *(corrected 2026-10-05 by `B-12`: 9 in `nginx.conf`, 7 in `nginx.dev.conf`)* |
 | **`G-9b`** the rollout mechanism | `U-6` | `B-09` | ~~Researcher + Planner~~ | ~~`B-09` does not start~~ **✅ CLOSED by the `B-09` Planner (2026-10-02) — NO REPO-VERIFIABLE MECHANISM EXISTS, AND THIS IS WHY THE BLOCK DEFERS. All four delivery defects are CONFIRMED, re-verified at `8ecdaba`, and the first is worse than recorded.** (1) **`deploy.yml` cannot deliver the file at all.** `actions/checkout@v4` runs on `runs-on: ubuntu-latest` — an **ephemeral GitHub-hosted runner**, discarded at job end. The production tree is only ever touched by the `appleboy/ssh-action` script, and that script contains **no `git` command of any kind** (verified: no `git`/`fetch`/`checkout`/`pull`/`rsync`/`rclone` anywhere in `deploy.yml`'s script body). So `/app/docker/nginx/nginx.conf` on the host is whatever an operator last placed there. **A committed `.conf` change does not reach production at all — not "may not take effect", but cannot.** (2) **It is a `:ro` bind mount** (`docker-compose.yml::nginx` and `docker-compose.prod.yml::nginx`), so even a host-side file change is invisible to the running container until nginx re-reads it, and `up -d` **will not recreate an unchanged service**. (3) **The health gate cannot see it:** `deploy.yml` runs `docker compose exec -T web curl -sf http://localhost:8000/health/ready/`, i.e. port 8000 **inside the web container, bypassing nginx**. (4) **Rollback excludes nginx:** `up -d --force-recreate --remove-orphans web bot`. **No `nginx -t`, no reload path and no `docker compose config` gate exists anywhere in the repository.** Option (i) *"forced nginx recreate in the deploy path"* is **REFUSED** — `deploy.yml` and `rollback.md` are **not this phase's file surface** and would claim phase 12's. **Chosen: the operator runbook** (mandatory manual steps written out in `### B-09`) **plus a rejection of the `docker compose config` gate** on the established-precedent ground recorded in `G-9e` |
 | **`G-9c`** which directive | `Q9` (**answered**) | `B-09` | ~~Researcher + Planner~~ | ~~`B-09` does not start~~ **✅ CLOSED by the `B-09` Planner (2026-10-02) — **NO DIRECTIVE CHANGES**, and the three candidate edits fail for three different reasons. `real_ip` is **verified absent** from both configs and `from docker/nginx/` tree-wide. **(a) `$remote_addr` (`G-9c` a) — REFUSED, it changes nothing observable.** `proxy_set_header X-Real-IP $remote_addr;` is present at **9/9** prod sites and **6/6** dev sites, and `B-08`'s resolver **prefers `X-Real-IP` and returns on it**. Therefore in production **Django never reaches the `X-Forwarded-For` branch at all** — the header this option would change is **dead data on the resolution path**. It would only remove a footgun for a hypothetical future reader, at the price of a 15-location edit with no syntax gate. **(b) the `real_ip` module (option ii) — REFUSED AS ACTIVELY HARMFUL, and this is the strongest single finding in the block.** nginx **is** the first hop (`C-6`: no CDN, no LB, nothing in front of it), so there is **no upstream proxy to trust** and `set_real_ip_from` has **no legitimate value to name** — the only expressible settings are inert or catastrophic. `real_ip_header` alone is inert (nginx's realip module replaces `$remote_addr` only for peers matched by a `set_real_ip_from` entry). `set_real_ip_from 0.0.0.0/0` is **catastrophic and not defence in depth**: it makes every client a "trusted proxy", so `$remote_addr` becomes the client's own `X-Real-IP`/`X-Forwarded-For` value — which **also destroys `limit_req_zone $binary_remote_addr`**, the one control `B-08` declared unforgeable and which **no test in the repository covers**. `set_real_ip_from` with the default `real_ip_header X-Real-IP` is the same catastrophe. **(c) keep `$proxy_add_x_forwarded_for` (option b) — ADOPTED, unchanged.** `B-08`'s right-to-left walk already makes the appending form safe, and the unforgeable header is the one already in place. **`G-8g`'s hazard is therefore recorded as NOT an outstanding risk but as a closed question:** the `real_ip` module is not merely absent, it is now **deliberately absent** and guarded by test `G-9d` #3 |
 | **`G-9d`** (new) the executable trust-model gate | `X-14`, `C-7`, `I.10` pt 3 | `B-09` | **Planner** — it is the only deliverable the block has left | ~~the shipped Python half depends on an nginx line no gate can see~~ **✅ CLOSED (2026-10-02) — THREE TEXTUAL TESTS in `src/backend/tests/test_nginx_config.py`, over BOTH `.conf` files, asserting the INVARIANT and never the current value.** This is the block's only code deliverable and it is the inverse of the original plan: the plan wanted an assertion that no location uses `$proxy_add_x_forwarded_for`, which would have to assert the **opposite** of today's config and would therefore **pin the forgeable-but-defended state as an invariant** — the mistake `B-07`'s `G-B` explicitly forbade (*"Do not assert the action's absence — that would pin a decision as an invariant"*). The gate instead pins what makes `B-08` correct. Full design, the three silent failures each test catches, and why a **fourth** test on `limit_req_zone` is deliberately **not** written, are in **`### B-09`** |
@@ -7303,7 +7423,7 @@ is the decision, not an omission.**
 | **(c)** record only | **SUPERSEDED by (b)** | (b) and (c) are the same shape once nothing ships. The distinction that survives is **whether the record is executable** — and it is: 6 tests, each with an owner-naming docstring, each red when the gap closes |
 | **Decode-scan revocation service** *(new — the option the plan never costed)* | **REJECTED — `G-A`** | O(live sessions) with a zlib decompress + HMAC verify per row, inside a window that already holds `Ad.objects.select_for_update()`. No index changes the asymptotics, and `ConsentRecord.session_key` is **wrong**, not slow (`auth_login`'s `cycle_key()` invalidates it). It also **duplicates phase 15's `15-AUTHZ-001` mechanism** — the same window, closed permanently and for free per request. A decode scan is a *worst-case* version of a fix phase 15 will make *unconditionally* |
 | **A per-request account-state check** | **REJECTED — forbidden here** | `04-VAL-001`; `MIDDLEWARE` is a pinned 15-entry list; and it is phase 15's `15-AUTHZ-001` by design. **This is the mechanism that actually closes the harm**, which is precisely why handing it to its owner is correct rather than lazy |
-| **Register `withdraw_consent_action`** *(the mandatory sub-decision)* | **REJECTED — `G-B`** | A **new, irreversible** operator capability (PII nulling, user *and* ad soft-delete, `LoginToken` deletion, no inverse) that `has_change_permission` — `is_staff`, ignores `obj` — would hand to every staff holder without a `permissions=["change"]` amendment. **And decisively: registering it while `G-A` is out would *add* a reachable session gap on the one path that erases PII**, because the request is the moderator's. The real choice is *capability* vs. *capability-plus-a-new-reachable-gap* |
+| **Register `withdraw_consent_action`** *(the mandatory sub-decision)* | **REJECTED — `G-B`** *(🔴 OVERTURNED 2026-10-05 by `B-12`: phase 06 later registered it with `permissions=["delete"]` — `admin.py:204`, `admin.py:321-324`. `G-B` held at the time; phase 06 owns the decision. Recorded, not re-litigated.)* | A **new, irreversible** operator capability (PII nulling, user *and* ad soft-delete, `LoginToken` deletion, no inverse) that `has_change_permission` — `is_staff`, ignores `obj` — would hand to every staff holder without a `permissions=["change"]` amendment. **And decisively: registering it while `G-A` is out would *add* a reachable session gap on the one path that erases PII**, because the request is the moderator's. The real choice is *capability* vs. *capability-plus-a-new-reachable-gap* |
 | **Ship the decline-path `logout()`** | **REJECTED — `G-7b`** | **A permanent one-way door**, link by link. And the harm it buys is near-zero: a declined user is self-restricting — `decline_consent` sets `ads_auto_publish=False` and listings already filter `user__is_declined=False` live. It would close the wrong thing at the cost of a data-loss-class bug |
 | **A `StrEnum` revocation reason code** | **REJECTED** | No consumer, no column, no reader. `ModeratorActionType` exists because `ModeratorActionLog.action_type` **is** a stored column; a reason code with neither is an abstraction without justification (rule 5). Warranted only if a **persisted revocation record** is introduced — a migration and a far larger design |
 | **A `User.session_epoch` column** | **REJECTED — forbidden here** | Correct, and phase 15's: a migration plus a middleware comparison, i.e. a second gate |
@@ -7330,13 +7450,15 @@ algorithm, the corrected facts and the Implementor brief are in **`### B-08`**.
 against these four and no others:
 
 1. `proxy_set_header X-Real-IP $remote_addr;` appears at **9 of 9** sites in
-   `docker/nginx/nginx.conf` and **6 of 6** in `docker/nginx/nginx.dev.conf`. It
+   `docker/nginx/nginx.conf` and ~~**6 of 6**~~ **7 of 7** in `docker/nginx/nginx.dev.conf`
+   *(corrected 2026-10-05 by `B-12`; verified 7 in `nginx.dev.conf`)*. It
    **overwrites**, so a client cannot influence it through nginx. **No Python code reads
    `HTTP_X_REAL_IP` today.** The clean header already exists.
 2. **`web` is not published in production** — `docker-compose.yml` publishes only nginx
    (`80:80`/`443:443`); `docker-compose.prod.yml` adds only `db` (`6432:6432`) and volumes.
    This is what makes (1) unforgeable in production.
-3. **All 15 `X-Forwarded-For` sites use `$proxy_add_x_forwarded_for`, which APPENDS.** A
+3. **~~All 15~~ All 16 `X-Forwarded-For` sites use `$proxy_add_x_forwarded_for`, which APPENDS.**
+   *(corrected 2026-10-05 by `B-12`: 9 in `nginx.conf`, 7 in `nginx.dev.conf`)* A
    client sending `XFF: 1.2.3.4` produces `1.2.3.4, <real client>`, so **`XFF[0]` is
    attacker-controlled end to end** and `split(",")[0]` returns the attacker's value.
 4. **No compose file declares a `networks:` key**, so nginx sits on a Docker-allocated
@@ -7387,7 +7509,9 @@ prefix follows `CSRF_TRUSTED_ORIGINS`, the nearest in-repo trust-naming preceden
 `StrEnum`**: `apps/core/enums.py` holds named *value sets* and a member per network would be
 absurd, and the trust *mode*'s two branches are **the algorithm, not a setting** — a mode that
 is not configurable must not be presented as if it were. `_TRANSPORT_SETTINGS` is
-**deliberately not extended**: it is a six-member `==`-compared transport-security contract.
+**deliberately not extended**: it is a ~~six-member~~ **seven-member** `==`-compared transport-security
+contract (corrected 2026-10-05 by `B-12`: `LOGIN_BROWSER_ID_COOKIE_HOST_PREFIX` was added by commit
+`a0bd928`).
 
 **`G-8e` — the home, and the plan's reason for it was false.** `apps/core/services/` was
 justified by "site_config.py's docstring says so". It does not — that docstring reads *"Used by
@@ -7419,7 +7543,7 @@ record and are not re-derived by the next editor.**
 | Option | Maintainability | Future evolution | Project convention | Verdict |
 |---|---|---|---|---|
 | **`$remote_addr`** for `X-Forwarded-For` (`G-9c` a) | removes the attacker-controlled prefix **at the source**; correct given `C-6` | correct as long as nginx is the first hop; if a CDN is ever added, the trust model must be revisited | consistent with nginx's own `$binary_remote_addr` keying | **REFUSED — it changes nothing observable.** `proxy_set_header X-Real-IP $remote_addr;` is set at **9/9** prod and **6/6** dev sites and `B-08` **returns on `X-Real-IP`**, so the `X-Forwarded-For` branch is **unreachable in production**. For legitimate traffic the output is **byte-identical**; under attack it differs only in a header **nothing reads**. Its entire value is as a footgun-removal for a *hypothetical future reader* — bought with a 15-location edit, no syntax gate, and no delivery path |
-| **keep `$proxy_add_x_forwarded_for`** (`G-9c` b) | **zero** nginx change | correct only while `B-08`'s rightmost-untrusted rule is in place | the Python half already defends it | **CHOSEN** — unchanged at all 15 sites. Combined with the `X-Real-IP` preference, `B-08` makes Django correct against the current, still-appendable header |
+| **keep `$proxy_add_x_forwarded_for`** (`G-9c` b) | **zero** nginx change | correct only while `B-08`'s rightmost-untrusted rule is in place | the Python half already defends it | **CHOSEN** — unchanged at all ~~15~~ **16** sites *(corrected 2026-10-05 by `B-12`)*. Combined with the `X-Real-IP` preference, `B-08` makes Django correct against the current, still-appendable header |
 | **`real_ip` module** — `set_real_ip_from` + `real_ip_header X-Forwarded-For` (option ii) | would make `REMOTE_ADDR` the true client IP, which `B-08`'s consumers would then prefer | **necessary only if a CDN/LB is ever put in front** — and then it becomes mandatory, not optional | nothing in the tree; and it would reach `$binary_remote_addr`, which the plan puts out of scope | **REFUSED AS ACTIVELY HARMFUL — the strongest finding in the block.** nginx **is** the first hop, so there is **no upstream proxy to trust** and `set_real_ip_from` has **no legitimate value to name**. `real_ip_header` alone is **inert** (nginx replaces `$remote_addr` only for peers matched by a `set_real_ip_from` entry, so it looks like hardening and is not). `set_real_ip_from 0.0.0.0/0` (or `::/0`) makes **every client a trusted proxy**, so `$remote_addr` becomes client-chosen — and because `limit_req_zone` keys on `$binary_remote_addr`, it **destroys the nginx-side rate limiting `B-08` declared unforgeable**, which **no test covers**. Shipping hardening that removes a control is a net loss |
 | **clear `X-Forwarded-For`** (`proxy_set_header X-Forwarded-For "";`) | `XFF[0]` stops being attacker-controlled, same benefit as the first row | destroys the chain entirely; a future CDN's hop information would be lost with no compensating gain | — | **REFUSED — dominated.** It buys the same thing as `$remote_addr` (an unread header in production), pays the same delivery cost, **additionally** discards real chain data, and unlike `$remote_addr` it cannot later become useful. Note it would leave `test_nginx_metrics_has_proxy_headers` **green** — the directive *name* is what it asserts (`B-9a`) — so the existing gate would not have caught the information loss |
 
@@ -7518,7 +7642,8 @@ complete.
 `B-08`'s peer gate, its `X-Real-IP` preference and its right-to-left walk make Django correct
 against the current, still-appendable header, and the peer gate is **always open in
 production** precisely because nginx's container IP is private — so the design's correctness
-rests on nginx overwriting `X-Real-IP`, which it does at **9/9** prod and **6/6** dev sites.
+rests on nginx overwriting `X-Real-IP`, which it does at **9/9** prod and ~~**6/6**~~ **7/7** dev sites
+*(corrected 2026-10-05 by `B-12`; verified 7 in `nginx.dev.conf`)*.
 Nothing is left undefended by deferring. What deferring leaves undefended is the *possibility*
 that someone later writes a naive `XFF[0]` reader — and that is exactly what `G-9d` now
 addresses, executably.
@@ -7587,5 +7712,6 @@ client-controlled **prefix** for a client-controlled **whole value**. That vecto
 `B-09`'s tests 1–2 now guard, and it was **uncovered until this block**. `G-9g`'s verdict —
 "`B-08` is complete and correct on its own; `B-09` is optional hardening" — is **confirmed as
 final**, and `docker-deployment.md::Client IP Trust Model` needs **no correction**, because
-`$proxy_add_x_forwarded_for` genuinely is still in use at all 15 sites.
+`$proxy_add_x_forwarded_for` genuinely is still in use at all ~~15~~ **16** sites *(corrected 2026-10-05
+by `B-12`: 9 in `nginx.conf`, 7 in `nginx.dev.conf`)*.
 
