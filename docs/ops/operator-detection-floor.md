@@ -31,7 +31,7 @@ Docker records a health status for every service that declares a `healthcheck:`,
 and `web`, `bot`, `scheduler`, `backup` and `pgbouncer` all do.
 
 ```
-docker inspect --format '{{.Name}} {{.State.Health.Status}}' $(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q)
+docker inspect --format '{{.Name}} {{.State.Health.Status}}' $(docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml ps -q)
 ```
 
 A non-zero count of `unhealthy` entries is the signal.
@@ -45,7 +45,7 @@ cycles), so a backup job that has stopped succeeding turns the container
 `unhealthy` instead of failing silently:
 
 ```
-docker inspect --format '{{.State.Health.Status}}' "$(docker compose -f docker-compose.yml -f docker-compose.prod.yml ps -q backup)"
+docker inspect --format '{{.State.Health.Status}}' "$(docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml ps -q backup)"
 ```
 
 A dump-age signal equivalent to the healthcheck is reachable directly on the

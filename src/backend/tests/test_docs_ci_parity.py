@@ -10,8 +10,12 @@ doc drift into a CI gate:
 4. entrypoint-test.sh:41 default PYTEST_OPTS includes `--reuse-db` + `--dist loadgroup`.
 5. Makefile: `test-clean-db` target exists, is in `.PHONY`, and `test-recreate`
    depends on it (requires T4/§8-rec-4 to be implemented first).
-6. docs/ops: every production `docker compose` invocation carries its flags, and
-   every canonical `ghcr.io` coordinate matches the manifest's own default
+6. docs/ops: every production `docker compose` invocation — embedded in a longer
+   command, prefixed by a variable assignment, or split across shell
+   backslash-continuations — carries its flags, and every canonical `ghcr.io`
+   coordinate matches the manifest's own default. Both checks are per-file: each
+   file the selector matches must still contain at least one conforming
+   invocation, so a deleted invocation is flagged rather than absorbed
    (12-VAL-003).
 
 Uses stdlib only: tomllib for TOML; Path.read_text() for YAML (string-level checks).
@@ -319,8 +323,12 @@ def test_restore_runbook_production_invocations_are_executable() -> None:
 # (equality, so a dropped row fails too). That guard is bounded to one file's
 # table. The guard below does NOT restate it: it polices the two further
 # documented claims `12-VAL-003` names — a `docker compose` invocation's FLAGS
-# and a canonical registry COORDINATE quoted in prose — against the live files,
-# and it applies to every `docs/ops/*.md`, not only restore.md.
+# and a canonical registry COORDINATE quoted in prose — against the live files.
+# It runs over every `docs/ops/*.md`, but it does not require them to *contain*
+# the token: the documentation -> live-file direction means "where a doc makes
+# the claim, the claim must match", and a doc that makes no such claim is left
+# alone. What it does require, per file, is that a claim which exists today is
+# not silently deleted afterwards.
 #
 # Direction: documentation -> live file. A newly added compose service or a new
 # workflow step must never force a doc sentence unless the doc itself makes the
@@ -339,13 +347,47 @@ def _docs_ops_markdown() -> list[Path]:
     return sorted(_DOCS_OPS.glob("*.md"))
 
 
+def _normalise_continuations(text: str) -> list[str]:
+    """Join shell ``\\``-continuations so a split invocation is one logical line.
+
+    A production invocation written across several physical lines with a trailing
+    backslash stops matching a per-physical-line selector, so the guard cannot
+    see it to check it. This folds each ``... \\`` plus its indented continuation
+    into a single space-separated line before any matching happens (12-VAL-003).
+    """
+    logical: list[str] = []
+    pending: str | None = None
+    for raw in text.split("\n"):
+        stripped = raw.strip()
+        if pending is None:
+            pending = stripped
+        else:
+            pending = f"{pending} {stripped}"
+        if pending.endswith("\\"):
+            pending = pending[:-1].rstrip()
+        else:
+            logical.append(pending)
+            pending = None
+    if pending is not None:
+        logical.append(pending)
+    return logical
+
+
 def _compose_invocations_targeting_prod(text: str) -> list[str]:
-    """Return the `docker compose` lines that reference the prod override."""
+    """Return every logical line invoking production via ``docker compose``.
+
+    The line is matched on *containment*, not ``startswith``: a production
+    invocation may be embedded in a longer command (e.g. ``docker inspect …
+    $(docker compose …)``) or prefixed by a per-command variable assignment
+    (``IMAGE_TAG=… docker compose …``). Requiring ``startswith("docker compose")``
+    silently skips those, which is exactly the vacuous-coverage defect this guard
+    exists to remove. ``\\``-continuations are folded first so a split invocation
+    is seen as one logical line (12-VAL-003).
+    """
     return [
-        line.strip()
-        for line in text.split("\n")
-        if line.strip().startswith("docker compose")
-        and _PROD_COMPOSE_FILE in line
+        line
+        for line in _normalise_continuations(text)
+        if "docker compose" in line and _PROD_COMPOSE_FILE in line
     ]
 
 
@@ -371,34 +413,81 @@ def _manifest_registry_coordinate() -> str:
     return f"{registry_match.group(1)}/{repository_match.group(1)}"
 
 
+# Files that today document at least one production `docker compose`
+# invocation and therefore MUST keep at least one invocation carrying the
+# required flags. A static manifest — not a derivation — is the deletion guard:
+# if the derivation and this set ever disagree, the guard fails, so removing
+# every invocation from a listed file (or adding a new one to an unlisted file)
+# is a loud failure rather than a silent shrink of coverage. Regenerate the
+# set deliberately when a runbook legitimately starts or stops documenting a
+# production command (12-VAL-003).
+_DOCS_OPS_FILES_WITH_PRODUCTION_INVOCATIONS = frozenset(
+    {
+        "docker-deployment.md",
+        "operator-detection-floor.md",
+        "restore.md",
+        "rollback.md",
+    }
+)
+
+# Files that today quote a canonical `ghcr.io` registry coordinate. Same
+# deletion-guard reasoning as above (12-VAL-003).
+_DOCS_OPS_FILES_WITH_REGISTRY_COORDINATES = frozenset(
+    {
+        "docker-deployment.md",
+        "rollback.md",
+    }
+)
+
+
+def _docs_ops_files_with_production_invocations() -> dict[str, str]:
+    """Return ``filename -> text`` for files with a production compose invocation."""
+    found: dict[str, str] = {}
+    for path in _docs_ops_markdown():
+        text = path.read_text(encoding="utf-8")
+        if _compose_invocations_targeting_prod(text):
+            found[path.name] = text
+    return found
+
+
 def test_docs_ops_production_compose_invocations_carry_env_file() -> None:
     """Every production `docker compose` invocation in docs/ops carries the flags.
 
-    Generalises the restore.md-only assertion above to every runbook: a
-    production invocation that omits ``--env-file .env.prod`` aborts during
+    A production invocation that omits ``--env-file .env.prod`` aborts during
     config rendering, and one that omits the base ``-f`` file silently runs the
     dev configuration. A documented invocation that cannot be executed is the
     exact class of drift `12-VAL-003` names (12-OPS-006 recorded it for
-    restore.md). Documentation -> live file: this asserts the doc's own claim,
-    not that every doc must contain such a line.
+    restore.md).
+
+    **Per-file, not a global floor.** The previous form counted matches across
+    all of docs/ops and asserted merely ``checked > 0``, so deleting one file's
+    every invocation (or all but one invocation anywhere) left the guard green.
+    Coverage is now anchored to ``_DOCS_OPS_FILES_WITH_PRODUCTION_INVOCATIONS``:
+    the set the selector derives must equal that manifest (so a deleted
+    invocation is flagged, not absorbed) and each listed file's invocation must
+    carry both flags.
     """
-    checked = 0
-    for path in _docs_ops_markdown():
-        text = path.read_text(encoding="utf-8")
-        for line in _compose_invocations_targeting_prod(text):
-            checked += 1
-            assert _PROD_ENV_FILE in line, (
-                f"{path.name}: production invocation must carry "
-                f"{_PROD_ENV_FILE!r} (12-VAL-003): {line}"
-            )
-            assert f"-f {_BASE_COMPOSE_FILE}" in line, (
-                f"{path.name}: production invocation must carry the base -f "
-                f"file (12-VAL-003): {line}"
-            )
-    assert checked, (
-        "docs/ops must contain at least one production docker compose invocation "
-        "for the parity guard to check (12-VAL-003)"
+    found = _docs_ops_files_with_production_invocations()
+    missing = sorted(_DOCS_OPS_FILES_WITH_PRODUCTION_INVOCATIONS - set(found))
+    unexpected = sorted(set(found) - _DOCS_OPS_FILES_WITH_PRODUCTION_INVOCATIONS)
+    assert not missing, (
+        "these docs/ops files no longer contain the production docker compose "
+        f"invocation they document (12-VAL-003): {missing}"
     )
+    assert not unexpected, (
+        "these docs/ops files newly document a production docker compose "
+        f"invocation; add them to the manifest above (12-VAL-003): {unexpected}"
+    )
+    for name, text in sorted(found.items()):
+        offenders = [
+            line
+            for line in _compose_invocations_targeting_prod(text)
+            if _PROD_ENV_FILE not in line or f"-f {_BASE_COMPOSE_FILE}" not in line
+        ]
+        assert not offenders, (
+            f"{name}: production invocation must carry {_PROD_ENV_FILE!r} and "
+            f"'-f {_BASE_COMPOSE_FILE}' (12-VAL-003): {offenders}"
+        )
 
 
 def test_docs_ops_registry_coordinate_matches_the_manifest() -> None:
@@ -410,20 +499,36 @@ def test_docs_ops_registry_coordinate_matches_the_manifest() -> None:
     does not pull. The expected value is derived from the manifest, so this
     cannot decay into a second copy of the string; trailing sentence punctuation
     is stripped before comparison (12-VAL-003).
+
+    **Per-file, not a global floor.** As with the compose guard above, the set of
+    files quoting a coordinate is anchored to
+    ``_DOCS_OPS_FILES_WITH_REGISTRY_COORDINATES`` so a deleted coordinate in a
+    named file is flagged rather than absorbed.
     """
     expected = _manifest_registry_coordinate()
-    quoted: list[tuple[str, str]] = []
+    quoted_by_file: dict[str, list[str]] = {}
     for path in _docs_ops_markdown():
         text = path.read_text(encoding="utf-8")
-        for match in _CANONICAL_COORDINATE_RE.findall(text):
-            quoted.append((path.name, match.rstrip(".")))
-    assert quoted, (
-        "docs/ops must quote the canonical registry coordinate for the guard to "
-        "check (12-VAL-003)"
+        matches = _CANONICAL_COORDINATE_RE.findall(text)
+        if matches:
+            quoted_by_file[path.name] = [match.rstrip(".") for match in matches]
+
+    missing = sorted(_DOCS_OPS_FILES_WITH_REGISTRY_COORDINATES - set(quoted_by_file))
+    unexpected = sorted(
+        set(quoted_by_file) - _DOCS_OPS_FILES_WITH_REGISTRY_COORDINATES
+    )
+    assert not missing, (
+        "these docs/ops files no longer quote the registry coordinate they "
+        f"document (12-VAL-003): {missing}"
+    )
+    assert not unexpected, (
+        "these docs/ops files newly quote a registry coordinate; add them to "
+        f"the manifest above (12-VAL-003): {unexpected}"
     )
     mismatched = [
         (name, coordinate)
-        for name, coordinate in quoted
+        for name, coordinates in sorted(quoted_by_file.items())
+        for coordinate in coordinates
         if coordinate != expected
     ]
     assert not mismatched, (

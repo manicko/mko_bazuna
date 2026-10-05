@@ -589,7 +589,7 @@ containers are still up (critical — it must reflect the prior deploy, not the
 new failing one):
 
 ```bash
-WEB_CID=$(docker compose --profile scheduler --profile backup \
+WEB_CID=$(docker compose --env-file .env.prod --profile scheduler --profile backup \
   -f docker-compose.yml -f docker-compose.prod.yml ps -q web)
 PREVIOUS_IMAGE_DIGEST=$(docker inspect --format='{{index .Image}}' "${WEB_CID}")
 ```
@@ -629,12 +629,12 @@ On health-check failure the workflow performs three steps:
 
 1. **Revert `IMAGE_TAG` to `PREVIOUS_IMAGE_TAG`** and pull the prior image:
    ```bash
-   IMAGE_TAG="${PREVIOUS_IMAGE_TAG}" docker compose -f docker-compose.yml -f docker-compose.prod.yml pull
+   IMAGE_TAG="${PREVIOUS_IMAGE_TAG}" docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml pull
    ```
 2. **Force-recreate** the long-lived containers so Docker does not reuse
    containers keyed on the old image digest:
    ```bash
-   IMAGE_TAG="${PREVIOUS_IMAGE_TAG}" docker compose --profile scheduler --profile backup -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate --remove-orphans web bot scheduler backup
+   IMAGE_TAG="${PREVIOUS_IMAGE_TAG}" docker compose --env-file .env.prod --profile scheduler --profile backup -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate --remove-orphans web bot scheduler backup
    ```
    Every long-lived service is recreated — `web`, `bot`, `scheduler` and
    `backup`. A rollback that leaves the scheduler on the image just judged
