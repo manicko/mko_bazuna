@@ -13,6 +13,7 @@ from django.http import HttpRequest, JsonResponse
 from django.views.decorators.cache import never_cache
 from django.views.decorators.http import require_POST
 
+from apps.core.middleware.preferred_city import CONSENT_PREFERENCES_COOKIE
 from apps.core.utils.preferred_city_cookie import (
     expire_preferred_city_cookie,
     set_preferred_city_cookie,
@@ -83,7 +84,7 @@ def set_preferred_city(request: HttpRequest) -> JsonResponse:
     response = JsonResponse({"ok": True})
     # Gate the preference cookie behind preferences consent (T-06c / ePrivacy).
     # The authenticated user's DB preference still applies without the cookie.
-    if request.COOKIES.get("consent_preferences") == "true":
+    if request.COOKIES.get(CONSENT_PREFERENCES_COOKIE) == "true":
         set_preferred_city_cookie(response, slug, secure=request.is_secure())
     logger.info("Set preferred_city to %s", slug)
     return response

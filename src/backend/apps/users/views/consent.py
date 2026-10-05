@@ -27,6 +27,13 @@ from django.views.decorators.http import require_POST
 from pydantic import ValidationError
 
 from apps.core.enums import ConsentChoice, ConsentVersion, CookieCategory
+from apps.core.middleware.preferred_city import (
+    CONSENT_ANALYTICS_COOKIE,
+    CONSENT_COOKIE_MAX_AGE,
+    CONSENT_COOKIE_NAME,
+    CONSENT_PREFERENCES_COOKIE,
+    CONSENT_TIMESTAMP_COOKIE,
+)
 from apps.core.services.contact_rate_limit import check_deep_link_render_rate_limit
 from apps.core.services.site_config import get_bot_username
 from apps.core.utils.preferred_city_cookie import (
@@ -56,14 +63,6 @@ from apps.users.services.login_token import (
 )
 
 logger = logging.getLogger(__name__)
-
-CONSENT_COOKIE_NAME = "consent_given"
-CONSENT_ANALYTICS_COOKIE = "consent_analytics"
-CONSENT_PREFERENCES_COOKIE = "consent_preferences"
-CONSENT_TIMESTAMP_COOKIE = "consent_timestamp"
-# 12 months (PO-05 / T-05). Browser-side expiry is the primary re-prompt
-# mechanism; the context processor adds a server-side timestamp check (T-08).
-CONSENT_COOKIE_MAX_AGE = 365 * 24 * 60 * 60
 
 
 def _set_consent_cookie(

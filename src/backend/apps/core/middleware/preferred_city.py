@@ -88,3 +88,15 @@ class PreferredCityMiddleware(MiddlewareMixin):
             # (``samesite="none"``) would make the cookie cross-site capable.
             expire_preferred_city_cookie(response, secure=request.is_secure())
         return response
+
+# Consent cookie names/ages shared by their writers (apps.users.views.consent)
+# and their readers (apps.users.context_processors,
+# apps.search.views.preferred_city). Imported by both consumers, exactly like
+# the PREFERRED_CITY_* names they sit beside.
+CONSENT_COOKIE_NAME = "consent_given"
+CONSENT_ANALYTICS_COOKIE = "consent_analytics"
+CONSENT_PREFERENCES_COOKIE = "consent_preferences"
+CONSENT_TIMESTAMP_COOKIE = "consent_timestamp"
+# 12 months (PO-05 / T-05). Browser-side expiry is the primary re-prompt
+# mechanism; the context processor adds a server-side timestamp check (T-08).
+CONSENT_COOKIE_MAX_AGE = 365 * 24 * 60 * 60

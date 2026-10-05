@@ -19,6 +19,13 @@ from datetime import timedelta
 
 from django.utils import timezone
 
+from apps.core.middleware.preferred_city import (
+    CONSENT_ANALYTICS_COOKIE,
+    CONSENT_COOKIE_NAME,
+    CONSENT_PREFERENCES_COOKIE,
+    CONSENT_TIMESTAMP_COOKIE,
+)
+
 # Consent state that counts as "the user has acted" (banner hidden) for the
 # backward-compatible ``consent_given`` cookie format transition (D-COOKIES):
 # old value ``"true"`` and new value ``"accepted"`` both mean full acceptance.
@@ -51,7 +58,7 @@ def consent_state(request) -> dict[str, bool]:
         ``consent_preferences`` booleans.
     """
     user = getattr(request, "user", None)
-    cookie = request.COOKIES.get("consent_given", "")
+    cookie = request.COOKIES.get(CONSENT_COOKIE_NAME, "")
 
     consent_analytics = False
     consent_preferences = False
@@ -83,8 +90,10 @@ def consent_state(request) -> dict[str, bool]:
     else:
         # Anonymous consent is cookie-driven.
         consent_shown = cookie in _ACTED_COOKIE_VALUES
-        consent_analytics = request.COOKIES.get("consent_analytics") == "true"
-        consent_preferences = request.COOKIES.get("consent_preferences") == "true"
+        consent_analytics = request.COOKIES.get(CONSENT_ANALYTICS_COOKIE) == "true"
+        consent_preferences = (
+            request.COOKIES.get(CONSENT_PREFERENCES_COOKIE) == "true"
+        )
 
         # Backward compatibility: the old ``consent_given=true`` cookie meant
         # full acceptance (both categories granted).
@@ -93,7 +102,7 @@ def consent_state(request) -> dict[str, bool]:
             consent_preferences = True
 
         # T-08: re-prompt when the consent_timestamp cookie is older than 12 months.
-        consent_timestamp = request.COOKIES.get("consent_timestamp")
+        consent_timestamp = request.COOKIES.get(CONSENT_TIMESTAMP_COOKIE)
         if consent_timestamp and _is_expired(consent_timestamp):
             consent_shown = False
 
