@@ -316,6 +316,10 @@ def search(request: HttpRequest) -> HttpResponse:
         "selected_category": selected_category_id,
         "total_count": total_count,
         "results_truncated": results_truncated,
+        # The cache cap drives the truncation notice's "showing the first
+        # <cap>" wording, so the rendered claim matches the data (13-PERF-006
+        # #2, Q9 ruling 2026-10-03).
+        "search_cache_max_hits": SEARCH_CACHE_MAX_HITS,
         "narrowed_category": narrowed_category,
         "all_categories": all_categories,
         "show_filters": True,
@@ -407,16 +411,26 @@ def _resolve_search_count(
     - ``cached_ids is None`` (cold-miss loser, lock held): ``ads`` is already
       the FTS-filtered queryset, so its count is reused directly.
 
+    The truncated branch never reports a total it did not compute (13-PERF-006
+    #2, Q9 ruling 2026-10-03).  It reports ``SEARCH_CACHE_MAX_HITS + 1`` — the
+    display value ruled on 2026-10-03 — and the notice carries the ``+`` that
+    disambiguates it from the exact cap value.
+
     Returns:
         A ``(total_count, results_truncated)`` tuple.
     """
     if cached_ids is not None:
-        total_count = len(cached_ids)
-        return total_count, total_count >= SEARCH_CACHE_MAX_HITS
+        if len(cached_ids) >= SEARCH_CACHE_MAX_HITS:
+            return SEARCH_CACHE_MAX_HITS + 1, True
+        return len(cached_ids), False
 
-    # Cold-miss loser fallback: ads is already the FTS-filtered queryset.
+    # Cold-miss loser fallback: ads is already the FTS-filtered queryset, so a
+    # true count is available. A truncated set still reports the capped display
+    # value, never an un-computed total (13-PERF-006 #2, Q9 2026-10-03).
     total_count = ads.count()
-    return total_count, total_count > SEARCH_CACHE_MAX_HITS
+    if total_count >= SEARCH_CACHE_MAX_HITS:
+        return SEARCH_CACHE_MAX_HITS + 1, True
+    return total_count, False
 
 
 def _rank_cache_hit_page(

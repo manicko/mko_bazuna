@@ -800,7 +800,7 @@ msgstr ""
 msgid "Be the first to create an ad via Telegram!"
 msgstr ""
 
-msgid "Over 1,000 results found. Showing the first 1,000. Refine your search to see more."
+msgid "%(floor)s+ results match this search. Showing the first %(cap)s — refine your search to narrow the results."
 msgstr ""
 
 msgid "Listing purpose"

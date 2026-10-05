@@ -88,10 +88,14 @@ is unaffected. {% endcomment %}
         {% endfor %}
     </div>
 {% endif %}
-<!-- Truncated results notice -->
+<!-- Truncated results notice (13-PERF-006 #2, Q9 ruling 2026-10-03): a
+     truncated result set shows <SEARCH_CACHE_MAX_HITS>+ (the cap value plus a
+     "+" floor marker) and never a true total that was not computed. The count
+     is total_count and the shown subset is the cache cap, so the claim matches
+     the data. -->
 {% if results_truncated %}
     <div class="mb-4 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-4 py-3">
-        {% blocktrans %}Over 1,000 results found. Showing the first 1,000. Refine your search to see more.{% endblocktrans %}
+        {% blocktrans with floor=total_count cap=search_cache_max_hits %}{{ floor }}+ results match this search. Showing the first {{ cap }} — refine your search to narrow the results.{% endblocktrans %}
     </div>
 {% endif %}
 <!-- Single-word category narrowing signal + undo (08-SRCH-009, Q8 ruling 2026-10-03, O8).

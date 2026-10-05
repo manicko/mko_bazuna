@@ -1543,32 +1543,28 @@ class TestSearchLogRedaction:
 
 
 class TestSearchViewTotalCount:
-    """Regression tests for the bounded display count vs the cache cap.
+    """Truncated-count UX: the display never over-claims what was searched.
 
-    After BLOCK 6 (13-PERF-006 #1 validated 2026-09) the dedicated FTS
-    ``COUNT(*)`` is gone: the producer pushes ``[:SEARCH_CACHE_MAX_HITS]`` into
-    SQL, so the at/over-cap path derives its count from that already-bounded,
-    already-filtered list and never re-runs the FTS filter to count. The count
-    on the truncated path is therefore the bounded list length; the *displayed*
-    value for a truncated set is restated by BLOCK 7 under the Q9 ruling of
-    2026-10-03 (``SEARCH_CACHE_MAX_HITS + 1``, never a true total that cannot be
-    computed).
+    13-PERF-006 #2, Q9 ruling 2026-10-03 (option a). The search results page
+    used to reconcile the count with a second FTS ``COUNT(*)`` so it could show
+    the true total. Under the ruling a truncated result set displays
+    ``SEARCH_CACHE_MAX_HITS + 1`` (the cap value plus the ``+`` floor marker)
+    and never asserts a total that was not computed. These tests pin the
+    displayed value and the notice's iff-truncated rendering.
     """
 
-    def test_total_count_exceeds_cap_when_many_matches(
+    def test_truncated_result_set_is_capped_display(
         self,
         seller: User,
         root_category: Category,
         city: City,
     ) -> None:
-        """With >1000 matching ads, the count is the bounded list, not a recount.
+        """With >1000 matching ads, the display is the capped value, not the try total.
 
-        Before BLOCK 6, the cached ID list was sliced at
-        ``SEARCH_CACHE_MAX_HITS`` and a second FTS ``COUNT(*)`` produced the true
-        total. The cap is now pushed into the producer's SQL (13-PERF-006 #1),
-        so the at/over-cap path consumes the bounded list: the count is the
-        list length (the cap) and ``results_truncated`` is ``True``. No second
-        FTS evaluation runs.
+        The cap is pushed into the producer's SQL (13-PERF-006 #1), so the
+        at/over-cap path never re-runs the FTS filter to count. The displayed
+        total is ``SEARCH_CACHE_MAX_HITS + 1`` (Q9 2026-10-03) and
+        ``results_truncated`` is ``True``.
         """
         num_ads = SEARCH_CACHE_MAX_HITS + 1  # 1001
         create_test_ads_bulk(
@@ -1584,8 +1580,8 @@ class TestSearchViewTotalCount:
         response = client.get("/search/?q=велосипед&lang=ru")
 
         assert response.status_code == 200
-        # The bounded cached list drives the count at/over the cap.
-        assert response.context["total_count"] == SEARCH_CACHE_MAX_HITS
+        # The truncated set shows the capped value — never the true total.
+        assert response.context["total_count"] == SEARCH_CACHE_MAX_HITS + 1
         # results_truncated must be True when the result set reaches the cap
         assert response.context["results_truncated"] is True
         # Pagination still limits the visible page to PER_PAGE (24)
@@ -1593,7 +1589,7 @@ class TestSearchViewTotalCount:
         assert len(page_ads) == 24
         assert all(a.title.startswith("Продам велосипед") for a in page_ads)
 
-    def test_total_count_at_cap_is_bounded_and_truncated(
+    def test_at_cap_is_truncated_and_capped_display(
         self,
         seller: User,
         root_category: Category,
@@ -1602,9 +1598,9 @@ class TestSearchViewTotalCount:
         """With exactly SEARCH_CACHE_MAX_HITS matching ads, the set is truncated.
 
         The producer's SQL ``LIMIT`` bounds the list at the cap, so a result set
-        of exactly ``SEARCH_CACHE_MAX_HITS`` rows reaches the boundary
-        (``results_truncated`` is ``True``): more rows may exist beyond the cap
-        and the count is not recomputed to prove otherwise (13-PERF-006 #1).
+        of exactly ``SEARCH_CACHE_MAX_HITS`` rows reaches the boundary: more
+        rows may exist beyond the cap and the count is not recomputed to prove
+        otherwise (13-PERF-006 #1). The display is capped (13-PERF-006 #2).
         """
         num_ads = SEARCH_CACHE_MAX_HITS  # exactly 1000
         create_test_ads_bulk(
@@ -1620,21 +1616,21 @@ class TestSearchViewTotalCount:
         response = client.get("/search/?q=велосипед&lang=ru")
 
         assert response.status_code == 200
-        assert response.context["total_count"] == SEARCH_CACHE_MAX_HITS
+        assert response.context["total_count"] == SEARCH_CACHE_MAX_HITS + 1
         assert response.context["results_truncated"] is True
 
-    def test_cold_miss_loser_reports_true_count(
+    def test_cold_miss_loser_reports_capped_display(
         self,
         seller: User,
         root_category: Category,
         city: City,
     ) -> None:
-        """On a cold-miss loser (cache returns None, lock held), the fallback
-        FTS queryset is reused to report the true count and truncation flag.
+        """On a cold-miss loser, a truncated set still shows the capped value.
 
         Seeds >1000 matching ads and forces ``get_cached_search_ids`` to return
-        None, so the view falls back to a direct FTS query and derives the count
-        from that same queryset (SRH-002).
+        None, so the view falls back to a direct FTS query. The fallback can
+        compute a true count, but a truncated set must still display the capped
+        value and never an un-computed total (Q9 2026-10-03).
         """
         num_ads = SEARCH_CACHE_MAX_HITS + 1  # 1001
         create_test_ads_bulk(
@@ -1652,9 +1648,48 @@ class TestSearchViewTotalCount:
             response = client.get("/search/?q=велосипед&lang=ru")
 
         assert response.status_code == 200
-        # True count via the reused FTS queryset, not capped
-        assert response.context["total_count"] == num_ads
+        assert response.context["total_count"] == SEARCH_CACHE_MAX_HITS + 1
         assert response.context["results_truncated"] is True
+
+    def test_truncation_notice_renders_iff_truncated(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """The notice renders iff the result set is truncated (both directions).
+
+        The rendered-page assertion is the binding tripwire of 13-PERF-006 #2:
+        the notice must appear when the set is truncated and must be absent when
+        it is not. The truncated page also carries the capped display value
+        (``SEARCH_CACHE_MAX_HITS + 1``) rather than a true total.
+        """
+        # Truncated branch: >1000 matches.
+        create_test_ads_bulk(
+            seller,
+            root_category,
+            city,
+            count=SEARCH_CACHE_MAX_HITS + 1,
+            title_prefix="Продам велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        truncated = client.get("/search/?q=велосипед&lang=ru")
+        truncated_html = truncated.content.decode()
+
+        assert truncated.context["results_truncated"] is True
+        assert truncated.context["total_count"] == SEARCH_CACHE_MAX_HITS + 1
+        # The notice carries the capped floor value (1001) and the shown cap.
+        assert f"{SEARCH_CACHE_MAX_HITS + 1}+" in truncated_html
+        assert f"показаны первые {SEARCH_CACHE_MAX_HITS}" in truncated_html.lower()
+
+        # Non-truncated branch: a fresh search below the cap renders no notice.
+        small = client.get("/search/?q=несуществующий&lang=ru")
+        small_html = small.content.decode()
+
+        assert small.context["results_truncated"] is False
+        assert "Совпадений:" not in small_html
 
 
 class TestSearchViewHasResultsMatchesRenderedRows:
