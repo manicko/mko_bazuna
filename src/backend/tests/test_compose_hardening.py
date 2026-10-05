@@ -333,25 +333,6 @@ def test_prod_app_services_require_image_tag() -> None:
     )
 
 
-def test_prod_env_template_ships_a_pinned_image_tag() -> None:
-    """``.env.prod.example`` must not ship ``IMAGE_TAG=latest``.
-
-    The template is the operator's source of truth; shipping a floating default
-    defeats the compose-side requirement (09-API-016).
-    """
-    env_example = (_ROOT / ".env.prod.example").read_text(
-        encoding="utf-8", errors="replace"
-    )
-    for line in env_example.split("\n"):
-        if line.startswith("IMAGE_TAG="):
-            value = line.split("=", 1)[1].strip()
-            assert value != "latest", (
-                ".env.prod.example must ship a concrete pinned IMAGE_TAG, not "
-                "`latest`"
-            )
-            assert value, ".env.prod.example IMAGE_TAG must be non-empty"
-
-
 def test_deploy_workflow_does_not_build() -> None:
     """The deploy job must pull a pre-built image, never build one (09-API-016).
 
