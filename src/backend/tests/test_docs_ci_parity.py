@@ -10,14 +10,50 @@ doc drift into a CI gate:
 4. entrypoint-test.sh:41 default PYTEST_OPTS includes `--reuse-db` + `--dist loadgroup`.
 5. Makefile: `test-clean-db` target exists, is in `.PHONY`, and `test-recreate`
    depends on it (requires T4/§8-rec-4 to be implemented first).
+6. docs/ops: every production `docker compose` invocation carries its flags, and
+   every canonical `ghcr.io` coordinate matches the manifest's own default
+   (12-VAL-003).
 
 Uses stdlib only: tomllib for TOML; Path.read_text() for YAML (string-level checks).
 No PyYAML dependency — the asserted values are command-line substrings in `run:` lines.
 Follows the test_i18n_completeness.py precedent (doc-DoD enforcement, no third-party deps).
+
+Behavioural vs structural guards (12-VAL-003)
+---------------------------------------------
+This repository uses two distinct guard classes, and the distinction is the
+convention `12-VAL-003` exists to make explicit:
+
+* A **structural** guard inspects configuration text or symbols and asserts a
+  *token* is present or absent. It is cheap, hermetic and CWD-independent, and it
+  is the correct tool when the artefact under test genuinely has no runtime
+  behaviour to observe (a workflow `run:` line, a Makefile target, a compose
+  key). Most assertions in this module are structural, and that is appropriate.
+* A **behavioural** guard exercises the real code path and asserts an
+  *observable outcome* — a rendered response body, a resolved metric series, a
+  subprocess exit status. It is the tool for anything that can silently become
+  inert while its token survives. The repository's model is
+  `apps/core/tests/test_observability.py::test_metrics_endpoint`, which renders
+  `/metrics` and asserts the exposition rather than the route's presence.
+
+The inconsistency this convention resolves: a structural guard placed over a
+*control* passes while the control is dead — the shared root cause of
+`12-OPS-001` (a SAST step that scanned zero files), `12-OPS-003` (an alert
+selector naming a series that does not exist) and `12-OPS-004` (a restore drill
+that echoed a count and asserted nothing). Where a control's outcome is
+observable, the guard must be behavioural; where it is not,
+`VAL-003`'s rule is to name that explicitly in the guard's docstring instead of
+letting a structural assertion stand in for an unobservable property.
+
+The `docs/ops` parity guard below is deliberately **structural**: the property it
+polices — that a document quotes the same flags and coordinate the live files
+declare — is static text, so a rendered record is neither available nor
+meaningful. It asserts in the **documentation → live file** direction only, so a
+new compose service never forces an unrelated doc edit.
 """
 
 from __future__ import annotations
 
+import re
 import tomllib
 from pathlib import Path
 
@@ -276,4 +312,122 @@ def test_restore_runbook_production_invocations_are_executable() -> None:
             f"production invocation must carry the base -f file (12-OPS-006): {line}"
         )
 
+
+# --- docs/ops parity (12-VAL-003) ------------------------------------------
+# `a89f0cd` (12-OPS-018) already derives the base manifest's own `image:` pins
+# and asserts docs/ops/docker-deployment.md's production TABLE quotes them
+# (equality, so a dropped row fails too). That guard is bounded to one file's
+# table. The guard below does NOT restate it: it polices the two further
+# documented claims `12-VAL-003` names — a `docker compose` invocation's FLAGS
+# and a canonical registry COORDINATE quoted in prose — against the live files,
+# and it applies to every `docs/ops/*.md`, not only restore.md.
+#
+# Direction: documentation -> live file. A newly added compose service or a new
+# workflow step must never force a doc sentence unless the doc itself makes the
+# claim. Structural by design (see the module docstring): the property policed is
+# static text, so no rendered outcome is available to assert.
+
+# The prod compose override, split so `-f docker-compose.prod.yml` matches only
+# as a whole flag and not as a prefix of another file name.
+_PROD_COMPOSE_FILE = "docker-compose.prod.yml"
+_BASE_COMPOSE_FILE = "docker-compose.yml"
+_CANONICAL_COORDINATE_RE = re.compile(r"ghcr\.io/[A-Za-z0-9_.\-/]+")
+
+
+def _docs_ops_markdown() -> list[Path]:
+    """Return every Markdown file under docs/ops, deterministically ordered."""
+    return sorted(_DOCS_OPS.glob("*.md"))
+
+
+def _compose_invocations_targeting_prod(text: str) -> list[str]:
+    """Return the `docker compose` lines that reference the prod override."""
+    return [
+        line.strip()
+        for line in text.split("\n")
+        if line.strip().startswith("docker compose")
+        and _PROD_COMPOSE_FILE in line
+    ]
+
+
+def _manifest_registry_coordinate() -> str:
+    """Derive the canonical `ghcr.io/<owner>/<repo>` coordinate from the manifest.
+
+    `docker-compose.prod.yml` is the single source of truth: it declares
+    ``image: ${REGISTRY:-<registry>}/${REPOSITORY:-<repo>}:...``. The default for
+    each variable is read from the manifest itself, so a doc that restates a
+    different owner or repository fails — the coordinate is never hard-coded
+    here. The guard's RED proof is exactly that: changing the manifest default
+    moves the expected value and a stale doc stops matching.
+    """
+    text = (_ROOT / _PROD_COMPOSE_FILE).read_text(encoding="utf-8")
+    registry_match = re.search(r"\$\{REGISTRY:-([^}]+)\}", text)
+    repository_match = re.search(r"\$\{REPOSITORY:-([^}]+)\}", text)
+    assert registry_match, (
+        f"{_PROD_COMPOSE_FILE} must default $REGISTRY (12-VAL-003)"
+    )
+    assert repository_match, (
+        f"{_PROD_COMPOSE_FILE} must default $REPOSITORY (12-VAL-003)"
+    )
+    return f"{registry_match.group(1)}/{repository_match.group(1)}"
+
+
+def test_docs_ops_production_compose_invocations_carry_env_file() -> None:
+    """Every production `docker compose` invocation in docs/ops carries the flags.
+
+    Generalises the restore.md-only assertion above to every runbook: a
+    production invocation that omits ``--env-file .env.prod`` aborts during
+    config rendering, and one that omits the base ``-f`` file silently runs the
+    dev configuration. A documented invocation that cannot be executed is the
+    exact class of drift `12-VAL-003` names (12-OPS-006 recorded it for
+    restore.md). Documentation -> live file: this asserts the doc's own claim,
+    not that every doc must contain such a line.
+    """
+    checked = 0
+    for path in _docs_ops_markdown():
+        text = path.read_text(encoding="utf-8")
+        for line in _compose_invocations_targeting_prod(text):
+            checked += 1
+            assert _PROD_ENV_FILE in line, (
+                f"{path.name}: production invocation must carry "
+                f"{_PROD_ENV_FILE!r} (12-VAL-003): {line}"
+            )
+            assert f"-f {_BASE_COMPOSE_FILE}" in line, (
+                f"{path.name}: production invocation must carry the base -f "
+                f"file (12-VAL-003): {line}"
+            )
+    assert checked, (
+        "docs/ops must contain at least one production docker compose invocation "
+        "for the parity guard to check (12-VAL-003)"
+    )
+
+
+def test_docs_ops_registry_coordinate_matches_the_manifest() -> None:
+    """Every `ghcr.io` coordinate quoted in docs/ops matches the manifest default.
+
+    The canonical coordinate is ``ghcr.io/mko-bazuna/mko_bazuna``; the manifest
+    derives it from ``${REGISTRY:-...}`` / ``${REPOSITORY:-...}``. A doc that
+    quotes a stale owner or repository sends an operator to an image the stack
+    does not pull. The expected value is derived from the manifest, so this
+    cannot decay into a second copy of the string; trailing sentence punctuation
+    is stripped before comparison (12-VAL-003).
+    """
+    expected = _manifest_registry_coordinate()
+    quoted: list[tuple[str, str]] = []
+    for path in _docs_ops_markdown():
+        text = path.read_text(encoding="utf-8")
+        for match in _CANONICAL_COORDINATE_RE.findall(text):
+            quoted.append((path.name, match.rstrip(".")))
+    assert quoted, (
+        "docs/ops must quote the canonical registry coordinate for the guard to "
+        "check (12-VAL-003)"
+    )
+    mismatched = [
+        (name, coordinate)
+        for name, coordinate in quoted
+        if coordinate != expected
+    ]
+    assert not mismatched, (
+        f"docs/ops quote a registry coordinate that is not the manifest's "
+        f"{expected!r} (12-VAL-003): {mismatched}"
+    )
 
