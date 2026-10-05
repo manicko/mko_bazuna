@@ -11,7 +11,7 @@ from __future__ import annotations
 import pytest
 
 from apps.ads.models import AdImage
-from apps.core.enums import AdStatus
+from apps.core.enums import AdStatus, ThumbnailSizeStrEnum
 from apps.media.services.references import KEY_COLUMNS, unreferenced_keys
 from conftest import create_test_ad
 
@@ -44,6 +44,69 @@ class TestKeyColumnsAntiDrift:
         # own column name makes the two lists directly comparable. Equality holds
         # only while the model's key columns and their order match the constant.
         assert img.storage_keys() == list(KEY_COLUMNS)
+
+    def test_key_column_set_matches_the_size_vocabulary(self) -> None:
+        """``KEY_COLUMNS`` equals the derived key-column set -- not a superset.
+
+        The expected set is *derived* from the vocabulary, never copied from the
+        constant: ``image`` plus ``thumbnail_<size>`` for every member of
+        :class:`ThumbnailSizeStrEnum` (the canonical size vocabulary). A new key
+        column (or a new enum member) drifts the two apart and fails here.
+
+        Blind spot (known residual): a key column named outside the
+        ``thumbnail_<enum member>`` convention is not derivable, so this assertion
+        cannot see it. The field-resolution and storage-keys tests are the only
+        guards against such an off-convention column.
+        """
+        expected = {"image"} | {
+            f"thumbnail_{size.value}" for size in ThumbnailSizeStrEnum
+        }
+
+        assert set(KEY_COLUMNS) == expected, (
+            "AdImage key-column drift: KEY_COLUMNS and the "
+            "ThumbnailSizeStrEnum-derived set disagree. "
+            f"KEY_COLUMNS-only: {set(KEY_COLUMNS) - expected}; "
+            f"derived-only: {expected - set(KEY_COLUMNS)}."
+        )
+
+    def test_every_key_column_is_indexed_and_constrained(self) -> None:
+        """Every ``KEY_COLUMNS`` name is covered by an index *and* a constraint.
+
+        Read from the model, not from a restated census. Deliberately *positive*
+        coverage, not exactness: this asserts each key column is indexed and
+        constrained, not that there are exactly four of either -- a future
+        legitimate composite index or an added constraint must not break it.
+
+        ``AdImage._meta.indexes`` is **not** a total index census (``sha256``'s
+        implicit ``db_index`` index is absent from it), so coverage is derived
+        from whatever the model declares rather than enumerated here.
+        """
+        indexed_fields = {
+            field for index in AdImage._meta.indexes for field in index.fields
+        }
+
+        constrained_fields: set[str] = set()
+        for constraint in AdImage._meta.constraints:
+            # ``UniqueConstraint`` carries no ``condition``; only
+            # ``CheckConstraint`` does. Derive from what is actually present.
+            condition = getattr(constraint, "condition", None)
+            if condition is None:
+                continue
+            for child in condition.children:
+                if isinstance(child, tuple) and child:
+                    constrained_fields.add(str(child[0]).split("__", 1)[0])
+
+        missing_index = set(KEY_COLUMNS) - indexed_fields
+        missing_constraint = set(KEY_COLUMNS) - constrained_fields
+
+        assert not missing_index, (
+            f"Key column(s) {sorted(missing_index)} carry no index on AdImage; "
+            "the hot-path liveness predicate would Seq Scan them."
+        )
+        assert not missing_constraint, (
+            f"Key column(s) {sorted(missing_constraint)} carry no DB constraint "
+            "on AdImage; KEY_FORMAT_REGEX is not enforced against them."
+        )
 
 
 class TestUnreferencedKeys:
