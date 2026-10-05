@@ -10,6 +10,7 @@ from django.contrib import messages
 from django.db import transaction
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.http import require_POST
 
 from apps.ads.models import Ad
@@ -154,7 +155,7 @@ def approve_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
                 outcome,
             )
 
-        return redirect(f"/admin/ads/ad/{ad_id}/change/")
+        return redirect(reverse("admin:ads_ad_change", args=[ad_id]))
 
 
 @require_POST
@@ -191,7 +192,9 @@ def reject_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
 
     logger.info("Admin %s rejected ad %s", request.user.id, ad_id)
 
-    return redirect("/admin/ads/ad/?status__exact=on_moderation")
+    return redirect(
+        f"{reverse('admin:ads_ad_changelist')}?status__exact=on_moderation"
+    )
 
 
 @require_POST
@@ -235,4 +238,6 @@ def ban_user(request: HttpRequest, ad_id: int) -> HttpResponse:
                 outcome,
             )
 
-    return redirect("/admin/ads/ad/?status__exact=on_moderation")
+    return redirect(
+        f"{reverse('admin:ads_ad_changelist')}?status__exact=on_moderation"
+    )

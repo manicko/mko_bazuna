@@ -31,7 +31,7 @@ Staff-only view showing moderation statistics, queue status, performance, and re
                             {{ pending_queue_size }}
                         </p>
                     </div>
-                    <a href="/admin/ads/ad/?status__exact=on_moderation"
+                    <a href="{% url 'admin:ads_ad_changelist' %}?status__exact=on_moderation"
                        class="px-4 py-2 bg-blue-600 text-white text-sm rounded hover:bg-blue-700">
                         {% trans "Review Queue" %}
                     </a>
