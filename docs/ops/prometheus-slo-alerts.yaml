@@ -15,15 +15,21 @@
 #   - PerformanceSLO.P99_SLO_MS               = 2000  (p99 latency SLO, identical to SEARCH_SLO_MS)
 #   - PerformanceSLO.CACHE_HIT_RATE_THRESHOLD = 85   (Redis cache hit rate, docs/99-agent/rules.md:221)
 #
-# SELECTOR CONTRACT (12-OPS-003). Every `expr` below resolves against a series
-# that a rendered `/metrics` actually exposes (see
-# apps/core/tests/test_observability.py, which parses this file and asserts
-# each selector against the live exposition):
-#   - The latency histogram is `django_http_requests_latency_including_middlewares_seconds_*`
-#     (django-prometheus). It carries `method`, `transport` and `view` labels
-#     and the prometheus_client default bucket edges
-#     (0.01 … 50.0, 75.0, +Inf).
-#   - The `/search/` view label is `view="search:search"`.
+# SELECTOR CONTRACT (12-OPS-003, corrected 13-PERF-011). Every `expr` below
+# resolves against a series — and a label set — that a rendered `/metrics`
+# actually exposes (see apps/core/tests/test_observability.py, which parses this
+# file and asserts each selector, name AND label matcher, against the live
+# exposition):
+#   - The *labelled* latency histogram is
+#     `django_http_requests_latency_seconds_by_view_method_*` (django-prometheus).
+#     It carries `view` and `method` labels and the prometheus_client default
+#     bucket edges (0.01 … 50.0, 75.0, +Inf).
+#   - The `/search/` view label is `view="search:search"`; the listings page is
+#     `view="ads:listings"`.
+#   - `django_http_requests_latency_including_middlewares_seconds_*` is the
+#     *unlabelled* histogram — it exposes no `view` label, so a selector that
+#     matched `view=` against it selected nothing and could never fire. That is
+#     the defect 13-PERF-011 corrects; the rules below use the labelled family.
 #   - `django_http_response_duration_seconds` does NOT exist in the exposition,
 #     and neither does a `handler` label — the rules that named them never fired.
 #
@@ -51,18 +57,20 @@ groups:
       # A sustained burn rate > 10 over a 14.4-minute window means 10% of the
       # error budget is being consumed within that window.
       #
-      # Metric source: django_http_requests_latency_including_middlewares_seconds_bucket
-      # (django-prometheus). View label: "search:search".
+      # Metric source: django_http_requests_latency_seconds_by_view_method_bucket
+      # (django-prometheus, LABELLED family). View labels: "search:search" and
+      # "ads:listings" — the listings path shares the buyer-critical latency
+      # budget and was unmonitored before 13-PERF-011.
       # -----------------------------------------------------------------
       - alert: search_slo_burn_rate
         expr: |
           (
             1
             - rate(
-                django_http_requests_latency_including_middlewares_seconds_bucket{le="2.5", view="search:search"}[14.4m]
+                django_http_requests_latency_seconds_by_view_method_bucket{le="2.5", view=~"search:search|ads:listings"}[14.4m]
               )
               / rate(
-                  django_http_requests_latency_including_middlewares_seconds_count{view="search:search"}[14.4m]
+                  django_http_requests_latency_seconds_by_view_method_count{view=~"search:search|ads:listings"}[14.4m]
                 )
           )
           / 0.01
@@ -90,8 +98,8 @@ groups:
       # -----------------------------------------------------------------
       # search_p95_latency_slo
       #
-      # Secondary alert for the p95 latency SLO: 95% of /search/ requests
-      # must complete within PerformanceSLO.P95_SLO_MS (500ms).
+      # Secondary alert for the p95 latency SLO: 95% of /search/ and listings
+      # requests must complete within PerformanceSLO.P95_SLO_MS (500ms).
       # Fires when the 5-minute p95 exceeds 500ms for more than 5 minutes.
       # -----------------------------------------------------------------
       - alert: search_p95_latency_slo
@@ -99,7 +107,7 @@ groups:
           histogram_quantile(
             0.95,
             sum by (le) (
-              rate(django_http_requests_latency_including_middlewares_seconds_bucket{view="search:search"}[5m])
+              rate(django_http_requests_latency_seconds_by_view_method_bucket{view=~"search:search|ads:listings"}[5m])
             )
           ) * 1000 > 500
         for: 5m
@@ -110,7 +118,7 @@ groups:
         annotations:
           summary: "Search p95 latency exceeds 500ms SLO (PerformanceSLO.P95_SLO_MS)"
           description: |-
-            The 95th-percentile search response time exceeded 500ms
+            The 95th-percentile search/listing response time exceeded 500ms
             (PerformanceSLO.P95_SLO_MS = 500) for more than 5 minutes.
             {{ $value | humanize }}ms observed.
           runbook_url: https://github.com/mko-bazuna/mko_bazuna/blob/main/docs/ops/prometheus-slo-alerts.yaml
@@ -125,4 +133,22 @@ groups:
 # the exposition does not contain, so the rule was removed rather than left as
 # a control that cannot run. Cache hit-rate monitoring, if wanted, belongs with
 # a deployed exporter and is a separate change.
+#
+# UNEXPORTED — NOT ALERTED ON (13-PERF-011). Two counters exist in the codebase
+# but are NOT exported by the web tier's `/metrics`, so no rule here may select
+# them (an alert on a never-exported series is the same defect class the
+# scrape-contract test exists to reject):
+#   - `translation_requests_total` / `translation_fallback_total` /
+#     `translation_circuit_open` are process-local to whichever process calls
+#     `translate_text`. Only the bot tier and the `migrate` one-shot do, and
+#     neither shares web's `PROMETHEUS_MULTIPROC_DIR`, so the series is absent
+#     from a web scrape (09: 2f8f8c7; `translation.py`'s module docstring says
+#     so honestly).
+#   - `telegram_dropped_outbound_calls_total` lives in the bot container, which
+#     sets neither `PROMETHEUS_MULTIPROC_DIR` nor the paired tmpfs, so it is
+#     process-local and lost on every bot restart (09: 5e12164).
+# The bot tier is deliberately outside the multiprocess contract, pinned by
+# src/backend/tests/test_compose_contract.py — so exporting these is a follow-on
+# that cannot be closed from inside this file. Recorded as a named follow-on,
+# not silently omitted.
 # ---------------------------------------------------------------------------

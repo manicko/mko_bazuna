@@ -158,6 +158,63 @@ def _series_in_expr(expr: str) -> set[str]:
     return found
 
 
+# A single PromQL selector: a metric name plus its optional `{matchers}` block.
+_SELECTOR_RE = re.compile(
+    r"([a-zA-Z_:][a-zA-Z0-9_:]*)\s*(?:\{([^}]*)\})?"
+)
+
+
+def _exposed_family_labels(exposition: str) -> dict[str, set[str]]:
+    """Map every exposed metric family to the set of label names it carries.
+
+    A family's label set is the union of the label keys across its sample
+    lines: ``name{le="2.5",view="search:search"} 1.0`` contributes
+    ``{"le", "view"}`` to family ``name``. A family that appears with no
+    ``{...}`` block has an empty label set — which is exactly the distinction a
+    selector must respect: matching ``view=`` against an unlabelled family
+    selects nothing (12-OPS-003 / 13-PERF-011).
+    """
+    labels: dict[str, set[str]] = {}
+    for line in exposition.splitlines():
+        if not line or line.startswith("#"):
+            continue
+        match = re.match(r"^([a-zA-Z_:][a-zA-Z0-9_:]*)\s*(?:\{([^}]*)\})?", line)
+        if not match:
+            continue
+        family = match.group(1)
+        keys = set(re.findall(r"([a-zA-Z_][a-zA-Z0-9_]*)\s*=", match.group(2) or ""))
+        labels.setdefault(family, set()).update(keys)
+    return labels
+
+
+def _selectors_in_expr(expr: str) -> list[tuple[str, set[str]]]:
+    """Return ``(metric_name, label_names)`` for every selector in *expr*.
+
+    Unlike :func:`_series_in_expr`, this keeps the label matcher keys so a
+    selector can be resolved against the *labels* a family actually exposes, not
+    just its name. Quoted label values are dropped; only the keys are returned.
+    PromQL keywords and functions are filtered out.
+    """
+    selectors: list[tuple[str, set[str]]] = []
+    for match in _SELECTOR_RE.finditer(expr):
+        name = match.group(1)
+        if name in _PROMQL_KEYWORDS:
+            continue
+        keys = set(
+            re.findall(r"([a-zA-Z_][a-zA-Z0-9_]*)\s*=", match.group(2) or "")
+        )
+        selectors.append((name, keys))
+    return selectors
+
+
+def _family_base(series: str) -> str:
+    """Strip a Prometheus histogram/counter suffix to its family base name."""
+    for suffix in ("_bucket", "_count", "_sum", "_created"):
+        if series.endswith(suffix):
+            return series[: -len(suffix)]
+    return series
+
+
 @pytest.mark.django_db
 def test_slo_alert_selectors_resolve_against_rendered_metrics(
     client: Client,
@@ -168,9 +225,23 @@ def test_slo_alert_selectors_resolve_against_rendered_metrics(
     the exporter actually exposes. This guard renders `/metrics` and fails if
     any alert names a series the exposition does not contain — which is exactly
     how the three dead rules shipped.
+
+    It also resolves every selector's **label matchers** against the labels the
+    family actually carries (13-PERF-011). A selector naming an existing family
+    with a label that family does not have — e.g. `view="search:search"` on the
+    unlabelled `..._including_middlewares_seconds` histogram — selects the empty
+    set and can never fire, which is the same defect class one level deeper. The
+    name-only check cannot see it because it strips matchers before resolving.
     """
+    # The labelled latency family is only exposed once a labelled view has been
+    # requested — django-prometheus creates the child series lazily. Warm the
+    # exposition with the two views the rules select, then scrape. The unlabelled
+    # family is present regardless (the `/metrics` request itself is observed).
+    client.get("/search/?q=laptop")
+    client.get("/")
     exposition = client.get("/metrics").content.decode("utf-8")
     exposed = _exposed_series_names(exposition)
+    exposed_labels = _exposed_family_labels(exposition)
     assert exposed, "the /metrics exposition contained no metric families"
 
     rules_text = _SLO_ALERTS_YAML.read_text(encoding="utf-8")
@@ -178,21 +249,30 @@ def test_slo_alert_selectors_resolve_against_rendered_metrics(
     assert exprs, f"no `expr:` selectors found in {_SLO_ALERTS_YAML.name}"
 
     unknown: list[str] = []
+    unknown_labels: list[str] = []
     for expr in exprs:
         for series in _series_in_expr(expr):
             # A `_bucket`/`_count`/`_sum` selector resolves to its family base.
-            base = series
-            for suffix in ("_bucket", "_count", "_sum", "_created"):
-                if base.endswith(suffix):
-                    base = base[: -len(suffix)]
-                    break
+            base = _family_base(series)
             if series in exposed or base in exposed:
                 continue
             unknown.append(series)
+        for series, matcher_keys in _selectors_in_expr(expr):
+            family = series if series in exposed_labels else _family_base(series)
+            available = exposed_labels.get(family)
+            if available is None:
+                continue  # already reported by the name check above
+            for key in sorted(matcher_keys - available):
+                unknown_labels.append(f"{series}{{{key}=}}")
 
     assert not unknown, (
         "the SLO alert file names series the /metrics exposition does not "
         "expose (12-OPS-003): " + ", ".join(sorted(set(unknown)))
+    )
+    assert not unknown_labels, (
+        "the SLO alert file matches labels the exposed metric family does not "
+        "carry, so the selector resolves to nothing and the rule can never fire "
+        "(13-PERF-011): " + ", ".join(sorted(set(unknown_labels)))
     )
 
 
@@ -237,6 +317,54 @@ def test_scrape_contract_rejects_a_selector_naming_an_absent_series() -> None:
         if s not in exposed and s.removesuffix("_bucket") not in exposed
     }
     assert not good_unknown, f"false positive on a valid selector: {good_unknown}"
+
+
+def test_scrape_contract_rejects_a_selector_matching_an_absent_label() -> None:
+    """The label-aware detector fails on a matcher the family does not carry.
+
+    A selector can name a real family yet still resolve to nothing when it
+    matches a label that family does not expose. This is the defect that
+    shipped on the latency histogram: ``view="search:search"`` against the
+    unlabelled ``..._including_middlewares_seconds`` family. The detector must
+    report it, so adding such a matcher turns
+    ``test_slo_alert_selectors_resolve_against_rendered_metrics`` red
+    (13-PERF-011).
+    """
+    exposed_labels = {
+        # The unlabelled histogram: no labels at all.
+        "django_http_requests_latency_including_middlewares_seconds": set(),
+        # The labelled histogram: view + method.
+        "django_http_requests_latency_seconds_by_view_method": {"view", "method"},
+    }
+    bad_expr = (
+        'rate(django_http_requests_latency_including_middlewares_seconds_bucket'
+        '{view="search:search"}[5m])'
+    )
+    reported: list[str] = []
+    for series, matcher_keys in _selectors_in_expr(bad_expr):
+        family = series if series in exposed_labels else _family_base(series)
+        available = exposed_labels.get(family)
+        if available is None:
+            continue
+        reported.extend(sorted(matcher_keys - available))
+    assert reported == ["view"], (
+        "the detector must report a matcher the exposed family does not carry "
+        "(13-PERF-011)"
+    )
+
+    # And it must NOT report a matcher the labelled family does carry.
+    good_expr = (
+        'rate(django_http_requests_latency_seconds_by_view_method_bucket'
+        '{view="ads:listings"}[5m])'
+    )
+    good_reported: list[str] = []
+    for series, matcher_keys in _selectors_in_expr(good_expr):
+        family = series if series in exposed_labels else _family_base(series)
+        available = exposed_labels.get(family)
+        if available is None:
+            continue
+        good_reported.extend(sorted(matcher_keys - available))
+    assert not good_reported, f"false positive on a valid selector: {good_reported}"
 
 
 def test_slo_alert_file_is_not_a_kubernetes_crd() -> None:
