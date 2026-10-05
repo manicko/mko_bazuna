@@ -21,6 +21,7 @@ from apps.core.enums import AdSource, AdStatus, LanguageLocale
 from apps.currencies.enums import CurrencyCode
 from apps.lookups.enums import LookupGroupCode
 from apps.media.services.filesystem import KEY_FORMAT_REGEX
+from apps.media.storage_keys import KEY_COLUMNS
 
 # Define allowed transitions as a mapping
 ALLOWED_TRANSITIONS: dict[AdStatus, set[AdStatus]] = {
@@ -751,13 +752,11 @@ class AdImage(models.Model):
         so filesystem erasure removes the original and all derived
         thumbnail files.
         """
-        keys: list[str] = [cast(str, self.image)]
-        if self.thumbnail_small:
-            keys.append(cast(str, self.thumbnail_small))
-        if self.thumbnail_medium:
-            keys.append(cast(str, self.thumbnail_medium))
-        if self.thumbnail_large:
-            keys.append(cast(str, self.thumbnail_large))
+        keys: list[str] = []
+        for column in KEY_COLUMNS:
+            value = getattr(self, column)
+            if value:
+                keys.append(cast(str, value))
         return keys
 
 
