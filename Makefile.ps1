@@ -66,6 +66,7 @@ function Show-Help {
     Write-Host "  seed-photos-validate  Cross-check photo_manifest.json against fixture files"
     Write-Host "  seed-photos-cleanup   Clean stale manifest entries for missing fixture files"
     Write-Host "  seed-photos-download  Download seed photos from Unsplash/Pexels to fixtures"
+    Write-Host "  verify-nginx   Verify the dev nginx /media/ rate-limit gate (host-side gate; --use-nginx profile)"
     Write-Host "  logs           Follow logs from all services"
     Write-Host "  backup         Create PostgreSQL backup with 7-day rotation"
     Write-Host "  restore        Restore database from backup file"
@@ -388,6 +389,30 @@ function Invoke-SeedPhotosDownload {
     uv run python scripts/download_seed_photos.py @args
 }
 
+# Verify the dev nginx /media/ rate-limit gate. Host-side, read-only, and never
+# brings nginx up: the dev `nginx` service is gated behind the `use-nginx`
+# compose profile (docker-compose.dev.override.yml), so starting it is an
+# operator action. Like Invoke-SeedPhotosValidate this is a plain host-side
+# script invocation - no compose project name, no container. The script's exit
+# code is propagated verbatim (see scripts/verify-nginx-media-limits.ps1 for the
+# contract): 0 PASS, 1 CONFIG, 2 STOPPED, 3 ABSENT, 4 PROBE FAIL. This is the
+# first non-test target in this file to propagate an exit code; the idiom is the
+# same one Invoke-Test/Invoke-TestAll/Invoke-TestRecreate use.
+function Invoke-VerifyNginx {
+    $nginxBurst = if ($env:NGINX_BURST) { $env:NGINX_BURST } else { "45" }
+    $nginxSettle = if ($env:NGINX_SETTLE) { $env:NGINX_SETTLE } else { "15" }
+    $nginxPollAttempts = if ($env:NGINX_POLL_ATTEMPTS) { $env:NGINX_POLL_ATTEMPTS } else { "15" }
+    $nginxPollInterval = if ($env:NGINX_POLL_INTERVAL) { $env:NGINX_POLL_INTERVAL } else { "1" }
+    # Pass the effective values through the environment so the script reads them
+    # with its own declared defaults (same env-override idiom, one direction).
+    $env:NGINX_BURST = $nginxBurst
+    $env:NGINX_SETTLE = $nginxSettle
+    $env:NGINX_POLL_ATTEMPTS = $nginxPollAttempts
+    $env:NGINX_POLL_INTERVAL = $nginxPollInterval
+    & pwsh -NoProfile -File "scripts/verify-nginx-media-limits.ps1"
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+
 # Main entry point
 switch ($Target.ToLower()) {
     "help" { Show-Help }
@@ -414,6 +439,7 @@ switch ($Target.ToLower()) {
     "seed-photos-validate" { Invoke-SeedPhotosValidate }
     "seed-photos-cleanup" { Invoke-SeedPhotosCleanup }
     "seed-photos-download" { Invoke-SeedPhotosDownload }
+    "verify-nginx" { Invoke-VerifyNginx }
     "consolidate" { Invoke-Consolidate }
     "consolidate-force" { Invoke-ConsolidateForce }
     "logs" { Invoke-Logs }
