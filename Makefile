@@ -315,16 +315,25 @@ restore-test:
 	done && \
 	echo "→ Restoring backup into isolated DB: $(BACKUP_FILE)" && \
 	docker exec restore-db pg_restore --clean --if-exists -U restore_user -d bazuna_restore -F c /backups/$$BACKUP_NAME && \
-	echo "→ Smoke test 1/4: pg_isready (connectivity)" && \
+	echo "→ Smoke test 1/5: pg_isready (connectivity)" && \
 	docker exec restore-db pg_isready -U restore_user -d bazuna_restore && \
 	echo "  ✓ Connectivity OK" && \
-	echo "→ Smoke test 2/4: table count (schema present)" && \
-	echo "  Tables: $$(docker exec restore-db psql -U restore_user -d bazuna_restore -t -A -c \
-		"SELECT count(*) FROM information_schema.tables WHERE table_schema='public';")" && \
-	echo "→ Smoke test 3/4: row count in ads_ad (data present)" && \
-	echo "  ads_ad rows: $$(docker exec restore-db psql -U restore_user -d bazuna_restore -t -A -c \
-		"SELECT count(*) FROM ads_ad;")" && \
-	echo "→ Smoke test 4/4: schema list" && \
+	echo "→ Smoke test 2/5: schema present (table count > 0)" && \
+	RESTORE_TABLES=$$(docker exec restore-db psql -U restore_user -d bazuna_restore -t -A -c \
+		"SELECT count(*) FROM information_schema.tables WHERE table_schema='public';") && \
+	echo "  Tables: $$RESTORE_TABLES" && \
+	test "$$RESTORE_TABLES" -gt 0 || { echo "  ✗ FAIL: restore produced no tables — empty or partial dump"; exit 1; } && \
+	echo "→ Smoke test 3/5: django_migrations present (schema is migrated, not a bare restore)" && \
+	RESTORE_MIGRATIONS=$$(docker exec restore-db psql -U restore_user -d bazuna_restore -t -A -c \
+		"SELECT count(*) FROM django_migrations;") && \
+	echo "  django_migrations rows: $$RESTORE_MIGRATIONS" && \
+	test "$$RESTORE_MIGRATIONS" -gt 0 || { echo "  ✗ FAIL: django_migrations is absent or empty — the dump is not a migrated database"; exit 1; } && \
+	echo "→ Smoke test 4/5: ads_ad has plausible rows" && \
+	RESTORE_ADS=$$(docker exec restore-db psql -U restore_user -d bazuna_restore -t -A -c \
+		"SELECT count(*) FROM ads_ad;") && \
+	echo "  ads_ad rows: $$RESTORE_ADS" && \
+	test "$$RESTORE_ADS" -gt 0 || { echo "  ✗ FAIL: ads_ad is empty — the dump restored no data"; exit 1; } && \
+	echo "→ Smoke test 5/5: schema list" && \
 	docker exec restore-db psql -U restore_user -d bazuna_restore -c "\dn" && \
 	if [ -z "$(APP_IMAGE)" ]; then \
 		echo "→ Skipping migrate --plan --check (APP_IMAGE not set)"; \

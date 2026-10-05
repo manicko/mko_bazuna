@@ -23,9 +23,18 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
-    # B4 dependency: ci.yml build job pushes the SHA-tagged image to GHCR.
-    # This job pulls that same image and uses it for the migrate --plan --check
-    # step in `make restore-test APP_IMAGE=<image>`.
+      # Recorded known-good application image for the migrate --plan --check step
+      # (12-OPS-004). On a `schedule` trigger the commit-SHA expression is the
+      # default-branch tip at fire time, which may have no pushed image, so the
+      # monthly drill could fail at `docker pull` for a reason unrelated to backup
+      # integrity. This tag is deliberately a RECORDED, CONCRETE release tag, not a
+      # moving pointer: bump it when a new known-good release is published. The
+      # guard test_restore_test_workflow.py::test_restore_test_pins_a_recorded_app_image
+      # fails if this line regresses to a commit-SHA expression.
+      RESTORE_APP_IMAGE_TAG: "2026.10.03"
+    # B4 dependency: ci.yml build job pushes a SHA-tagged image to GHCR.
+    # This job restores a real artifact and checks migration compatibility of
+    # the RESTORE_APP_IMAGE_TAG image against the restored schema.
     services:
       db:
         image: postgres:18-alpine
@@ -75,11 +84,34 @@ jobs:
         run: uv run python manage.py bootstrap_reference_data
         working-directory: src/backend
 
-      - name: Generate test backup
+      - name: Generate self-generated smoke dump (ADDITIONAL check, not a real artifact)
+        # HONEST LABEL (12-OPS-004): this dump is generated from the CI database
+        # three steps earlier, so restoring it proves only that the round trip
+        # works — NOT that any production artifact is restorable. It is kept as an
+        # ADDITIONAL smoke test, labelled as what it is. The real-artifact half
+        # (fetching the newest OFF-HOST production dump) is OPEN: see the
+        # "Off-host real-artifact acquisition — OPEN NAMED TASK" note below.
         run: |
           mkdir -p backups
           pg_dump --no-sync -h localhost -U postgres -d mko_bazuna -F c > backups/test_backup.dump
 
+      # ---------------------------------------------------------------------
+      # Off-host real-artifact acquisition — OPEN NAMED TASK (12-OPS-004)
+      # ---------------------------------------------------------------------
+      # The 2026-10-04 coordinator ruling keeps the off-host half OPEN because
+      # it is NOT implementable from this repository:
+      #   * the `backup` container is postgres:18.6-alpine with `cap_drop: [ALL]`
+      #     and `read_only: true` and tmpfs on /tmp only, so it has NO
+      #     object-storage client binary (aws/gsutil/rclone are absent);
+      #   * no storage SDK is in pyproject.toml;
+      #   * any new credential would have to land in ALLOWED_ENV_VARS plus all
+      #     four .env.*.example files in one commit.
+      # Named infrastructure task: "Configure an off-host push from the `backup`
+      # service (credentials + retention policy + a stated restore path) and make
+      # restore-test.yml download and restore the newest production artifact."
+      # Recorded in docs/ops/restore.md's scope statement. Until it lands, the
+      # drill proves a real round trip of a labelled ADDITIONAL dump, not an
+      # off-host production artifact.
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
         with:
@@ -87,8 +119,8 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Pull app image
-        run: docker pull ghcr.io/mko-bazuna/mko_bazuna:${{ github.sha }}
+      - name: Pull recorded known-good app image
+        run: docker pull ghcr.io/mko-bazuna/mko_bazuna:${{ env.RESTORE_APP_IMAGE_TAG }}
 
       - name: Run restore-test with migrate --plan --check
-        run: make restore-test BACKUP_FILE=backups/test_backup.dump APP_IMAGE=ghcr.io/mko-bazuna/mko_bazuna:${{ github.sha }}
+        run: make restore-test BACKUP_FILE=backups/test_backup.dump APP_IMAGE=ghcr.io/mko-bazuna/mko_bazuna:${{ env.RESTORE_APP_IMAGE_TAG }}

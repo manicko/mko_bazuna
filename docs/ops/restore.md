@@ -291,15 +291,38 @@ The `make restore-test` target:
    (`bazuna_restore`, user: `restore_user`)
 5. Waits up to 30 s for `pg_isready` (connectivity check)
 6. Runs `pg_restore --clean --if-exists -F c` into the isolated DB
-7. Runs four smoke checks:
+7. Runs five smoke checks that **assert**, not merely print (an empty or partial
+   restore fails the target with a non-zero exit):
    - **Connectivity:** `pg_isready`
-   - **Schema (table count):** `SELECT count(*) FROM information_schema.tables WHERE table_schema='public'`
-   - **Data (row count):** `SELECT count(*) FROM ads_ad`
+   - **Schema (table count):** `SELECT count(*) FROM information_schema.tables WHERE table_schema='public'` — must be `> 0`
+   - **Migrations:** `SELECT count(*) FROM django_migrations` — the table must exist and be non-empty, proving the dump is a migrated database rather than a bare restore
+   - **Data (row count):** `SELECT count(*) FROM ads_ad` — must be `> 0`
    - **Schema list:** `\dn`
 8. Optionally runs `migrate --plan --check` against the restored DB using the
    production app image (when `APP_IMAGE` is provided) — verifies Django ORM-level
    migration compatibility against the restored schema
 9. Tears down all isolated resources (container, volume, network) via an `EXIT` trap
+
+### What the drill proves, and what it does NOT (12-OPS-004)
+
+The drill now proves something about a **real restore**: it fails on an empty or
+partial restore, asserts `django_migrations` is present, and asserts `ads_ad` has
+rows. In CI the dump it restores is still generated from the CI database three
+steps earlier, so it is labelled an **additional** smoke test, not a production
+artifact.
+
+**OPEN NAMED TASK — off-host real-artifact acquisition.** Restoring the newest
+**off-host production** dump is **not implemented**, because it is not
+implementable from this repository: the `backup` container is
+`postgres:18.6-alpine` with `cap_drop: [ALL]` and `read_only: true` and tmpfs on
+`/tmp` only, so it has **no object-storage client binary**; no storage SDK is in
+`pyproject.toml`; and any new credential must land in `ALLOWED_ENV_VARS` plus all
+four `.env.*.example` files in one commit. This was re-opened with the
+implementability finding on 2026-10-04 and is tracked as the named infrastructure
+task *"Configure an off-host push from the `backup` service (credentials +
+retention policy + stated restore path) and make the drill restore the newest
+production artifact."* Until it lands, the RPO/RTO preconditions below remain
+unmet.
 
 ### Migrate --plan --check (optional)
 
@@ -310,8 +333,10 @@ to the restored DB with `DJANGO_BUILD=1` and `DJANGO_SETTINGS_MODULE=config.sett
 to bypass secret-validation guards. The `--check` flag causes a non-zero exit if
 pending migrations exist — the CI backup is generated from a fully-migrated DB
 (after `bootstrap_reference_data`), so the plan is empty and the step succeeds.
-CI provides the SHA-tagged image automatically via `.github/workflows/restore-test.yml`;
-manual runs skip this step unless `APP_IMAGE` is set explicitly.
+CI provides a **recorded known-good** image automatically (the concrete
+`RESTORE_APP_IMAGE_TAG` pinned in `.github/workflows/restore-test.yml`, not a
+moving `github.sha`); manual runs skip this step unless `APP_IMAGE` is set
+explicitly.
 
 ## Troubleshooting
 
