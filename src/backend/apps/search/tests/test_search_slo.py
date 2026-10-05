@@ -4,7 +4,8 @@ Tests for Block B3 — SLO regression guard (finding 13-PERF-001).
 Verifies the two remaining PERF-001 deliverables:
   - ``PerformanceSLO`` constant values match the spec and rules.md references.
   - The ``/search/`` endpoint completes within the ≤2s SLO at seed volume
-    (≥50 PUBLISHED ads), as defined in ``docs/01-spec/search-patterns.md:360``.
+    (≥50 PUBLISHED ads), as defined in ``docs/01-spec/search-patterns.md``
+    ("Target response time: ≤2 seconds for search queries").
 
 This is a **single-sample wall-clock bound**, not a percentile measurement: one
 ``/search/`` request is timed against ``SEARCH_SLO_MS`` (2000 ms), the p99 /
@@ -53,7 +54,7 @@ class TestSLOConstants:
         assert PerformanceSLO.P99_SLO_MS == 2000
 
     def test_search_slo_ms(self) -> None:
-        """Search response SLO is ≤2000ms (search-patterns.md:360)."""
+        """Search response SLO is ≤2000ms (the ≤2s search-patterns.md target)."""
         assert PerformanceSLO.SEARCH_SLO_MS == 2000
 
     def test_cache_hit_rate_threshold(self) -> None:
@@ -65,7 +66,7 @@ class TestSLOConstants:
         assert PerformanceSLO.LOAD_TEST_P95_REGRESSION_THRESHOLD == 10
 
     def test_search_slo_matches_spec(self) -> None:
-        """search-patterns.md:360 defines ≤2 seconds → SEARCH_SLO_MS = 2000."""
+        """search-patterns.md "≤2 seconds" target → SEARCH_SLO_MS = 2000."""
         assert PerformanceSLO.SEARCH_SLO_MS == 2000
 
     def test_search_slo_is_p99_aligned(self) -> None:
@@ -100,8 +101,8 @@ class TestSearchResponseSLORegression:
     def test_search_at_seed_volume_meets_slo(self, seller, category, city) -> None:
         """Search at seed volume (≥50 published ads) must complete within SLO.
 
-        The spec (``docs/01-spec/search-patterns.md:360``) defines the target
-        response time as ≤2 seconds for search queries.  This test seeds a
+        The spec (``docs/01-spec/search-patterns.md``, "Target response time:
+        ≤2 seconds for search queries") sets the bound.  This test seeds a
         representative catalog of 60 PUBLISHED ads and times a real search
         request through the Django test client, asserting the elapsed time
         stays within ``PerformanceSLO.SEARCH_SLO_MS``.
@@ -134,5 +135,6 @@ class TestSearchResponseSLORegression:
             f"Search at seed volume took {elapsed_ms:.0f}ms, exceeding SLO of "
             f"{slo_ms}ms (PerformanceSLO.SEARCH_SLO_MS). "
             f"Seeded {self._SEED_AD_COUNT} PUBLISHED ads. "
-            f"Threshold source: docs/01-spec/search-patterns.md:360"
+            f"Threshold source: docs/01-spec/search-patterns.md "
+            f'("Target response time: ≤2 seconds for search queries")'
         )
