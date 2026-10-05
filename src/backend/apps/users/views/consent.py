@@ -318,25 +318,6 @@ def consent_withdraw(request: HttpRequest) -> HttpResponse:
     return response
 
 
-def is_consent_given(request: HttpRequest) -> bool:
-    """
-    [Deprecated] Check if the user has acted on consent (banner hidden).
-
-    This function is kept as a backward-compatible shim. Its logic now lives in
-    ``apps.users.context_processors.consent_state``, which computes
-    ``consent_shown`` for every template. Prefer the context processor.
-
-    Args:
-        request: HTTP request.
-
-    Returns:
-        ``True`` if the user has acted (banner hidden), ``False`` otherwise.
-    """
-    from apps.users.context_processors import consent_state
-
-    return consent_state(request)["consent_shown"]
-
-
 @never_cache
 def login_issue(request: HttpRequest) -> HttpResponse:
     """

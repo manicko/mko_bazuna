@@ -18,15 +18,11 @@ data change.
 
 import logging
 from enum import StrEnum
-from typing import TYPE_CHECKING
 
 from django.core.cache import cache
 
 from apps.core.utils.cache import bump_version_key
 from apps.core.utils.swr_cache import get_with_stale_revalidate
-
-if TYPE_CHECKING:
-    pass
 
 logger = logging.getLogger(__name__)
 
@@ -59,13 +55,6 @@ LOOKUP_RESOLVE_CACHE_LOCK_TTL: int = 30
 RESOLVED_PURPOSES_SEGMENT = "purposes"
 RESOLVED_FEATURES_SEGMENT = "features"
 RESOLVED_CONDITIONS_SEGMENT = "conditions"
-
-# Deprecated aliases — kept for backward compatibility with any external
-# callers still importing the old prefix constants.  They return only the
-# segment string, not a full cache key.
-RESOLVED_PURPOSES_PREFIX = RESOLVED_PURPOSES_SEGMENT
-RESOLVED_FEATURES_PREFIX = RESOLVED_FEATURES_SEGMENT
-RESOLVED_CONDITIONS_PREFIX = RESOLVED_CONDITIONS_SEGMENT
 
 
 def get_lookup_resolve_version() -> int:
