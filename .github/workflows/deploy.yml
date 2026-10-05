@@ -170,9 +170,18 @@ jobs:
             # runs `up -d --remove-orphans` with no service filter, so the
             # manifest is the single source of truth and a service added there
             # (with `restart:`) is started by the next deploy automatically. The
-            # guard in test_deploy_workflow.py derives the restart:-carrying set
-            # from the manifest and fails if the deploy path ever filters it out.
-            COMPOSE_PROFILES="--profile scheduler --profile backup --profile pgbouncer"
+            # guard in test_deploy_workflow.py derives the profile set from the
+            # manifest and fails if the deploy path omits one.
+            #
+            # The pgbouncer profile is deliberately ABSENT (12-OPS-007). Its
+            # service is documented BLOCKED/unusable (docker-compose.prod.yml;
+            # docs/ops/docker-deployment.md) and its pinned image tag
+            # (edoburu/pgbouncer:1.25.2) does not resolve on Docker Hub. Because
+            # `docker compose pull` fails as a whole when any one image is
+            # unresolvable, activating the profile under `set -e` aborts the
+            # deploy before anything is deployed. Keep it out until the image tag
+            # and the documented blockers are resolved.
+            COMPOSE_PROFILES="--profile scheduler --profile backup"
 
             echo "=== Starting deployment of IMAGE_TAG=${IMAGE_TAG} ==="
 
@@ -207,7 +216,7 @@ jobs:
             echo "Database backup created."
 
             # b. Pull the new image (profiles so the profile-gated services are
-            #    pulled too — scheduler, backup and pgbouncer).
+            #    pulled too — scheduler and backup; pgbouncer is off, see above).
             echo "=== Step 2: Pull new image ==="
             IMAGE_TAG="${IMAGE_TAG}" docker compose ${COMPOSE_PROFILES} -f docker-compose.yml -f docker-compose.prod.yml pull
 

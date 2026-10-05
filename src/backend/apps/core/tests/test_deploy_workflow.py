@@ -35,15 +35,20 @@ def test_deploy_workflow_has_rollback_step() -> None:
 
 
 def test_deploy_path_names_the_profile_gated_services() -> None:
-    """The deploy path names scheduler/backup and activates their profiles.
+    """The deploy path activates the profiles the manifest gates, and never the blocked one.
 
     Thin companion to the guard in src/backend/tests/test_deploy_workflow.py:
     without the explicit profiles and service names the scheduler is left on a
-    stale image and the daily backup job is never started (12-OPS-007).
+    stale image and the daily backup job is never started (12-OPS-007). The
+    `pgbouncer` profile is deliberately excluded — its image tag does not resolve
+    and the service is documented BLOCKED/unusable (12-OPS-007).
     """
     text = _read(".github", "workflows", "deploy.yml")
-    for profile in ("--profile scheduler", "--profile backup", "--profile pgbouncer"):
+    for profile in ("--profile scheduler", "--profile backup"):
         assert profile in text, f"deploy.yml must activate {profile} (12-OPS-007)"
+    assert "--profile pgbouncer" not in text, (
+        "deploy.yml must NOT activate the blocked pgbouncer profile (12-OPS-007)"
+    )
     for service in ("scheduler", "backup"):
         assert service in text, (
             f"deploy.yml must name the long-lived service {service!r} (12-OPS-007)"

@@ -265,7 +265,13 @@ services:
       # shipped here, so this profile is BLOCKED until it is in place.
       # (The service is separately unusable: wrong `PGBOUNCER_*` prefix,
       # `POSTGRES_*` instead of `DATABASE_URL`, and a non-existent pinned tag —
-      # outside BLOCK 5; see docs/ops/docker-deployment.md.)
+      # outside BLOCK 5; see docs/ops/docker-deployment.md.) NAMED FOLLOW-ON:
+      # the pinned tag `edoburu/pgbouncer:1.25.2` does not resolve on Docker Hub
+      # (the repository's tags are `v1.25.2-p0`, `v1.26.0-p0`, …), so
+      # `docker compose pull` aborts as a whole when the profile is enabled.
+      # Correcting it to an existing tag is a separate change and does NOT
+      # unblock the profile — the service stays documented-unusable and the
+      # profile stays off (12-OPS-007).
       - IGNORE_STARTUP_PARAMETERS=options,extra_float_digits
     ports:
       - "6432:6432"

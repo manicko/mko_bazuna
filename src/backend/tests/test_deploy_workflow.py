@@ -382,6 +382,58 @@ def _restart_carrying_prod_services() -> set[str]:
     return {name for name, svc in services.items() if "restart" in (svc or {})}
 
 
+def _manifest_profiles() -> set[str]:
+    """Return every compose profile named by a service in the prod manifest.
+
+    Derived from ``docker-compose.prod.yml`` so the required deploy profile set
+    is the manifest's declaration, never a hand-maintained list. A profile-gated
+    service added to the manifest is therefore covered by the guard with no
+    edit here (12-OPS-007).
+    """
+    from ruamel.yaml import YAML
+
+    data = YAML(typ="safe").load(_PROD_COMPOSE.read_text(encoding="utf-8")) or {}
+    services = data.get("services", {}) or {}
+    return {profile for svc in services.values() for profile in (svc or {}).get("profiles", [])}
+
+
+# Profiles that must stay OFF the deploy path, and the DOCUMENTED BLOCKED status
+# that justifies each — the reason, not a bare literal. The deploy guard compares
+# this set against ``_manifest_profiles()``, so a profile-gated service absent
+# from ``deploy.yml``'s COMPOSE_PROFILES fails UNLESS it appears here with a real
+# reason (12-OPS-007).
+_BLOCKED_PROFILE_JUSTIFICATIONS: dict[str, str] = {
+    "pgbouncer": "this profile is BLOCKED until it is in place",
+}
+
+
+def _blocked_profile_exclusions() -> dict[str, str]:
+    """Return the profiles the deploy path must NOT activate, with their reason.
+
+    An exclusion is only valid when the manifest still documents the profile as
+    BLOCKED. Removing the BLOCKED note without removing the exclusion (or vice
+    versa) therefore fails: the exclusion must never outlive or precede its
+    justification. A reason that is empty, or that is not present verbatim in
+    ``docker-compose.prod.yml``, is rejected — the cited warning
+    ``"this profile is BLOCKED until it is in place"`` lives on the manifest's
+    ``pgbouncer`` service (12-OPS-007). The operator-facing counterpart,
+    ``"BLOCKED — do not enable the pgbouncer profile yet"``, is in
+    ``docs/ops/docker-deployment.md``.
+    """
+    manifest_text = _PROD_COMPOSE.read_text(encoding="utf-8")
+    for profile, reason in _BLOCKED_PROFILE_JUSTIFICATIONS.items():
+        assert reason.strip(), (
+            f"blocked profile {profile!r} needs a documented reason, not a bare "
+            "literal (12-OPS-007)"
+        )
+        assert reason in manifest_text, (
+            f"blocked profile {profile!r} cites {reason!r}, which is not in "
+            "docker-compose.prod.yml — remove the exclusion or restore the "
+            "documented BLOCKED note (12-OPS-007)"
+        )
+    return dict(_BLOCKED_PROFILE_JUSTIFICATIONS)
+
+
 def _deploy_recreate_service_filters() -> list[set[str]]:
     """Return the service-name filters on the deploy `up -d` commands.
 
@@ -435,17 +487,40 @@ def test_deploy_invocations_activate_every_profile_gated_service() -> None:
     """Every deploy compose invocation carries the explicit profile flags.
 
     `up -d` with no profile flags does not activate a profile-gated service —
-    that is the whole defect. The deploy path activates scheduler, backup and
-    pgbouncer explicitly (12-OPS-007).
+    that is the whole defect. The guard DERIVES the required profile set from
+    ``docker-compose.prod.yml`` (the manifest's own declaration) rather than
+    restating a hand-maintained list, so a profile-gated service added to the
+    manifest without a matching flag on the deploy path turns this red
+    (12-OPS-007).
+
+    The ``pgbouncer`` profile is deliberately EXCLUDED: its image tag does not
+    resolve and the service is documented BLOCKED/unusable, so activating it
+    aborts ``docker compose pull`` and, under ``set -e``, the whole deploy. The
+    exclusion is tied to the documented BLOCKED note (see
+    ``_blocked_profile_exclusions``), so removing the note without removing the
+    exclusion — or vice versa — fails this guard (12-OPS-007).
     """
     text = _DEPLOY_YML.read_text(encoding="utf-8")
     match = re.search(r'COMPOSE_PROFILES="([^"]*)"', text)
     assert match, "deploy.yml must declare COMPOSE_PROFILES (12-OPS-007)"
     profiles = match.group(1)
-    for profile in ("--profile scheduler", "--profile backup", "--profile pgbouncer"):
-        assert profile in profiles, (
-            f"deploy COMPOSE_PROFILES must include {profile!r} (12-OPS-007)"
+
+    blocked = _blocked_profile_exclusions()
+    required = _manifest_profiles() - set(blocked)
+
+    for profile in sorted(required):
+        assert f"--profile {profile}" in profiles, (
+            f"deploy COMPOSE_PROFILES must include the manifest profile "
+            f"{profile!r} (12-OPS-007); got {profiles!r}"
         )
+    # The pgbouncer profile must stay OFF the deploy path: activating it aborts
+    # `docker compose pull` on an unresolvable image tag (12-OPS-007).
+    for profile in sorted(blocked):
+        assert f"--profile {profile}" not in profiles, (
+            f"deploy COMPOSE_PROFILES must NOT activate the blocked profile "
+            f"{profile!r} (12-OPS-007)"
+        )
+
     # Every state-changing service-lifecycle invocation (`pull`, `up -d`, and
     # the pre-deploy `exec -T db pg_dump`) must consume it. Read-only probes
     # (`images`, the `exec -T web curl` health check) and comment/echo lines
