@@ -32,6 +32,7 @@ _COMPOSE = _ROOT / "docker-compose.yml"
 _PROD_COMPOSE = _ROOT / "docker-compose.prod.yml"
 _DEV_OVERRIDE_COMPOSE = _ROOT / "docker-compose.dev.override.yml"
 _TEST_COMPOSE = _ROOT / "docker-compose.test.yml"
+_DOCS_OPS = _ROOT / "docs" / "ops"
 
 
 def _load_yaml(path: Path) -> dict:
@@ -536,3 +537,74 @@ def test_pgbouncer_auth_type_matches_engine_password_encryption() -> None:
         f"pgbouncer PGBOUNCER_AUTH_TYPE must be {_PG_PASSWORD_ENCRYPTION_DEFAULT!r} "
         f"to match the PostgreSQL 18 password_encryption default; got {auth_type!r}"
     )
+
+
+# ---------------------------------------------------------------------------
+# docs/ops pinned-image parity (12-OPS-018)
+# ---------------------------------------------------------------------------
+# Operator-facing docs quote the exact pinned images (09-API-016). The pins live
+# in the compose manifests, which are the SINGLE source of truth; a doc that
+# restates a different tag sends an operator to an image the stack does not run.
+# The guard DERIVES the pinned images from the manifests and asserts the runbook
+# table quotes exactly those, so a fixpoint guard could not detect a tag that was
+# MISSING from the table (dropped rows / a `_OVERRIDE in line` selector) — the
+# table is parsed as a set and compared for equality instead (12-OPS-018).
+def _parse_prod_service_image_table(text: str) -> dict[str, str]:
+    """Return ``{service: quoted_image}`` from the docker-deployment table.
+
+    Rows read ``| `svc` | `image:tag` (upstream) | … |`` for upstream images
+    (the value is the full pinned image, tag included) and ``| `svc` | Prebuilt
+    GHCR image, … |`` for the GHCR-built application services (whose tag is a
+    runtime variable, not a literal; the value is the sentinel ``ghcr``).
+    """
+    table: dict[str, str] = {}
+    row_re = re.compile(r"^\|\s*`([^`]+)`\s*\|\s*([^|]+?)\s*\|")
+    for line in text.split("\n"):
+        match = row_re.match(line)
+        if not match:
+            continue
+        service, cell = match.group(1), match.group(2).strip()
+        if service in {"Service", "---------"} or service.startswith("-"):
+            continue
+        tag_match = re.match(r"`([^`]+)`", cell)
+        if tag_match:
+            table[service] = tag_match.group(1)
+        elif cell.startswith("Prebuilt GHCR image"):
+            table[service] = "ghcr"
+    return table
+
+
+def test_docker_deployment_table_quotes_the_pinned_images() -> None:
+    """The prod service table quotes exactly the manifest's upstream images.
+
+    Derives the base manifest's own ``image:`` pins and compares them, as a
+    ``{service: image}`` mapping, against the ``docs/ops/docker-deployment.md``
+    table. The FULL pinned image (tag included) is compared, so a row that names
+    a different tag fails; because the comparison is equality, a pinned image
+    that is MISSING from the table fails too (12-OPS-018).
+    """
+    base = _load_yaml(_COMPOSE)["services"]
+    expected = {
+        "db": base["db"]["image"],
+        "nginx": base["nginx"]["image"],
+    }
+    table = _parse_prod_service_image_table(
+        (_DOCS_OPS / "docker-deployment.md").read_text(encoding="utf-8")
+    )
+    for service, image in expected.items():
+        assert service in table, (
+            f"docker-deployment.md production table must list {service!r} "
+            "(12-OPS-018)"
+        )
+        assert table[service] == image, (
+            f"docker-deployment.md lists {service} as {table[service]!r}, but the "
+            f"manifest pins {image!r} (12-OPS-018)"
+        )
+    # No stale tag: no doc/ops runbook may restate the floating `18-alpine`
+    # family for the pinned `db`/`backup` image (the pin is `postgres:18.6-alpine`).
+    for path in _DOCS_OPS.glob("*.md"):
+        text = path.read_text(encoding="utf-8")
+        assert "postgres:18-alpine" not in text, (
+            f"{path.name} restates the unpinned `postgres:18-alpine`; the manifest "
+            "pins `postgres:18.6-alpine` (12-OPS-018)"
+        )

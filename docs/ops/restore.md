@@ -43,9 +43,9 @@ When running in production with the backup profile enabled, backups run automati
 docker compose --env-file .env.prod -f docker-compose.yml -f docker-compose.prod.yml --profile backup up -d
 ```
 
-The backup service uses the `postgres:18-alpine` image and connects directly to the `db` service. It:
+The backup service uses the `postgres:18.6-alpine` image and connects directly to the `db` service. It:
 - Runs `pg_dump -F c` (custom format)
-- Stores backups to `./backups/dump_YYYYMMDD.dump`
+- Stores backups to `./backups/dump_YYYYMMDD_HHMMSS.dump`
 - Prunes backups older than 7 days
 - Runs every 24 hours in a loop
 
@@ -59,6 +59,10 @@ make backup
 
 This creates a timestamped backup in `./backups/` with format `dump_YYYYMMDD_HHMMSS.dump`.
 
+> **`make backup` reads `.env.dev` and runs against the dev compose files**, so it
+> backs up the **development** database. For the production backup, rely on the
+> `backup` service (above) or run the `pg_dump` against `.env.prod`.
+
 ## Identify Backup File
 
 List available backups:
@@ -68,7 +72,7 @@ ls -la ./backups/
 ```
 
 Manual backup files use: `dump_YYYYMMDD_HHMMSS.dump`
-Automated backup files use: `dump_YYYYMMDD.dump`
+Automated backup files use: `dump_YYYYMMDD_HHMMSS.dump`
 
 ## Prerequisites Check
 
@@ -178,7 +182,7 @@ docker volume create mko-bazuna-restore-data
 # 2. Create a throwaway network
 docker network create mko-bazuna-restore-net
 
-# 3. Start postgres:18-alpine in detached mode with an isolated DB
+# 3. Start postgres:18.6-alpine in detached mode with an isolated DB
 docker run --rm -d \
     --name restore-db \
     --network mko-bazuna-restore-net \
@@ -188,7 +192,7 @@ docker run --rm -d \
     -e POSTGRES_USER=restore_user \
     -e POSTGRES_PASSWORD=restore_pass \
     -e POSTGRES_HOST_AUTH_METHOD=trust \
-    postgres:18-alpine
+    postgres:18.6-alpine
 
 # 4. Wait for readiness, then restore
 docker exec restore-db pg_isready -U restore_user -d bazuna_restore
@@ -227,7 +231,7 @@ docker network rm mko-bazuna-restore-net
 
 - **RPO = 24 hours.** Backups are produced by a daily `pg_dump -F c` job in the production backup
   service (`docker-compose.prod.yml`, `--profile backup`). The service loops with `sleep 86400`,
-  producing one dump per day at `./backups/dump_YYYYMMDD.dump`.
+  producing one dump per day at `./backups/dump_YYYYMMDD_HHMMSS.dump`.
 - **Retention = 7 days.** The backup service prunes files older than 7 days via:
   ```bash
   find /backups -name 'dump_*.dump' -mtime +7 -delete
@@ -283,7 +287,7 @@ The `make restore-test` target:
 1. Validates `BACKUP_FILE` is provided and exists
 2. Creates an isolated named volume (`mko-bazuna-restore-<timestamp>`)
 3. Creates an isolated network (`mko-bazuna-restore-net-<timestamp>`)
-4. Starts `postgres:18-alpine` with `POSTGRES_HOST_AUTH_METHOD=trust` and an isolated DB
+4. Starts the `restore-test` target's postgres image with `POSTGRES_HOST_AUTH_METHOD=trust` and an isolated DB
    (`bazuna_restore`, user: `restore_user`)
 5. Waits up to 30 s for `pg_isready` (connectivity check)
 6. Runs `pg_restore --clean --if-exists -F c` into the isolated DB
@@ -350,4 +354,5 @@ make prune-backups
 - [Task Definition](../.ai/tasks/done/TASK_014_docker_backup_DONE.yaml)
 - [Makefile Backup Target](../../Makefile) - Manual backup automation
 - [PgBouncer Configuration](../docker-compose.prod.yml) - If using connection pooling, restore connects directly to db, bypassing PgBouncer
-- [CI Pipeline](../../.github/workflows/ci.yml) - No backup testing in CI (ephemeral environment)
+- [CI Pipeline](../../.github/workflows/ci.yml) - CI workflow
+- [Restore Test Workflow](../../.github/workflows/restore-test.yml) - Monthly automated restore-test validation (first Monday of each month)

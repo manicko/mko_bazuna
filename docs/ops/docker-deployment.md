@@ -325,15 +325,27 @@ GitHub Actions runner cannot reach the production host.
 
 ### Production Services
 
+In production the application services are **prebuilt GHCR images**, not local
+builds: `docker-compose.prod.yml` overrides each one with
+`image: ${REGISTRY}/${REPOSITORY}:${IMAGE_TAG:?…}` and declares **no `build:`**
+for it, so `docker compose pull` fetches the CI-built artefact and the deploy
+workflow never builds (12-OPS-002). The `db` and `nginx` services come from
+upstream images; `backup` and `pgbouncer` carry their own images; `scheduler`,
+`backup` and `pgbouncer` are profile-gated and off by default (the `pgbouncer`
+profile is BLOCKED — see below).
+
 | Service | Image/Command | Notes |
 |---------|---------------|-------|
-| `db` | `postgres:18-alpine` | Persistent volume `postgres_data` |
-| `migrate` | Build image, runs `migrate_locked.main` | One-shot service: runs `migrate --run-syncdb`, `setup_search_triggers`, `load_exchange_rates` under advisory lock ID 100, with optional `backfill_translations` when `RUN_TRANSLATION_BACKFILL=true`. Each step is bounded by `SCHEDULER_COMMAND_TIMEOUT` (`check=False, timeout=...`); a timed-out step is logged and skipped (ENT-001) |
-| `create_admin` | Build image, creates admin user | One-shot service, idempotent |
-| `seed` | Build image, `entrypoint-seed.sh` | One-shot service, gated by `profiles: ["seed"]`. Populates database with demo data. See [Seed Data](#seed-data) below. |
-| `web` | Build image, gunicorn | Port 8000 not published; nginx proxies |
-| `bot` | Build image, `python -m telegram_bot.main` | Restarts on failure; dual liveness marker: file-based (`docker/healthcheck-bot.sh` checks PID + `/tmp/mko_bazuna_bot_alive` marker freshness via `BOT_HEALTH_STALE_SECONDS`, the primary bot alert) **and** Redis-based `bot:liveness` key (written by `LivenessMiddleware` in `telegram_bot/lifecycle.py`, read by the web `/health/ready/` probe via `BOT_HEALTH_CHECK_ENABLED`, which defaults off so the probe reports bot as `"disabled"` and does not gate web readiness) |
-| `nginx` | `nginx:alpine` | Ports 80/443; TLS termination |
+| `db` | `postgres:18.6-alpine` (upstream) | Persistent volume `postgres_data` |
+| `migrate` | Prebuilt GHCR image, runs `migrate_locked.main` | One-shot service: runs `migrate --run-syncdb`, `setup_search_triggers`, `load_exchange_rates` under advisory lock ID 100, with optional `backfill_translations` when `RUN_TRANSLATION_BACKFILL=true`. Each step is bounded by `SCHEDULER_COMMAND_TIMEOUT` (`check=False, timeout=...`); a timed-out step is logged and skipped (ENT-001) |
+| `create_admin` | Prebuilt GHCR image, creates admin user | One-shot service, idempotent |
+| `seed` | Prebuilt GHCR image, `entrypoint-seed.sh` | One-shot service, gated by `profiles: ["seed"]`. Populates database with demo data. See [Seed Data](#seed-data) below. |
+| `web` | Prebuilt GHCR image, gunicorn | Port 8000 not published; nginx proxies |
+| `bot` | Prebuilt GHCR image, `python -m telegram_bot.main` | Restarts on failure; dual liveness marker: file-based (`docker/healthcheck-bot.sh` checks PID + `/tmp/mko_bazuna_bot_alive` marker freshness via `BOT_HEALTH_STALE_SECONDS`, the primary bot alert) **and** Redis-based `bot:liveness` key (written by `LivenessMiddleware` in `telegram_bot/lifecycle.py`, read by the web `/health/ready/` probe via `BOT_HEALTH_CHECK_ENABLED`, which defaults off so the probe reports bot as `"disabled"` and does not gate web readiness) |
+| `scheduler` | Prebuilt GHCR image, `entrypoint-scheduler.sh` | Profile-gated (`profiles: ["scheduler"]`); long-lived, `restart: unless-stopped` |
+| `backup` | `postgres:18.6-alpine` (upstream) | Profile-gated (`profiles: ["backup"]`); daily `pg_dump` with 7-day retention |
+| `pgbouncer` | `edoburu/pgbouncer:1.25.2` (upstream) | Profile-gated (`profiles: ["pgbouncer"]`) and **BLOCKED** — do not enable; the pinned tag does not resolve. See [PgBouncer is opt-in and currently unusable](#pgbouncer-is-opt-in-and-currently-unusable) |
+| `nginx` | `nginx:1.30.5` (upstream) | Ports 80/443; TLS termination |
 
 ### TLS Configuration
 
@@ -537,7 +549,12 @@ a busy message.
 > default (`ALTER DATABASE mko_bazuna SET lock_timeout = '10s'`, or
 > `postgresql.conf`), which is **not** shipped in this repo — it is phase 12's
 > (production-ops) decision. Until that default exists, leaving the profile off
-> is required.
+> is required. The pinned image tag (`edoburu/pgbouncer:1.25.2`) also does not
+> resolve on Docker Hub, so `docker compose pull` aborts as a whole if the
+> profile is activated — the deploy path (`deploy.yml`) therefore excludes it
+> (12-OPS-007).
+
+### PgBouncer is opt-in and currently unusable
 
 If PgBouncer is enabled (opt-in `--profile pgbouncer`), the pooler must list
 `options` in `ignore_startup_parameters`. The variable is **unprefixed**
@@ -585,12 +602,17 @@ Deployment configuration is validated via Django's `manage.py check --deploy`:
 
   The validation is bypassed in two cases: during the Docker image build (`DJANGO_BUILD=1`, build-time `collectstatic`), and for dev one-shot services, which run the bootstrap module `config.settings.oneshot` with `DJANGO_ONESHOT=1` (set on `migrate`, `load_cities`, `load_catalog`, `create_admin`, and `seed` in `docker-compose.dev.override.yml`) — these do not serve HTTP and are fed placeholder/dummy tokens from `.env.dev` during bootstrap. Under `config.settings.prod` the `DJANGO_ONESHOT` flag is ignored (with a boot warning) and the guards always run. In production, `docker-compose.prod.yml` one-shot services run **full** secret validation against the real `.env.prod` values (no bypass flag); the long-lived `web` and `bot` services also never set either flag, so the real secret values are enforced at boot.
 
-> **CI security scanning (SAST):** The CI `security` job runs `bandit` (finding 12-OPS-008)
-> against `src/backend` and `src/telegram_bot` per the `[tool.bandit]` config in
-> `pyproject.toml`. Test directories (`src/backend/apps/**/tests`, `src/backend/tests`) and
-> `docs` are excluded; `B101` (assert) and `B105` (hardcoded password strings) are skipped
-> as pre-existing/mitigated. This complements the existing `pip-audit`, Trivy filesystem
-> scan, and Gitleaks secret scan that also run in the `security` job.
+> **CI security scanning (SAST):** The CI `security` job runs `bandit` (finding
+> 12-OPS-001) from the repository root against `src/backend` and
+> `src/telegram_bot` per the `[tool.bandit]` config in `pyproject.toml`. The
+> config's `exclude_dirs` excludes the four test trees
+> (`src/backend/apps/*/tests/*`, `src/backend/config/settings/tests/*`,
+> `src/backend/tests/*`, `src/telegram_bot/tests/*`); `B101` (assert) and `B105`
+> (hardcoded password strings) are skipped as pre-existing/mitigated. Running
+> from `src/backend` previously resolved the scan roots and config path to
+> absent files, so bandit aborted with exit 2 and scanned zero files. This
+> complements the existing `pip-audit`, Trivy filesystem scan, and Gitleaks
+> secret scan that also run in the `security` job.
 
 ### Image tag policy
 
@@ -609,12 +631,14 @@ CI, and a build step in the deploy job would reintroduce the untraceable-tag pro
 
 If a deployment introduces a regression, follow the [Deployment Rollback Runbook](rollback.md).
 The runbook covers image-tag rollback (changing `IMAGE_TAG` in `.env.prod` and
-re-deploying), config rollback (reverting `.env.prod` via `git checkout`),
+re-deploying), config rollback (editing `.env.prod` on the host — the file is
+gitignored, so there is no git history to check out),
 schema rollback (forward-only Django migrations require a backup restore +
 corrective `migrate` step), health-check-gated validation (curl `/health/ready/`
-until 200, verify bot marker freshness), rollback-test cadence in staging, and
+until 200; the probe checks database and cache only — a bot fault does not fail
+the gate), rollback-test cadence in staging, and
 the failure escalation path. This addresses finding
-  [12-OPS-007](../../.ai/audit/12-production-ops/findings.md).
+  [12-OPS-007](../../.ai/plans/12-production-ops-remediation.md).
 
 ## Makefile Commands
 
@@ -1389,9 +1413,12 @@ generation process, and configuration options.
 ### Production Logging
 
 The production settings module (`config.settings.prod`) defines a `LOGGING` dict that
-configures a console `StreamHandler` on the root logger at `INFO` level. Application loggers
-for bot update processing, rate-limit hits, dedup suppression, and startup messages propagate
-to this root handler and therefore appear in the web/bot container stdout for log aggregation.
+configures a console `StreamHandler` on the root logger at `WARNING` level. The
+`django`, `django.request` and `django.server` loggers are also `WARNING`, while the
+`apps` and `telegram_bot` loggers are explicitly `INFO` (`propagate: False`). Application
+loggers for bot update processing, rate-limit hits, dedup suppression, and startup
+messages therefore emit at `INFO` and appear in the web/bot container stdout for log
+aggregation.
 
 This replaces Django's default logging (`DEFAULT_LOGGING`), which only configured the `django`
 logger and silently dropped application-level `INFO` records.

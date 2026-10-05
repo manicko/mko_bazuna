@@ -111,7 +111,7 @@ mv /path/to/postgres_data/data/* /path/to/postgres_data/18/docker/
 ```yaml
 services:
   db:
-    image: postgres:18-alpine
+    image: postgres:18.6-alpine
     restart: always
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
@@ -131,7 +131,7 @@ services:
 ```yaml
 services:
   db:
-    image: postgres:18-alpine
+    image: postgres:18.6-alpine
     restart: always
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-postgres}
@@ -153,7 +153,7 @@ If you need the old path for compatibility with tooling:
 ```yaml
 services:
   db:
-    image: postgres:18-alpine
+    image: postgres:18.6-alpine
     restart: always
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-postgres}

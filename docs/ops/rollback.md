@@ -35,10 +35,10 @@ failure escalation.
   the image must restart **both** services atomically so they never run against
   mismatched schema or code.
 - **Image tag drives both processes:** `docker-compose.prod.yml` resolves the image
-  for `web`, `bot`, `migrate`, `create_admin`, `seed`, `load_cities`, and
-  `load_catalog` from a single env var: `${IMAGE_TAG:-latest}`. Changing that one
-  variable and re-running `docker compose up -d` rolls back **all** services
-  simultaneously — no per-service tagging drift.
+  for `web`, `bot`, `migrate`, `create_admin`, `seed`, `load_cities`,
+  `load_catalog` and `scheduler` from a single env var: `${IMAGE_TAG:?…}`. Changing
+  that one variable and re-running `docker compose up -d` rolls back **all**
+  services simultaneously — no per-service tagging drift.
 - **Config is bind-mounted read-only:** `.env.prod` is mounted as
   `/app/src/.env:ro` into every container. Config changes take effect only on
   container restart (`up -d` recreates the affected containers). A config
@@ -81,7 +81,7 @@ failure escalation.
 | Aspect | Rollback mechanism | Risk level |
 |--------|-------------------|------------|
 | Image tag | Change `IMAGE_TAG` in `.env.prod`, re-deploy | Low |
-| Config | `git checkout .env.prod` to pinned commit, re-deploy | Low |
+| Config | Revert the config change in `.env.prod` on the host (the file is gitignored — there is no git history to check out), re-deploy | Low |
 | Schema | `migrate <app> <previous_migration>` + data backfill | High |
 | Health | Liveness: `/health/live/` · Readiness: `/health/ready/` (database + cache only; bot reported `"disabled"` in production) · scheduler marker via `healthcheck-scheduler.sh` | — (validation) |
 
@@ -105,24 +105,27 @@ Before starting a rollback:
 Production image tags are resolved in `docker-compose.prod.yml`:
 
 ```yaml
-image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}
+image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-mko-bazuna/mko_bazuna}:${IMAGE_TAG:?IMAGE_TAG must be set}
 ```
 `IMAGE_TAG` is set in `.env.prod` (see
-  [.env.prod.example](../../.env.prod.example), line 68). To find the
+  [.env.prod.example](../../.env.prod.example)). To find the
   last-known-good tag:
 
 ```bash
-# Show IMAGE_TAG history from git history of .env.prod
-git log --oneline -10 -- .env.prod
-git show <commit>:.env.prod | grep IMAGE_TAG
+# .env.prod is gitignored — its history is NOT in git. Read the current tag from
+# the file on the production host, and enumerate published image tags from GHCR.
+grep '^IMAGE_TAG=' .env.prod
+gh api repos/mko-bazuna/mko_bazuna/packages/container/mko_bazuna/versions --jq '.[].metadata.container.tags[]'
 ```
 
 If image tags map to git tags, you can also enumerate published tags:
 
 ```bash
 # List recent image tags from GHCR (if using GitHub Packages)
-gh repo view manicko/mko_bazuna --json nameWithPath -t '{{.}}'
-# Then inspect: gh api repos/manicko/mko_bazuna/packages/container/mko_bazuna/versions
+# NOTE: the bare repository path is NOT the registry namespace — the canonical
+# coordinate is ghcr.io/mko-bazuna/mko_bazuna.
+gh api repos/mko-bazuna/mko_bazuna/packages/container/mko_bazuna/versions \
+  --jq '.[].metadata.container.tags[]'
 ```
 
 ## 1. Image-Tag Rollback
@@ -141,9 +144,10 @@ a new `IMAGE_TAG` introduced a runtime error, 500s, or bot crashes.
    ```
 
    The image tag is the **only** variable that controls which container image
-   `web`, `bot`, and all one-shot services pull. All seven services in
-   `docker-compose.prod.yml` (lines 8, 18, 28, 36, 44, 54, 63) reference
-   `${IMAGE_TAG:-latest}`.
+   the application services pull. `docker-compose.prod.yml` references
+   `${IMAGE_TAG:?…}` on `web`, `bot`, `migrate`, `create_admin`, `seed`,
+   `load_cities`, `load_catalog` and `scheduler` (eight services). `backup` and
+   `pgbouncer` use their own images and do not read `IMAGE_TAG`.
 
 2. **Recreate the long-lived containers:**
 
@@ -151,7 +155,7 @@ a new `IMAGE_TAG` introduced a runtime error, 500s, or bot crashes.
    # Use --pull to force a fresh image pull (avoid stale cached layers)
    docker compose --env-file .env.prod \
      -f docker-compose.yml -f docker-compose.prod.yml \
-     --profile scheduler --profile backup --profile pgbouncer \
+     --profile scheduler --profile backup \
      up -d --pull always web bot scheduler backup
    ```
 
@@ -180,9 +184,19 @@ difference (same `IMAGE_TAG` string but different digest), force recreation:
 ```bash
 docker compose --env-file .env.prod \
   -f docker-compose.yml -f docker-compose.prod.yml \
-  --profile scheduler --profile backup --profile pgbouncer \
+  --profile scheduler --profile backup \
   up -d --force-recreate --pull always web bot scheduler backup
 ```
+
+> **The `pgbouncer` profile stays OFF.** It is deliberately absent from every
+> `--profile …` list in this runbook. Its service is documented **BLOCKED** and
+> unusable — the pinned tag `edoburu/pgbouncer:1.25.2` does not resolve on Docker
+> Hub, and `docker compose pull` aborts as a whole when any one image is
+> unresolvable, so activating the profile breaks the pull (and, in `deploy.yml`
+> under `set -e`, the whole deploy). Do **not** add `--profile pgbouncer` to any
+> command here until the image tag and the other documented blockers are
+> resolved. See [Production Deployment](docker-deployment.md) — *PgBouncer is
+> opt-in and currently unusable*.
 
 ## 2. Config Rollback
 
@@ -196,14 +210,17 @@ config.
 
 ### Procedure
 
-1. **Revert `.env.prod` to the target commit:**
+1. **Revert `.env.prod` on the host:**
+
+   `.env.prod` is gitignored — it is host-local and lives in no commit — so there
+   is no `git checkout <target-commit> -- .env.prod` to run. Keep a dated copy of
+   the previous file (or its changed variables) as the rollback source.
 
    ```bash
-   # Revert the entire file to the last-known-good version
-   git checkout <target-commit> -- .env.prod
+   # Restore the entire file from an operator-kept copy
+   cp .env.prod.last-known-good .env.prod
 
    # Or revert only the changed variable(s) (preferred for surgical rollback)
-   git checkout <target-commit> -- .env.prod
    sed -i 's/^PROBLEM_VAR=.*/PROBLEM_VAR=previous_value/' .env.prod
    ```
 
@@ -256,9 +273,10 @@ Did the bad deploy change the SCHEMA (new/reversed migrations)?
 
 Per the project's [Migration Workflow](migration-workflow.md), the
 steady state is one `0001_initial.py` per app. Production deployments run the
-`migrate` one-shot service once before `web`/`bot` start. There is no
-PgBouncer transaction-mode pool in the dev/migrate path; the advisory lock
-(ID 100) serializes migration runs.
+`migrate` one-shot service once before `web`/`bot` start. The migrate path
+connects directly to the `db` service; the opt-in `pgbouncer` profile is off and
+its service is documented BLOCKED/unusable, so no transaction-mode pool sits in
+front of `migrate`. The advisory lock (ID 100) serializes migration runs.
 
 Django's `migrate` command supports rolling back to a previous migration:
 
@@ -419,8 +437,9 @@ marker:
    within that window (detects retry-loop / stuck scheduler or a failing cycle)
 
 > **Note:** The scheduler runs every hour, so `SCHEDULER_HEALTH_STALE_SECONDS` must be
-> greater than the hourly cycle (3600 s). The production value of 7200 s allows one missed clean
-> cycle before the healthcheck reports failure.
+> greater than the hourly cycle (3600 s). The production value of 7200 s (declared
+> on the prod `scheduler` service in `docker-compose.prod.yml`) allows one missed
+> clean cycle before the healthcheck reports failure.
 
 Verify scheduler health via Docker:
 
@@ -500,21 +519,25 @@ production. This validates:
 ### Staging rollback drill procedure
 
 ```bash
+# The staging drill runs on a staging host using the SAME compose files as
+# production; only the host-local .env.prod differs. There is no
+# .env.staging file and no docker-compose.staging.yml in the repository.
+
 # 1. Deploy a "bad" image to staging (simulated failure)
 export IMAGE_TAG=v1.4.0-broken  # or a deliberately broken build
-docker compose --env-file .env.staging \
+docker compose --env-file .env.prod \
   -f docker-compose.yml -f docker-compose.prod.yml \
   up -d --pull always web bot
 
 # 2. Wait for health checks to fail (or run manually)
 sleep 60
-docker compose --env-file .env.staging \
+docker compose --env-file .env.prod \
   -f docker-compose.yml -f docker-compose.prod.yml ps
 # Expected: web/bot show "unhealthy"
 
 # 3. Roll back to last-known-good
 export IMAGE_TAG=v1.3.2  # last-known-good tag
-docker compose --env-file .env.staging \
+docker compose --env-file .env.prod \
   -f docker-compose.yml -f docker-compose.prod.yml \
   up -d --pull always web bot
 
@@ -523,10 +546,12 @@ timeout 90 bash -c 'while ! docker compose exec -T web curl -sf http://localhost
 echo "Rollback validated in staging"
 ```
 
-> **Staging config:** If no staging `.env.prod` file exists yet, create
-> `.env.staging` from `.env.prod.example` with staging credentials. The staging
-> environment uses the same `docker-compose.prod.yml` override (no separate
-> staging compose file — see [Production Deployment](docker-deployment.md#production-deployment)).
+> **Staging config:** The staging host uses the same `docker-compose.yml` +
+> `docker-compose.prod.yml` pair as production (there is no separate staging
+> compose file). Its `.env.prod` carries staging credentials and a staging
+> `IMAGE_TAG`; it is host-local and gitignored, exactly like production's. Do
+> not invent an `.env.staging` file — see
+> [Production Deployment](docker-deployment.md#production-deployment).
 
 ### CI integration
 
@@ -554,22 +579,28 @@ manual procedures when the automated flow cannot help: no previous image tag is
 available, the failure is a config regression (no code change), or the automated
 rollback's own re-validation also fails.
 
-### Capturing `PREVIOUS_IMAGE_TAG`
+### Capturing `PREVIOUS_IMAGE_DIGEST`
 
 Before pulling or recreating any container, the deploy script captures the
-**currently running** image tag so the last-known-good value is always available
-for rollback. It is read from the running `web` container's image tag while the
-old containers are still up (critical — it must reflect the prior deploy, not the
+**currently running** image so the last-known-good identity is always available
+for rollback (12-OPS-008). A tag is a mutable label, so the rollback targets the
+running image's **digest**, read from the `web` container while the old
+containers are still up (critical — it must reflect the prior deploy, not the
 new failing one):
 
 ```bash
-PREVIOUS_IMAGE_TAG=$(docker compose images --format '{{.Tag}}' web | head -1)
+WEB_CID=$(docker compose --profile scheduler --profile backup \
+  -f docker-compose.yml -f docker-compose.prod.yml ps -q web)
+PREVIOUS_IMAGE_DIGEST=$(docker inspect --format='{{index .Image}}' "${WEB_CID}")
 ```
 
-The captured value is the resolved `${IMAGE_TAG}` (e.g. a git SHA or `v1.3.2`),
-since `docker-compose.prod.yml` resolves the `web` image from
-`${REGISTRY}/${REPOSITORY}:${IMAGE_TAG}`. It is held in a shell variable for the
-duration of the SSH deploy step; if the deploy succeeds it is discarded.
+The captured value is a `sha256:…` image id. The script also records the resolved
+tag as a label. It is held in a shell variable for the duration of the SSH deploy
+step; if the deploy succeeds it is discarded. If no digest was captured (the
+`web` container was not running) the rollback branch reports
+"No previous image digest available for rollback"; if the digest is no longer in
+the registry it reports that the digest is "absent from the registry and could
+not be pulled" — two distinct failure branches.
 
 ### Automatic rollback condition
 
@@ -603,7 +634,7 @@ On health-check failure the workflow performs three steps:
 2. **Force-recreate** the long-lived containers so Docker does not reuse
    containers keyed on the old image digest:
    ```bash
-   IMAGE_TAG="${PREVIOUS_IMAGE_TAG}" docker compose --profile scheduler --profile backup --profile pgbouncer -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate --remove-orphans web bot scheduler backup
+   IMAGE_TAG="${PREVIOUS_IMAGE_TAG}" docker compose --profile scheduler --profile backup -f docker-compose.yml -f docker-compose.prod.yml up -d --force-recreate --remove-orphans web bot scheduler backup
    ```
    Every long-lived service is recreated — `web`, `bot`, `scheduler` and
    `backup`. A rollback that leaves the scheduler on the image just judged
@@ -691,8 +722,9 @@ If the standard rollback does not restore service:
 
 4. **Re-deploy the last-known-good image:**
    ```bash
-   # Ensure IMAGE_TAG in .env.prod points to the last-known-good image
-   git checkout <last-good-commit> -- .env.prod
+   # .env.prod is gitignored — edit IMAGE_TAG in the file on the host directly;
+   # there is no git history to check out.
+   sed -i 's/^IMAGE_TAG=.*/IMAGE_TAG=<last-known-good-tag>/' .env.prod
    docker compose --env-file .env.prod \
      -f docker-compose.yml -f docker-compose.prod.yml \
      up -d --force-recreate --pull always
@@ -706,7 +738,7 @@ If the standard rollback does not restore service:
 6. **Post-incident review:** Document the root cause and add a preventive
    measure (CI gate, migration test, or a deploy-workflow healthcheck assertion)
    referenced in finding
-   [12-OPS-005](../../.ai/audit/12-production-ops/findings.md) and
+   [12-OPS-005](../../.ai/plans/12-production-ops-remediation.md) and
    [finding 12-OPS-001](docker-deployment.md#deployment-checks).
 
 ### Contact escalation (on-call roster)
@@ -754,9 +786,4 @@ Use this table to select the rollback dimension based on the failure mode:
   script
 - [docker/healthcheck-scheduler.sh](../../docker/healthcheck-scheduler.sh) — scheduler
   healthcheck script
-- [Finding 12-OPS-007](../../.ai/audit/12-production-ops/findings.md) — rollback runbook (this document)
-- [Finding 12-OPS-005](../../.ai/audit/12-production-ops/findings.md) — deploy workflow (`deploy.yml`, health-check gating)
-- [Finding 12-OPS-010](../../.ai/audit/12-production-ops/findings.md) — automated deploy rollback on health-check failure
-- [Finding 12-OPS-002](../../.ai/audit/12-production-ops/findings.md) — healthcheck endpoint changed to `/health/live/`
-- [Finding 12-OPS-003](../../.ai/audit/12-production-ops/findings.md) — Redis-based bot liveness marker (`bot:liveness`)
-- [Finding 12-OPS-006](../../.ai/audit/12-production-ops/findings.md) — restore-test automation (`restore-test.yml`)
+- [Phase 12 production/operations remediation plan](../../.ai/plans/12-production-ops-remediation.md) — the validated findings record for the operations work in this runbook (rollback runbook, deploy workflow health-check gating, automated digest rollback, `/health/live/` healthcheck, bot liveness marker, restore-test automation)

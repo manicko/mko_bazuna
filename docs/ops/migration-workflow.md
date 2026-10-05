@@ -52,7 +52,7 @@ db  →  migrate  →  load_cities  →  load_catalog  →  web (gunicorn)
                                      →  seed (profile-gated)
 ```
 
-- `db` is a `postgres:18-alpine` container with a `pg_isready` healthcheck.
+- `db` is a `postgres:18.6-alpine` container with a `pg_isready` healthcheck.
 - `migrate` runs `migrate_locked.main` (3 required steps + 1 optional backfill under advisory lock), then exits.
 - `load_cities` loads `cities.json` (15 ME cities) into the DB, then exits.
 - `load_catalog` loads `categories.yaml` into the DB, then exits. `web` and `bot` both
