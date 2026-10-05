@@ -58,26 +58,37 @@ def render_trust_badge(context: template.Context, user: User) -> str:
     if user.pk is None:
         return ""
 
-    # Use prefetched trust_score (via prefetch_related("user__trust_score"))
-    # to avoid an N+1 query per ad in the listings loop.  When the relation
-    # has been prefetched, ``_prefetched_objects_cache`` holds the result
-    # (the related object or None) and accessing ``user.trust_score`` does
-    # NOT hit the database — so the fallback ``SellerTrustScore.objects.get``
-    # below is skipped entirely.
-    prefetched_cache = getattr(user, "_prefetched_objects_cache", None)
-    if isinstance(prefetched_cache, dict) and "trust_score" in prefetched_cache:
-        trust_score = getattr(user, "trust_score", None)
-        if trust_score is None:
+    # Read the related score from the attribute that the ORM actually
+    # populates.  For a reverse ``OneToOneField`` (``related_name="trust_score"``)
+    # ``prefetch_related("user__trust_score")`` caches the related object in the
+    # forward descriptor's cache and exposes it via ``user.trust_score`` — it
+    # does NOT populate ``user._prefetched_objects_cache`` (that cache is for
+    # reverse *FK* / *M2M* prefetches).  Because ``RelatedObjectDoesNotExist``
+    # subclasses ``AttributeError``, a ``getattr(user, "trust_score", None)``
+    # swallows the "no related row" signal.  The only correct way to read the
+    # descriptor is to catch that specific exception: a prefetched relation is
+    # then served from cache with zero queries, and a genuinely absent score
+    # (or an unprefetched user) is the only case that reaches the fallback
+    # lookup below.
+    #
+    # ``prefetch_related("user__trust_score")`` is present on the listings,
+    # search, favorites and ad-detail querysets, so the fallback is the
+    # exception path, not the common one (13-PERF-004 validated 2026-09).
+    try:
+        trust_score = user.trust_score
+    except SellerTrustScore.DoesNotExist:
+        trust_score = None
+
+    if trust_score is None:
+        # No prefetched/cached relation.  It may be genuinely absent (a seller
+        # with no score yet) or the caller may not prefetch — both reach the
+        # single related lookup, which is retained for that unprefetched path
+        # (the fallback is not a defect there; 13-PERF-004 validated 2026-09).
+        try:
+            trust_score = SellerTrustScore.objects.get(user=user)
+        except SellerTrustScore.DoesNotExist:
+            logger.debug("No SellerTrustScore for user %s", user.id)
             return ""
-    else:
-        # Not prefetched — try the cached attribute, then fall back to DB.
-        trust_score = getattr(user, "trust_score", None)
-        if trust_score is None:
-            try:
-                trust_score = SellerTrustScore.objects.get(user=user)
-            except SellerTrustScore.DoesNotExist:
-                logger.debug("No SellerTrustScore for user %s", user.id)
-                return ""
 
     template_path = BADGE_TEMPLATES.get(trust_score.trust_level)
     if template_path is None:

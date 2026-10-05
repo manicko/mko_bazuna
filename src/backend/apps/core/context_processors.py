@@ -8,6 +8,7 @@ import json
 from enum import StrEnum
 
 from django.conf import settings
+from django.db.models import Exists, OuterRef
 from django.utils.translation import gettext as _
 
 from apps.core.services.site_config import get_bot_username
@@ -92,7 +93,21 @@ def header_context(request) -> dict:
     return {
         "bot_username": get_bot_username(),
         "root_categories": list(
-            Category.objects.root_nodes().filter(is_active=True).order_by("name")
+            Category.objects.root_nodes()
+            .filter(is_active=True)
+            .annotate(
+                # A single correlated ``EXISTS`` instead of one
+                # ``get_children().exists()`` per root in the template.  The
+                # predicate mirrors ``mptt``'s ``get_children()`` exactly — it
+                # counts every direct child regardless of ``is_active``, so the
+                # expand button renders for the same nodes as before
+                # (13-PERF-009 validated 2026-09).  This converts an N+1
+                # (one indexed SELECT 1 per non-leaf root) into one statement.
+                has_children=Exists(
+                    Category.objects.filter(parent=OuterRef("pk"))
+                ),
+            )
+            .order_by("name")
         ),
         "preferred_city_display": preferred_city_display,
         "cities": list(City.objects.order_by("name")),

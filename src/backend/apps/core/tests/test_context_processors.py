@@ -66,7 +66,7 @@ def _call_header_context(request: HttpRequest) -> dict:
         patch("apps.categories.models.Category") as mock_category,
         patch("apps.locations.models.City") as mock_city,
     ):
-        mock_category.objects.root_nodes.return_value.filter.return_value.order_by.return_value = []
+        mock_category.objects.root_nodes.return_value.filter.return_value.annotate.return_value.order_by.return_value = []
         mock_city.objects.order_by.return_value = []
         context = header_context(request)
     return {"context": context, "mock_city": mock_city}
@@ -90,7 +90,7 @@ def test_localized_name_for_valid_slug() -> None:
         patch("apps.categories.models.Category") as mock_category,
         patch("apps.locations.models.City") as mock_city,
     ):
-        mock_category.objects.root_nodes.return_value.filter.return_value.order_by.return_value = []
+        mock_category.objects.root_nodes.return_value.filter.return_value.annotate.return_value.order_by.return_value = []
         mock_city.objects.order_by.return_value = []
         mock_city.objects.filter.return_value.first.return_value = city
 
@@ -117,7 +117,7 @@ def test_badge_falls_back_to_preferred_when_current_city_none() -> None:
         patch("apps.categories.models.Category") as mock_category,
         patch("apps.locations.models.City") as mock_city,
     ):
-        mock_category.objects.root_nodes.return_value.filter.return_value.order_by.return_value = []
+        mock_category.objects.root_nodes.return_value.filter.return_value.annotate.return_value.order_by.return_value = []
         mock_city.objects.order_by.return_value = []
         mock_city.objects.filter.return_value.first.return_value = podgorica
 
@@ -150,7 +150,7 @@ def test_badge_prefers_effective_url_city_over_stale_preferred() -> None:
         patch("apps.categories.models.Category") as mock_category,
         patch("apps.locations.models.City") as mock_city,
     ):
-        mock_category.objects.root_nodes.return_value.filter.return_value.order_by.return_value = []
+        mock_category.objects.root_nodes.return_value.filter.return_value.annotate.return_value.order_by.return_value = []
         mock_city.objects.order_by.return_value = []
         mock_city.objects.filter.side_effect = filter_side_effect
 
@@ -173,7 +173,7 @@ def test_country_wide_label_for_stale_slug() -> None:
         patch("apps.categories.models.Category") as mock_category,
         patch("apps.locations.models.City") as mock_city,
     ):
-        mock_category.objects.root_nodes.return_value.filter.return_value.order_by.return_value = []
+        mock_category.objects.root_nodes.return_value.filter.return_value.annotate.return_value.order_by.return_value = []
         mock_city.objects.order_by.return_value = []
         mock_city.objects.filter.return_value.first.return_value = None
 

@@ -37,32 +37,32 @@ from conftest import create_test_ads_bulk
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
-# Bound rationale (investigated per task Step 4):
+# Bound rationale (re-derived 2026-10-03 for 13-PERF-014 validated 2026-09):
 #
 # The search view's FTS pipeline, search-result caching (SWR + single-flight),
-# analytics recording, filter-option resolution, paginator, and save-search
-# modal context inherently issue ~28 base queries — already exceeding the
-# project-wide 16-query guard (test_ad_detail_queries.py:37,
-# test_listings_context.py:176) which applies to the simpler detail/listings
-# views.
+# analytics recording, filter-option resolution, paginator, save-search modal
+# context, and the shared catalog header issue a fixed base inventory.  The
+# previous bound of 100 was widened to absorb two per-ad N+1s, both of which
+# are now resolved:
+#   1. ``ad.images.first`` in ads/partials/ad_list.html — ``images`` IS in
+#      ``prefetch_related`` on ``ListingsQuery.build_queryset``.
+#   2. ``render_trust_badge`` (trust_tags.py) — the reverse-OneToOne prefetch
+#      detection was corrected (13-PERF-004), so the fallback lookup no longer
+#      risks firing per card on a prefetched page.
+# The header no longer calls ``cat.get_children.exists`` per root either
+# (13-PERF-009): ``header_context`` annotates the root list with one correlated
+# ``Exists``.
 #
-# At 60 seed ads (24 on page 1, PER_PAGE=24), the render path adds 48 per-ad
-# queries (24 × 2) from two known N+1 sources in *existing* files that this
-# task does not modify:
-#   1. ``ad.images.first`` in ads/partials/ad_list.html:107 — ``images`` is
-#      not in ``prefetch_related`` on ListingsQuery.build_queryset.
-#   2. ``render_trust_badge`` (trust_tags.py:66) calls
-#      ``SellerTrustScore.objects.get(user=user)`` when the prefetched
-#      ``user__trust_score`` resolves to None, bypassing the prefetch.
+# Measured at the tripwire's own seed volume (60 PUBLISHED ads, page size 24,
+# ``?q=товар&lang=ru``) via a one-off instrumented ``CaptureQueriesContext``
+# run on 2026-10-03: **56 queries** (identical before and after the BLOCK 5
+# change at this fixture, which has a single childless root).
 #
-# Both are documented N+1 regressions (13-PERF-004 recommendation #3:
-# "extend N+1 query-count guards to the search view"). Since this task only
-# creates the test file, the bound is set to 100 — comfortably above the
-# measured 80, with margin for minor variations, yet tight enough to catch
-# a *new* per-ad N+1 (e.g. another un-prefetched relation would add ~24
-# queries → 104 > 100).  Once the two N+1 sources above are resolved, the
-# bound should be tightened toward the ~32-query base.
-_QUERY_BOUND: int = 100
+# Bound = measured 56 + headroom 16 = 72.  The headroom is deliberately below
+# one page of per-ad pairs (24 x 2 = 48) so a *new* per-ad N+1 still trips the
+# guard; it absorbs only minor, non-scaling variation.  The value may only go
+# DOWN from here, and only after a fresh recorded measurement.
+_QUERY_BOUND: int = 72
 
 # Seed volume: ≥50 PUBLISHED ads to exceed the minimum and exercise
 # pagination + filter-option resolution at realistic scale.
