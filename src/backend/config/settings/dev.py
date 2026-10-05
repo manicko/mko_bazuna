@@ -12,8 +12,10 @@ SECURE_SSL_REDIRECT = False
 SESSION_COOKIE_SECURE = False
 CSRF_COOKIE_SECURE = False
 # The login-binding cookie is plain HTTP in the default dev stack
-# (docker-compose.dev.override.yml publishes Django directly on :8000 with no
-# proxy). Off => the cookie is named ``login_browser_id`` and is emitted without
+# (docker-compose.dev.override.yml publishes Django directly on :8000; nginx is
+# gated behind the opt-in `use-nginx` compose profile, so it is absent unless
+# that profile is enabled, in which case Django is reached through a TLS proxy).
+# Off => the cookie is named ``login_browser_id`` and is emitted without
 # ``Secure`` (see login_token.py, which derives both from this one setting); a
 # ``__Host-``-prefixed cookie without ``Secure`` is rejected by every conformant
 # user agent, which would silently discard the cookie and turn every dev login
@@ -47,7 +49,10 @@ USE_X_FORWARDED_HOST = True
 
 # No extra trusted proxy networks in dev: the default dev stack publishes Django
 # directly on :8000, so the peer is loopback and the gate in
-# apps/core/utils/client_ip.py is already open.
+# apps/core/utils/client_ip.py is already open. nginx is gated behind the opt-in
+# `use-nginx` compose profile (docker-compose.dev.override.yml), so it is absent
+# unless that profile is enabled; when it is, requests arrive via a proxy, but
+# the value stays empty and is left to the operator to widen deliberately.
 TRUSTED_PROXY_NETWORKS: tuple[str, ...] = ()
 
 # Development uses in-process cache (no Redis needed).
