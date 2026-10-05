@@ -40,6 +40,7 @@ from apps.core.utils.rate_limit_response import rate_limited_response
 from apps.locations.models import City
 from apps.locations.services.city_suggestions import suggest_city
 from apps.media.services.filesystem import assert_storage_key_contained
+from apps.media.storage_keys import KEY_COLUMNS
 from apps.users.services.account_state import account_state_q
 
 logger = logging.getLogger(__name__)
@@ -205,13 +206,12 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponseBase:
     # Match any AdImage that references this key in its ``image`` field or in
     # one of the ``thumbnail_*`` fields. ``get`` must not be used: seed data
     # shares the same key across several ads, which would raise
-    # MultipleObjectsReturned -> HTTP 500 for viewers.
-    key_q = (
-        Q(image=image_key)
-        | Q(thumbnail_small=image_key)  # type: ignore[operator]
-        | Q(thumbnail_medium=image_key)  # type: ignore[operator]
-        | Q(thumbnail_large=image_key)  # type: ignore[operator]
-    )
+    # MultipleObjectsReturned -> HTTP 500 for viewers. The column set is owned
+    # by ``apps.media.storage_keys`` so it cannot drift from the model's key
+    # columns.
+    key_q = Q()
+    for column in KEY_COLUMNS:
+        key_q |= Q(**{column: image_key})
 
     if not AdImage.objects.filter(key_q).exists():
         raise Http404("Image not found")
