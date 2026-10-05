@@ -2,8 +2,9 @@
 
 Each ``@task`` weight reflects the relative frequency of the journey on the
 live site.  The ``_assert_p95`` event hook raises ``RuntimeError`` when the
-p95 response time exceeds ``PerformanceSLO.P95_SLO_MS`` (500 ms), surfacing
-regressions as a CI step failure rather than a silent threshold warning.
+run recorded no requests, or when the p95 response time exceeds
+``PerformanceSLO.P95_SLO_MS`` (500 ms), surfacing regressions as a CI step
+failure rather than a silent threshold warning (PERF-001 validated 2026-09).
 
 Run locally::
 
@@ -31,16 +32,38 @@ def _assert_p95(environment, **kwargs) -> None:
     """Assert the p95 response time stayed within the SLO threshold.
 
     Fires when locust finishes (including ``--headless`` runs in CI).
-    Raises ``RuntimeError`` if the p95 exceeds ``PerformanceSLO.P95_SLO_MS``.
+    Raises ``RuntimeError`` if the run carried no responses, or if the p95
+    exceeds ``PerformanceSLO.P95_SLO_MS``.
+
+    The aggregate is read from ``RequestStats.total`` (a ``StatsEntry`` that is
+    always present).  ``RequestStats.get(name, method)`` must **not** be used:
+    a missing key resolves through ``EntriesDict.__missing__``, which fabricates
+    an empty entry, so the p95 would read as ``0`` and the gate would pass
+    forever (PERF-001 validated 2026-09).  The non-empty precondition below
+    turns "no data" into a loud failure rather than a silently green one.
     """
     stats = environment.runner.stats
-    p95 = stats.get("Total", "NONE").percentile(0.95)
+    total = stats.total
+    if total.num_requests == 0:
+        msg = (
+            "p95 gate cannot evaluate: the run recorded no requests "
+            "(RequestStats.total.num_requests == 0)"
+        )
+        logger.error(msg)
+        environment.process_exit_code = 1
+        raise RuntimeError(msg)
+    p95 = total.get_response_time_percentile(0.95)
     if p95 > P95_SLO_MS:
         msg = f"p95 response time {p95:.0f}ms exceeds SLO of {P95_SLO_MS}ms"
         logger.error(msg)
         environment.process_exit_code = 1
         raise RuntimeError(msg)
-    logger.info("p95 response time %.0fms is within SLO of %dms", p95, P95_SLO_MS)
+    logger.info(
+        "p95 response time %.0fms is within SLO of %dms (%d requests)",
+        p95,
+        P95_SLO_MS,
+        total.num_requests,
+    )
 
 
 class BuyerJourneyUser(HttpUser):

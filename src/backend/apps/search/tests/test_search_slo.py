@@ -6,6 +6,12 @@ Verifies the two remaining PERF-001 deliverables:
   - The ``/search/`` endpoint completes within the ≤2s SLO at seed volume
     (≥50 PUBLISHED ads), as defined in ``docs/01-spec/search-patterns.md:360``.
 
+This is a **single-sample wall-clock bound**, not a percentile measurement: one
+``/search/`` request is timed against ``SEARCH_SLO_MS`` (2000 ms), the p99 /
+search-latency target.  It is a smoke-level regression guard for the request
+path — a percentile SLO can only be established by a load run, and the CI
+``load-test`` job's p95 gate is the instrument for that.
+
 The ``django-prometheus`` wiring (INSTALLED_APPS, MIDDLEWARE, ``/metrics``,
 nginx restriction) is already covered by ``apps/core/tests/test_observability.py``;
 this module completes B3 with the SLO constants assertion and the latency
@@ -84,7 +90,9 @@ class TestSearchResponseSLORegression:
 
     Seeds ≥50 PUBLISHED ads (approximating the seed volume referenced in the
     spec) and times a real ``/search/`` request through the Django test client,
-    asserting elapsed time stays within ``PerformanceSLO.SEARCH_SLO_MS``.
+    asserting the single sample's elapsed time stays within
+    ``PerformanceSLO.SEARCH_SLO_MS``.  It is a single-sample wall-clock bound,
+    not a percentile measurement.
     """
 
     _SEED_AD_COUNT: int = 60  # well above the ≥50 minimum

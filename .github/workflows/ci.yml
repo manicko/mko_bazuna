@@ -511,19 +511,33 @@ jobs:
         env:
           PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
         run: |
+          # The p95 gate is the locustfile's `_assert_p95` hook: it raises and
+          # sets process_exit_code=1 when the run records no requests or when the
+          # p95 exceeds PerformanceSLO.P95_SLO_MS (500 ms). The hook is the single
+          # source of truth — there is deliberately no second CSV parser here.
+          # The old step read column $6 of the stats CSV, which is "Average
+          # Response Time", not a percentile: it compared the wrong number and
+          # could not fail on p95. (PERF-001 validated 2026-09.)
+          #
+          # `pipefail` is required: `locust … | tee` alone returns tee's exit
+          # status (0), so without it a non-zero locust exit — the hook's failure
+          # signal — would be swallowed and the step would pass on a breach.
+          set -e
+          set -o pipefail
           uv run locust -f src/benchmark/locustfile.py \
             --headless --host http://localhost:8000 \
             --users 50 --spawn-rate 10 --run-time 60s \
             -L info \
-            --csv=/tmp/locust-results
-          # Check p95 against SLO (PerformanceSLO.P95_SLO_MS = 500)
-          P95_SLO=500
-          ACTUAL_P95=$(cat /tmp/locust-results_stats.csv | awk -F, 'NR>1 && $1=="Total" {print $6}' | head -1)
-          if [ -n "$ACTUAL_P95" ] && [ "$(echo "$ACTUAL_P95 > $P95_SLO" | bc)" = "1" ]; then
-            echo "::error::p95 response time ${ACTUAL_P95}ms exceeds SLO of ${P95_SLO}ms"
+            --csv=/tmp/locust-results 2>&1 | tee /tmp/locust-run.log
+          # Positive control: the hook must have emitted its success verdict. If
+          # the event never fired (a locust API change) the gate is dead, and
+          # this assertion turns that into a loud failure instead of a silent
+          # pass. Only the within-SLO line is accepted; the "exceeds SLO" line
+          # would already have failed the step via pipefail.
+          if ! grep -q "p95 response time .* is within SLO" /tmp/locust-run.log; then
+            echo "::error::p95 gate did not report a within-SLO verdict"
             exit 1
           fi
-          echo "p95 ${ACTUAL_P95}ms within SLO of ${P95_SLO}ms"
 
   # Deploy-check gate (12-OPS-021): run manage.py check --deploy against the
   # production settings module so deployment warnings (W-series) fail the
