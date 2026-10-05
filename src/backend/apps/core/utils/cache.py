@@ -130,7 +130,7 @@ def bump_version_key(key: str) -> int:
 
 def get_cached_criteria(key: str = CRITERIA_CACHE_KEY) -> dict | None:
     """
-    Get cached ModerationCriteria values.
+    Get the cached moderation criteria values.
 
     Args:
         key: Cache key (defaults to moderation_criteria:v1)
@@ -147,7 +147,7 @@ def set_cached_criteria(
     ttl: int = CRITERIA_CACHE_TTL,
 ) -> None:
     """
-    Set cached ModerationCriteria values.
+    Set the cached moderation criteria values.
 
     Args:
         value: Dict of criteria values to cache
@@ -159,7 +159,7 @@ def set_cached_criteria(
 
 def invalidate_criteria_cache(key: str = CRITERIA_CACHE_KEY) -> None:
     """
-    Invalidate the cached ModerationCriteria.
+    Invalidate the cached moderation criteria.
 
     Called when admin updates criteria to ensure fresh values on next access.
 

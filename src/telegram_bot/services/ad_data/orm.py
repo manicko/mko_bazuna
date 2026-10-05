@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 
 __all__ = [
     "create_draft_ad",
-    "_get_ad_status",
     "delete_draft",
     "touch_draft",
     "search_categories",
