@@ -202,13 +202,13 @@ see [ui-patterns.md](ui-patterns.md).
 
 | Service | Image / Command | Notes |
 |---------|----------------|-------|
-| `db` | `postgres:18-alpine` + volume + healthcheck (`pg_isready`) | — |
+| `db` | `postgres:18.6-alpine` + volume + healthcheck (`pg_isready`) | — |
 | `web` | Django + gunicorn (sync WSGI) from `docker/Dockerfile`; `gunicorn config.wsgi:application` | Gunicorn reads runtime settings from `gunicorn.conf.py` (auto-discovered at the project root, copied to `/app` in the image; CWD is `/app`). The `--bind 0.0.0.0:8000` flag and other server settings (workers, timeout, max_requests, graceful_timeout, loglevel, accesslog/errorlog, preload_app) now live in that file. Mounts `media_volume`; `env_file: .env`; `depends_on load_catalog` (completed successfully); port 8000 NOT published. |
 | `bot` | Same image; `python -m telegram_bot.main` | Mounts `media_volume`; `depends_on load_catalog` (completed successfully); `restart: unless-stopped`. Dual liveness markers: file-based (`docker/healthcheck-bot.sh` checking PID + `/tmp/mko_bazuna_bot_alive` marker freshness via `BOT_HEALTH_STALE_SECONDS`, the primary bot alert) and Redis-based `bot:liveness` key (written by `LivenessMiddleware` in `telegram_bot/lifecycle.py`, read by the web `/health/ready/` readiness probe via `BOT_HEALTH_CHECK_ENABLED`, which defaults off so the Redis key is an informational/alert dimension rather than a web readiness gate by default). |
 | `migrate` | Same image; one-shot migration | Runs `python src/backend/manage.py bootstrap_reference_data` — delegates to `migrate_locked.main`, which executes all three required steps (`migrate --run-syncdb`, `setup_search_triggers`, `load_exchange_rates`) plus an optional `backfill_translations` step (included when `RUN_TRANSLATION_BACKFILL=true`) inside a session-scoped advisory lock (ID 100). |
 | `create_admin` | Same image; one-shot admin creation | Runs `entrypoint-create-admin.sh`; session-scoped advisory lock ID 101. Idempotent. |
 | `seed` | Same image; one-shot demo data | Runs `entrypoint-seed.sh`; gated by `profiles: ["seed"]`. Populates DB with demo data. Session-scoped advisory lock ID 110. |
-| `nginx` | `nginx:alpine`; ports 80/443 | Mounts `media_volume` (ro); `proxy_pass → web:8000`; serves `/media/`; TLS. Static files served via whitenoise proxy. |
+| `nginx` | `nginx:1.30.5`; ports 80/443 | Mounts `media_volume` (ro); `proxy_pass → web:8000`; serves `/media/`; TLS. Static files served via whitenoise proxy. |
 
 Volumes: `postgres_data`, `media_volume`. Static files baked into image via whitenoise; nginx serves `/media/` only.
 

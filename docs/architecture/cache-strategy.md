@@ -12,7 +12,7 @@ related:
   - rules
   - architecture
   - search-patterns
-source_reference: .ai/plans/14-performance-fixes.md
+source_reference: .ai/plans/13-performance-remediation.md
 finding: 13-PERF-006
 ---
 

@@ -525,7 +525,7 @@ docker compose --env-file .env.dev -f docker-compose.yml run --rm web uv run pyt
 ### Role or database does not exist
 
 ```text
-psycopg2.OperationalError: FATAL: role "postgres" does not exist
+psycopg.OperationalError: FATAL: role "postgres" does not exist
 FATAL: database "postgres" does not exist
 ```
 

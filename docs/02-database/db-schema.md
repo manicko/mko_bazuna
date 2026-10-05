@@ -832,6 +832,59 @@ source (StrEnum: TELEGRAM | SEED, nullable, default NULL)  # 'SEED' marks seed-g
 db_table: popular_searches
 ```
 
+**`query_normalized` carries derived, redacted text — never the raw query.** The
+redaction contract spans **both** `popular_searches.query_normalized` and
+`search_history.query_normalized`, and the two must be read together. This is
+load-bearing, not historical trivia:
+
+- **Why the column exists in this shape.** Migration
+  `apps/search/migrations/0002_redact_search_queries` redacted `query` in place but
+  **deliberately preserved `query_normalized` intact**, on the reasoning that the key is
+  the lookup/dedup column and rewriting it would need a table rebuild. That left the key
+  derived from the **raw** query while `query` was already masked — so phone numbers,
+  e-mail addresses and personal names that `redact_search_query()` strips from `query`
+  survived verbatim in the indexed key. Note the shape of the gap: `query` was safe
+  while `query_normalized`, the column the autocomplete prefix read touches, was not.
+- **The owner ruled on 2026-10-03** (06-PII-108, Q-D5 resolved in
+  `.ai/plans/06-pii-consent-remediation.md` §0.6.1) to key on the **redacted** form.
+  The repair has shipped as `search_query_key()` in
+  `src/backend/apps/core/utils/sanitize.py`, adopted by all four writers
+  (`record_search_history` for the table and the anonymous session store,
+  `increment_popular_search`, and both `SeedService._seed_popular_searches` sites),
+  plus data migration `0005_redact_search_query_keys`, which **re-derived the
+  historical keys** for both tables.
+- **New writes and historical rows are now both redacted.** Writes are redacted at
+  write time, and `0005` repaired the pre-existing rows, so no row in either table
+  should hold raw query text today. **This holds only because that data migration
+  exists and has run** — it is the thing that makes historical rows safe, and nothing
+  else does.
+
+Three obligations follow, and each is a way to reopen a closed exposure:
+
+1. **Redact first, then lower.** `search_query_key()` is
+   `redact_search_query(query).strip().lower()` on the **raw** query. The order is
+   load-bearing: `_NAME_PATTERN` matches personal names on an uppercase first letter
+   (`\b[А-ЯЁA-Z]`), so it matches nothing in an already-lowercased string and
+   lower-then-redact would leave **every** name in the key. A new writer that
+   computes `query.strip().lower()`, or any digest of the raw query, silently
+   reintroduces the leak.
+2. **A digest is not an acceptable substitute.** `get_popular_suggestions` reads
+   `query_normalized__startswith`; a keyed digest has no prefix structure and would
+   return zero rows for every query. The column must stay plain redacted text.
+3. **The repair is irreversible** — both `0002` and `0005` use
+   `reverse_code=migrations.RunPython.noop`, so the raw keys are gone by design and a
+   revert cannot restore them (nor can one leak them). `0005` merged colliding
+   `popular_searches` keys group-by-key, summing `hit_count` and keeping one row,
+   because `increment_popular_search`'s `get_or_create` raises
+   `MultipleObjectsReturned` on duplicates; `0006_deduplicate_and_unique_popular_search`
+   follows on. `search_history` keeps only the newest row per `(user_id, new key)`.
+
+`popular_searches` is the higher-sensitivity of the two: it is global and cross-user, so
+a row there has no per-user retention bound. `SavedSearch.query` is **out of scope** and
+must not be touched — it is the FTS query string, stored in the user's language, and
+redacting it changes what the search *means*; `pii_inventory.py` records it as
+`ErasureAction.RETAIN` for that reason.
+
 ---
 
 ### SearchHistory
@@ -841,7 +894,7 @@ Per-user search query tracking for personalized autocomplete.
 id (PK)
 user_id (FK → users.id, CASCADE, nullable)
 query (VARCHAR(200))                                            # PII-redacted at write time (SRH-004); phones, emails, multi-word names masked via redact_search_query()
-query_normalized (VARCHAR(200), db_index=True)                 # search_query_key(query) — redact-then-lower, same derivation as popular_searches (06-PII-108)
+query_normalized (VARCHAR(200), db_index=True)                 # search_query_key(query) — redact-then-lower, same derivation as popular_searches (06-PII-108). See "query_normalized carries derived, redacted text — never the raw query" above: the column is indexed, so it must never receive raw query text, and that obligation spans both tables.
 created_at (TIMESTAMP, auto_now_add=True)
 
 db_table: search_history

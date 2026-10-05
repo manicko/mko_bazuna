@@ -74,7 +74,7 @@ Pinned in `docker/Dockerfile`, `docker-compose.yml`. All compatible with Django 
 - **gunicorn:** pin `gunicorn>=26.0`.
 - **whitenoise:** add if used for `/static/` (media still needs nginx).
 - **PgBouncer:** pin `pgbouncer>=1.25.2`. Keep `prepare_threshold=None` and add `options="-c lock_timeout=10s"` (03-DB-004); list `options` in the pooler's `ignore_startup_parameters` (unprefixed `IGNORE_STARTUP_PARAMETERS` for the pinned image). Note the pooler then **discards** `options`, so the bound is voided and a **server-side** `lock_timeout` default is additionally required — enabling the profile without one yields silent unbounded waits.
-- **nginx:** `nginx:alpine` tracks 1.30.x.
+- **nginx:** pinned to `nginx:1.30.5`. The floating `nginx:alpine` tag tracks mainline; this project tracks the stable 1.30.x line, so the patch is pinned rather than floating (09-API-016). The pin is enforced: `docker-compose.yml` carries `image: nginx:1.30.5`, and the test suite asserts that the production services table in [docker-deployment](../ops/docker-deployment.md) quotes the base manifest's own `image:` pins. Rolling back to `nginx:alpine` is the documented fallback only.
 
 ## Key Compatibility Decisions
 

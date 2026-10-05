@@ -89,7 +89,7 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
   become functional under Redis.
 - **Dev/test:** `config/settings/dev.py` and `config/settings/test.py` override `CACHES` to
   `LocMemCache` — no Redis needed for local development or testing.
-- **Docker:** `redis:7-alpine` service in `docker-compose.yml`; wired into `web`, `bot`,
+- **Docker:** `redis:7.4.11-alpine` service in `docker-compose.yml`; wired into `web`, `bot`,
    and `scheduler` via `REDIS_URL` env var and `depends_on` healthchecks. The `scheduler`
    service also `depends_on: load_catalog (completed successfully)` so sweep commands never
    start before the category catalog is loaded. **Redis is a disposable cache, not durable
