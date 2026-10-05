@@ -11,11 +11,15 @@ Usage::
 
     python -m manage.py profile_queries
     python -m manage.py profile_queries --query "велосипед" --table ads
+    python -m manage.py profile_queries --min-rows 50000
     python -m manage.py profile_queries --dry-run
 
-Requires a running PostgreSQL database with seed data (>=10k published ads)
-so the Seq-Scan assertion is meaningful. In the dev environment, run
-``make up`` first to seed the database.
+Requires a running PostgreSQL database with seed data (>= ``--min-rows``
+published ads, default 10000) so the Seq-Scan assertion is meaningful.
+**Below the threshold the command says the measurement did NOT happen and
+exits non-zero** — it never prints a clean-run verdict it did not earn. The
+dev stack seeds far fewer rows; seed a production-like dataset before
+trusting a result (PERF-012b validated 2026-09).
 """
 
 import logging
@@ -81,12 +85,25 @@ class Command(BaseCommand):
             default=False,
             help="Print the SQL that would be explained without executing EXPLAIN.",
         )
+        parser.add_argument(
+            "--min-rows",
+            type=int,
+            dest="min_rows",
+            default=SEED_SCALE_MIN_ROWS,
+            help=(
+                "Minimum published-ad count for the Seq-Scan assertion to be "
+                "meaningful (default: %(default)s, seed scale). Below this the "
+                "command reports that the measurement did NOT happen and exits "
+                "non-zero rather than printing a clean-run verdict."
+            ),
+        )
 
     def handle(self, *args, **options) -> None:
         """Execute EXPLAIN on representative queries and assert index usage."""
         table: str = options["table"]
         search_term: str = options["query"]
         dry_run: bool = options["dry_run"]
+        min_rows: int = options["min_rows"]
 
         # Surface SLO constants in operational output (rules.md:228).
         logger.info(
@@ -102,20 +119,31 @@ class Command(BaseCommand):
             f"p99={PerformanceSLO.P99_SLO_MS}ms"
         )
 
-        queries = self._build_queries(search_term)
+        city_id, category_id = self._resolve_filter_ids()
+
+        queries = self._build_queries(search_term, city_id, category_id)
 
         row_count = Ad.objects.filter(status=AdStatus.PUBLISHED).count()
         logger.info("Published ads in '%s': %d", table, row_count)
         self.stdout.write(f"Published ads: {row_count}")
 
-        if row_count < SEED_SCALE_MIN_ROWS:
-            self.stdout.write(
-                self.style.WARNING(
-                    f"WARNING: only {row_count} published ads — "
-                    f"Seq-Scan assertion skipped (need >={SEED_SCALE_MIN_ROWS} "
-                    f"for seed-scale profiling). Run 'make up' to seed the dev DB."
-                )
+        # A skip is a NON-measurement. The command must not print a
+        # clean-run verdict it did not earn: below the threshold the planner
+        # may legitimately choose a Seq Scan, so the assertion would be
+        # meaningless, and a green "no Seq Scan" line reads as a measurement
+        # that happened. Say the measurement did NOT happen and exit non-zero
+        # (PERF-012b validated 2026-09). ``--dry-run`` prints SQL only and
+        # never asserts, so it is exempt.
+        if not dry_run and row_count < min_rows:
+            msg = (
+                f"measurement did NOT happen: only {row_count} published ads, "
+                f"below the required {min_rows} (--min-rows). At this size the "
+                f"planner may legitimately choose a Seq Scan, so the assertion "
+                f"would be meaningless. Seed a production-like dataset and "
+                f"re-run; do not read this run as a clean result."
             )
+            logger.error(msg)
+            raise CommandError(msg)
 
         failures: list[str] = []
         for label, queryset in queries:
@@ -123,14 +151,13 @@ class Command(BaseCommand):
             explain_output = self._explain(queryset, dry_run)
             self.stdout.write(explain_output)
 
-            if not dry_run and row_count >= SEED_SCALE_MIN_ROWS:
-                if self._has_seq_scan(explain_output, table):
-                    msg = (
-                        f"Seq Scan detected on '{table}' in the '{label}' query — "
-                        f"add an index before tuning the query (rules.md:227)."
-                    )
-                    logger.error(msg)
-                    failures.append(msg)
+            if not dry_run and self._has_seq_scan(explain_output, table):
+                msg = (
+                    f"Seq Scan detected on '{table}' in the '{label}' query — "
+                    f"add an index before tuning the query (rules.md:227)."
+                )
+                logger.error(msg)
+                failures.append(msg)
 
         if failures:
             raise CommandError(
@@ -146,12 +173,60 @@ class Command(BaseCommand):
             )
         )
 
-    def _build_queries(self, search_term: str) -> list[tuple[str, QuerySet[Ad]]]:
+    def _resolve_filter_ids(self) -> tuple[int, int]:
+        """Return a real ``(city_id, category_id)`` from the database.
+
+        The query shapes must name rows that exist. Hard-coded ids
+        (``city_id=1``, ``category_id__in=[1, 2, 3]``) named rows that need
+        not exist, so the EXPLAIN could profile an empty filter and report a
+        clean plan for a query production never runs (PERF-012b validated
+        2026-09).
+
+        The city is the lowest-id row with a PUBLISHED ad, so the filter is
+        non-empty; the category is the lowest-id **active leaf or root** with a
+        PUBLISHED ad. If either cannot be resolved the command says so and
+        stops — it never falls back to a literal.
+        """
+        city_id = (
+            Ad.objects.filter(status=AdStatus.PUBLISHED)
+            .order_by("city_id")
+            .values_list("city_id", flat=True)
+            .first()
+        )
+        category_id = (
+            Ad.objects.filter(status=AdStatus.PUBLISHED, category__is_active=True)
+            .order_by("category_id")
+            .values_list("category_id", flat=True)
+            .first()
+        )
+        if city_id is None or category_id is None:
+            msg = (
+                "cannot resolve a real city/category for the query shapes: no "
+                "PUBLISHED ad with a city and an active category exists. "
+                "Measurement did NOT happen — seed a production-like dataset."
+            )
+            logger.error(msg)
+            raise CommandError(msg)
+        return city_id, category_id
+
+    def _build_queries(
+        self,
+        search_term: str,
+        city_id: int,
+        category_id: int,
+    ) -> list[tuple[str, QuerySet[Ad]]]:
         """Build representative querysets mirroring the search/listings views.
 
-        Query patterns are derived from:
-        - apps.search.views.search — FTS search on the per-language vector
-        - apps.ads.services.listings_query — base PUBLISHED filter + sort
+        Query patterns mirror the production paths:
+        - ``apps.search.views.search`` — FTS search on the per-language vector,
+          including the FTS-filtered **count** path the view runs at/over the
+          cache cap (``_resolve_search_count``).
+        - ``apps.ads.services.listings_query.ListingsQuery.build_queryset`` —
+          the PUBLISHED filter + sort pipeline, with a **resolved** city and
+          category so the filter is against real rows.
+
+        Every id is resolved from a real row by :meth:`_resolve_filter_ids`;
+        no literal id is used.
 
         Returns a list of ``(label, queryset)`` pairs so callers can correlate
         each EXPLAIN output with the query it represents.
@@ -166,24 +241,39 @@ class Command(BaseCommand):
             status=AdStatus.PUBLISHED,
         ).filter(Q(category__isnull=True) | Q(category__is_active=True))
 
+        # The FTS-filtered queryset is the same filter the search view's
+        # count path (``_resolve_search_count``) applies before ``.count()``,
+        # so the FTS plan this EXPLAIN shows is the plan the count uses.
+        fts_filtered = base.annotate(
+            rank=SearchRank(F(vector_field), search_query),
+        ).filter(**{vector_field: search_query})
+
         return [
             (
                 "fts_search (websearch)",
-                base.annotate(
-                    rank=SearchRank(F(vector_field), search_query),
-                ).filter(**{vector_field: search_query}),
+                fts_filtered,
+            ),
+            (
+                "fts_search_count (search view count path)",
+                fts_filtered,
             ),
             (
                 "listing (all published, newest first)",
                 base.order_by("-published_at"),
             ),
             (
+                "listing_city_category (resolved city + category)",
+                base.filter(city_id=city_id, category_id=category_id).order_by(
+                    "-published_at"
+                ),
+            ),
+            (
                 "filter_by_city",
-                base.filter(city_id=1).order_by("-published_at"),
+                base.filter(city_id=city_id).order_by("-published_at"),
             ),
             (
                 "filter_by_category_subtree",
-                base.filter(category_id__in=[1, 2, 3]).order_by("-published_at"),
+                base.filter(category_id=category_id).order_by("-published_at"),
             ),
             (
                 "filter_by_price_range",

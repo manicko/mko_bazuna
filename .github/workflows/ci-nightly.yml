@@ -80,3 +80,107 @@ jobs:
           name: nightly-coverage-report
           path: src/backend/coverage.xml
           retention-days: 7
+
+  # Query-plan profiler (PERF-012b validated 2026-09). The command is the
+  # repository's only EXPLAIN tool and it is not runnable on a small dataset:
+  # below the threshold it reports "the measurement did NOT happen" and exits
+  # non-zero. This nightly job seeds a production-like dataset, runs the
+  # profiler above the threshold, and fails the nightly if any profiled query
+  # falls back to a Seq Scan on the ads table. It is scheduled nightly only —
+  # the seed volume is far too large for a per-PR job.
+  query-profile:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
+    services:
+      db:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: mko_bazuna
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5.4.2
+        with:
+          enable-cache: true
+
+      - name: Install dependencies
+        run: uv sync --frozen --no-install-project --group dev
+        working-directory: src/backend
+
+      - name: Wait for database
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+        run: |
+          for i in $(seq 1 30); do
+            if uv run python -c "import psycopg; psycopg.connect('postgres://postgres:postgres@localhost:5432/mko_bazuna')" 2>/dev/null; then
+              echo "Database ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ERROR: Database unavailable after 30s" >&2
+          exit 1
+        working-directory: src/backend
+
+      - name: Run migrations + seed reference data
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run python manage.py bootstrap_reference_data
+        working-directory: src/backend
+
+      - name: Seed 10k published ads (production-like scale)
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: |
+          uv run python manage.py shell -c "
+          from decimal import Decimal
+          from django.contrib.auth import get_user_model
+          from django.db import transaction
+          from apps.ads.models import Ad, AdStatus
+          from apps.categories.models import Category
+          from apps.locations.models import City
+          cat = Category.objects.filter(is_active=True).first()
+          city = City.objects.first()
+          User = get_user_model()
+          seller = User.objects.first() or User.objects.create_user('profiler-seller', telegram_id=999998)
+          rows = [
+              Ad(
+                  title=f'Profiler ad {i}',
+                  category=cat,
+                  city=city,
+                  seller=seller,
+                  price=Decimal('100'),
+                  status=AdStatus.PUBLISHED,
+              )
+              for i in range(10000)
+          ]
+          with transaction.atomic():
+              Ad.objects.bulk_create(rows, batch_size=1000)
+          print('Seeded 10000 published ads for the query profiler')
+          "
+        working-directory: src/backend
+
+      - name: Run query-plan profiler
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run python manage.py profile_queries --min-rows 10000
+        working-directory: src/backend
