@@ -23,7 +23,9 @@ self-reference left to exclude.  An ``.exclude(pk=instance.pk)`` would in fact
 be unsafe here -- ``Collector`` sets ``instance.pk = None`` after its
 ``atomic()`` block, and ``.exclude(pk=None)`` raises ``ValueError``.
 
-The four key columns are **duplicated** from ``AdImage`` rather than derived:
+The four key columns are owned by :mod:`apps.media.storage_keys` and re-exported
+here so that ``from apps.media.services.references import KEY_COLUMNS`` keeps
+working.  The vocabulary is **duplicated** from ``AdImage`` rather than derived:
 the model carries no marker distinguishing key columns from the non-key
 ``telegram_file_id`` / ``sha256`` fields, so derivation would require a model
 change.  The drift risk is instead pinned by a relational test asserting that
@@ -36,18 +38,15 @@ registration and the filesystem error boundary.
 """
 
 from collections.abc import Sequence
-from typing import Final
 
 from django.db.models import Q
 
 from apps.ads.models import AdImage
+from apps.media.storage_keys import KEY_COLUMNS
 
-KEY_COLUMNS: Final[tuple[str, ...]] = (
-    "image",
-    "thumbnail_small",
-    "thumbnail_medium",
-    "thumbnail_large",
-)
+# Re-exported so existing import paths keep working unedited.  The vocabulary
+# itself is owned by ``apps.media.storage_keys``.
+__all__ = ["KEY_COLUMNS", "unreferenced_keys"]
 
 
 def unreferenced_keys(keys: Sequence[str]) -> list[str]:
