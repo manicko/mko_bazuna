@@ -53,6 +53,14 @@ class Command(BaseCommand):
     rows (seed scale). If it does, add an index before tuning the query
     (docs/99-agent/rules.md:227).
 
+    The threshold is a **table-size** axis (``--min-rows``, default
+    ``SEED_SCALE_MIN_ROWS`` = 10000): below it the planner may legitimately
+    choose a Seq Scan, so the assertion would be meaningless. Below the
+    threshold — and outside ``--dry-run`` — the command says the measurement
+    did NOT happen and **exits non-zero** (``CommandError``); it never prints a
+    clean-run verdict it did not earn (13-PERF-012b / 13-PERF-015 validated
+    2026-09). Callers must read the exit code, not the stdout.
+
     The regression-threshold output references ``PerformanceSLO`` constants
     (src/benchmark/constants.py) so the SLO budget is visible alongside the
     plan (docs/99-agent/rules.md:228).
@@ -99,7 +107,14 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options) -> None:
-        """Execute EXPLAIN on representative queries and assert index usage."""
+        """Execute EXPLAIN on representative queries and assert index usage.
+
+        Emits the SLO thresholds, resolves real filter ids, and EXPLAINs each
+        shape. Below ``--min-rows`` (and outside ``--dry-run``) it raises
+        ``CommandError`` so the exit is non-zero and no success line is
+        printed — a skip is a non-measurement, not a clean run. A detected Seq
+        Scan on the target table raises ``CommandError`` naming the query.
+        """
         table: str = options["table"]
         search_term: str = options["query"]
         dry_run: bool = options["dry_run"]

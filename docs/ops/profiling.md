@@ -3,6 +3,7 @@
 > **Purpose:** Establish a repeatable profiling cadence for the search and listings hot paths, using both Python-level cProfile and PostgreSQL `EXPLAIN (ANALYZE, BUFFERS)`.
 > **Tools:** `scripts/profile_search.py` (cProfile), `profile_queries` management command (EXPLAIN), `PerformanceSLO` constants (`src/benchmark/constants.py`)
 > **Spec:** `docs/99-agent/rules.md:224-228` (Profiling Rules)
+> **Updated:** 13-PERF-015 (validated 2026-09) — the `profile_queries` description now matches the tool BLOCK 3 shipped.
 
 ## Overview
 
@@ -12,6 +13,28 @@ Two complementary profiling tools cover the ad search/listing critical path:
 |---|---|---|
 | `profile_search.py` (cProfile) | Python-level call counts and cumulative time — middleware, ORM, FTS, SWR cache, template rendering | Before optimizing a hot path; diagnosing latency regressions in the application layer |
 | `profile_queries` (EXPLAIN ANALYZE) | PostgreSQL query-plan nodes, actual row counts, buffer hits/reads | When a hot path is confirmed via cProfile; verifying index usage before tuning query text |
+
+`make profile` runs **`scripts/profile_search.py`** (the cProfile harness) — it does
+**not** run `profile_queries`. The two tools are separate entry points with
+separate invocation sections below.
+
+`profile_queries` asserts "no Seq Scan on the `ads` table" **only when the
+measurement is meaningful**, and it now fails loudly when it is not:
+
+- It takes a `--min-rows` threshold (default `SEED_SCALE_MIN_ROWS`, `10000`).
+  This is a **table-size** axis, not a match-count axis: below the threshold the
+  planner may legitimately prefer a sequential scan, so the assertion would be
+  vacuous.
+- Below the threshold (and without `--dry-run`) the command writes that the
+  **measurement did NOT happen** and **exits non-zero** (`CommandError`). It
+  never prints a clean-run verdict it did not earn. The previous behaviour — a
+  green "Profiling complete" line and exit 0 while the assertion was skipped —
+  was removed by 13-PERF-012b/13-PERF-015 (BLOCK 3).
+- What it **can** tell you: whether the planner picks a sequential scan on
+  `ads` for the representative shapes, at the sampled table size.
+- What it **cannot** tell you: it does not measure match count (FTS cost scales
+  with how many rows match, not how many rows exist), and it says nothing about
+  a run that skipped — check the exit code, not the log line.
 
 Both tools reference `PerformanceSLO` thresholds so the SLO budget is visible alongside the profile output:
 
@@ -37,9 +60,24 @@ See `docs/99-agent/rules.md:224-228` for the full profiling rules.
 The dev environment must be running with seed data so the Seq-Scan assertion is meaningful (the planner legitimately uses Seq Scan on tables <10k rows — see `SEED_SCALE_MIN_ROWS` in the command source).
 
 ```bash
-# Start dev stack (web :8000 + test DB :5433) and seed >10k published ads
+# Start dev stack (web :8000 + test DB :5433). This seeds SEED_ADS ads — the
+# compose default is 600, NOT >10k — so profile_queries will report that the
+# measurement did not happen and exit non-zero at that size.
 make up
 ```
+
+To make the assertion meaningful, seed a production-like dataset at or above
+the threshold before running `profile_queries` (the nightly `query-profile` job
+seeds 10000 published ads and is the model):
+
+```bash
+# Inside the dev web container:
+python -m manage.py seed --ads 10000 --force
+```
+
+The earlier claim that "the dev compose stack seeds >10k ads automatically" was
+false: `docker-compose.yml` sets `SEED_ADS=${SEED_ADS:-600}`, so `make up`
+seeds 600 ads (13-PERF-015 validated 2026-09).
 
 ## Running cProfile — `scripts/profile_search.py`
 
@@ -71,10 +109,11 @@ The management command compiles the same query patterns used by the production s
 # Inside the dev container (requires DJANGO_SETTINGS_MODULE + DB)
 python -m manage.py profile_queries
 
-# Override the search term, table, or skip execution:
+# Override the search term, table, threshold, or skip execution:
 python -m manage.py profile_queries --query "велосипед"
 python -m manage.py profile_queries --table ads
-python -m manage.py profile_queries --dry-run       # print SQL only, no EXPLAIN execution
+python -m manage.py profile_queries --min-rows 50000   # lower/raise the table-size threshold
+python -m manage.py profile_queries --dry-run          # print SQL only, no EXPLAIN execution
 
 # In Docker (test environment):
 docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-compose.test.yml \
@@ -83,22 +122,78 @@ docker compose --project-name mko-bazuna-test -f docker-compose.yml -f docker-co
 
 ### Representative queries
 
-The command EXPLAINs these patterns, derived from the search/listings views:
+The command resolves a **real** `city_id` and `category_id` from the database
+(the lowest-id row with a PUBLISHED ad / with an active category) before
+compiling the shapes, so each filter is non-empty — the old `city_id=1` /
+`category_id__in=[1, 2, 3]` literals named rows that need not exist. If either
+cannot be resolved the command stops rather than falling back to a literal.
+
+It EXPLAINs these patterns, derived from the search/listings views:
 
 1. **FTS search** — `SearchRank` + `@@ tsvector` filter on `search_vector_ru` (uses `IX_ads_search_gin_ru` GIN index)
-2. **Listing** — `status=PUBLISHED` ordered by `-published_at` (uses `IX_ads_pub_listing`)
-3. **Filter by city** — `status=PUBLISHED` + `city_id` (uses `IX_ads_pub_listing`)
-4. **Filter by category subtree** — `status=PUBLISHED` + `category_id IN (...)` (uses `IX_ads_pub_listing`)
-5. **Filter by price range** — `status=PUBLISHED` + `price_normalized_eur` range (uses `IX_ads_price_normalized_eur`)
-6. **Sort by price** — `ORDER BY price_normalized_eur ASC NULLS LAST` (uses `IX_ads_price_normalized_eur`)
+2. **FTS search count** — the FTS-filtered count path the search view runs at/over the cache cap (`_resolve_search_count`)
+3. **Listing** — `status=PUBLISHED` ordered by `-published_at` (uses `IX_ads_pub_listing`)
+4. **Listing, resolved city + category** — `status=PUBLISHED` + the resolved `city_id` and `category_id`
+5. **Filter by city** — `status=PUBLISHED` + `city_id` (uses `IX_ads_pub_listing`)
+6. **Filter by category subtree** — `status=PUBLISHED` + `category_id` (uses `IX_ads_pub_listing`)
+7. **Filter by price range** — `status=PUBLISHED` + `price_normalized_eur` range (uses `IX_ads_price_normalized_eur`)
+8. **Sort by price** — `ORDER BY price_normalized_eur ASC NULLS LAST` (uses `IX_ads_price_normalized_eur`)
 
 ### Seed-scale guard
 
-The Seq-Scan assertion is **skipped** (with a WARNING) when the published-ad count is below `SEED_SCALE_MIN_ROWS` (10k). This prevents false positives on small datasets where a sequential scan is the optimal plan. To seed the dev DB with enough data:
+Below `--min-rows` (default `SEED_SCALE_MIN_ROWS`, 10000) the command reports
+that the **measurement did NOT happen** and **exits non-zero** — it does not
+print a success line. This prevents a false "no Seq Scan" verdict on small
+datasets where a sequential scan is the optimal plan. `--dry-run` is exempt
+(it prints SQL and never asserts).
+
+Seed a production-like dataset at or above the threshold:
 
 ```bash
-make up   # the dev compose stack seeds >10k ads automatically
+# Seed 10000 ads explicitly — make up alone seeds only 600 (SEED_ADS default).
+python -m manage.py seed --ads 10000 --force
 ```
+
+## Profiling the on-demand price-recompute sweep
+
+`recompute_normalized_prices` (apps/currencies) re-derives
+`price_normalized_eur` for every non-draft ad after an exchange-rate change.
+It is **absent from both `HOURLY_COMMANDS` and `DAILY_COMMANDS`**, so the
+scheduler never runs it — it executes **only on demand**. Unlike the two tools
+above, it is a **write** sweep, so what matters is its statement count, its
+`SELECT ... FOR UPDATE` batch count, and its wall time, not a query plan.
+
+Its transaction shape (`03-DB-008`) is **out of scope for performance work
+here**: it is one session-scoped advisory lock (`pg_advisory_lock`), a
+`select_for_update()` read of `_BATCH_SIZE` (500) rows per batch, and a
+per-batch `COMMIT`, so row locks are released as the sweep progresses. This
+section **measures and records** that cost; it does not change the command.
+
+**Measured cost** (13-PERF-013 validated 2026-09). Method: a
+`CaptureQueriesContext` around a `call_command("recompute_normalized_prices")`
+run against a freshly seeded test database, with every row made stale first so
+each batch writes and locks. The exact command is `python -m
+manage.py recompute_normalized_prices`; the dataset is `seed --ads N --force`.
+
+| Published ads | Statements | `SELECT ... FOR UPDATE` batches | `UPDATE`s | Wall time |
+|---|---|---|---|---|
+| 2 000 | 22 | 5 (4 × 500 + 1 empty terminator) | 4 | 0.93 s |
+| 10 000 | 86 | 21 (20 × 500 + 1 empty terminator) | 20 | 4.5 s |
+
+The sweep is linear in the row count at a fixed batch size: one
+`SELECT ... FOR UPDATE` and one `UPDATE` per 500 rows, plus one terminating
+empty `SELECT`. At 10 000 rows the per-batch hold averages ~225 ms, consistent
+with the worst-batch ≈358 ms recorded for this command in
+`docker-deployment.md` (`LOCK_TIMEOUT_SECONDS` is 10 s, so a batch holds well
+under the bound).
+
+**A `statement_timeout` is not added here.** A statement and a lock wait are
+different bounds; the per-batch shape keeps each batch short, and bounding lock
+waits is `03-DB-004` (owner: phase 03), which is why this section records the
+cost rather than adding a timeout. Note for whoever implements that: the ~1 s
+row-lock holds in `test_recompute_command.py::TestRecomputeRowLockConcurrency`,
+`test_sweep_archive.py`, and `test_transition_concurrency.py` break under a
+**global** lock timeout below that — phase 03 must choose per-role.
 
 ## Index Decision Rule
 
