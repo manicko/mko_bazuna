@@ -214,17 +214,25 @@ def test_collapseBranches_removed() -> None:
     assert "collapseBranches" not in _HEADER_CATALOG_CONTENT
 
 
-def test_children_exists_replaces_get_children_count_in_header() -> None:
-    """Expand-button condition uses ``get_children.exists``, not the
-    non-existent ``get_children_count`` (RC-A)."""
-    assert "cat.get_children.exists" in _HEADER_CATALOG_CONTENT
+def test_header_child_existence_uses_annotated_has_children() -> None:
+    """The header expand-button condition uses the annotated ``has_children``
+    boolean, not the non-existent ``get_children_count`` (RC-A) and not the
+    per-root ``get_children.exists`` N+1 probe that 13-PERF-009 removed.
+
+    ``header_context`` annotates ``root_categories`` with one correlated
+    ``Exists``; the template consumes that annotation.  The rendered output is
+    unchanged — a node renders an expand button iff it has direct children."""
+    assert "cat.has_children" in _HEADER_CATALOG_CONTENT
     assert "get_children_count" not in _HEADER_CATALOG_CONTENT
+    assert "cat.get_children.exists" not in _HEADER_CATALOG_CONTENT
 
 
-def test_children_exists_replaces_get_children_count_in_submenu() -> None:
-    """mega_submenu.html uses ``get_children.exists`` (RC-A)."""
-    assert "child.get_children.exists" in _SUBMENU_CONTENT
+def test_submenu_child_existence_uses_annotated_has_children() -> None:
+    """mega_submenu.html uses the annotated ``has_children`` boolean (RC-A,
+    13-PERF-009), not the per-child ``get_children.exists`` N+1 probe."""
+    assert "child.has_children" in _SUBMENU_CONTENT
     assert "get_children_count" not in _SUBMENU_CONTENT
+    assert "child.get_children.exists" not in _SUBMENU_CONTENT
 
 
 def test_firstof_replaced_with_with_tag() -> None:
