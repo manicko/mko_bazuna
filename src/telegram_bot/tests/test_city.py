@@ -127,3 +127,74 @@ class TestProcessCity:
 
         state.update_data.assert_awaited_with(city_id=15)
         state.set_state.assert_awaited_with(AdCreateForm.title)
+
+    @pytest.mark.asyncio
+    async def test_below_cutoff_query_does_not_resolve(self) -> None:
+        """A query below the fuzzy cutoff falls through to the error branch."""
+        from telegram_bot.handlers.ad_create.city import process_city
+
+        with patch(
+            "telegram_bot.handlers.ad_create.city.get_city_by_name",
+            new=AsyncMock(return_value=None),
+        ):
+            with patch(
+                "telegram_bot.handlers.ad_create.city.get_all_cities",
+                new=AsyncMock(
+                    return_value=[MagicMock(get_name=MagicMock(return_value="Podgorica"))]
+                ),
+            ):
+                state = MagicMock()
+                state.get_data = AsyncMock(return_value={})
+                state.update_data = AsyncMock()
+                state.set_state = AsyncMock()
+
+                message = MagicMock()
+                # SequenceMatcher("xyznotacity", "Podgorica") == 0.2000 -- below.
+                message.text = "xyznotacity"
+                message.answer = AsyncMock()
+
+                await process_city(message, state)
+
+        state.update_data.assert_not_awaited()
+        state.set_state.assert_not_awaited()
+        message.answer.assert_awaited_once()
+        called_text = message.answer.call_args[0][0]
+        assert "not found" in called_text.lower() or "exact" in called_text.lower()
+
+    @pytest.mark.asyncio
+    async def test_in_band_query_resolves(self) -> None:
+        """A query whose ratio lies in-band (0.6 < ratio < 0.8) resolves."""
+        from telegram_bot.handlers.ad_create import AdCreateForm
+        from telegram_bot.handlers.ad_create.city import process_city
+
+        city = MagicMock(id=20, get_name=MagicMock(return_value="Podgorica"))
+
+        async def fake_get_city_by_name(name: str):
+            if name == "Podgo":
+                return None
+            return city
+
+        with patch(
+            "telegram_bot.handlers.ad_create.city.get_city_by_name",
+            new=AsyncMock(side_effect=fake_get_city_by_name),
+        ):
+            with patch(
+                "telegram_bot.handlers.ad_create.city.get_all_cities",
+                new=AsyncMock(
+                    return_value=[MagicMock(get_name=MagicMock(return_value="Podgorica"))]
+                ),
+            ):
+                state = MagicMock()
+                state.get_data = AsyncMock(return_value={})
+                state.update_data = AsyncMock()
+                state.set_state = AsyncMock()
+
+                message = MagicMock()
+                # SequenceMatcher("Podgo", "Podgorica") == 0.7143 -- in (0.6, 0.8).
+                message.text = "Podgo"
+                message.answer = AsyncMock()
+
+                await process_city(message, state)
+
+        state.update_data.assert_awaited_with(city_id=20)
+        state.set_state.assert_awaited_with(AdCreateForm.title)

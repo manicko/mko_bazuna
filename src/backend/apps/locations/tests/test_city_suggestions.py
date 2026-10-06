@@ -35,6 +35,17 @@ def other_city() -> City:
     )
 
 
+@pytest.fixture
+def podgorica_city() -> City:
+    """Create Podgorica so an in-band typo resolves against it."""
+    return City.objects.create(
+        country_code="ME",
+        name="Подгорица",
+        region="Balkans",
+        slug="podgorica",
+    )
+
+
 class TestSuggestCity:
     """Unit tests for ``suggest_city``."""
 
@@ -62,3 +73,18 @@ class TestSuggestCity:
     def test_returns_none_when_no_cities_exist(self) -> None:
         """With zero cities in the DB, any slug returns None."""
         assert suggest_city("anything") is None
+
+    def test_below_cutoff_query_is_rejected(self, podgorica_city: City) -> None:
+        """A query below the fuzzy cutoff does not resolve to a suggestion."""
+        # SequenceMatcher("xyznotacity", "podgorica") == 0.2000 -- well below.
+        assert suggest_city("xyznotacity") is None
+
+    def test_in_band_query_resolves(self, podgorica_city: City) -> None:
+        """A query whose ratio lies in-band (0.6 < ratio < 0.8) resolves."""
+        # SequenceMatcher("podgo", "podgorica") == 0.7143 -- in (0.6, 0.8).
+        assert suggest_city("podgo") == "podgorica"
+
+    def test_above_cutoff_query_resolves(self, podgorica_city: City) -> None:
+        """A query above the cutoff resolves to the closest slug."""
+        # SequenceMatcher("Podgoric", "Podgorica") == 0.9412 -- above.
+        assert suggest_city("Podgoric") == "podgorica"
