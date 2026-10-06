@@ -56,8 +56,9 @@ fast-gate CI run:
     REAL in-process source extraction (Python ``ast`` + full-root template
     scan). This is the reverse of ``test_extraction_completeness``: a msgid
     that leaves the source must not linger in the catalogue (BLOCK 11,
-    14-I18N-014). The three runtime-live ``_lazy`` strings are exempted by the
-    single ``_EXTRACTION_GAP_MSGIDS`` definition.
+    14-I18N-014). No exemption is needed: the three ``_NON_CONTENT_REPLIES``
+    strings in ``submit.py`` are imported as un-aliased ``gettext_lazy`` (plan
+    27 BLOCK B-07) and are therefore extracted by the in-process scan.
 20. ``test_reverse_gate_flags_a_synthetic_orphan`` and
     ``test_reverse_gate_flags_a_synthetic_wrapped_orphan`` — prove the parse
     catches a simple AND a wrapped multi-line orphan (a line-anchored regex
@@ -1658,16 +1659,20 @@ def test_template_roots_and_scope_are_non_empty() -> None:
 #   (a) Python — ``ast.parse`` over every in-scope module, collecting the first
 #       positional argument of every Call whose callee is a bare ``ast.Name`` in
 #       Django's gettext keyword set. ``_lazy`` is DELIBERATELY OMITTED, exactly
-#       mirroring xgettext: the alias is not a gettext keyword, so xgettext does
-#       not extract it. (The three ``gettext_lazy as _lazy`` strings in
-#       ``submit.py`` are consequently source-invisible — the exemption below.)
+#       mirroring xgettext: an alias is not a gettext keyword. Plan 27 BLOCK
+#       B-07 removed the last such alias (``submit.py`` now imports un-aliased
+#       ``gettext_lazy``), so the three ``_NON_CONTENT_REPLIES`` strings are
+#       source-visible and the former ``_EXTRACTION_GAP_MSGIDS`` exemption is
+#       retired.
 #   (b) Templates — ``_extract_template_msgids`` over a FULL ``_template_roots()``
 #       scan, WITHOUT ``exclude_subpaths``. makemessages scans ``admin/`` and the
 #       other excluded subtrees too, so reusing :func:`_collect_template_files`
 #       here would drop ~62 legitimate msgids and produce a red-on-arrival gate.
 
-# The gettext function names xgettext treats as keywords. ``_lazy`` is absent by
-# design — see the module comment above.
+# The gettext function names xgettext treats as keywords. An alias such as
+# ``_lazy`` is absent by design — see the module comment above. Plan 27 BLOCK
+# B-07 removed the last such alias, so nothing is currently source-invisible to
+# this scan.
 _PY_GETTEXT_KEYWORDS = frozenset({
     "_",
     "gettext",
@@ -1681,41 +1686,6 @@ _PY_GETTEXT_KEYWORDS = frozenset({
     "npgettext_lazy",
     "dgettext",
     "dngettext",
-})
-
-# ---------------------------------------------------------------------------
-# Named extraction-gap exemption (BLOCK 11, 14-I18N-014) — ONE definition
-# ---------------------------------------------------------------------------
-# The three msgids below are RUNTIME-LIVE and extracted by NOTHING: they are
-# wrapped in ``gettext_lazy as _lazy`` at
-# ``telegram_bot/handlers/ad_create/submit.py::_NON_CONTENT_REPLIES``, and
-# xgettext does not treat ``_lazy`` as a gettext keyword (the alias was
-# introduced by commit ``d0a3ac2a``, which changed ``_(...)`` to ``_lazy(...)``).
-# They are NOT stale: they render under the seller's locale at runtime. The
-# reverse gate therefore exempts them by msgid so it stays GREEN on arrival
-# while still failing any genuine orphan. This is the only reverse diff against
-# the in-process extraction; the two source-only strings (the
-# ``create_admin_user`` password-policy msgid and the ``submission.py`` consent
-# msgid) are a FORWARD gap and are deliberately NOT asserted here (BLOCK 11 is
-# scoped to the removed direction only).
-#
-# Finding: 14-I18N-014 (N-2), extraction-keyword gap. Owner: the i18n gate
-# owner (plan 25). When xgettext/the extraction gains the ``_lazy`` keyword the
-# three entries are removed from this set in the same commit that proves the
-# extraction reaches them; the gate then covers the `_lazy` gap directly.
-_EXTRACTION_GAP_MSGIDS: frozenset[str] = frozenset({
-    (
-        "Your draft was no longer available, so it was replaced with a fresh "
-        "one. Press confirm again to submit."
-    ),
-    (
-        "Your ad could not be submitted from its current state. A fresh draft "
-        "was prepared \u2014 press confirm again to submit."
-    ),
-    (
-        "One of your photos is no longer available. A fresh draft was prepared "
-        "\u2014 please upload the missing photo again, then send 'done'."
-    ),
 })
 
 
@@ -1741,8 +1711,9 @@ def _extract_python_msgids(root: Path) -> set[str]:
 
     A msgid is the first positional argument of a Call whose callee is a bare
     ``ast.Name`` in :data:`_PY_GETTEXT_KEYWORDS` and whose argument is a string
-    constant. ``_lazy`` is not in that set — mirroring xgettext — so the three
-    ``gettext_lazy as _lazy`` strings are intentionally not extracted.
+    constant. An alias such as ``_lazy`` is not in that set — mirroring
+    xgettext — so aliased call sites would not be extracted; plan 27 BLOCK B-07
+    removed the last such alias, so every in-scope call site is extracted.
     """
     msgids: set[str] = set()
     for py_file in root.rglob("*.py"):
@@ -1784,15 +1755,17 @@ def _real_extraction_msgids() -> set[str]:
 def reverse_orphans(
     catalogue_text: str,
     extraction_ids: set[str],
-    exemptions: frozenset[str],
+    exemptions: frozenset[str] = frozenset(),
 ) -> set[str]:
     """Return catalogue msgids absent from *extraction_ids*, after exemptions.
 
     Parses the catalogue with the plural-aware BLOCK 7 parser (never a regex),
     so a wrapped multi-line ``msgid ""`` entry is compared as its joined string
     rather than silently missed by a ``^msgid "…"$`` line anchor. The empty
-    header msgid is skipped. *exemptions* is the single named
-    :data:`_EXTRACTION_GAP_MSGIDS` definition; no second, divergent list exists.
+    header msgid is skipped. *exemptions* is an optional set of msgids to
+    ignore; the real gate passes none (plan 27 BLOCK B-07 retired the former
+    ``_EXTRACTION_GAP_MSGIDS`` exemption), but the parameter keeps the
+    suppression mechanism independently testable.
     """
     entries = _parse_po_entries(catalogue_text)
     return {
@@ -1808,9 +1781,10 @@ def test_reverse_stale_entry_gate() -> None:
     Guards the removed direction: a msgid that leaves the source must not
     linger in the catalogue. Compares each catalogue against an in-process
     extraction (Python ``ast`` + full-root template scan) and fails per
-    catalogue with any surviving orphans. The three runtime-live ``_lazy``
-    strings are exempted by the single :data:`_EXTRACTION_GAP_MSGIDS`
-    definition; no other reverse diff remains. No count is hard-coded.
+    catalogue with any surviving orphans. No exemption is applied: plan 27
+    BLOCK B-07 de-aliased the last ``gettext_lazy`` alias, so the three
+    ``_NON_CONTENT_REPLIES`` strings are extracted directly. No count is
+    hard-coded.
     """
     extraction = _real_extraction_msgids()
     assert extraction, "the in-process source extraction found no msgids"
@@ -1819,13 +1793,13 @@ def test_reverse_stale_entry_gate() -> None:
     for po_path in _po_files():
         lang = _locale_code(po_path)
         text = po_path.read_text(encoding="utf-8")
-        found = reverse_orphans(text, extraction, _EXTRACTION_GAP_MSGIDS)
+        found = reverse_orphans(text, extraction)
         if found:
             orphans_by_lang[lang] = found
 
     assert not orphans_by_lang, (
         "stale catalogue entries (present in the catalogue, absent from the "
-        "source extraction after the _EXTRACTION_GAP_MSGIDS exemption):\n"
+        "source extraction):\n"
         + "\n".join(
             f"{lang}: {sorted(m[:90] for m in orphans)}"
             for lang, orphans in sorted(orphans_by_lang.items())
@@ -1851,7 +1825,7 @@ def test_reverse_gate_flags_a_synthetic_orphan() -> None:
         'msgstr "Translation"\n'
     )
 
-    orphans = reverse_orphans(catalogue, extraction, _EXTRACTION_GAP_MSGIDS)
+    orphans = reverse_orphans(catalogue, extraction)
     assert orphans == {"Removed from source"}, (
         f"the reverse gate must flag the synthetic orphan, got {orphans!r}"
     )
@@ -1879,28 +1853,27 @@ def test_reverse_gate_flags_a_synthetic_wrapped_orphan() -> None:
         '"Translation of the wrapped orphan."\n'
     )
 
-    orphans = reverse_orphans(catalogue, extraction, _EXTRACTION_GAP_MSGIDS)
+    orphans = reverse_orphans(catalogue, extraction)
     assert orphans == {
         "Removed from source",
         "A wrapped multi-line msgid that the source no longer contains.",
     }, f"the reverse gate must flag both orphans (simple + wrapped), got {orphans!r}"
 
 
-def test_reverse_gate_honours_the_named_exemption() -> None:
-    """The single named exemption suppresses exactly its msgids (BLOCK 11).
+def test_reverse_gate_honours_an_exemption() -> None:
+    """The optional exemption suppresses exactly its msgids (BLOCK 11).
 
     A catalogue msgid absent from the extraction passes when — and only when —
-    it is a member of :data:`_EXTRACTION_GAP_MSGIDS`. The same msgid without the
-    exemption fires, proving the exemption is consulted rather than the gate
-    being weakened.
+    it is a member of the *exemptions* set. The same msgid without the exemption
+    fires, proving the suppression is consulted rather than the gate being
+    weakened. Uses a local synthetic set: the real gate applies no exemption
+    since plan 27 BLOCK B-07 retired ``_EXTRACTION_GAP_MSGIDS``.
     """
-    orphan = "Your draft was no longer available, so it was replaced with a fresh one. Press confirm again to submit."
-    assert orphan in _EXTRACTION_GAP_MSGIDS, (
-        "the DRAFT_GONE _lazy msgid must be named in the exemption set"
-    )
+    orphan = "A synthetic orphan that no source contains."
     catalogue = f'msgid "{orphan}"\nmsgstr ""\n'
+    exemptions = frozenset({orphan})
 
-    exempt = reverse_orphans(catalogue, set(), _EXTRACTION_GAP_MSGIDS)
+    exempt = reverse_orphans(catalogue, set(), exemptions)
     assert not exempt, "an exempted msgid must not be reported as an orphan"
 
     unexempt = reverse_orphans(catalogue, set(), frozenset())
@@ -1909,13 +1882,31 @@ def test_reverse_gate_honours_the_named_exemption() -> None:
     )
 
 
-def test_extraction_gap_exemptions_name_the_lazy_strings() -> None:
-    """Each ``_EXTRACTION_GAP_MSGIDS`` member is a real catalogue msgid (BLOCK 11).
+def test_non_content_replies_are_extracted() -> None:
+    """The three ``_NON_CONTENT_REPLIES`` strings are source-visible (BLOCK B-07).
 
-    An exemption for a msgid that no longer exists is how a stale exemption
-    hides a regression. Every exempted msgid must still be present in the
-    catalogues, so removing one is a deliberate, visible edit.
+    Plan 27 BLOCK B-07 de-aliased ``gettext_lazy`` in
+    ``telegram_bot/handlers/ad_create/submit.py``, so the in-process ``ast``
+    extraction now reaches the three module-level replies that the retired
+    ``_EXTRACTION_GAP_MSGIDS`` exemption once suppressed. This pins that
+    closure: the strings are extracted from source AND remain present in every
+    catalogue, with the DRAFT_GONE msgid proving the parse end to end.
     """
+    extraction = _real_extraction_msgids()
+    replies = {
+        "Your draft was no longer available, so it was replaced with a fresh "
+        "one. Press confirm again to submit.",
+        "Your ad could not be submitted from its current state. A fresh draft "
+        "was prepared \u2014 press confirm again to submit.",
+        "One of your photos is no longer available. A fresh draft was prepared "
+        "\u2014 please upload the missing photo again, then send 'done'.",
+    }
+    not_extracted = replies - extraction
+    assert not not_extracted, (
+        "de-aliased _NON_CONTENT_REPLIES strings absent from the in-process "
+        f"source extraction: {sorted(m[:90] for m in not_extracted)}"
+    )
+
     catalogue_msgids: set[str] = set()
     for po_path in _po_files():
         catalogue_msgids.update(
@@ -1923,9 +1914,9 @@ def test_extraction_gap_exemptions_name_the_lazy_strings() -> None:
             for msgid, _ in _parse_po_entries(po_path.read_text(encoding="utf-8"))
             if msgid
         )
-    missing = _EXTRACTION_GAP_MSGIDS - catalogue_msgids
+    missing = replies - catalogue_msgids
     assert not missing, (
-        "extraction-gap exemption msgids absent from the catalogues: "
+        "de-aliased _NON_CONTENT_REPLIES msgids absent from the catalogues: "
         f"{sorted(m[:90] for m in missing)}"
     )
 

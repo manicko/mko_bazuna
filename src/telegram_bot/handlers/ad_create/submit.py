@@ -17,7 +17,7 @@ from aiogram import types
 from aiogram.fsm.context import FSMContext
 from asgiref.sync import sync_to_async
 from django.db import OperationalError
-from django.utils.translation import gettext as _, gettext_lazy as _lazy
+from django.utils.translation import gettext as _, gettext_lazy
 
 from apps.ads.services.submission import (
     SubmitAdInput,
@@ -63,15 +63,15 @@ logger = logging.getLogger(__name__)
 # ``gettext`` would freeze every reply to the import-time language; the lazy
 # proxy resolves under the seller's locale when the message is rendered below.
 _NON_CONTENT_REPLIES: dict[SubmitAdOutcome, object] = {
-    SubmitAdOutcome.DRAFT_GONE: _lazy(
+    SubmitAdOutcome.DRAFT_GONE: gettext_lazy(
         "Your draft was no longer available, so it was replaced with a fresh "
         "one. Press confirm again to submit."
     ),
-    SubmitAdOutcome.INVALID_TRANSITION: _lazy(
+    SubmitAdOutcome.INVALID_TRANSITION: gettext_lazy(
         "Your ad could not be submitted from its current state. A fresh draft "
         "was prepared — press confirm again to submit."
     ),
-    SubmitAdOutcome.PHOTO_UNAVAILABLE: _lazy(
+    SubmitAdOutcome.PHOTO_UNAVAILABLE: gettext_lazy(
         "One of your photos is no longer available. A fresh draft was prepared "
         "— please upload the missing photo again, then send 'done'."
     ),
