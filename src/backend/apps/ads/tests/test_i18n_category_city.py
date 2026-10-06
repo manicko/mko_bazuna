@@ -13,8 +13,10 @@ covered by ``test_submenu.py`` and ``test_moderation_views.py`` respectively.
 from __future__ import annotations
 
 import pytest
+from django.conf import settings
 from django.test import Client
 from django.urls import reverse
+from django.utils import translation
 
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
@@ -163,3 +165,77 @@ class TestDetailPageI18n:
         content = response.content.decode("utf-8")
         assert "Prevoz" in content
         assert "Транспорт" not in content
+
+
+class TestNonCanonicalCookieLocale:
+    """Non-canonical ``lang_pref`` cookie drives the DB accessors.
+
+    ``14-I18N-001``: before the fix a raw cookie such as ``en-US`` reached
+    ``translation.activate()`` unvalidated, so ``request.LANGUAGE_CODE`` was
+    ``en-us`` — outside ``settings.LANGUAGES`` — and every DB-backed string fell
+    through the ``locale -> ru`` chain to Russian, site-wide.
+
+    These assertions read the accessor results (``Category.get_name``,
+    ``City.get_name``, ``Ad.get_title``), never rendered chrome: under test
+    ``settings.LANGUAGE_CODE`` is ``en`` and Django adds it as a catalogue
+    fallback, so a chrome assertion is false-green (VAL-003).
+    """
+
+    def test_non_canonical_cookie_drives_accessors(
+        self,
+        seller: User,
+        localized_category: Category,
+        localized_city: City,
+    ) -> None:
+        """``en-US`` cookie resolves to ``en`` for every DB accessor."""
+        ad = create_test_ad(
+            seller,
+            localized_category,
+            localized_city,
+            title="Non-canonical cookie ad",
+            status=AdStatus.PUBLISHED,
+        )
+        client = Client()
+        client.cookies["lang_pref"] = "en-US"
+        response = client.get(reverse("ads:detail", args=[ad.id]))
+        assert response.status_code == 200
+
+        # Resolve the active locale through the same source of truth the view
+        # uses, then assert the accessors return that locale's value.
+        active = translation.get_language()
+        assert active in {code for code, _ in settings.LANGUAGES}
+
+        localized_category.refresh_from_db()
+        localized_city.refresh_from_db()
+        ad.refresh_from_db()
+        assert active == "en"
+        assert localized_category.get_name(active) == "Transport"
+        assert localized_city.get_name(active) == "Testgrad"
+        assert ad.get_title(active) == "Non-canonical cookie ad"
+
+    def test_unsupported_cookie_falls_back_for_accessors(
+        self,
+        seller: User,
+        localized_category: Category,
+        localized_city: City,
+    ) -> None:
+        """An unsupported cookie resolves to the BOSNIAN accessor values."""
+        ad = create_test_ad(
+            seller,
+            localized_category,
+            localized_city,
+            title="Unsupported cookie ad",
+            status=AdStatus.PUBLISHED,
+        )
+        client = Client()
+        client.cookies["lang_pref"] = "de-DE"
+        response = client.get(reverse("ads:detail", args=[ad.id]))
+        assert response.status_code == 200
+
+        active = translation.get_language()
+        assert active in {code for code, _ in settings.LANGUAGES}
+        assert active == "bs"
+        localized_category.refresh_from_db()
+        localized_city.refresh_from_db()
+        assert localized_category.get_name(active) == "Prevoz"
+        assert localized_city.get_name(active) == "Testgrad"

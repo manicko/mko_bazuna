@@ -1,10 +1,24 @@
 """
 Language preference middleware for Mko Bazuna.
 
-The single authority for the active language. Resolves the user language per
-priority ``?lang=X`` > ``lang_pref`` cookie > ``Accept-Language`` > ``settings.LANGUAGE_CODE``,
-activates the Django translation for the request thread, and keeps
-``request.LANGUAGE_CODE`` in sync with the thread-local active language.
+The single authority for the active language. All three locale sources resolve
+through ONE normalising sink: the ``?lang=X`` query parameter, the ``lang_pref``
+cookie and the ``Accept-Language`` header each yield a ``LanguageLocale`` member,
+and that member is what reaches ``translation.activate()`` and
+``request.LANGUAGE_CODE``. There is no fourth path, and no branch passes a raw
+``str`` to the sink.
+
+Priority chain: ``?lang=X`` > ``lang_pref`` cookie > ``Accept-Language`` >
+``settings.LANGUAGE_CODE``.
+
+Normalisation guarantee: every source is normalised through
+``LanguageLocale.from_code`` before activation, so non-canonical BCP-47 tags
+(``en-US``, ``ru-RU``, ``de-DE``) resolve to a supported locale instead of
+driving the site to the fallback. ``request.LANGUAGE_CODE`` is therefore always
+a member of ``settings.LANGUAGES``, for every input, hostile ones included.
+
+The ``Accept-Language`` header honours descending q-values via Django's
+``parse_accept_lang_header`` and explicitly drops any member with ``q == 0``.
 
 Django's ``LocaleMiddleware`` is intentionally NOT used (see
 ``config/settings/base.py``): it is dormant in this project (no
@@ -27,6 +41,7 @@ from django.http import HttpRequest, HttpResponse
 from django.utils import translation
 from django.utils.cache import patch_vary_headers
 from django.utils.deprecation import MiddlewareMixin
+from django.utils.translation.trans_real import parse_accept_lang_header
 
 from apps.core.enums import LanguageLocale
 
@@ -57,23 +72,38 @@ class LanguagePreMiddleware(MiddlewareMixin):
     """
 
     def process_request(self, request: HttpRequest) -> None:
-        """Determine and set the language code for the current request."""
+        """Determine and set the language code for the current request.
+
+        Every source resolves to a ``LanguageLocale`` member before reaching the
+        single sink ``_set_language_code``, so no branch can activate a raw,
+        unvalidated code. The cookie branch normalises the cookie value through
+        ``LanguageLocale.from_code``; the fallback branch normalises
+        ``settings.LANGUAGE_CODE`` the same way.
+        """
         lang = request.GET.get("lang")
         if lang is not None:
             self._apply_lang_param(request, lang)
             return
 
-        lang = request.COOKIES.get(LANGUAGE_COOKIE_NAME)
-        if lang is not None:
-            self._set_language_code(request, lang)
+        cookie_value = request.COOKIES.get(LANGUAGE_COOKIE_NAME)
+        if cookie_value is not None:
+            resolved = LanguageLocale.from_code(
+                cookie_value, fallback=LanguageLocale.BOSNIAN
+            )
+            self._set_language_code(request, resolved)
             return
 
-        lang = self._parse_accept_language(request)
-        if lang is not None:
-            self._set_language_code(request, lang)
+        accept_locale = self._parse_accept_language(request)
+        if accept_locale is not None:
+            self._set_language_code(request, accept_locale)
             return
 
-        self._set_language_code(request, settings.LANGUAGE_CODE)
+        self._set_language_code(
+            request,
+            LanguageLocale.from_code(
+                settings.LANGUAGE_CODE, fallback=LanguageLocale.BOSNIAN
+            ),
+        )
 
     def process_response(self, request: HttpRequest, response: HttpResponse) -> HttpResponse:
         """Persist the ``lang_pref`` cookie and emit language response headers.
@@ -105,14 +135,19 @@ class LanguagePreMiddleware(MiddlewareMixin):
         a fallback resolution does not write ``lang_pref``.
         """
         if not lang:
-            self._set_language_code(request, settings.LANGUAGE_CODE)
+            self._set_language_code(
+                request,
+                LanguageLocale.from_code(
+                    settings.LANGUAGE_CODE, fallback=LanguageLocale.BOSNIAN
+                ),
+            )
             return
 
         resolved = LanguageLocale.from_code(
             lang, fallback=LanguageLocale.BOSNIAN
         )
         resolved_code = resolved.value
-        self._set_language_code(request, resolved_code)
+        self._set_language_code(request, resolved)
 
         # Persist preference only for explicitly supported codes (including
         # normalized variants like en-US → en). Unsupported fallback does not
@@ -129,32 +164,43 @@ class LanguagePreMiddleware(MiddlewareMixin):
         else:
             logger.warning("Ignoring invalid lang parameter: %s", lang)
 
-
-    def _set_language_code(self, request: HttpRequest, lang: str) -> None:
+    def _set_language_code(
+        self, request: HttpRequest, locale: LanguageLocale
+    ) -> None:
         """Activate the language for the current thread and sync the request.
 
-        ``translation.activate(lang)`` sets the thread-local active language
-        (read by ``{% get_current_language %}`` and Django's ``i18n`` context
-        processor), and ``request.LANGUAGE_CODE`` is set to the resulting
-        ``translation.get_language()`` so the two are always in agreement.
+        This is the single typed sink every locale source routes through: it
+        accepts a ``LanguageLocale`` MEMBER (never a raw ``str``), activates it
+        via ``translation.activate(locale.value)`` — which sets the thread-local
+        active language read by ``{% get_current_language %}`` and Django's
+        ``i18n`` context processor — and sets ``request.LANGUAGE_CODE`` to the
+        resulting ``translation.get_language()`` so the two always agree and the
+        request attribute is always a member of ``settings.LANGUAGES``.
         """
-        translation.activate(lang)
+        translation.activate(locale.value)
         request.LANGUAGE_CODE = translation.get_language()
 
-    def _parse_accept_language(self, request: HttpRequest) -> str | None:
-        """Extract the primary language tag from the Accept-Language header.
+    def _parse_accept_language(self, request: HttpRequest) -> LanguageLocale | None:
+        """Resolve the Accept-Language header to a configured locale.
 
-        Returns the resolved language code (normalized via
-        ``LanguageLocale.from_code``) if a supported locale is found,
-        falling back to BOSNIAN for unsupported codes. Returns ``None``
-        only when no Accept-Language header is present, so that
+        Parses each comma-separated member together with its ``q`` parameter via
+        Django's ``parse_accept_lang_header``, which returns ``((tag, q), ...)``
+        already sorted descending by ``q`` and lowercased. Any member with
+        ``q == 0`` is skipped explicitly — the parser retains it, and a ``q=0``
+        member means "not acceptable". The first tag that maps to a
+        ``LanguageLocale`` member is returned; when a header is present but no
+        tag is supported the resolution falls back to ``LanguageLocale.BOSNIAN``.
+
+        Returns ``None`` only when the header is absent or empty, so that
         ``process_request`` falls back to ``settings.LANGUAGE_CODE``.
         """
         accept_language = request.META.get("HTTP_ACCEPT_LANGUAGE", "")
-        if not accept_language:
+        if not accept_language or not accept_language.strip():
             return None
-        first_tag = accept_language.split(",")[0]
-        resolved = LanguageLocale.from_code(
-            first_tag, fallback=LanguageLocale.BOSNIAN
-        )
-        return resolved.value
+        for tag, q in parse_accept_lang_header(accept_language):
+            if q == 0:
+                continue
+            resolved = LanguageLocale.from_code(tag, fallback=LanguageLocale.BOSNIAN)
+            if resolved.value == tag.split("-")[0].lower():
+                return resolved
+        return LanguageLocale.BOSNIAN

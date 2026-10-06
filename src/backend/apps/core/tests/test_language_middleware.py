@@ -13,10 +13,12 @@ from __future__ import annotations
 from unittest.mock import MagicMock
 
 import pytest
+from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.http import HttpRequest, HttpResponse
 from django.utils import translation
 
+from apps.core.enums import LanguageLocale
 from apps.core.middleware.language import (
     LANGUAGE_COOKIE_MAX_AGE,
     LANGUAGE_COOKIE_NAME,
@@ -142,6 +144,60 @@ def test_cookie_valid_values(middleware: LanguagePreMiddleware) -> None:
         assert request.LANGUAGE_CODE == code
 
 
+# Non-canonical BCP-47 cookie tags (14-I18N-001).
+# Each entry is (raw cookie value, expected resolved locale code). A raw value
+# whose base language is unsupported resolves to the BOSNIAN fallback per spec.
+_NON_CANONICAL_COOKIE_CASES: list[tuple[str, str]] = [
+    ("en-US", "en"),
+    ("EN", "en"),
+    ("en_US", "bs"),  # underscore is not a BCP-47 separator -> unsupported
+    ("de-DE", "bs"),  # de is unsupported -> fallback
+    ("ru-RU", "ru"),
+    ("nonsense", "bs"),
+]
+
+
+def test_cookie_non_canonical_resolves_to_supported_locale(
+    middleware: LanguagePreMiddleware,
+) -> None:
+    """Non-canonical cookie tags resolve to a member of settings.LANGUAGES.
+
+    Before the fix the raw cookie string reached ``translation.activate()``
+    unchanged, so ``en-US`` activated ``en-us`` (not a configured locale) and
+    every DB-backed string fell through to Russian. Every resolved code must be
+    a member of ``settings.LANGUAGES`` (14-I18N-001).
+    """
+    supported = {code for code, _ in settings.LANGUAGES}
+    for raw, expected in _NON_CANONICAL_COOKIE_CASES:
+        request = _make_request(cookies={LANGUAGE_COOKIE_NAME: raw})
+        middleware.process_request(request)
+        assert request.LANGUAGE_CODE in supported, (
+            f"cookie {raw!r} resolved to {request.LANGUAGE_CODE!r}, "
+            "which is not a member of settings.LANGUAGES"
+        )
+        assert request.LANGUAGE_CODE in LanguageLocale.values()
+        assert request.LANGUAGE_CODE == expected
+
+
+def test_cookie_membership_holds_for_every_case_in_table(
+    middleware: LanguagePreMiddleware,
+) -> None:
+    """Membership guard spans the canonical AND non-canonical cookie table.
+
+    Iterates ``LanguageLocale.values()`` for the canonical half (never bare
+    literals) and the explicit non-canonical half, asserting membership for
+    every input including the hostile ones.
+    """
+    supported = {code for code, _ in settings.LANGUAGES}
+    cases = [(code, code) for code in LanguageLocale.values()]
+    cases += _NON_CANONICAL_COOKIE_CASES
+    for raw, expected in cases:
+        request = _make_request(cookies={LANGUAGE_COOKIE_NAME: raw})
+        middleware.process_request(request)
+        assert request.LANGUAGE_CODE in supported, f"cookie {raw!r} -> {request.LANGUAGE_CODE!r}"
+        assert request.LANGUAGE_CODE == expected
+
+
 # --- Priority: Accept-Language header ---
 
 
@@ -182,6 +238,52 @@ def test_accept_language_empty_string_falls_back_to_language_code(
     request = _make_request(accept_language="")
     middleware.process_request(request)
     assert request.LANGUAGE_CODE == "en"
+
+
+def test_accept_language_honours_descending_q_values(
+    middleware: LanguagePreMiddleware,
+) -> None:
+    """The highest-q supported tag wins, not merely the first tag (14-I18N-015).
+
+    ``de-DE`` is unsupported and ranks first; ``ru`` ranks second at q=0.8 and
+    must be selected over ``bs`` at q=0.6. Before the fix only the first
+    comma-separated tag was inspected, so this resolved to ``bs``.
+    """
+    request = _make_request(accept_language="de-DE,ru;q=0.8,bs;q=0.6")
+    middleware.process_request(request)
+    assert request.LANGUAGE_CODE == "ru"
+
+
+def test_accept_language_q_zero_member_is_not_selected(
+    middleware: LanguagePreMiddleware,
+) -> None:
+    """A supported tag with ``q=0`` is skipped explicitly.
+
+    ``ru;q=0`` means Russian is explicitly unacceptable, so the resolver must
+    skip it and fall back to BOSNIAN. Django's parser retains ``q=0`` members,
+    so the skip is explicit, not a parser default.
+    """
+    request = _make_request(accept_language="ru;q=0")
+    middleware.process_request(request)
+    assert request.LANGUAGE_CODE == "bs"
+
+
+def test_accept_language_q_zero_higher_rank_does_not_shadow_supported(
+    middleware: LanguagePreMiddleware,
+) -> None:
+    """A q=0 unsupported-first tag does not stop the next supported tag."""
+    request = _make_request(accept_language="de-DE;q=0,bs;q=0.7")
+    middleware.process_request(request)
+    assert request.LANGUAGE_CODE == "bs"
+
+
+def test_accept_language_underscore_tag_is_unsupported(
+    middleware: LanguagePreMiddleware,
+) -> None:
+    """A malformed member (``en_US``) rejects the whole header -> fallback."""
+    request = _make_request(accept_language="en_US")
+    middleware.process_request(request)
+    assert request.LANGUAGE_CODE == "bs"
 
 
 # --- Priority: default ---

@@ -50,7 +50,10 @@ def category_submenu(request: HttpRequest, slug: str) -> HttpResponse:
     if category is None:
         raise Http404("Category not found")
 
-    cache_key = f"category:submenu:{get_tree_version()}:{category.slug}:{request.LANGUAGE_CODE or LanguageLocale.RUSSIAN.value}"
+    locale = LanguageLocale.from_code(
+        request.LANGUAGE_CODE, fallback=LanguageLocale.RUSSIAN
+    ).value
+    cache_key = f"category:submenu:{get_tree_version()}:{category.slug}:{locale}"
 
     def _render_submenu_fragment() -> str:
         children = list(
