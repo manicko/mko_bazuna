@@ -830,8 +830,7 @@ class TestLoginPreferredCitySync:
             username="declined_pref",
             is_declined=True,
         )
-        request = RequestFactory().get("/")
-        request.COOKIES["preferred_city"] = "podgorica"
+        request = RequestFactory().get("/", HTTP_COOKIE="preferred_city=podgorica")
 
         _reconcile_preferred_city_on_login(request, user)
 
@@ -851,8 +850,7 @@ class TestLoginPreferredCitySync:
             chat_id=700000411,
             username="active_pref",
         )
-        request = RequestFactory().get("/")
-        request.COOKIES["preferred_city"] = "podgorica"
+        request = RequestFactory().get("/", HTTP_COOKIE="preferred_city=podgorica")
 
         _reconcile_preferred_city_on_login(request, user)
 

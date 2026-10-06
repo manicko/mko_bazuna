@@ -739,7 +739,9 @@ class TestFailureBranchLogsMaskIdentifier:
         # The mask produced by the production helper is what was logged.
         assert mask_telegram_id(self._RAW_CHAT_ID) in caplog.text
         # The transport value is untouched: the sender received the real id.
-        sent_kwargs = mock_bot.send_message.await_args.kwargs
+        sent_call = mock_bot.send_message.await_args
+        assert sent_call is not None
+        sent_kwargs = sent_call.kwargs
         assert sent_kwargs["chat_id"] == self._RAW_CHAT_ID
         # The payload the sender consumed still carries the real id.
         assert payload["chat_id"] == self._RAW_CHAT_ID

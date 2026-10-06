@@ -595,6 +595,12 @@ jobs:
         run: uv sync --frozen --no-install-project --group dev
         working-directory: src/backend
 
+      # `theme` (src/theme) is imported through INSTALLED_APPS, so django.setup()
+      # needs src on the import path — the same PYTHONPATH every other Django job
+      # sets. It stays on the step, not the job env block: that block is the
+      # production-variable set read by test_deploy_check_env_parity.py.
       - name: Run Django deploy checks
+        env:
+          PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
         run: uv run python manage.py check --deploy --fail-level WARNING
         working-directory: src/backend
