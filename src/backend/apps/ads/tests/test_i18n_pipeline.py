@@ -126,6 +126,71 @@ def test_pot_creation_date_sync() -> None:
 
 
 # ---------------------------------------------------------------------------
+# BLOCK 11 (14-I18N-014, N-2) — obsolete-symmetry assertion
+# ---------------------------------------------------------------------------
+# BLOCK 10 resolved the obsolete dimension once (a one-shot prune); this is the
+# durable gate. It asserts ZERO ``#~`` obsolete blocks in EVERY catalogue — the
+# post-prune invariant across all three. It reads the obsolete dimension ONLY:
+# per BC-3 it must not require an obsolete ``msgstr`` to be non-empty (the ``en``
+# obsolete entry shipped with an empty ``msgstr`` legitimately, as every ``en``
+# entry does), so no msgstr content is inspected.
+
+# ``#~ msgid `` is the exact form xgettext/msgattrib emit for an obsolete singular
+# entry; it anchors the obsolete count without matching active ``msgid`` lines.
+_OBSOLETE_MSGID_RE = re.compile(r"^#~ msgid ", re.MULTILINE)
+
+
+def _obsolete_msgid_count(text: str) -> int:
+    """Return the number of ``#~ msgid `` obsolete blocks in *text*.
+
+    Reads the obsolete dimension only — the ``msgstr`` content of an obsolete
+    entry is never inspected (BC-3).
+    """
+    return len(_OBSOLETE_MSGID_RE.findall(text))
+
+
+def test_no_obsolete_entries_in_any_catalogue() -> None:
+    """No catalogue carries a ``#~`` obsolete block (BLOCK 11, 14-I18N-014).
+
+    Durable form of BLOCK 10's prune. The assertion covers ALL THREE catalogues:
+    the asymmetry (``ru``/``bs`` at 7, ``en`` at 1 pre-prune) *is* the finding,
+    and gating only two locales would let ``en`` drift the other way. The
+    post-prune target is zero in every catalogue; ``7/7/1`` justified the block
+    but is not the invariant asserted. No count is hard-coded.
+    """
+    for po_path in _po_files():
+        lang = po_path.parent.parent.name
+        text = po_path.read_text(encoding="utf-8")
+        count = _obsolete_msgid_count(text)
+        assert count == 0, (
+            f"{lang}/django.po: {count} obsolete '#~ msgid' block(s) — a fresh "
+            f"extraction must leave every catalogue obsolete-free"
+        )
+
+
+def test_obsolete_count_helper_flags_a_synthetic_block_per_locale() -> None:
+    """A synthetic ``#~`` block fires :func:`_obsolete_msgid_count` for ru/bs/en.
+
+    Proves the guard fails for a ``#~`` block in EACH of the three locales, not
+    only the two that carried seven pre-prune (BC-3: proving it only on
+    ``ru``/``bs`` demonstrates the half that was already true). The helper reads
+    the obsolete dimension only — the entry's empty ``msgstr`` is irrelevant.
+    """
+    obsolete_entry = (
+        "#: synthetic\n"
+        "#~ msgid \"Withdrawn string\"\n"
+        'msgstr ""\n'
+    )
+    for lang in ("ru", "bs", "en"):
+        assert _obsolete_msgid_count(obsolete_entry) == 1, (
+            f"a synthetic '#~' block must be counted for {lang}"
+        )
+
+    # A catalogue with no obsolete block reports zero.
+    assert _obsolete_msgid_count('msgid "Active"\nmsgstr "Активно"\n') == 0
+
+
+# ---------------------------------------------------------------------------
 # Part B — component_tag Filter
 # ---------------------------------------------------------------------------
 
