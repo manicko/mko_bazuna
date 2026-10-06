@@ -51,15 +51,19 @@ services:
     ports:
       - "5433:5432"
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d mko_bazuna"]
+      # Recovery-aware readiness: pg_isready alone is a liveness probe that turns
+      # green as soon as the postmaster accepts connections, BEFORE crash recovery
+      # (WAL replay) finishes. Chaining a SELECT 1 against the application DB makes
+      # `healthy` imply a consistent recovery state, so a still-recovering server is
+      # never mistaken for a ready one. This replaces the base service's 30s window:
+      # the same engine on a persistent, reused volume skips initdb and performs only
+      # crash recovery after an interrupted run, which is fsync-bound and takes
+      # ~73s on this host (re-derived from logs) -- well past the former 10s.
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mko_bazuna -q && psql -U postgres -d mko_bazuna -tAc 'SELECT 1' >/dev/null 2>&1"]
       interval: 5s
       timeout: 5s
       retries: 5
-      # Same PostgreSQL engine as the base db, but this volume is persistent and
-      # reused, so initdb does not recur between runs; only crash recovery after
-      # an interrupted run applies. A shorter window than the base 30s keeps the
-      # fast gate responsive while still covering that recovery.
-      start_period: 10s
+      start_period: 90s
 
   # Override migrate service for test: uses test settings
   migrate:

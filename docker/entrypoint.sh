@@ -35,22 +35,41 @@ fix_volume_permissions() {
     fi
 }
 
-# Wait for database to be ready
+# Wait for database to be ready.
+# Bounded wait (30 attempts): a recovery-aware readiness gate must never retry
+# forever. Errors indicating crash recovery in progress are expected and retried
+# quietly; any other error is counted but still retried. On exhaustion a clear
+# diagnostic error naming the last observed error is printed before exiting.
 wait_for_db() {
     # Skip DB wait if no DATABASE_URL configured (e.g., for static-only builds)
     if [ -z "$DATABASE_URL" ]; then
         return 0
     fi
 
+    local max_attempts=30
+    local attempt
+    local stderr_output
+    local last_error=""
+
     echo "Waiting for PostgreSQL..."
-    for i in {1..30}; do
-        if /opt/venv/bin/python -c "import os, psycopg; psycopg.connect(os.environ['DATABASE_URL'])" 2>/dev/null; then
-            echo "Database ready"
-            return 0
+    for ((attempt = 1; attempt <= max_attempts; attempt++)); do
+        stderr_output=$(/opt/venv/bin/python -c \
+            "import os, psycopg; psycopg.connect(os.environ['DATABASE_URL'])" 2>&1) \
+            && { echo "Database ready"; return 0; }
+
+        last_error="$stderr_output"
+        # Crash-recovery errors are expected while the server is still replaying WAL;
+        # retry them without noise. Anything else is still retried, but surfaced.
+        if printf '%s' "$stderr_output" | grep -Eq \
+            'database system is starting up|is not yet accepting connections|Consistent recovery state has not been yet reached'; then
+            echo "Database is still recovering (attempt ${attempt}/${max_attempts}); waiting..."
+        else
+            echo "Database not ready yet (attempt ${attempt}/${max_attempts}): ${stderr_output}" >&2
         fi
         sleep 1
     done
-    echo "ERROR: Database unavailable after 30s" >&2
+    echo "ERROR: Database unavailable after ${max_attempts}s (exhausted bounded retries)." >&2
+    echo "ERROR: last observed error: ${last_error}" >&2
     exit 1
 }
 
