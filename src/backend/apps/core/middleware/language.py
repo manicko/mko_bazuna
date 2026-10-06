@@ -165,7 +165,8 @@ class LanguagePreMiddleware(MiddlewareMixin):
 
         Normalizes language variants (e.g. ``en-US`` → ``en``) via
         ``LanguageLocale.from_code`` and falls back to BOSNIAN for unsupported
-        codes, per spec (i18n-spec.md:63-64). The preference is persisted in
+        codes, per spec (i18n-spec.md, "Runtime Language Resolution (Web UI)").
+        The preference is persisted in
         the cookie and session only when the code is explicitly supported —
         a fallback resolution does not write ``lang_pref``.
         """

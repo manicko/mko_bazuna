@@ -2,9 +2,11 @@
 Tests for the shared ``format_price`` display helper (spec Task 7 / T-11).
 """
 
+import re
 from decimal import Decimal
 
 import pytest
+from django.template.loader import render_to_string
 from django.utils.formats import get_format
 from django.utils.translation import override
 
@@ -182,15 +184,97 @@ def test_active_price_chip_bounds_match_card_separators(locale: str) -> None:
 
 @pytest.mark.django_db
 def test_active_price_chip_none_bound_renders_exactly_as_before() -> None:
-    """An open-ended range keeps the current unbounded rendering (14-I18N-010).
+    """An open-ended range renders the literal ``None`` side (14-I18N-010).
 
-    The producer preserves ``None`` rather than inventing a bound, so the
-    template's ``{% if active_price_min or active_price_max %}`` chip still
-    renders the present side alone - no new placeholder, no new string.
+    BLOCK 4 constraint 4: a ``None`` bound must render *exactly* as it did
+    before the ``blocktrans`` -> ``trans`` change. The old chip interpolated the
+    raw bound, so a missing side rendered the literal ``None`` (e.g.
+    ``Price: None–500``); the producer preserves ``None`` and the template now
+    makes that literal explicit rather than relying on Django's implicit
+    coercion, so the rendered output is byte-identical and independent of any
+    catalogue support. No new placeholder, no new translatable string.
     """
     assert _chip_bounds(min_price=None, max_price="500") == (None, "500")
     assert _chip_bounds(min_price="500", max_price=None) == ("500", None)
     assert _chip_bounds(min_price=None, max_price=None) == (None, None)
+
+
+# --- rendered active-price chip (14-I18N-010) ------------------------------
+#
+# The producer-level assertions above read ``filter_context`` only. These render
+# the real partial so the open-bound *output* is pinned, not merely the stored
+# value: the validator noted the earlier test never exercised the rendered chip.
+# The expected strings are exactly the pre-change ``blocktrans`` output, so a
+# regression to the empty-side rendering fails here.
+
+_EN_DASH = "\u2013"
+_CHIP_RE = re.compile(r"bg-orange-100[^>]*>\s*(.*?)\s*<a", re.DOTALL)
+
+
+def _rendered_chip(**kwargs) -> str | None:
+    """Render ``ad_list.html`` and return the active-price chip's inner text.
+
+    Uses the real producer plus the partial's minimal context so the assertion
+    covers the template, not just ``filter_context``. The chip is uniquely
+    identified by its ``bg-orange-100`` class.
+    """
+    built = build_listings_context(
+        category_slug=None,
+        city_slug=None,
+        breadcrumb_category=None,
+        sort=None,
+        min_price=kwargs.get("min_price"),
+        max_price=kwargs.get("max_price"),
+        purpose_slug=None,
+        condition_slug=None,
+        feature_slugs=[],
+        page=None,
+        user_id=None,
+    )
+    context = dict(built.filter_context)
+    context.update(
+        {
+            "query": None,
+            "current_features": [],
+            "page_obj": None,
+            "has_results": None,
+            "LANGUAGE_CODE": "en",
+        }
+    )
+    html = render_to_string("ads/partials/ad_list.html", context)
+    match = _CHIP_RE.search(html)
+    return match.group(1).strip() if match else None
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize(
+    ("min_price", "max_price", "expected"),
+    [
+        ("500", "900", f"Price: 500{_EN_DASH}900"),
+        (None, "500", f"Price: None{_EN_DASH}500"),
+        ("500", None, f"Price: 500{_EN_DASH}None"),
+    ],
+)
+def test_active_price_chip_renders_exact_string(
+    min_price: str | None, max_price: str | None, expected: str
+) -> None:
+    """The rendered chip reproduces the pre-change output for every bound shape.
+
+    Covers both bounds set, min-only, and max-only under the English catalogue
+    (``Price:`` is the msgid), so the exact separator and the literal open-bound
+    ``None`` are pinned. The neither-bound case never reaches the chip: the
+    enclosing ``{% if active_price_min or active_price_max %}`` guard suppresses
+    it, asserted separately below.
+    """
+    with override("en"):
+        assert _rendered_chip(min_price=min_price, max_price=max_price) == expected
+
+
+@pytest.mark.django_db
+def test_active_price_chip_absent_when_no_bounds() -> None:
+    """With neither bound set the enclosing guard suppresses the chip entirely."""
+    with override("en"):
+        assert _rendered_chip(min_price=None, max_price=None) is None
 
 
 @pytest.mark.django_db

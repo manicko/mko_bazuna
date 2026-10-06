@@ -411,8 +411,9 @@ def build_listings_context(
     # correct type at the query layer - and the display shape is built here, once,
     # through the single price formatter (BLOCK 3). No currency: the chip carries
     # numeric bounds only, so ``format_price_value`` is called in its currency-less
-    # form. A ``None`` bound stays ``None`` (formatter returns "") and the template
-    # keeps its current open-ended rendering.
+    # form. A ``None`` bound stays ``None`` so the template renders the literal
+    # ``None`` for that side - byte-identical to the pre-change ``blocktrans``
+    # output (e.g. ``Price: None-500``), per BLOCK 4 constraint 4.
     filter_context: dict[str, Any] = {
         "current_category": category_slug,
         "current_city": city_slug,
