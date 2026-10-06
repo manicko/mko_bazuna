@@ -169,6 +169,44 @@ def test_prod_staticfiles_backend_is_theme_storage() -> None:
     assert f"static_backend={_THEME_STATICFILES_BACKEND}" in result.stdout
 
 
+# Probe the resolved ``NUMBER_GROUPING`` per locale. Django resolves each format
+# attribute through ``FORMAT_MODULE_PATH`` before the bundled locale data, so
+# the ``bs`` value comes from ``config.locale_formats`` while ``ru``/``en`` come
+# from ``django.conf.locale.<lang>.formats``. ``django.setup()`` is required
+# because ``get_format`` reads ``settings.FORMAT_MODULE_PATH``.
+_NUMBER_GROUPING_PROBE_CODE = (
+    "import django; django.setup(); "
+    "from django.utils.formats import get_format; "
+    "print('ru=' + repr(get_format('NUMBER_GROUPING', lang='ru'))); "
+    "print('bs=' + repr(get_format('NUMBER_GROUPING', lang='bs'))); "
+    "print('en=' + repr(get_format('NUMBER_GROUPING', lang='en')))"
+)
+
+
+def test_bs_number_grouping_override_matches_the_other_locales() -> None:
+    """``FORMAT_MODULE_PATH`` gives ``bs`` the ``NUMBER_GROUPING`` it lacks (14-I18N-003).
+
+    Django's bundled ``django.conf.locale.bs.formats`` leaves
+    ``NUMBER_GROUPING`` undefined, and ``django.utils.numberformat`` gates
+    thousands grouping on ``grouping != 0`` — the missing value defaults to 0, so
+    ``bs`` prices were ungrouped even under ``force_grouping=True`` (the ``Q3``
+    option (a) decision). ``base.py``'s ``FORMAT_MODULE_PATH`` supplies
+    ``config.locale_formats.bs.formats`` with ``NUMBER_GROUPING = 3``.
+
+    The subprocess imports ``base.py`` (through ``config.settings.prod``) and
+    reads the **resolved** ``get_format`` value, so the test fails if the setting
+    is dropped or the override package is unwired — not merely if a line is
+    absent. ``ru`` and ``en`` must be unaffected: they take 3 from their bundled
+    locale data, which this change must not disturb.
+    """
+    env = _prod_env_overrides()
+    result = _run_in_subprocess(env, _NUMBER_GROUPING_PROBE_CODE)
+    assert result.returncode == 0, result.stderr
+    assert "ru=3" in result.stdout
+    assert "bs=3" in result.stdout
+    assert "en=3" in result.stdout
+
+
 def test_dev_and_test_share_the_transport_tuple() -> None:
     """config.settings.dev and config.settings.test agree on all seven transport settings.
 

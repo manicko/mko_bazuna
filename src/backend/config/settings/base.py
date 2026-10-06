@@ -166,6 +166,18 @@ LANGUAGES = [
 ]
 LOCALE_PATHS = [BASE_DIR / "backend" / "locale"]
 
+# Project-level format overrides, resolved per-attribute ahead of Django's
+# bundled locale data (14-I18N-003 / Q3 option (a)). Django's bundled Bosnian
+# locale defines DECIMAL_SEPARATOR and THOUSAND_SEPARATOR but leaves
+# NUMBER_GROUPING commented out, and ``django.utils.numberformat`` gates
+# grouping on ``grouping != 0``; a missing value defaults to 0, so ``bs``
+# thousands grouping is unreachable even under ``force_grouping=True``.
+# ``config.locale_formats.bs.formats`` supplies NUMBER_GROUPING = 3, while every
+# other attribute still falls through to django.conf.locale.bs.formats — Django
+# resolves each format attribute against the first module that defines it. It is
+# a list of dotted module paths, never Path objects.
+FORMAT_MODULE_PATH = ["config.locale_formats"]
+
 # Security settings (TLS/SSL ready)
 # The cookie-secure overrides in dev.py/test.py are development-only relaxations
 # of these production defaults.

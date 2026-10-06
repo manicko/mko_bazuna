@@ -41,21 +41,21 @@ def format_price_value(
 
 
 def _format_amount(value: Decimal) -> str:
-    """Format a Decimal amount for display (up to 2 decimals, comma thousands).
+    """Format a Decimal amount for display (up to 2 decimals, localised).
 
     Mirrors Django's ``floatformat`` default (-g): shows an integer without
-    decimals when there is no fractional part, otherwise up to two decimals,
-    with thousands separators via ``intcomma``.
+    decimals when there is no fractional part, otherwise up to two decimals.
+    The ``Decimal`` itself is handed to ``intcomma`` so the localising path is
+    taken for fractional amounts too — ``intcomma`` only localises
+    ``float``/``Decimal``; given a ``str`` it falls back to an ASCII-comma
+    ``use_l10n=False`` path and leaves the ASCII decimal point in place
+    (14-I18N-003). ``normalize()`` trims trailing zeros on the ``Decimal`` and
+    its exponent form does not survive ``number_format``.
     """
     from django.contrib.humanize.templatetags.humanize import intcomma
 
     rounded = value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP).normalize()
-    # normalize() can produce exponent notation for large/small values; format
-    # to a plain string preserving up to two decimals.
-    formatted = format(rounded, "f")
-    if "." in formatted:
-        formatted = formatted.rstrip("0").rstrip(".")
-    return intcomma(formatted)
+    return intcomma(rounded)
 
 
 @register.filter
