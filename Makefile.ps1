@@ -55,6 +55,7 @@ function Show-Help {
     Write-Host "  lint           Run ruff linter inside web container"
     Write-Host "  format         Auto-fix lint issues (including import sorting) inside web container"
     Write-Host "  typecheck      Run basedpyright type checker inside web container"
+    Write-Host "  lint-templates Run djlint on Django templates (host-side, PYTHONPATH=src/backend)"
     Write-Host "  profile        Run cProfile search-endpoint profiling harness (ITERATIONS/TOP/SORT env vars)"
     Write-Host "  shell          Open bash shell in web container"
     Write-Host "  migrate        Run database migrations (one-shot, advisory-locked)"
@@ -187,6 +188,16 @@ function Invoke-Typecheck {
 function Invoke-Format {
     $env:COMPOSE_PROJECT_NAME = $DevProject
     docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml run --rm web uv run ruff check --fix src/
+}
+
+# Lint Django templates with djlint (host-side, no container). The custom rule
+# module alongside the templates is importable only when src/backend is on
+# PYTHONPATH; the project is never installed (no [build-system]), so set it here
+# to match CI's PYTHONPATH=. mechanism. Exit code is propagated.
+function Invoke-LintTemplates {
+    $env:PYTHONPATH = "src/backend"
+    uv run djlint src/backend/templates/
+    if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
 # Run cProfile-based search-endpoint profiling harness (ITERATIONS/TOP/SORT env vars)
@@ -429,6 +440,7 @@ switch ($Target.ToLower()) {
     "lint" { Invoke-Lint }
     "format" { Invoke-Format }
     "typecheck" { Invoke-Typecheck }
+    "lint-templates" { Invoke-LintTemplates }
     "profile" { Invoke-Profile }
     "load" { Invoke-Load }
     "shell" { Invoke-Shell }

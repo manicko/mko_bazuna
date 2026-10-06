@@ -31,7 +31,7 @@ Use `.\Makefile.ps1` in PowerShell 7+:
 |---|---|
 | Lint | `uv run ruff check <path>` |
 | Auto-fix (incl. import sorting, I001) | `uv run ruff check --fix <path>` |
-| Lint templates | `uv run djlint src/backend/templates/` |
+| Lint templates | `.\Makefile.ps1 lint-templates` (or `$env:PYTHONPATH='src/backend'; uv run djlint src/backend/templates/`) |
 | Typecheck | `uv run basedpyright <path>` |
 | Add dep | `uv add <pkg>` / `uv add --dev <pkg>` |
 
