@@ -9,6 +9,10 @@ from django.utils.formats import get_format
 from django.utils.translation import override
 
 from apps.ads.models import Ad
+from apps.ads.services.listings_query import (
+    ListingsQuery,
+    build_listings_context,
+)
 from apps.ads.templatetags.price_tags import format_price, format_price_value
 from apps.core.enums import LanguageLocale
 from apps.currencies.enums import CurrencyCode
@@ -121,3 +125,96 @@ def test_format_price_filter_free_renders_free() -> None:
     ad = Ad(price_amount=Decimal("0"), price_currency=CurrencyCode.EUR)
     with override("en"):
         assert format_price(ad) == "Free"
+
+
+# --- active-price filter chip (14-I18N-010) --------------------------------
+#
+# The shared producer ``build_listings_context`` formats both bounds through
+# ``format_price_value`` in its currency-less form before publishing them into
+# ``filter_context``. The assertions below read the accessor/producer result -
+# the default-independent surface - never the rendered chip chrome, so a locale
+# without catalogue support cannot produce a false green (VAL-003).
+
+
+def _chip_bounds(**kwargs) -> tuple[str | None, str | None]:
+    """Return the producer's ``(active_price_min, active_price_max)`` for a query.
+
+    Drives the single producer with sane vector-returning defaults so a test
+    only states the price params it cares about.
+    """
+    built = build_listings_context(
+        category_slug=None,
+        city_slug=None,
+        breadcrumb_category=None,
+        sort=None,
+        min_price=kwargs.get("min_price"),
+        max_price=kwargs.get("max_price"),
+        purpose_slug=None,
+        condition_slug=None,
+        feature_slugs=[],
+        page=None,
+        user_id=None,
+    )
+    return (
+        built.filter_context["active_price_min"],
+        built.filter_context["active_price_max"],
+    )
+
+
+@pytest.mark.django_db
+@pytest.mark.parametrize("locale", LanguageLocale.values())
+def test_active_price_chip_bounds_match_card_separators(locale: str) -> None:
+    """Both chip bounds localise and group exactly like a card price (14-I18N-010).
+
+    Pre-fix the chip interpolated raw ``Decimal`` bounds through ``blocktrans``,
+    which applies no filter chain: a bound rendered ungrouped with an ASCII
+    decimal point. The producer now routes both bounds through
+    ``format_price_value``, so the chip inherits the card's resolved separators.
+    The expected strings are built from ``get_format``, never hard-coded, and the
+    seven-digit bound proves grouping (a five-digit number has at most one group).
+    """
+    thousands = _thousand_separator(locale)
+    with override(locale):
+        min_bound, max_bound = _chip_bounds(min_price="12345", max_price="1234567")
+    assert min_bound == f"12{thousands}345"
+    assert max_bound == f"1{thousands}234{thousands}567"
+
+
+@pytest.mark.django_db
+def test_active_price_chip_none_bound_renders_exactly_as_before() -> None:
+    """An open-ended range keeps the current unbounded rendering (14-I18N-010).
+
+    The producer preserves ``None`` rather than inventing a bound, so the
+    template's ``{% if active_price_min or active_price_max %}`` chip still
+    renders the present side alone - no new placeholder, no new string.
+    """
+    assert _chip_bounds(min_price=None, max_price="500") == (None, "500")
+    assert _chip_bounds(min_price="500", max_price=None) == ("500", None)
+    assert _chip_bounds(min_price=None, max_price=None) == (None, None)
+
+
+@pytest.mark.django_db
+def test_active_price_range_still_returns_decimals() -> None:
+    """``active_price_range`` keeps its Decimal contract; formatting is at the producer.
+
+    The query layer must not learn about display: a ``Decimal`` in a price range
+    is the correct type there, and re-typing it would move formatting into the
+    query (14-I18N-010, constraint 1).
+    """
+    built = build_listings_context(
+        category_slug=None,
+        city_slug=None,
+        breadcrumb_category=None,
+        sort=None,
+        min_price="1000",
+        max_price="2000",
+        purpose_slug=None,
+        condition_slug=None,
+        feature_slugs=[],
+        page=None,
+        user_id=None,
+    )
+    assert ListingsQuery.active_price_range(built.params) == (
+        Decimal("1000"),
+        Decimal("2000"),
+    )

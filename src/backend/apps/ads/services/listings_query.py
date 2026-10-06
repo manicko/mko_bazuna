@@ -27,6 +27,7 @@ from pydantic import Field, field_validator
 
 from apps.ads.models import Ad, AdFeature
 from apps.ads.services.favorites import annotate_favorites
+from apps.ads.templatetags.price_tags import format_price_value
 from apps.categories.models import Category
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
 from apps.core.enums import AdSort, AdStatus
@@ -405,14 +406,29 @@ def build_listings_context(
         ListingsQuery.resolve_filter_options(breadcrumb_category)
     )
     active_price_min, active_price_max = ListingsQuery.active_price_range(params)
+    # The active-price chip renders the same localised, grouped numeric bounds the
+    # cards do (14-I18N-010). ``active_price_range`` still returns Decimals - the
+    # correct type at the query layer - and the display shape is built here, once,
+    # through the single price formatter (BLOCK 3). No currency: the chip carries
+    # numeric bounds only, so ``format_price_value`` is called in its currency-less
+    # form. A ``None`` bound stays ``None`` (formatter returns "") and the template
+    # keeps its current open-ended rendering.
     filter_context: dict[str, Any] = {
         "current_category": category_slug,
         "current_city": city_slug,
         "current_sort": params.sort,
         "min_price": min_price,
         "max_price": max_price,
-        "active_price_min": active_price_min,
-        "active_price_max": active_price_max,
+        "active_price_min": (
+            format_price_value(active_price_min, None)
+            if active_price_min is not None
+            else None
+        ),
+        "active_price_max": (
+            format_price_value(active_price_max, None)
+            if active_price_max is not None
+            else None
+        ),
         "current_listing_purpose": purpose_slug,
         "current_features": feature_slugs,
         "current_condition": condition_slug,
