@@ -47,7 +47,7 @@ This file contains coding standards and rules for the Mko Bazuna project.
   |---|---|
   | `unit` | Pure unit tests, no database — runs in the fast gate |
   | `integration` | Tests that exercise the DB / Django `Client` stack |
-  | `seed` | Nightly-only; invokes `call_command('seed')` or `ImageGenerator`. Excluded from `make test`, included in `make test-all` |
+  | `seed` | Separate-workflow only (`ci-seed.yml`, once per push); invokes `call_command('seed')` or `ImageGenerator`. Excluded from `make test`, included in `make test-all` |
   | `settings` | Import-time settings validation in a subprocess (e.g. `config/settings/tests/test_settings_secrets.py`) |
   | `concurrent` | Requires `transaction=True` (TRUNCATE per test) — bot tests mutating shared DB state |
   | `slow` | Individually slow tests (>5 s); **not** excluded by the fast gate |

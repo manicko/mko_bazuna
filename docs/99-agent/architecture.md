@@ -240,7 +240,7 @@ by CI.
 | DJANGO_SECRET_KEY | `test-secret-key-for-testing-only` (step `env:`) | `test-secret-key-for-testing-only` (`env_file: .env.test`) | — |
 | All other variables | rely on `base.py` defaults (e.g. `SITE_URL`, `REDIS_URL`, `BOT_TOKEN`) | explicitly set in `.env.test` (`env_file:`) — 16+ variables | — |
 
-**CI** (`.github/workflows/ci.yml`, `.github/workflows/ci-nightly.yml`) runs pytest directly with
+**CI** (`.github/workflows/ci.yml`, `.github/workflows/ci-seed.yml`) runs pytest directly with
 `uv` against a PostgreSQL GitHub Actions **service container**:
 
 - **Database**: CI sets a single `DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna`

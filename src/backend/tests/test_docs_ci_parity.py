@@ -5,7 +5,7 @@ Asserts that live CI configuration matches the documented contract, converting
 doc drift into a CI gate:
 
 1. ci.yml:91 uses `--dist loadgroup` + `-m "not seed"` + `--reuse-db` (not loadscope).
-2. ci-nightly.yml:73 uses `-m "seed"` with NO xdist (serial run).
+2. ci-seed.yml uses `-m "seed"` with NO xdist (serial run), triggered once per push (no nightly cron).
 3. pyproject.toml: no `e2e` marker; `xdist_group` registered; `addopts` has no `--cov`.
 4. entrypoint-test.sh:41 default PYTEST_OPTS includes `--reuse-db` + `--dist loadgroup`.
 5. Makefile: `test-clean-db` target exists, is in `.PHONY`, and `test-recreate`
@@ -73,7 +73,7 @@ while not (_ROOT / "pyproject.toml").exists():
     _ROOT = _ROOT.parent
 
 _CI_YML = _ROOT / ".github" / "workflows" / "ci.yml"
-_CI_NIGHTLY_YML = _ROOT / ".github" / "workflows" / "ci-nightly.yml"
+_CI_SEED_YML = _ROOT / ".github" / "workflows" / "ci-seed.yml"
 _PYPROJECT = _ROOT / "pyproject.toml"
 _ENTRYPOINT = _ROOT / "docker" / "entrypoint-test.sh"
 _MAKEFILE = _ROOT / "Makefile"
@@ -122,20 +122,28 @@ def test_ci_command_subset() -> None:
     assert not missing, f"ci.yml missing expected tokens: {missing}"
 
 
-# --- ci-nightly.yml parity -----------------------------------------------
+# --- ci-seed.yml parity ---------------------------------------------------
 
 
-def test_nightly_runs_seed() -> None:
-    """ci-nightly.yml:73 must run -m 'seed'."""
-    text = _CI_NIGHTLY_YML.read_text()
-    assert '-m "seed"' in text, "ci-nightly.yml:73 must use -m 'seed'"
+def test_seed_workflow_runs_seed() -> None:
+    """ci-seed.yml must run -m 'seed'."""
+    text = _CI_SEED_YML.read_text()
+    assert '-m "seed"' in text, "ci-seed.yml must use -m 'seed'"
 
 
-def test_nightly_is_serial() -> None:
-    """ci-nightly.yml must NOT use xdist (no -n, no --dist)."""
-    text = _CI_NIGHTLY_YML.read_text()
-    assert "-n auto" not in text, "ci-nightly.yml must not use -n auto (serial run)"
-    assert "--dist" not in text, "ci-nightly.yml must not use --dist (serial run)"
+def test_seed_workflow_is_serial() -> None:
+    """ci-seed.yml must NOT use xdist (no -n, no --dist)."""
+    text = _CI_SEED_YML.read_text()
+    assert "-n auto" not in text, "ci-seed.yml must not use -n auto (serial run)"
+    assert "--dist" not in text, "ci-seed.yml must not use --dist (serial run)"
+
+
+def test_seed_workflow_runs_on_push() -> None:
+    """ci-seed.yml is push-triggered; the nightly cron is gone for good."""
+    text = _CI_SEED_YML.read_text()
+    assert "push:" in text, "ci-seed.yml must be triggered by push"
+    assert "schedule:" not in text, "ci-seed.yml must not carry a nightly schedule"
+    assert "cron:" not in text, "ci-seed.yml must not carry a cron schedule"
 
 
 # --- pyproject.toml parity -----------------------------------------------

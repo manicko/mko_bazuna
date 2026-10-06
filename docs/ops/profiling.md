@@ -67,8 +67,8 @@ make up
 ```
 
 To make the assertion meaningful, seed a production-like dataset at or above
-the threshold before running `profile_queries` (the nightly `query-profile` job
-seeds 10000 published ads and is the model):
+the threshold before running `profile_queries` (the `query-profile` job in
+`ci-seed.yml` seeds 10000 published ads and is the model):
 
 ```bash
 # Inside the dev web container:

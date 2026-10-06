@@ -42,8 +42,8 @@ uv sync --frozen --no-install-project --group dev
 # because this expansion is unquoted). For marker-based exclusion use
 # PYTEST_SKIP_MARKERS instead (see below).
 # PYTEST_SKIP_MARKERS="seed" appends -m "not (seed)" to pytest, excluding tests by
-# marker. This is how the dev fast-gate (`make test`) skips the ~17-min nightly
-# seed suite while `make test-all` runs everything. Complements PYTEST_OPTS.
+# marker. This is how the dev fast-gate (`make test`) skips the ~17-min seed
+# suite while `make test-all` runs everything. Complements PYTEST_OPTS.
 # --reuse-db (default) skips test DB schema rebuild on subsequent runs; the DB
 # container persists between runs via the named postgres_data volume. Use
 # `make test-recreate` to force a fresh schema (--create-db), e.g. after

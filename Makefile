@@ -43,8 +43,8 @@ help:
 	@echo "  build          Rebuild Docker images"
 	@echo ""
 	@echo "Test Environment:"
-	@echo "  test           Run fast gate (skips nightly seed suite; reuses DB)"
-	@echo "  test-all       Run complete suite (includes nightly seed suite; reuses DB)"
+	@echo "  test           Run fast gate (skips seed suite; reuses DB)"
+	@echo "  test-all       Run complete suite (includes seed suite; reuses DB)"
 	@echo "  test-db        Start test PostgreSQL (long-running, enables reuse-db)"
 	@echo "  test-down      Stop test environment (preserves DB; use 'down -v' to wipe)"
 	@echo "  test-logs      Follow test environment logs"
@@ -108,13 +108,13 @@ restart:
 
 # ====================== Code Quality ======================
 
-# `test` runs the fast gate: excludes the nightly `seed` suite (~17-min bulk)
+# `test` runs the fast gate: excludes the `seed` suite (~17-min bulk)
 # via the entrypoint PYTEST_SKIP_MARKERS=seed env var. DB persists via --reuse-db.
 test:
 	docker compose $(COMPOSE_TEST) up -d db
 	docker compose $(COMPOSE_TEST) run --rm --env PYTEST_SKIP_MARKERS=seed test
 
-# Run the complete suite INCLUDING the nightly `seed` suite (~35min).
+# Run the complete suite INCLUDING the `seed` suite (~35min).
 test-all:
 	docker compose $(COMPOSE_TEST) up -d db
 	docker compose $(COMPOSE_TEST) run --rm test

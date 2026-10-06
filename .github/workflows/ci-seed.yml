@@ -1,12 +1,16 @@
-name: Nightly Seed Tests
+name: Seed Tests
 
 on:
-  schedule:
-    - cron: "0 3 * * *" # 03:00 UTC daily — runs the slow ~18-minute seed test suite
+  # Once per push to the long-lived branches: the slow ~18-minute serial seed
+  # suite is far too slow for the fast gate (ci.yml runs `-m "not seed"`), so it
+  # lives in this separate workflow and runs at merge time instead of on a
+  # nightly cron.
+  push:
+    branches: [main, develop]
   workflow_dispatch: # Manual trigger for on-demand seed runs
 
 concurrency:
-  group: nightly-seed-tests
+  group: seed-tests
   # Do NOT cancel — these are important correctness tests that should always complete.
   cancel-in-progress: false
 
@@ -77,17 +81,17 @@ jobs:
         if: always()
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
-          name: nightly-coverage-report
+          name: seed-coverage-report
           path: src/backend/coverage.xml
           retention-days: 7
 
   # Query-plan profiler (PERF-012b validated 2026-09). The command is the
   # repository's only EXPLAIN tool and it is not runnable on a small dataset:
   # below the threshold it reports "the measurement did NOT happen" and exits
-  # non-zero. This nightly job seeds a production-like dataset, runs the
-  # profiler above the threshold, and fails the nightly if any profiled query
-  # falls back to a Seq Scan on the ads table. It is scheduled nightly only —
-  # the seed volume is far too large for a per-PR job.
+  # non-zero. This job seeds a production-like dataset, runs the profiler above
+  # the threshold, and fails the run if any profiled query falls back to a Seq
+  # Scan on the ads table. It runs on push, not per-PR — the seed volume is far
+  # too large for a per-PR job.
   query-profile:
     runs-on: ubuntu-latest
     timeout-minutes: 20

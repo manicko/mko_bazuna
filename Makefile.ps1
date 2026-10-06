@@ -45,8 +45,8 @@ function Show-Help {
     Write-Host "  up             Start dev environment (web on :8000, hot-reload) + test DB on :5433"
     Write-Host "  down           Stop and remove containers"
     Write-Host "  build          Rebuild Docker images"
-    Write-Host "  test           Run fast test gate: skips nightly 'seed' suite (~90s vs ~35min full); auto-starts test DB"
-    Write-Host "  test-all       Run complete suite (includes nightly 'seed' tests, ~35min)"
+    Write-Host "  test           Run fast test gate: skips 'seed' suite (~90s vs ~35min full); auto-starts test DB"
+    Write-Host "  test-all       Run complete suite (includes 'seed' tests, ~35min)"
     Write-Host "  test-db        Start test PostgreSQL (long-running, enables reuse-db)"
     Write-Host "  test-down      Stop test environment (preserves DB for reuse-db)"
     Write-Host "  test-logs      Follow test environment logs"
@@ -151,7 +151,7 @@ function Invoke-TestRecreate {
 }
 
 # Run the fast test gate in the test container (auto-starts the test DB if not
-# running). Excludes the nightly `seed` suite (~1,054s of ~1,350s) so a full dev
+# running). Excludes the `seed` suite (~1,054s of ~1,350s) so a full dev
 # iteration runs in ~300s. For the complete suite use `test-all`; for a fresh schema
 # use `test-recreate`.
 function Invoke-Test {
@@ -163,7 +163,7 @@ function Invoke-Test {
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 
-# Run the COMPLETE test suite (includes the nightly `seed` suite, ~35min). Use
+# Run the COMPLETE test suite (includes the `seed` suite, ~35min). Use
 # this only when a change touches seeding or image generation code paths.
 function Invoke-TestAll {
     $env:COMPOSE_PROJECT_NAME = $TestProject

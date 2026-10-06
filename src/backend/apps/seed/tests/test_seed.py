@@ -423,7 +423,7 @@ class TestImageGeneratorTruthfulness:
     single ``-small`` variant and report a half-written state as complete, so
     ``generate`` manufactured rows pointing at files that were never written.
 
-    Every test does a real encode, so it is ``seed``-marked (nightly / full
+    Every test does a real encode, so it is ``seed``-marked (ci-seed / full
     suite); the C-1 manifest tripwire needs no DB and no encode and is
     ``unit``-marked so it runs in the fast gate.
     """

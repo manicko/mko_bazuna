@@ -18,8 +18,8 @@ Use `.\Makefile.ps1` in PowerShell 7+:
 | Task | Command |
 |---|---|
 | Dev up (web :8000 + test DB :5433) | `.\Makefile.ps1 up` |
-| Fast test gate (skips nightly `seed` tests) | `.\Makefile.ps1 test` |
-| Full suite (incl. nightly `seed`) | `.\Makefile.ps1 test-all` |
+| Fast test gate (skips `seed` tests) | `.\Makefile.ps1 test` |
+| Full suite (incl. `seed`) | `.\Makefile.ps1 test-all` |
 | Fresh test schema (after migration changes) | `.\Makefile.ps1 test-recreate` |
 | Stop test environment | `.\Makefile.ps1 test-down` |
 
