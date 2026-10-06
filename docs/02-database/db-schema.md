@@ -764,7 +764,7 @@ language (VARCHAR(5), nullable, default 'bs')   # Saved-search query language: s
 created_at (TIMESTAMP)
 updated_at (TIMESTAMP, auto_now=True)          # last-modified (plan 16 / FND-001)
 last_notified_at (TIMESTAMP, nullable)          # last time this search produced a notification
-unsubscribe_token (VARCHAR(40), unique, db_index, nullable)  # opaque capability token (32 URL-safe chars); resolved under transaction.atomic() + select_for_update() in alerts.py _resolve_owned to prevent lost-update races on the unsubscribe toggle
+unsubscribe_token (VARCHAR(40), unique, db_index, nullable)  # opaque capability token (32 URL-safe chars); resolved under transaction.atomic() + select_for_update() in telegram_bot/services/alerts.py _resolve_owned to prevent lost-update races on the unsubscribe toggle
 
 Index: IX_saved_searches_user_active (user_id, is_active)
 db_table: saved_searches

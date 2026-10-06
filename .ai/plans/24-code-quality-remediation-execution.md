@@ -83,6 +83,130 @@ Carried forward from the source plan §0.2.2, restated against the tree. **Uncha
 
 ---
 
+## 0.6 Execution status log (appended by the Tech Lead, 2026-10-05; completed 2026-10-06)
+
+**This plan is complete for every executable block.** Eleven of thirteen blocks are committed
+(`B-10` ships nothing by design; `B-13` remains `blocked`). The table below is the authoritative
+final status; it was re-derived with `git log --all --oneline | Select-String "10-CQ-"` on
+2026-10-06.
+
+| Block | Finding | Status | Commit |
+|---|---|---|---|
+| `B-1` | `CQ-017.1/.2`, `CQ-007` residue | **COMMITTED** | `72599594` (`10-CQ-017`) |
+| `B-2` | `CQ-006` | **COMMITTED** | `7b2662a6` (`10-CQ-006`) |
+| `B-3` | `CQ-018` (URL half) | **COMMITTED** | `cdbdbb75` (`10-CQ-018`) |
+| `B-4` | `CQ-003` | **COMMITTED** | `6d37b5db` (`10-CQ-003`) |
+| `B-5` | `CQ-013` | **COMMITTED** | `65f2e783` (`10-CQ-013`) |
+| `B-6` | `CQ-016` | **COMMITTED** | `6236f7d0` (`10-CQ-016`) |
+| `B-7` | `CQ-004` | **COMMITTED** | `4f81711e` (`10-CQ-004`) |
+| `B-8` | `CQ-014` | **COMMITTED** | `c6c98518` (`10-CQ-014`) |
+| `B-9` | `CQ-002` (alerts half) | **COMMITTED** | `29a1db94` (`10-CQ-002`) |
+| `B-10` | `CQ-012` | **CLOSED** — decision-only, zero commits (see §3 B-10 RESULT) | — |
+| `B-11` | `CQ-015` | **COMMITTED** | `f2ffb39e` (`10-CQ-015`) |
+| `B-12` | `CQ-011` | **COMMITTED** | `910b66d4` (`10-CQ-011`) |
+| `B-13` | `CQ-001` | **BLOCKED** — four unmet preconditions | — |
+
+**No executable block remains.** `B-13` does not start until phase 03 BLOCK 5 and phase 15
+`AUTHZ-007` land. `B-10` ships nothing. New findings discovered during execution are recorded in
+§0.6.3.
+
+### 0.6.1 Audit corrections for the remaining blocks (Auditor, 2026-10-05)
+
+Five corrections to the block text below, each independently verified against HEAD. **The
+corrections win over the block prose where they disagree; the binding constraints and acceptance
+criteria of each block are unchanged.**
+
+1. **`B-3` anchor imprecision — the `/change/` redirect is in `approve_ad`, not
+   `moderation_review`.** `moderation_review` returns `render(...)` only and has **no redirect at
+   all**. The hardcoded `/admin/ads/ad/{ad_id}/change/` redirect lives inside `approve_ad`, which
+   the block already lists as a *read-only reference* — it is now also a **target**. The three
+   edit targets are therefore `approve_ad`, `reject_ad`, `ban_user` in
+   `apps/moderation/views/review.py`, plus the changelist `href` in
+   `templates/analytics/moderation_dashboard.html`. `reverse` is **not** currently imported;
+   add `from django.urls import reverse`. Both `admin:ads_ad_change` and `admin:ads_ad_changelist`
+   **resolve at HEAD** (verified via the dev Django shell). **Plan 19 `B-2` has landed and has not
+   touched `review.py` or `review.html` since this plan was written** — the external ordering
+   dependency is satisfied and the `B-4` template-collision risk is dormant.
+2. **`B-4` — the defect is verbatim live; `TestModerationReviewLocking` asserts token presence,
+   not a count** (`"transaction.atomic" in source` and `"select_for_update" in source` for
+   `reject_ad` and `ban_user`). `moderation_review`'s context is a **single key** (`{"ad": ad}`);
+   `G-4a`(a) extracts that one-key contract. `answer`/the four reject tests post
+   `reason_category="spam_scam"` (a valid member). The template has **not** been touched by plan
+   19. `CategoryRejectReason` has exactly the 8 members the block lists, values matching the
+   template's 8 `<option>` literals byte-for-byte.
+3. **`B-9` — a second source-inspection class must be re-pointed: `TestResolveOwnedConcurrency`.**
+   Plan §5.1 names only `TestResolveOwnedLocking`, but `TestResolveOwnedConcurrency` (same test
+   module) also imports `_resolve_owned` **from the handler** and turns red if the function moves
+   without it. Both classes are re-pointed at `telegram_bot/services/alerts.py` in the same commit.
+   Exactly **two** ORM sites exist (`get_user_saved_searches`, `_resolve_owned`); `select_for_update()`
+   is the first statement **inside** `with transaction.atomic():`. The plan's claim that phase 01
+   `ENT-005` "shipped `login.py`" is inaccurate — `services/login.py` does not exist — but the
+   binding constraint ("do not create it") still holds. `SET LOCAL lock_timeout` remains absent;
+   **option (c) — byte-preserved lock shape — is the resolution** per §4.1.
+4. **`B-12` — `Q1` must reconcile slug-matching vs localized-name-matching, not only a cutoff.**
+   `ads/views/listings.py::_suggest_category` matches **category slugs** via a direct
+   `Category.objects.filter(...).values_list("slug")` query, whereas `search/views/search.py`'s
+   ladder matches **localized names** from `category_fuzzy.get_active_category_names`. The shared
+   "one name list" premise does not hold as-is for the ads site. Current graph:
+   `search → categories`, `search → ads` (the latter introduced by B-11 `f2ffb39e`), and **no**
+   `ads → search` edge (which `Q1`(b) would create). Post-B-2, the fuzzy neighbourhood holds no
+   bare locale literal. `TestFuzzyEquivalence` re-derives `0.8` and must stay **byte-unchanged**.
+5. **`test_i18n_completeness.py` path correction.** Several `tests_to_run` lists name
+   `src/backend/tests/test_i18n_completeness.py`; the file actually lives at
+   **`src/backend/apps/ads/tests/test_i18n_completeness.py`**. The fast gate still exercises it.
+
+### 0.6.2 Gate rulings applied to the remaining blocks
+
+Per §4.0 (standing instruction: take the recommended option; stop interrupting the owner), the
+remaining technical gates are decided as follows and are binding on the Implementor:
+
+| Gate | Block | Ruling applied |
+|---|---|---|
+| `G-4a` | `B-4` | **Option (a)** — extract `moderation_review`'s one-key context into a module-private helper; `reject_ad` re-renders with the error and the preserved `reason_category`/`reason_text`. |
+| `Q1` | `B-12` | **Option (a)** — ladder in `apps/categories/services/fuzzy.py` with the name list **injected**; no new `ads → search` edge. `_suggest_category` injects its slug list; the search ladder injects `get_active_category_names`. |
+| `Q7` | `B-12` | **Option (b)** — `suggest_city` stays separate; its surviving `0.6` **must be justified in the commit body** as an entity-specific divergence from the ruled `0.8`. |
+
+### 0.6.3 Execution result and new findings (Tech Lead, 2026-10-06)
+
+**Result.** `B-3` → `B-4` → `B-9` → `B-12` all landed, one commit per block, in the ruled order
+(`cdbdbb75`, `6d37b5db`, `29a1db94`, `910b66d4`). The final fast gate is green
+(`.\Makefile.ps1 test`: 3448 passed, `seed` skipped). No migration was written; no
+`AdvisoryLockId` member was touched; no `type: ignore` was added, removed or narrowed; no
+source-inspection test was deleted or relaxed; `TestFuzzyEquivalence` is byte-unchanged and
+green (project rule 2 invoked zero times). `B-13` remains blocked.
+
+**Deviations from the block prose, recorded (all within the blocks' binding constraints):**
+
+1. **`B-4` — the reject-modal `<option>` list stays hardcoded markup.** `G-4a`(a)'s mechanism is
+   the shared `_review_context` builder; sourcing the option list from the enum would require
+   editing the read-only `apps/core/enums.py` (a `B-2`-only file) or adding a labels API, and
+   binding constraint 5 forbids a generic enum-in-template mechanism. The vocabulary is still
+   enforced at the boundary. An invalid category cannot match any option by construction, so the
+   select resets to its prompt; the raw value is preserved in the context and the typed comment
+   is repopulated in the textarea. One new msgid (not two), per §5.1's i18n obligation.
+2. **`B-9` — a third `_resolve_owned` test site was re-pointed.**
+   `test_lock_timeout_boundary.py::TestResolveOwnedLockTimeout` both imports `_resolve_owned`
+   from the handler and patches the handler's `SavedSearch` reference; it is re-pointed at
+   `telegram_bot/services/alerts.py` in the same commit with its assertion unchanged. §0.6.1
+   item 3 named only the two `test_unsubscribe.py` classes.
+3. **`B-12` — the new module is `apps/categories/services/fuzzy.py`** per the `Q1`(a) ruling,
+   holding `match_category(query, candidates)` (exact tier + fuzzy tier) and
+   `CATEGORY_FUZZY_CUTOFF = 0.8`. The listings did-you-mean gains the exact-match tier; the
+   search side still loads its one cached name list from `get_active_category_names`.
+
+**New findings discovered during execution — recorded, NOT fixed (each is outside every block's
+closed file surface):**
+
+| # | Finding | Evidence | Suggested routing |
+|---|---|---|---|
+| NF-1 | `templates/admin/moderation/review.html`'s relative form actions are off by one level under the trailing-slash URL: from `/moderation/review/<id>/`, `../approve/<id>/` resolves to `/moderation/review/approve/<id>/` (404), `../` to `/moderation/review/`, etc. The queue links to the admin change page, not the review page, so the broken surface is currently unreachable from the UI. | RFC 3986 resolution verified with `urljoin`; `apps/moderation/urls.py` serves `review/<int:ad_id>/`; no template or view references `moderation:review`. | New block: fix the four form actions + back link (`../../…`) or re-point them at `{% url %}`. |
+| NF-2 | A fourth fuzzy site: `telegram_bot/handlers/ad_create/city.py` calls `difflib.get_close_matches(..., cutoff=0.6)` inline for city names. `Q7`(b) ruled only the web `suggest_city`; this bot site is a different tier and was outside `B-12`'s surface. | Source read; absent from every block's file list. | New finding: decide whether bot city matching joins a shared city-fuzzy helper or stays entity-specific with a named constant. |
+| NF-3 | The checked-in locale catalogs are stale: a full `makemessages` extraction surfaces an unrelated untranslated msgid (`Password does not meet the password policy: %(errors)s`, from `create_admin_user.py`) with empty `ru`/`bs` `msgstr`. `B-4` hand-inserted only its new msgid to keep the diff scoped; the i18n gate is green. | Reproducible `makemessages` run during `B-4`. | Phase 25 / i18n owner: full catalog refresh and fill the missing translations. |
+| NF-4 | `apps/search/tests/test_search_slo.py::TestSearchResponseSLORegression` is a single-sample 2000 ms wall-clock bound and is load-flaky on this Windows/Docker host (2.7 s–6.2 s under load; passes when idle; unrelated to phase-10 changes). | Three independent runs, including with all phase-10 changes stashed. | Phase 11 / test-quality owner: mark it environment-sensitive or convert it to a load-run percentile. |
+| NF-5 | `uv run djlint` fails with `ModuleNotFoundError: djlint_custom_rules` (the module exists at `src/backend/djlint_custom_rules.py` and is declared in `pyproject.toml` but is not importable in the uv env); `PYTHONPATH=src/backend uv run djlint …` is clean. | Reproduced during `B-3`/`B-4`. | Tooling owner: fix the editable-install exposure or document the workaround in `.kilo/rules/commands.md`. |
+
+---
+
 ## 1. Reconciliation — all 16 original blocks
 
 ### 1.1 The table
