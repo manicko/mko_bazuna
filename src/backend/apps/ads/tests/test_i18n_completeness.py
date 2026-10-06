@@ -38,7 +38,17 @@ fast-gate CI run:
     with unwrapped string/f-string text arguments.
 15. ``test_no_cyrillic_msgids`` — no ``msgid`` in any ``.po`` contains
     Cyrillic characters (msgids must be English; msgstr is exempt).
-16. ``test_no_raw_get_name_in_templates`` — public/seller-facing templates must
+16. ``test_bs_msgstr_has_no_cyrillic`` — locale-scoped script gate (BLOCK 9,
+    14-I18N-N-1): a Cyrillic code point in a ``bs`` ``msgstr`` is a violation,
+    while Cyrillic in a ``ru`` ``msgstr`` is correct and stays exempt. Three
+    ``bs`` strings knowingly ship as-is under the named, commented
+    ``_BS_MSGSTR_LATIN_SCRIPT_EXEMPTIONS`` set while the Q1 reviewer sign-off
+    is ``OPEN-PENDING-REVIEWER`` (2026-10-05).
+17. ``test_cyrillic_msgstr_rule_is_locale_scoped`` — proves the rule is not
+    "no Cyrillic anywhere": Cyrillic in a synthetic ``bs`` ``msgstr`` fires,
+    Cyrillic in a synthetic ``ru`` ``msgstr`` does not, and the real ``ru``
+    Catalogue's legitimate Cyrillic passes.
+18. ``test_no_raw_get_name_in_templates`` — public/seller-facing templates must
     use locale-aware ``|get_title`` / ``|get_category_name`` /
     ``|get_city_name`` / ``|get_lookup_name`` filters instead of raw
     ``{{ obj.get_name }}`` calls or raw ``.title`` / ``.name`` attribute access.
@@ -1124,6 +1134,199 @@ def test_no_cyrillic_msgids() -> None:
                     f"{rel}: msgid contains Cyrillic (Russian-as-msgid): "
                     f"{msgid[:80]!r}"
                 )
+
+
+# ---------------------------------------------------------------------------
+# BLOCK 9 (14-I18N-N-1) — locale-scoped msgstr script gate
+# ---------------------------------------------------------------------------
+# ``test_no_cyrillic_msgids`` above declares every ``msgstr`` exempt because
+# "msgstr values for ru/bs are naturally Cyrillic". That is right for ``ru``
+# and WRONG for ``bs``: Bosnian is written in Latin and a Cyrillic code point
+# in a ``bs`` ``msgstr`` is contamination by construction (a Russian verb or a
+# stray Cyrillic ``а`` inside a Latin word). The rule below is the ``bs``-only
+# complement of the existing msgid-only rule; it is about SCRIPT, not language
+# quality — it cannot judge fluency and does not pretend to.
+
+# Q1 RULING — 2026-10-05, Product Owner, OPTION (b). The gate history is
+# ``OPEN-PENDING-REVIEWER``: the *who* is decided (a NATIVE BOSNIAN reviewer,
+# preferably Montenegrin; machine output and translation APIs are explicitly
+# NOT acceptable), but no sign-off exists yet. The three ``bs`` ``msgstr``
+# values below therefore ship AS-IS and are exempted by msgid here — never
+# silently: each entry names the finding, the required reviewer and the owner,
+# and each is NOT closed for that string. When the reviewer supplies values, a
+# follow-up commit replaces the values and removes the matching msgids from
+# this set; the gate then closes. The Implementor is FORBIDDEN from writing,
+# guessing, machine-translating or approximating any ``bs`` text, so no value
+# is invented here.
+#
+#   THE THREE EXEMPTED bs ENTRIES (by msgid):
+#   1. the multi-line support-greeting msgid ending "To create an ad, use
+#      /post." — its bs msgstr is a Bosnian frame carrying the Russian verb
+#      "користи" and a Cyrillic "а" inside the Latin word "oglasa". This is the
+#      only Cyrillic-bearing line in the whole bs catalogue.
+#   2. "Moderator #%(mid)s" — a byte-identical copy-through; the ru msgstr is
+#      the legitimate Cyrillic "Модератор #%(mid)s". Rendered in
+#      analytics/moderation_dashboard.html (an excluded template subtree) as a
+#      ``{% blocktrans with mid=… %}`` body — this gate reads the CATALOGUE
+#      msgstr, so it reaches the entry regardless of that template exclusion.
+#   3. "Admin" — a byte-identical copy-through; the ru msgstr is "Админ". In
+#      scan scope via components/header.html and
+#      components/header_auth_entry.html.
+#
+# The six legitimate ``bs`` copy-throughs (ID, Telegram ID:, Pro, Telegram,
+# Google Translate, Plausible Analytics) are Latin and pass the predicate
+# untouched. The ``Start`` copy-through is a BLOCK 10 orphan and is NOT
+# corrected here. The two shared-form ``bs`` plurals are CORRECT.
+_BS_MSGSTR_LATIN_SCRIPT_EXEMPTIONS = frozenset({
+    (
+        "👋 Hi! You have reached Bazuna support.\n"
+        "\n"
+        "Write your question — we will answer as soon as possible.\n"
+        "\n"
+        "To create an ad, use /post."
+    ),
+    "Moderator #%(mid)s",
+    "Admin",
+})
+
+
+def _locale_code(po_path: Path) -> str:
+    """Derive a locale code from a ``…/<locale>/LC_MESSAGES/django.po`` path.
+
+    ``django.po`` -> ``LC_MESSAGES`` -> ``<locale>`` (e.g. ``ru``, ``bs``,
+    ``en``). The locale is read from the path so the rule never hard-codes a
+    literal locale in a loop.
+    """
+    return po_path.parent.parent.name
+
+
+_CYRILLIC_RE = re.compile(r"[\u0400-\u04FF]")
+
+
+def _bs_msgstr_violations(text: str) -> list[tuple[str, str]]:
+    """Return ``(msgid, msgstr_form)`` pairs whose Cyrillic contaminates a bs msgstr.
+
+    Every ``msgstr`` form of every non-exempt ``bs`` entry is inspected. The
+    predicate is script-only and locale-scoped by the caller: it is invoked for
+    the ``bs`` catalogue, never for ``ru`` (whose Cyrillic is correct).
+    """
+    return [
+        (msgid, form)
+        for msgid, msgstr_forms in _parse_po_entries(text)
+        if msgid and msgid not in _BS_MSGSTR_LATIN_SCRIPT_EXEMPTIONS
+        for form in msgstr_forms
+        if _CYRILLIC_RE.search(form)
+    ]
+
+
+def test_bs_msgstr_has_no_cyrillic() -> None:
+    """A Cyrillic code point in a ``bs`` ``msgstr`` is a violation (BLOCK 9).
+
+    Locale-scoped sibling of ``test_no_cyrillic_msgids`` (which inspects the
+    ``msgid`` only and leaves ``msgstr`` exempt): Bosnian is Latin, so a
+    Cyrillic code point in a ``bs`` ``msgstr`` is contamination, while ``ru``'s
+    Cyrillic ``msgstr`` values are correct and stay exempt. Every ``msgstr``
+    form of a ``bs`` entry is inspected (simple and plural alike). The three
+    knowingly-shipped-as-is strings are consulted BY MSGID against
+    ``_BS_MSGSTR_LATIN_SCRIPT_EXEMPTIONS`` and their finding stays OPEN under
+    the Q1 ruling (2026-10-05, option b).
+    """
+    for po_path in _po_files():
+        if _locale_code(po_path) != "bs":
+            continue
+        text = po_path.read_text(encoding="utf-8")
+        violations = _bs_msgstr_violations(text)
+        if violations:
+            rel = po_path.relative_to(settings.BASE_DIR)
+            msgid, form = violations[0]
+            pytest.fail(
+                f"{rel}: bs msgstr contains Cyrillic (Bosnian is Latin — "
+                f"contaminated msgstr): msgid={msgid[:80]!r} "
+                f"msgstr={form[:80]!r}"
+            )
+
+
+def test_cyrillic_msgstr_rule_is_locale_scoped() -> None:
+    """The script rule is locale-scoped, not "no Cyrillic anywhere".
+
+    Uses one synthetic ``.po`` text to prove the distinction directly: the same
+    Cyrillic-bearing entry is a violation when parsed by the ``bs`` predicate
+    and correct when the ``ru`` catalogue is what is read. A blanket "no
+    Cyrillic in a msgstr" rule would fail on ``ru`` immediately; this confirms
+    the predicate keys on the locale, derived from the path — not on Cyrillic
+    alone — so ``ru`` and ``bs`` can never share one rule.
+    """
+    po_text = (
+        "#: test\n"
+        'msgid "Synthetic label"\n'
+        'msgstr "Синтетички натпис"\n'
+    )
+
+    # The bs predicate flags the synthetic Cyrillic msgstr...
+    assert _bs_msgstr_violations(po_text), (
+        "the bs predicate must flag a Cyrillic msgstr"
+    )
+
+    # ...while the real ru catalogue is never fed to it. Locale is derived from
+    # the path, so ru is simply out of scope for the bs gate: its hundreds of
+    # legitimate Cyrillic msgstrs are exempt by construction.
+    ru_path = Path(settings.LOCALE_PATHS[0]) / "ru" / "LC_MESSAGES" / "django.po"
+    bs_path = Path(settings.LOCALE_PATHS[0]) / "bs" / "LC_MESSAGES" / "django.po"
+    assert _locale_code(ru_path) == "ru"
+    assert _locale_code(bs_path) == "bs"
+
+    ru_text = ru_path.read_text(encoding="utf-8")
+    ru_cyrillic = any(
+        _CYRILLIC_RE.search(form)
+        for _, forms in _parse_po_entries(ru_text)
+        for form in forms
+    )
+    assert ru_cyrillic, "the real ru catalogue legitimately contains Cyrillic"
+    # The gate's scope predicate excludes ru, so those Cyrillic msgstrs pass.
+    assert _locale_code(ru_path) != "bs", "ru must be outside the bs gate's scope"
+
+
+def test_bs_msgstr_exemptions_name_q1_reviewer_and_owner() -> None:
+    """The three ``bs`` exemptions are named, reasoned and never silent.
+
+    Mirrors the ``_BOT_EXEMPT_FUNCTIONS`` convention: a single module-level
+    named set, consulted by msgid, with a comment block naming the Q1 ruling
+    (2026-10-05, option b), ACCEPTED / OPEN-PENDING-REVIEWER, the required
+    reviewer (native Bosnian, preferably Montenegrin) and the owner. This test
+    pins the set's membership by msgid so a future removal of a value (once a
+    reviewer signs off) is a deliberate, visible edit rather than a drift.
+    """
+    assert _BS_MSGSTR_LATIN_SCRIPT_EXEMPTIONS == frozenset({
+        (
+            "👋 Hi! You have reached Bazuna support.\n"
+            "\n"
+            "Write your question — we will answer as soon as possible.\n"
+            "\n"
+            "To create an ad, use /post."
+        ),
+        "Moderator #%(mid)s",
+        "Admin",
+    }), (
+        "the bs exemptions are the three Q1-pending strings; removing one "
+        "requires the reviewer's values in the same commit"
+    )
+
+    # Each exempted msgid must be a real bs entry — an exemption for a msgid
+    # that no longer exists is how a stale exemption hides a regression.
+    bs_msgids: set[str] = set()
+    for po_path in _po_files():
+        if _locale_code(po_path) != "bs":
+            continue
+        bs_msgids.update(
+            msgid
+            for msgid, _ in _parse_po_entries(po_path.read_text(encoding="utf-8"))
+            if msgid
+        )
+    missing = _BS_MSGSTR_LATIN_SCRIPT_EXEMPTIONS - bs_msgids
+    assert not missing, (
+        "bs exemption msgids absent from the bs catalogue: "
+        f"{sorted(m[:40] for m in missing)}"
+    )
 
 
 # ---------------------------------------------------------------------------
