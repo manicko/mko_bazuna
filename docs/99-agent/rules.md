@@ -234,6 +234,7 @@ A dedicated `i18n` CI job runs `compilemessages` + these tests on every push.
 - `.mo` files are **not** in version control (`.gitignore` line 55) — build-time artifacts
 - DB-based i18n (`components/feature_tag.html` via `get_lookup_name`) is exempt from the completeness gate
 - Scan scope excludes `admin/` staff templates, `analytics/moderation_dashboard.html`, and `components/feature_tag.html`; the excluded set is kept in sync with the `_BOT_EXEMPT_FUNCTIONS` / `exclude_subpaths` definitions in `test_i18n_completeness.py`
+- **Model metadata is an explicit exemption (14-I18N-013 Option A):** `verbose_name` / `help_text` on Django model fields are not scanned and are deliberately not wrapped in `gettext_lazy`. The exemption is unconditional, adds no catalogue entry, and leaves the admin tests asserting English field text unchanged. It sits alongside the three template exclusions above and, like them, is not a silent omission.
 
 ## Performance Discipline
 

@@ -13,7 +13,7 @@ related:
   - db-categories
   - db-enums
   - architecture
-  - i18n-translation-pipeline-gap-analysis
+  - rules
 ---
 
 ## Purpose
@@ -22,7 +22,7 @@ Authoritative implementation architecture for the **multilingual (i18n) feature*
 (commit `f661532`). It complements the product-level language decisions in
 [`technical-specification.md > §G`](technical-specification.md) (content language, search, city match)
 and the operational extraction/compile pipeline in
-[`../99-agent/i18n-translation-pipeline-gap-analysis.md`](../99-agent/i18n-translation-pipeline-gap-analysis.md).
+[`../99-agent/rules.md`](../99-agent/rules.md) (§"i18n Pipeline").
 
 This document is the single source of truth for the **runtime and behavioral mechanics** of
 localization: per-request language resolution, per-user Telegram language, category/city/entity
@@ -46,7 +46,9 @@ automated completeness gate. Schema fields are summarized here; column-level det
 
 ## Runtime Language Resolution (Web UI)
 
-`LANGUAGE_CODE = "ru"` (L55), `USE_I18N = True` (L56), `LANGUAGES = [("ru","Russian"),("bs","Bosnian"),("en","English")]` (L57-61), and `LOCALE_PATHS = [BASE_DIR / "backend" / "locale"]` (L62) in `config/settings/base.py`.
+`LANGUAGE_CODE = "ru"`, `USE_I18N = True`,
+`LANGUAGES = [("ru","Russian"),("bs","Bosnian"),("en","English")]`, and
+`LOCALE_PATHS = [BASE_DIR / "backend" / "locale"]` in `config/settings/base.py`.
 
 Language is resolved per request by a single custom authority —
 `LanguagePreMiddleware` (`apps/core/middleware/language.py`) — which calls
@@ -58,12 +60,33 @@ is NOT in `MIDDLEWARE`.**
 | 1 (highest) | `?lang=<code>` query parameter | GET param `lang` |
 | 2 | Persisted choice | `lang_pref` cookie (1-year max age) |
 | 3 | Browser hint | `Accept-Language` header |
-| 4 (default) | System default | `ru` |
+| 4 (default) | System default | `settings.LANGUAGE_CODE` (`ru`) |
 
-The resolved code is normalized by `LanguageLocale.from_code()` (accepts `en-US` → `en`, falls back
-to `bs` when unsupported). A session key `django_language` is also written. The active language is
+**Normalisation for all three sources.** Every source is normalised through
+`LanguageLocale.from_code` (`apps/core/enums.py`) before it reaches the single typed sink
+`LanguagePreMiddleware._set_language_code`, which accepts a `LanguageLocale` member (never a raw
+`str`) and activates it. There is no branch that passes a raw string to the sink, so
+`request.LANGUAGE_CODE` is always a member of `settings.LANGUAGES`. A non-canonical BCP-47 tag
+(`en-US`, `ru-RU`, `de-DE`) therefore resolves to a supported locale; an unsupported code falls back
+to `LanguageLocale.BOSNIAN`.
+
+**`Accept-Language` q-value rule.** `_parse_accept_language` parses the header with Django's
+`parse_accept_lang_header`, iterates members in descending `q` order, and **skips any member whose
+`q == 0`** ("not acceptable"). It returns the first tag that maps to a `LanguageLocale` member; when
+the header is present but no tag is supported, resolution falls back to `LanguageLocale.BOSNIAN`.
+An absent or empty header returns `None`, and `process_request` then falls back to
+`settings.LANGUAGE_CODE` (`ru`), normalised through `LanguageLocale.from_code`.
+
+**Session write is not unconditional.** On the `?lang=` path only, when the base tag is an
+explicitly supported code, the middleware persists the preference to the `lang_pref` cookie and, for
+an **authenticated** user whose session is available, writes the `django_language` session key. An
+unsupported `?lang=` value is logged and does **not** write the cookie or session; it resolves to the
+Bosnian fallback for that request only. The `lang_pref` `set_cookie` in `process_response` is the
+authoritative server-side writer — the language switcher no longer writes it from JavaScript.
+
+The active language is
 exposed to templates via `LANGUAGE_CODE` through the `apps.core.context_processors.language`
-context processor (`apps/core/context_processors.py` L22-24).
+context processor (`apps/core/context_processors.py`).
 
 Templates read `LANGUAGE_CODE` to select the locale passed to the name-localization filters (see
 [Category / city name localization](#category-city-entity-name-localization)).
@@ -80,7 +103,7 @@ Templates read `LANGUAGE_CODE` to select the locale passed to the name-localizat
 
 ## Per-User Language (Telegram Bot)
 
-`User.telegram_language` (`apps/users/models.py` L102-107) is a required `CharField(max_length=5,
+`User.telegram_language` (`apps/users/models.py`) is a required `CharField(max_length=5,
 default=LanguageLocale.RUSSIAN.value)` whose `choices` are the `LanguageLocale` values. It is the
 single source of truth for the language a seller receives in Telegram, and is **not null/blank**
 (default `"ru"`). Added in `apps/users/migrations/0005_user_telegram_language.py` (depends on
@@ -140,9 +163,9 @@ fallback for `LookupItem`).
 
 | Model | `get_name(locale)` fallback | Location |
 |---|---|---|
-| `Category` | locale → `ru` → `name` | `apps/categories/models.py` L53-62 |
-| `City` | locale → `ru` → `name` | `apps/locations/models.py` L45-54 |
-| `LookupItem` | locale → `ru` → `slug` | `apps/lookups/models.py` L88-96 |
+| `Category` | locale → `ru` → `name` | `apps/categories/models.py` |
+| `City` | locale → `ru` → `name` | `apps/locations/models.py` |
+| `LookupItem` | locale → `ru` → `slug` | `apps/lookups/models.py` |
 
 Templates do **not** call `get_name` directly. They use the `localized_content` template-tag filters
 (`apps/core/templatetags/localized_content.py`), each taking an explicit `locale` and implementing
@@ -157,12 +180,12 @@ Templates do **not** call `get_name` directly. They use the `localized_content` 
 | `get_description` | `(ad, locale=LanguageLocale.RUSSIAN)` | `ad.get_description(locale)` |
 
 Per-ad content lives in `Ad.title` (Russian base) / `Ad.title_en` / `Ad.title_bs` and the matching
-`description_*` columns (`apps/ads/models.py` L43-75). `Ad.get_title(locale)` iterates
-`[f"title_{locale}", "title"]` returning the first truthy value; `get_description(locale)` is
-analogous (`apps/ads/models.py` L464-487).
+`description_*` columns (`apps/ads/models.py`). `Ad.get_title(locale)` iterates
+`[f"title_{locale}", "title"]` returning the first truthy value; `Ad.get_description(locale)` is a
+separate method with the analogous behaviour, both on the `Ad` model in `apps/ads/models.py`.
 
 Entity-suggestion matching threads the locale explicitly: `get_entity_suggestions(prefix,
-limit=5, locale=LanguageLocale.RUSSIAN)` (`apps/search/services/entity_suggestions.py` L36-38) resolves category and
+limit=5, locale=LanguageLocale.RUSSIAN)` (`apps/search/services/entity_suggestions.py`) resolves category and
 city labels via `get_name(locale)`, so autocomplete matches the active UI language.
 
 ## Feature Tag Rendering (Catalog + Detail)
@@ -213,7 +236,7 @@ column and PostgreSQL text-search configuration:
 | `bs` | `simple` | `search_vector_bs` |
 | `en` | `english` | `search_vector_en` |
 
-(`apps/core/enums.py` L187-237.) The buyer's resolved `LANGUAGE_CODE` selects the vector column
+(`apps/core/enums.py`, `LanguageLocale`). The buyer's resolved `LANGUAGE_CODE` selects the vector column
 and config; category names are indexed per language via `name_i18n->>'bs'` / `->>'en'` (falling
 back to the Russian `name`) at `weight 'C'`. No query-time translation occurs (decision G).
 
@@ -229,7 +252,10 @@ category:submenu:<tree_version>:<slug>:<locale>
 - `<tree_version>` — atomic counter in `apps.categories.cache` (`category:tree_version`), bumped
   by `Category` / `CategoryPath` save+delete signals, so a single increment invalidates all
   cached submenus.
-- `<locale>` — `request.LANGUAGE_CODE or "ru"` (resolved by `LanguagePreMiddleware`).
+- `<locale>` — built via
+  `LanguageLocale.from_code(request.LANGUAGE_CODE, fallback=LanguageLocale.RUSSIAN).value`
+  (`apps/categories/views.py`, `category_submenu`), so the segment is a normalised supported code
+  rather than the raw `request.LANGUAGE_CODE` attribute.
 - TTL 300 s (`SUBMENU_CACHE_TTL`) with a 60 s stale-serve window (`SUBMENU_CACHE_STALE_TTL`)
   and a 30 s single-flight lock (`SUBMENU_CACHE_LOCK_TTL`); the fragment is cached via
   `category_submenu()` in `apps/categories/views.py`, which calls
@@ -238,13 +264,46 @@ category:submenu:<tree_version>:<slug>:<locale>
 The locale segment is the key correctness property: without it, a Russian submenu render would be
 reused for a Bosnian visitor.
 
+**Cache / `Vary` contract.** The cache key above carries the locale explicitly, so the fragment does
+not rely on HTTP content negotiation. The `Vary` behaviour is documented in the
+`LanguagePreMiddleware` module docstring (`apps/core/middleware/language.py`): the middleware emits
+`Vary: Accept-Language` (plus `Content-Language`), which is its **only** `Vary` contribution and does
+**not** cover cookie-driven locale. On the real stack, `Vary: Cookie` reaches token-bearing responses
+**incidentally** via `CsrfViewMiddleware` (any template that called `get_token()`), while the two
+token-free HTMX fragments (`ads/partials/ad_list.html`, `categories/partials/mega_submenu.html`) can
+lose it. The middleware deliberately adds no `Vary: Cookie` today; making it deliberate is deferred
+until a shared cache is introduced. See the module docstring for the full contract.
+
+## Timezone and Date Localization
+
+Display timezone is `TIME_ZONE = "Europe/Podgorica"`, a hard-coded literal beside `LANGUAGE_CODE` in
+`config/settings/base.py`. It is **not** read through `env()`, has **no** `ALLOWED_ENV_VARS` entry and
+no `.env*.example` line (Product Owner ruling Q4, 2026-10-03). `USE_TZ` stays Django's default
+(`True`), so stored timestamps remain UTC-aware and only presentation moves to the display timezone.
+
+Dates are rendered through Django's locale-aware `date` filter using named format attributes, so each
+string follows the active locale's formats:
+
+| Template | Format attribute |
+|---|---|
+| `ads/detail.html` | `DATE_FORMAT` |
+| `analytics/seller_dashboard.html` | `DATE_FORMAT` |
+| `ads/partials/ad_list.html` | `SHORT_DATE_FORMAT` |
+| `cabinet/search_history.html` | `DATETIME_FORMAT` |
+
+Two templates also render a machine-readable `<time datetime="…">` attribute built with the literal
+`date:'Y-m-d'` pattern (`ads/detail.html` and `ads/partials/ad_list.html`). That attribute is
+**ISO-8601 and locale-independent by design** — it is not converted to the display timezone and not
+localized, because it exists for machines (HTML semantics, crawlers), not for readers. Only the
+human-visible text beside it uses the localized format attributes above.
+
 ## Localized Notifications
 
 Bot alerts (saved-search / new-matching-ad notifications) are localized to the recipient's
 preference rather than the request locale. `build_alert_message(ad, saved_search, locale=...)`
-(`apps/search/services/immediate_alerts.py` L96-142) wraps every `gettext` call in
+(`apps/search/services/immediate_alerts.py`) wraps every `gettext` call in
 `translation_override(locale)`, and `locale` is read per-recipient from
-`User.telegram_language` in `_build_payload` (L145-161), defaulting to Russian:
+`User.telegram_language` in `_build_payload`, defaulting to Russian:
 
 ```
 locale = getattr(user, "telegram_language", None) or LanguageLocale.RUSSIAN.value
@@ -262,10 +321,10 @@ containerised deployment. Its advisory lock (`AdvisoryLockId.ALERT_DELIVERY_TASK
 durable daily marker ([`db-schema.md`](../02-database/db-schema.md#scheduler_daily_state-singleton)),
 which records the day only after every daily command exits 0, so a restart mid-day does not
 re-fire the set.
- `_format_digest` (L187-203) accepts a `locale` parameter, wraps its `gettext()` call in
+ `_format_digest` accepts a `locale` parameter, wraps its `gettext()` call in
 `translation_override(locale)`, and renders each ad title via `ad.get_title(locale)` (truncated to
-50 characters) instead of the Russian-only `ad.title`. The call site (`_send_user_digests`,
-L140-185) resolves `locale` per recipient from `user.telegram_language` (defaulting to
+50 characters) instead of the Russian-only `ad.title`. The call site (`_send_user_digests`)
+resolves `locale` per recipient from `user.telegram_language` (defaulting to
 `LanguageLocale.RUSSIAN.value`); the msgid `"New ads matching your saved searches ({count} found):\n"`
 is extracted and translated in all three `.po` files (ru, bs, en).
 
@@ -290,9 +349,13 @@ timeout, a circuit breaker (3 failures → 60 s cooldown), and an LRU cache. No 
 Russian vector is built from this translated content,
 `to_tsvector('russian', …)` is correct for `search_vector_ru`.
 
-> Egress is a best-effort, non-identifying content transfer — see
-> [`../96-researches/i18n-translation-egress.md`](../96-researches/i18n-translation-egress.md)
-> and [`technical-specification.md §G`](technical-specification.md).
+> Egress is a best-effort, non-identifying content transfer — see the
+> [Translation Egress](#translation-egress) contract above and
+> [`technical-specification.md §G`](technical-specification.md).
+>
+> The former cross-reference here pointed at `../96-researches/i18n-translation-egress.md`; that
+> research note was **never committed** and the whole `docs/96-researches/` directory does not exist.
+> The contract it would have described is the section above, which is the live source of truth.
 
 ## Python-side `gettext` Usage
 
@@ -322,7 +385,7 @@ QLT-005 extended `_()` wrapping to the seven Telegram bot handler modules under
 
 The static extraction/compile pipeline (Makefile targets, Dockerfile + entrypoint
 `compilemessages`, `.po`/`.mo` layout under `backend/locale`, `.mo` git-ignored) is documented in
-[`../99-agent/i18n-translation-pipeline-gap-analysis.md`](../99-agent/i18n-translation-pipeline-gap-analysis.md).
+[`../99-agent/rules.md`](../99-agent/rules.md) (§"i18n Pipeline", "Workflow").
 This section records only the behavioral gate.
 
 **CI i18n gate** — a dedicated `i18n` job runs in `ci.yml` parallel to `build`/`test`/`lint`/
@@ -357,7 +420,12 @@ The gate was extended (QLT-005) with bot-handler i18n scanning — Part C of
 in `_()`, activated at runtime by `LanguageMiddleware` (FQ-001).
 
 The scan scope excludes the `admin/` staff subtree, the analytics/moderation dashboards, and
-`components/feature_tag.html` (DB-based i18n via `get_lookup_name`). `test_i18n_pipeline.py` adds
+`components/feature_tag.html` (DB-based i18n via `get_lookup_name`) — these three template
+exclusions mirror the `exclude_subpaths` tuple in `test_i18n_completeness.py`. **Model metadata is
+an explicit, unconditional exemption:** `verbose_name` / `help_text` on Django model fields are not
+scanned and are intentionally not wrapped in `gettext_lazy`. The exemption entails no catalogue
+entry and no runtime change; the admin tests asserting English field text are unchanged (14-I18N-013
+Option A). `test_i18n_pipeline.py` adds
 unit checks for `.po` existence, `msgstr` non-emptiness, the `component_tag` template filter, and
 `test_pot_creation_date_sync` — which asserts all three `.po` files share an identical
 `POT-Creation-Date` (since `makemessages` runs all locale flags in a single invocation).
@@ -365,10 +433,13 @@ unit checks for `.po` existence, `msgstr` non-emptiness, the `component_tag` tem
 > **Definition of Done (automatable):** every new visible UI string wrapped in `{% trans %}`; all
 > `{% trans %}` msgids extracted into `ru`/`bs`/`en` `.po`; `ru`+`bs` `msgstr` non-empty (`en`
 > follows Django convention — empty `msgstr` means the msgid is already English); `compilemessages`
-> succeeds; no raw `.get_name` calls in templates. See
-> [`../99-agent/i18n-definition-of-done-research.md`](../99-agent/i18n-definition-of-done-research.md)
-> for the full checklist — a pre-implementation research report whose identified gaps were
-> implemented in `f661532`; this spec is the authoritative current description.
+> succeeds; no raw `.get_name` calls in templates. The operational checklist lives in the
+> completeness gate above and in [`../99-agent/rules.md`](../99-agent/rules.md) (§"i18n Pipeline",
+> "Completeness gate"); this spec is the authoritative current description.
+>
+> The former cross-reference here pointed at `../99-agent/i18n-definition-of-done-research.md`; that
+> pre-implementation research report was **never committed** and no such file exists in
+> `docs/99-agent/`.
 
 ## Languages
 
@@ -385,4 +456,4 @@ unit checks for `.po` existence, `msgstr` non-emptiness, the `component_tag` tem
 - [`db-categories.md`](../02-database/db-categories.md) — submenu cache key `<locale>` segment.
 - [`db-enums.md`](../02-database/db-enums.md) — `LanguageLocale`.
 - [`architecture.md`](../99-agent/architecture.md) — two-process model (bot + web share the user language field).
-- [`i18n-translation-pipeline-gap-analysis.md`](../99-agent/i18n-translation-pipeline-gap-analysis.md) — operational extraction/compile pipeline + gettext inventory.
+- [`rules.md`](../99-agent/rules.md) — agent coding rules; the operational extraction/compile pipeline and the i18n `Completeness gate` (§"i18n Pipeline").
