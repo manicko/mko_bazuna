@@ -2,11 +2,12 @@
 Language Switcher Component for Mko Bazuna.
 
 Displays a dropdown with available languages (ru, bs, en).
-Selection sets the lang_pref cookie via JavaScript and navigates via ?lang=X parameter.
+Selection navigates via the ?lang=X parameter; the lang_pref cookie is written
+server-side by LanguagePreMiddleware.process_response, never by JavaScript.
 
 Dependencies:
   - {{ LANGUAGE_CODE }} from context processor (apps.core.context_processors.language)
-  - lang_pref cookie parsed by LanguagePreMiddleware (apps.core.middleware.language)
+  - lang_pref cookie written by LanguagePreMiddleware (apps.core.middleware.language)
 {% endcomment %}
 {% load i18n %}
 {% load dict_tags %}
@@ -44,28 +45,12 @@ Dependencies:
 (function() {
     'use strict';
 
-    const COOKIE_NAME = 'lang_pref';
-    const COOKIE_PATH = '/';
-    const COOKIE_MAX_AGE = 365 * 24 * 60 * 60; // 1 year in seconds
     const container = document.getElementById('lang-switcher');
     if (!container) return;
 
     const toggleBtn = container.querySelector('[data-lang-switcher-toggle]');
     const menu = container.querySelector('[data-lang-switcher-menu]');
     const links = container.querySelectorAll('[data-lang-switcher-link]');
-
-    /**
-     * Set a cookie with the given name, value, and options.
-     */
-    function setCookie(name, value, maxAge, path) {
-        var parts = [
-            encodeURIComponent(name) + '=' + encodeURIComponent(value),
-            'max-age=' + maxAge,
-            'path=' + path,
-            'SameSite=Lax'
-        ];
-        document.cookie = parts.join('; ');
-    }
 
     /**
      * Toggle dropdown visibility.
@@ -95,15 +80,11 @@ Dependencies:
         toggleDropdown();
     });
 
-    // On language link click: set cookie, then allow default navigation
+    // On language link click: close the dropdown and allow default navigation.
+    // The server writes lang_pref from the ?lang=X parameter (see the component
+    // doc comment); no cookie is written from JavaScript.
     links.forEach(function(link) {
-        link.addEventListener('click', function(e) {
-            var lang = link.getAttribute('data-lang');
-            {% if consent_preferences %}
-            if (lang) {
-                setCookie(COOKIE_NAME, lang, COOKIE_MAX_AGE, COOKIE_PATH);
-            }
-            {% endif %}
+        link.addEventListener('click', function() {
             // Allow default browser navigation (href carries ?lang=X)
             closeDropdown();
         });

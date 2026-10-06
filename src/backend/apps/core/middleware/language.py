@@ -27,9 +27,25 @@ Django's ``LocaleMiddleware`` is intentionally NOT used (see
 cookie (which is never set here) plus ``Accept-Language``, clobbering the value
 resolved above and ignoring both ``?lang=`` and the ``lang_pref`` cookie.
 
-This middleware also replaces ``LocaleMiddleware``'s response contract:
-``Vary: Accept-Language`` and ``Content-Language`` headers, keeping the
-behaviour forward-compatible with any future reverse proxy / page cache.
+This middleware also replaces part of ``LocaleMiddleware``'s response contract:
+it emits ``Vary: Accept-Language`` and ``Content-Language``. Those two headers
+are this middleware's ONLY contribution to the ``Vary`` contract, and they do
+not cover cookie-driven locale: a response whose language was resolved from the
+``lang_pref`` cookie still advertises only ``Accept-Language``.
+
+Cookie-driven locale is in fact already covered in the real stack, but
+INCIDENTALLY, not by anything declared here: ``CsrfViewMiddleware`` adds
+``Vary: Cookie`` on any response whose template called ``get_token()``, and the
+full page templates do render ``{% csrf_token %}``. So a ``Vary``-honouring
+cache already keys on the cookie today even though this middleware never says
+so. The property is fragile: the two token-free HTMX fragments
+(``ads/partials/ad_list.html`` and ``categories/partials/mega_submenu.html``)
+render no CSRF token, so a fragment can lose ``Vary: Cookie`` without notice.
+When a shared cache is introduced this must be made DELIBERATE rather than
+inherited from a CSRF side effect — either by adding ``Vary: Cookie`` to the
+cache contract explicitly or by ensuring every cached fragment is token-bearing
+— but this middleware must not add a ``Vary`` header today (14-I18N-012): the
+code is already correct, only the description was wrong.
 """
 
 from __future__ import annotations
@@ -108,11 +124,27 @@ class LanguagePreMiddleware(MiddlewareMixin):
     def process_response(self, request: HttpRequest, response: HttpResponse) -> HttpResponse:
         """Persist the ``lang_pref`` cookie and emit language response headers.
 
+        This ``set_cookie`` call is the AUTHORITATIVE ``lang_pref`` writer: it is
+        the only server-side write, it runs on every request that carried
+        ``?lang=``, and it is the writer under which the cookie's ``httponly``
+        attribute can safely be set (Q5 option (a), 14-I18N-009). The language
+        switcher no longer writes this cookie from JavaScript.
+
         The cookie value is stored on the request during ``process_request``
-        and applied here where we have access to the response object. The
-        ``Vary``/``Content-Language`` headers replicate the contract that
-        Django's ``LocaleMiddleware.process_response`` provided, so the
-        behaviour is preserved for any future reverse proxy / page cache.
+        and applied here where we have access to the response object. The cookie
+        carries the project's own security policy rather than Django's defaults:
+        ``secure`` and ``samesite`` are read from ``settings.SESSION_COOKIE_*``
+        so ``prod.py``'s strictness and ``dev.py``/``test.py``'s relaxation keep
+        applying, and ``httponly=True`` hides the preference from
+        ``document.cookie``.
+
+        The ``Vary: Accept-Language`` / ``Content-Language`` headers are this
+        middleware's only ``Vary`` contribution and do not cover cookie-driven
+        locale. ``Vary: Cookie`` reaches the real response incidentally, via
+        ``CsrfViewMiddleware`` on token-bearing templates — see the module
+        docstring for the fragility this leaves in the token-free HTMX
+        fragments and for what must be made deliberate when a shared cache is
+        introduced.
         """
         cookie_value = getattr(request, "_lang_cookie_value", None)
         if cookie_value is not None:
@@ -120,6 +152,9 @@ class LanguagePreMiddleware(MiddlewareMixin):
                 LANGUAGE_COOKIE_NAME,
                 cookie_value,
                 max_age=LANGUAGE_COOKIE_MAX_AGE,
+                secure=settings.SESSION_COOKIE_SECURE,
+                samesite=settings.SESSION_COOKIE_SAMESITE,
+                httponly=True,
             )
         patch_vary_headers(response, ("Accept-Language",))
         response.headers.setdefault("Content-Language", translation.get_language())

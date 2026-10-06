@@ -16,6 +16,8 @@ import pytest
 from django.conf import settings
 from django.contrib.auth.models import AnonymousUser
 from django.http import HttpRequest, HttpResponse
+from django.test import override_settings
+from django.urls import reverse
 from django.utils import translation
 
 from apps.core.enums import LanguageLocale
@@ -313,6 +315,99 @@ def test_cookie_set_when_lang_param_used(middleware: LanguagePreMiddleware) -> N
     assert "Accept-Language" in response.headers.get("Vary", "")
     assert response.headers.get("Content-Language") == "bs"
     assert request.LANGUAGE_CODE == "bs"
+
+
+@override_settings(SESSION_COOKIE_SECURE=True, SESSION_COOKIE_SAMESITE="Strict")
+def test_cookie_carries_project_security_attributes(
+    middleware: LanguagePreMiddleware,
+) -> None:
+    """The lang_pref cookie carries the project's secure/samesite/httponly policy.
+
+    ``lang_pref`` was the only project cookie opting out of every
+    ``SESSION_COOKIE_*``/``CSRF_COOKIE_*`` attribute the project sets. The
+    middleware's ``set_cookie`` is now the authoritative writer (Q5 option (a))
+    and reads ``secure``/``samesite`` from settings rather than writing literals,
+    so ``prod.py``'s strictness and ``test.py``'s relaxation keep applying.
+
+    ``SESSION_COOKIE_*`` is pinned here (the base settings already do this in
+    production) so the assertion is not vacuously true under the test settings'
+    ``SESSION_COOKIE_SECURE = False`` relaxation — and so the values are proven
+    to be READ from settings, not hard-coded. ``httponly`` is safe because no
+    client-side code reads the cookie.
+    """
+    request = _make_request(get={"lang": "bs"})
+    response = HttpResponse()
+    middleware.process_request(request)
+    middleware.process_response(request, response)
+
+    cookie = response.cookies["lang_pref"]
+    # Read from settings, never a literal: Django's Morsel stores Secure as ""
+    # when False and True when set, so compare the flag's truthiness.
+    assert bool(cookie["secure"]) == settings.SESSION_COOKIE_SECURE
+    assert cookie["samesite"] == settings.SESSION_COOKIE_SAMESITE
+    assert cookie["httponly"] is True
+    # The hardening must not alter the name, max_age or written value.
+    assert cookie.value == "bs"
+    assert int(cookie["max-age"]) == LANGUAGE_COOKIE_MAX_AGE
+    # Vary stays byte-identical to the pre-block contract: this block adds no header.
+    assert "Accept-Language" in response.headers.get("Vary", "")
+    assert "Cookie" not in response.headers.get("Vary", "")
+    assert response.headers.get("Content-Language") == "bs"
+    assert request.LANGUAGE_CODE == "bs"
+
+
+def test_cookie_security_attributes_track_settings(
+    middleware: LanguagePreMiddleware,
+) -> None:
+    """secure/samesite follow SESSION_COOKIE_* rather than a literal.
+
+    Proves the values are read from settings: with the prod values pinned the
+    emitted cookie carries ``Secure`` and ``SameSite=Strict``; with the test
+    relaxation the ``Secure`` flag is absent. A hard-coded literal could not
+    satisfy both.
+    """
+    request = _make_request(get={"lang": "bs"})
+    response = HttpResponse()
+    middleware.process_request(request)
+    middleware.process_response(request, response)
+
+    cookie = response.cookies["lang_pref"]
+    with override_settings(SESSION_COOKIE_SECURE=True, SESSION_COOKIE_SAMESITE="Strict"):
+        strict_request = _make_request(get={"lang": "bs"})
+        strict_response = HttpResponse()
+        middleware.process_request(strict_request)
+        middleware.process_response(strict_request, strict_response)
+    strict_cookie = strict_response.cookies["lang_pref"]
+
+    assert bool(strict_cookie["secure"]) is True
+    assert strict_cookie["samesite"] == "Strict"
+    assert bool(cookie["secure"]) is False
+    assert cookie["samesite"] == settings.SESSION_COOKIE_SAMESITE
+
+
+@override_settings(SESSION_COOKIE_SECURE=True, SESSION_COOKIE_SAMESITE="Strict")
+def test_lang_param_sets_cookie_without_consent_context(client) -> None:
+    """?lang=bs sets lang_pref end-to-end with NO consent context present.
+
+    Under Q5 option (a) the server write is the authoritative writer: the
+    language switcher no longer writes the cookie from JavaScript, and it never
+    did unless ``consent_preferences`` was set. This drives the real middleware
+    stack (no ``consent_preferences`` cookie seeded) against a DB-free route and
+    asserts the cookie is still emitted — the case current tests do not cover.
+    The cookie must also carry ``httponly`` (safe because no client-side code
+    reads it) and the project's security policy; ``SESSION_COOKIE_*`` is pinned
+    so the values are proven to be read from settings, not hard-coded.
+    """
+    response = client.get(reverse("core:csp_report"), {"lang": "bs"})
+
+    assert "consent_preferences" not in client.cookies
+    assert "lang_pref" in response.cookies
+    cookie = response.cookies["lang_pref"]
+    assert cookie.value == "bs"
+    assert cookie["httponly"] is True
+    assert bool(cookie["secure"]) == settings.SESSION_COOKIE_SECURE
+    assert cookie["samesite"] == settings.SESSION_COOKIE_SAMESITE
+    assert int(cookie["max-age"]) == LANGUAGE_COOKIE_MAX_AGE
 
 
 def test_cookie_not_set_when_no_lang_param(middleware: LanguagePreMiddleware) -> None:
