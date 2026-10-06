@@ -405,19 +405,28 @@ Definition of Done on every fast-gate run:
 | `test_mo_compiled` | `.mo` exists for every `.po` |
 | `test_template_extraction_coverage` | msgids extracted from `{% trans %}`/`{{ _("…") }}`/`{% blocktrans %}` templates each exist in all three `.po` files |
 | `test_hreflang_present` | every page template renders `<link rel="alternate" hreflang>` (via `components/locale_head.html` partial, I18N-004) |
+| `test_hreflang_include_in_every_page_template` | source-level: every in-scope non-partial page template contains the `components/locale_head.html` include (BLOCK 8 / 14-I18N-008) |
 | `test_plural_forms` | each `.po` `Plural-Forms` header matches CLDR rules |
 | `test_locale_switch_re_render` | `?lang=bs` content re-renders in the Bosnian locale |
-| `test_bot_no_hardcoded_messages` | (QLT-005) AST-scans `telegram_bot/handlers/*.py` for user-facing Bot/API method calls (`.answer()`, `.reply()`, `.edit_text()`, etc.) whose text arg is a bare string literal or f-string rather than a `_()` call |
+| `test_bot_no_hardcoded_messages` | (QLT-005) AST-scans **all of `src/telegram_bot` except `tests/`** (widened by BLOCK 8 / 14-I18N-006) for user-facing Bot/API method calls (`.answer()`, `.reply()`, `.edit_text()`, etc.) whose text arg is a bare string literal or f-string rather than a `_()` call |
 | `test_no_cyrillic_msgids` | (QLT-005) no `msgid` in any `.po` file contains Cyrillic characters; msgids must be English |
+| `test_bs_msgstr_has_no_cyrillic` | (BLOCK 9 / N-1) locale-scoped sibling of `test_no_cyrillic_msgids`: a Cyrillic code point in a **`bs` `msgstr`** is a violation (Bosnian is Latin), every `msgstr` form inspected; `ru`'s legitimate Cyrillic stays exempt. The three knowingly-shipped-as-is strings are consulted by msgid against the named `_BS_MSGSTR_LATIN_SCRIPT_EXEMPTIONS` set (Q1 ruling 2026-10-05, option b — `OPEN-PENDING-REVIEWER`) |
+| `test_reverse_stale_entry_gate` | (BLOCK 11 / 14-I18N-014) reverse of `test_extraction_completeness`: every catalogue msgid must exist in a real in-process source extraction (Python `ast` + full-root template scan) — a msgid that leaves the source must not linger. The wrapped multi-line msgid is compared as its joined string (parsed, never regexed). The three runtime-live `_lazy` strings are exempted by the single `_EXTRACTION_GAP_MSGIDS` definition |
+| `test_no_obsolete_entries_in_any_catalogue` | (BLOCK 11 / 14-I18N-014, `test_i18n_pipeline.py`) zero `#~` obsolete blocks in **every** catalogue (post-prune target is zero; the pre-prune `7/7/1` justified the block but is not the invariant asserted) |
 | `test_title_tags_translated` | Page `<title>` tags localize per language |
 | `test_plural_forms_runtime` | `{% blocktrans count %}` selects correct CLDR plural form at runtime |
 | `test_all_languages_ltr` | All configured languages use LTR scripts; `LANGUAGE_BIDI` is False for ru/bs/en |
 | `test_no_hardcoded_js_strings` | Inline `<script>` blocks contain no untranslated prose string literals |
-| `test_bot_no_raw_model_field_access` | AST-scans bot `handlers/` and `services/` for raw `.name`/`.title`/`.description` access |
-The gate was extended (QLT-005) with bot-handler i18n scanning — Part C of
-`test_i18n_completeness.py` AST-scans `telegram_bot/handlers/` and
-`telegram_bot/services/` to enforce that all user-facing bot strings are wrapped
-in `_()`, activated at runtime by `LanguageMiddleware` (FQ-001).
+| `test_bot_no_raw_model_field_access` | AST-scans the widened bot scope (all of `src/telegram_bot` except `tests/`) for raw `.name`/`.title`/`.description` access |
+Part C of `test_i18n_completeness.py` AST-scans the widened bot scope — all of
+`src/telegram_bot` except `tests/` (BLOCK 8 / 14-I18N-006), which reaches the
+`middlewares/` package (including the locale-activating `language.py`), `retry.py`,
+`states.py`, `main.py`, the `schemas/` package and the nine-module
+`handlers/ad_create/` package — to enforce that all user-facing bot strings are
+wrapped in `_()`, activated at runtime by `LanguageMiddleware` (FQ-001).
+User-facing strings that are deliberately not translated are listed once in the
+named exemption sets (`_BOT_EXEMPT_FUNCTIONS`, `_BS_MSGSTR_LATIN_SCRIPT_EXEMPTIONS`,
+`_EXTRACTION_GAP_MSGIDS`) and consulted by symbol, never by line number.
 
 The scan scope excludes the `admin/` staff subtree, the analytics/moderation dashboards, and
 `components/feature_tag.html` (DB-based i18n via `get_lookup_name`) — these three template
@@ -426,9 +435,11 @@ an explicit, unconditional exemption:** `verbose_name` / `help_text` on Django m
 scanned and are intentionally not wrapped in `gettext_lazy`. The exemption entails no catalogue
 entry and no runtime change; the admin tests asserting English field text are unchanged (14-I18N-013
 Option A). `test_i18n_pipeline.py` adds
-unit checks for `.po` existence, `msgstr` non-emptiness, the `component_tag` template filter, and
+unit checks for `.po` existence, `msgstr` non-emptiness, the `component_tag` template filter,
+the plural-aware parser case (`test_parse_po_entries_reports_blank_non_final_form`, BLOCK 7), and
 `test_pot_creation_date_sync` — which asserts all three `.po` files share an identical
-`POT-Creation-Date` (since `makemessages` runs all locale flags in a single invocation).
+`POT-Creation-Date` (since `makemessages` runs all locale flags in a single invocation) — plus the
+durable obsolete-symmetry assertion `test_no_obsolete_entries_in_any_catalogue` (BLOCK 11).
 
 > **Definition of Done (automatable):** every new visible UI string wrapped in `{% trans %}`; all
 > `{% trans %}` msgids extracted into `ru`/`bs`/`en` `.po`; `ru`+`bs` `msgstr` non-empty (`en`
