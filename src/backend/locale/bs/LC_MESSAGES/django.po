@@ -29,10 +29,6 @@ msgstr "Nevalidni ID oglasa. Upotreba: /copy <ad_id>"
 msgid "You can only copy your own ads."
 msgstr "Možeš kopirati samo svoje oglase."
 
-#, python-brace-format
-msgid "Failed to copy ad: {error}"
-msgstr "Ne uslovi kopiranje oglasa: {error}"
-
 msgid "Failed to copy ad."
 msgstr "Nije uspjelo kopiranje oglasa."
 
@@ -409,9 +405,6 @@ msgstr "Odaberite željeni jezik:"
 msgid "Unsupported language."
 msgstr "Nepodržani jezik."
 
-msgid "Please login first."
-msgstr "Prvo se prijavite."
-
 #, python-format
 msgid "Language set to %(lang)s"
 msgstr "Jezik postavljen na %(lang)s"
@@ -449,9 +442,6 @@ msgstr "Vaš nalog je ograničen. Kontaktirajte podršku za pomoć."
 
 msgid "Your account has been deleted."
 msgstr "Vaš nalog je izbrisan."
-
-msgid "Consent declined: you can browse but cannot post. Contact still works."
-msgstr "Suglasnost odbijena: pregled samo, kontakt i dalje radi."
 
 msgid ""
 "Consent declined: you can browse but cannot post. You can change this from "
@@ -549,12 +539,6 @@ msgid ""
 "The reject reason is not valid. Select one of the listed reasons and try "
 "again."
 msgstr "Razlog odbijanja nije važeći. Odaberite jedan od navedenih razloga i pokušajte ponovo."
-
-msgid ""
-"Cannot approve: the ad owner has reached the maximum number of active ads."
-msgstr ""
-"Ne može se odobriti: vlasnik oglasa je dostigao maksimalan broj aktivnih "
-"oglasa."
 
 #, python-brace-format
 msgid "New ads matching your saved searches ({count} found):\n"
@@ -855,10 +839,6 @@ msgstr "Da li ste mislili:"
 
 msgid "Clear all filters"
 msgstr "Očisti sve filtere"
-
-#, python-format
-msgid "Price: %(min)s–%(max)s"
-msgstr "Cijena: %(min)s–%(max)s"
 
 msgid "Purpose:"
 msgstr "Namjena:"
@@ -1440,30 +1420,8 @@ msgstr "Podneti žalbu nadzornom organu."
 msgid "6. Erasure and Retention"
 msgstr "6. Brisanje i zadržavanje"
 
-msgid ""
-"When you withdraw consent, your account and its advertisements are\n"
-"                soft-deleted immediately. All personal data is permanently "
-"erased\n"
-"                within <strong>30 days</strong> of withdrawal. Consent state "
-"is otherwise\n"
-"                retained for 12 months, after which you are re-prompted."
-msgstr ""
-"Kada povučete pristanak, vaš nalog i njegove oglase odmah će biti obrisani "
-"(soft-delete). Svi lični podaci će biti trajno izbrisani u roku od 30 dana "
-"od povlačenja. Stanje pristanka će inače biti zadržano 12 meseci, nakon čega "
-"ćete biti ponovo upitani."
-
 msgid "7. Manage Your Consent"
 msgstr "7. Upravljajte vašim pristanakom"
-
-msgid "You can revisit and change your consent choices at any time. Use the"
-msgstr ""
-"Možete ponovo posetiti i promeniti vaše izbore pristanka u bilo koje vreme. "
-"Koristite"
-
-msgid "link to open the consent banner, or contact us on Telegram at"
-msgstr ""
-"link da otvorite banner pristanka, ili kontaktirajte nas putem Telegrama na"
 
 msgid "You can revisit and change your consent choices at any time. A decline is reversible: choose to accept again and posting is restored."
 msgstr ""
@@ -1536,18 +1494,6 @@ msgstr "Molimo pošaljite vaše pitanje kao tekstualnu poruku."
 msgid "Your request has been received. Reference: %(ref)s"
 msgstr "Vaš zahtjev je primljen. Referenca: %(ref)s"
 
-msgid "Start"
-msgstr "Start"
-
-msgid "Language"
-msgstr "Jezik"
-
-msgid "Post ad"
-msgstr "Objavi oglas"
-
-msgid "Alerts"
-msgstr "Obavještenja"
-
 #, python-format
 msgid "[%(ref)s] New support request"
 msgstr "[%(ref)s] Novi zahtjev za podršku"
@@ -1579,10 +1525,6 @@ msgstr ""
 msgid "Ad not found"
 msgstr "Oglas nije pronađen"
 
-#: src/telegram_bot/handlers/ad_create/submit.py
-msgid "Your draft expired and was deleted. Please start again with /post."
-msgstr "Vaš nacrt oglasa je istekao i obrisan. Molimo ponovo pokrenite /post."
-
 #: src/backend/apps/ads/views/edit.py
 msgid "This ad cannot be edited in its current status."
 msgstr "Ovaj oglas se ne može uređivati u trenutnom statusu."
@@ -1611,40 +1553,6 @@ msgstr ""
 "Jedna od vaših fotografija više nije dostupna. Pripremljen je novi nacrt — "
 "ponovo učitajte fotografiju koja nedostaje, zatim pošaljite „done“."
 
-
-#~ msgid ""
-#~ "We need your consent to process the Telegram name and username you "
-#~ "provided for account identification and ad publishing.\n"
-#~ "\n"
-#~ "Essential functions (login, contact) always work. Declining consent means "
-#~ "browse-only mode: you can browse ads and contact sellers but cannot "
-#~ "publish."
-#~ msgstr ""
-#~ "Potreban nam je vaš pristanak da obradimo Telegram ime i korisničko ime "
-#~ "koje ste naveli za identifikaciju naloga i objavljivanje oglasa.\n"
-#~ "\n"
-#~ "Osnovne funkcije (prijava, kontakt) uvijek rade. Odbijanje pristanka "
-#~ "znači samo za pregledanje: možete pregledavati oglase i kontaktirati "
-#~ "prodače, ali ne možete objavljivati."
-
-#~ msgid ""
-#~ "Login successful! Browse-only mode is active: you can browse ads and "
-#~ "contact sellers, but cannot publish."
-#~ msgstr ""
-#~ "Prijava usječna! Aktivan je režim samo za pregledanje: možete "
-#~ "pregledavati oglase i kontaktirati prodače, ali ne možete objavljivati."
-
-#~ msgid "Decline"
-#~ msgstr "Odbij"
-
-#~ msgid "User not found. Please try logging in again."
-#~ msgstr "Korisnik nije pronađen. Pokušajte ponovo da se prijavite."
-
-#~ msgid "Mko Bazuna"
-#~ msgstr "Mko Bazuna"
-
-#~ msgid "Login to Mko Bazuna"
-#~ msgstr "Prijava na Mko Bazuna"
 
 #: src/backend/templates/privacy.html
 msgid ""
@@ -1769,13 +1677,6 @@ msgid "To manage ads, please accept the personal data storage consent first."
 msgstr ""
 "Da biste upravljali oglasima, prvo prihvatite saglasnost za pohranu ličnih "
 "podataka."
-
-#~ msgid ""
-#~ "Withdrawing consent permanently erases your Telegram ID, all ads, and "
-#~ "prevents re-login. Are you sure?"
-#~ msgstr ""
-#~ "Povlačenjem soglasja trajno brišete vaš Telegram ID, sve oglase i sprečavate "
-#~ "ponovni priključak. Da li ste sigurni?"
 
 #: src/backend/apps/ads/admin.py
 msgid "Remove selected photos from the ad"

@@ -28,10 +28,6 @@ msgstr ""
 msgid "You can only copy your own ads."
 msgstr ""
 
-#, python-brace-format
-msgid "Failed to copy ad: {error}"
-msgstr ""
-
 msgid "Failed to copy ad."
 msgstr ""
 
@@ -341,9 +337,6 @@ msgstr ""
 msgid "Unsupported language."
 msgstr ""
 
-msgid "Please login first."
-msgstr ""
-
 #, python-format
 msgid "Language set to %(lang)s"
 msgstr ""
@@ -377,9 +370,6 @@ msgid "Your account is restricted. Contact support for assistance."
 msgstr ""
 
 msgid "Your account has been deleted."
-msgstr ""
-
-msgid "Consent declined: you can browse but cannot post. Contact still works."
 msgstr ""
 
 msgid ""
@@ -469,10 +459,6 @@ msgstr ""
 msgid ""
 "The reject reason is not valid. Select one of the listed reasons and try "
 "again."
-msgstr ""
-
-msgid ""
-"Cannot approve: the ad owner has reached the maximum number of active ads."
 msgstr ""
 
 #, python-brace-format
@@ -763,10 +749,6 @@ msgid "Did you mean:"
 msgstr ""
 
 msgid "Clear all filters"
-msgstr ""
-
-#, python-format
-msgid "Price: %(min)s–%(max)s"
 msgstr ""
 
 msgid "Purpose:"
@@ -1322,22 +1304,7 @@ msgstr ""
 msgid "6. Erasure and Retention"
 msgstr ""
 
-msgid ""
-"When you withdraw consent, your account and its advertisements are\n"
-"                soft-deleted immediately. All personal data is permanently "
-"erased\n"
-"                within <strong>30 days</strong> of withdrawal. Consent state "
-"is otherwise\n"
-"                retained for 12 months, after which you are re-prompted."
-msgstr ""
-
 msgid "7. Manage Your Consent"
-msgstr ""
-
-msgid "You can revisit and change your consent choices at any time. Use the"
-msgstr ""
-
-msgid "link to open the consent banner, or contact us on Telegram at"
 msgstr ""
 
 msgid "You can revisit and change your consent choices at any time. A decline is reversible: choose to accept again and posting is restored."
@@ -1405,18 +1372,6 @@ msgstr ""
 msgid "Your request has been received. Reference: %(ref)s"
 msgstr ""
 
-msgid "Start"
-msgstr ""
-
-msgid "Language"
-msgstr ""
-
-msgid "Post ad"
-msgstr ""
-
-msgid "Alerts"
-msgstr ""
-
 #, python-format
 msgid "[%(ref)s] New support request"
 msgstr ""
@@ -1438,10 +1393,6 @@ msgid ""
 msgstr ""
 
 msgid "Ad not found"
-msgstr ""
-
-#: src/telegram_bot/handlers/ad_create/submit.py
-msgid "Your draft expired and was deleted. Please start again with /post."
 msgstr ""
 
 #: src/backend/apps/ads/services/submission.py
@@ -1565,11 +1516,6 @@ msgstr ""
 #: src/backend/apps/ads/views/edit.py
 msgid "To manage ads, please accept the personal data storage consent first."
 msgstr ""
-
-#~ msgid ""
-#~ "Withdrawing consent permanently erases your Telegram ID, all ads, and "
-#~ "prevents re-login. Are you sure?"
-#~ msgstr ""
 
 #: src/backend/apps/ads/admin.py
 msgid "Remove selected photos from the ad"

@@ -187,7 +187,7 @@ makemigrations:
 	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py makemigrations
 
 makemessages:
-	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py makemessages -l ru -l bs -l en --no-location
+	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py makemessages -l ru -l bs -l en --no-location --no-obsolete
 
 compilemessages:
 	docker compose $(COMPOSE_FILES) run --rm web uv run python src/backend/manage.py compilemessages \

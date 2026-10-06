@@ -86,7 +86,7 @@ $dev = 'docker compose --env-file .env.dev -f docker-compose.yml -f docker-compo
 
 Extract (same flags as `make makemessages`):
 ```powershell
-$dev run --rm --no-deps --entrypoint "" web python src/backend/manage.py makemessages -l ru -l bs -l en --no-location
+$dev run --rm --no-deps --entrypoint "" web python src/backend/manage.py makemessages -l ru -l bs -l en --no-location --no-obsolete
 ```
 
 Compile (`.mo` gitignored — only needed manually after editing `.po`):

@@ -29,10 +29,6 @@ msgstr "Недопустимый ID объявления. Использован
 msgid "You can only copy your own ads."
 msgstr "Вы можете копировать только свои объявления."
 
-#, python-brace-format
-msgid "Failed to copy ad: {error}"
-msgstr "Не удалось скопировать объявление: {error}"
-
 msgid "Failed to copy ad."
 msgstr "Не удалось скопировать объявление."
 
@@ -417,9 +413,6 @@ msgstr "Выберите предпочитаемый язык:"
 msgid "Unsupported language."
 msgstr "Неподдерживаемый язык."
 
-msgid "Please login first."
-msgstr "Пожалуйста, войдите сначала."
-
 #, python-format
 msgid "Language set to %(lang)s"
 msgstr "Язык установлен: %(lang)s"
@@ -459,9 +452,6 @@ msgstr "Ваш аккаунт ограничен. Обратитесь в под
 
 msgid "Your account has been deleted."
 msgstr "Ваш аккаунт удалён."
-
-msgid "Consent declined: you can browse but cannot post. Contact still works."
-msgstr "Согласие отклонено: просмотр только, связь по-прежнему работает."
 
 msgid ""
 "Consent declined: you can browse but cannot post. You can change this from "
@@ -560,12 +550,6 @@ msgid ""
 "The reject reason is not valid. Select one of the listed reasons and try "
 "again."
 msgstr "Причина отклонения недействительна. Выберите одну из причин в списке и попробуйте снова."
-
-msgid ""
-"Cannot approve: the ad owner has reached the maximum number of active ads."
-msgstr ""
-"Нельзя одобрить: владелец объявления достиг максимального количества "
-"активных объявлений."
 
 #, python-brace-format
 msgid "New ads matching your saved searches ({count} found):\n"
@@ -867,10 +851,6 @@ msgstr "Вы хотели сказать:"
 
 msgid "Clear all filters"
 msgstr "Очистить все фильтры"
-
-#, python-format
-msgid "Price: %(min)s–%(max)s"
-msgstr "Цена: %(min)s–%(max)s"
 
 msgid "Purpose:"
 msgstr "Назначение:"
@@ -1458,30 +1438,8 @@ msgstr "Подать жалобу в контролирующий орган."
 msgid "6. Erasure and Retention"
 msgstr "6. Удаление и хранение"
 
-msgid ""
-"When you withdraw consent, your account and its advertisements are\n"
-"                soft-deleted immediately. All personal data is permanently "
-"erased\n"
-"                within <strong>30 days</strong> of withdrawal. Consent state "
-"is otherwise\n"
-"                retained for 12 months, after which you are re-prompted."
-msgstr ""
-"При отзыве согласия ваш аккаунт и его объявления немедленно удаляются (soft-"
-"delete). Все персональные данные безвозвратно удаляются в течение 30 дней с "
-"момента отзыва. Состояние согласия иначе хранится 12 месяцев, после чего вы "
-"снова запрашиваете согласие."
-
 msgid "7. Manage Your Consent"
 msgstr "7. Управление вашим согласием"
-
-msgid "You can revisit and change your consent choices at any time. Use the"
-msgstr ""
-"Вы можете в любой момент пересмотреть и изменить ваши предпочтения согласия. "
-"Используйте"
-
-msgid "link to open the consent banner, or contact us on Telegram at"
-msgstr ""
-"ссылку, чтобы открыть баннер согласия, или свяжитесь с нами через Telegram:"
 
 msgid "You can revisit and change your consent choices at any time. A decline is reversible: choose to accept again and posting is restored."
 msgstr ""
@@ -1554,18 +1512,6 @@ msgstr "Пожалуйста, отправьте ваш вопрос текст�
 msgid "Your request has been received. Reference: %(ref)s"
 msgstr "Ваш запрос получен. Номер обращения: %(ref)s"
 
-msgid "Start"
-msgstr "Старт"
-
-msgid "Language"
-msgstr "Язык"
-
-msgid "Post ad"
-msgstr "Разместить объявление"
-
-msgid "Alerts"
-msgstr "Уведомления"
-
 #, python-format
 msgid "[%(ref)s] New support request"
 msgstr "[%(ref)s] Новый запрос в поддержку"
@@ -1597,10 +1543,6 @@ msgstr ""
 msgid "Ad not found"
 msgstr "Объявление не найдено"
 
-#: src/telegram_bot/handlers/ad_create/submit.py
-msgid "Your draft expired and was deleted. Please start again with /post."
-msgstr "Черновик объявления истёк и был удалён. Пожалуйста, начните заново командой /post."
-
 #: src/backend/apps/ads/views/edit.py
 msgid "This ad cannot be edited in its current status."
 msgstr "Это объявление нельзя редактировать в его текущем статусе."
@@ -1629,42 +1571,6 @@ msgstr ""
 "Одна из ваших фотографий больше недоступна. Подготовлен новый черновик — "
 "загрузите отсутствующую фотографию снова, затем отправьте «done»."
 
-
-#~ msgid ""
-#~ "We need your consent to process the Telegram name and username you "
-#~ "provided for account identification and ad publishing.\n"
-#~ "\n"
-#~ "Essential functions (login, contact) always work. Declining consent means "
-#~ "browse-only mode: you can browse ads and contact sellers but cannot "
-#~ "publish."
-#~ msgstr ""
-#~ "Нам необходимо ваше согласие на обработку имени и имени пользователя "
-#~ "Telegram, которые вы предоставили для идентификации аккаунта и публикации "
-#~ "объявлений.\n"
-#~ "\n"
-#~ "Основные функции (вход, контакты) всегда работают. Отказ от согласия "
-#~ "означает режим просмотра только: вы можете просматривать объявления и "
-#~ "связываться с продавцами, но не можете публиковать."
-
-#~ msgid ""
-#~ "Login successful! Browse-only mode is active: you can browse ads and "
-#~ "contact sellers, but cannot publish."
-#~ msgstr ""
-#~ "Вход выполнен успешно! Режим только для просмотра: вы можете "
-#~ "просматривать объявления и связываться с продавцами, но не можете "
-#~ "публиковать."
-
-#~ msgid "Decline"
-#~ msgstr "Отклонить"
-
-#~ msgid "User not found. Please try logging in again."
-#~ msgstr "Пользователь не найден. Попробуйте войти снова."
-
-#~ msgid "Mko Bazuna"
-#~ msgstr "Mko Bazuna"
-
-#~ msgid "Login to Mko Bazuna"
-#~ msgstr "Вход в Mko Bazuna"
 
 #: src/backend/templates/privacy.html
 msgid ""
@@ -1790,13 +1696,6 @@ msgid "To manage ads, please accept the personal data storage consent first."
 msgstr ""
 "Чтобы управлять объявлениями, сначала примите согласие на хранение "
 "персональных данных."
-
-#~ msgid ""
-#~ "Withdrawing consent permanently erases your Telegram ID, all ads, and "
-#~ "prevents re-login. Are you sure?"
-#~ msgstr ""
-#~ "Отозвание согласия постоянно удаляет ваш Telegram ID, все объявления и "
-#~ "предотвращает повторный вход. Вы уверены?"
 
 #: src/backend/apps/ads/admin.py
 msgid "Remove selected photos from the ad"
