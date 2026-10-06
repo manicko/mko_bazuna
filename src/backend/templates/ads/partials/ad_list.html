@@ -159,7 +159,7 @@ is unaffected. {% endcomment %}
                             <span>{{ ad.city|get_city_name:LANGUAGE_CODE }}</span>
                             <span>{{ ad.category|get_category_name:LANGUAGE_CODE }}</span>
                             <time datetime="{{ ad.published_at|date:'Y-m-d' }}">
-                                {{ ad.published_at|date:'M d' }}
+                                {{ ad.published_at|date:'SHORT_DATE_FORMAT' }}
                             </time>
                         </div>
                     </div>

@@ -158,6 +158,12 @@ ALLOWED_HOSTS = env.list("ALLOWED_HOSTS", default=[])
 
 # Internationalization
 LANGUAGE_CODE = "ru"
+# Hard-coded literal, NOT read through ``env()``: the Product Owner ruling of
+# 2026-10-03 (Q4) fixed the marketplace's display timezone as Europe/Podgorica
+# and closed the env-overridability branch. There is deliberately no
+# ALLOWED_ENV_VARS entry and no .env*.example line. USE_TZ stays Django's
+# default (True), so stored timestamps are aware and only presentation moves.
+TIME_ZONE = "Europe/Podgorica"
 USE_I18N = True
 LANGUAGES = [
     ("ru", "Russian"),

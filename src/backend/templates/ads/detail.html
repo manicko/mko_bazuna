@@ -157,7 +157,7 @@
                             </div>
                             <div>
                                 <time datetime="{{ ad.published_at|date:'Y-m-d' }}">
-                                    {% trans "Published:" %} {{ ad.published_at|date:'M d, Y' }}
+                                    {% trans "Published:" %} {{ ad.published_at|date:'DATE_FORMAT' }}
                                 </time>
                             </div>
                         </div>

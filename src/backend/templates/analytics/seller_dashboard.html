@@ -84,7 +84,7 @@ Extends the same visual style as the main ads dashboard.
                             <tbody class="divide-y divide-gray-100">
                                 {% for metric in daily_metrics %}
                                     <tr class="hover:bg-gray-50">
-                                        <td class="px-6 py-3 whitespace-nowrap">{{ metric.date|date:"M d, Y" }}</td>
+                                        <td class="px-6 py-3 whitespace-nowrap">{{ metric.date|date:'DATE_FORMAT' }}</td>
                                         <td class="px-6 py-3">
                                             <a href="{% url 'ads:detail' metric.ad_id %}"
                                                class="text-blue-600 hover:underline">

@@ -14,6 +14,7 @@ from pathlib import Path
 
 import pytest
 
+from apps.core.enums import LanguageLocale
 from config.settings.tests import TEST_SECRET_KEY
 from config.settings.tests.test_prod_logging import (
     _prod_env_overrides,
@@ -321,4 +322,182 @@ def test_login_binding_name_and_secure_flag_agree_per_module() -> None:
             f"{env_name}: name {resolved['name']} and secure {resolved['secure']} "
             "disagree; a __Host- cookie without Secure is discarded by every "
             "conformant user agent"
+        )
+
+
+# The zone the Product Owner ruling of 2026-10-03 (Q4) fixed: hard-coded, not
+# env-overridable. ``django.conf.global_settings`` defaults ``TIME_ZONE`` to
+# "America/Chicago", so its absence from every settings module — not an explicit
+# America/Chicago — is the defect (14-I18N-004).
+_TIME_ZONE = "Europe/Podgorica"
+
+# One known UTC instant used to prove the calendar day itself moves with the
+# zone. Podgorica is UTC+1 in March (05:30 on the 16th); the America/Chicago
+# default is UTC-5 (23:30 on the 15th), so the day-flip is observable.
+_KNOWN_UTC_INSTANT = "2026-03-16T04:30:00+00:00"
+
+# Locale format NAMES, never pattern strings: the display templates now pass
+# these to the ``date`` filter, which resolves them through ``get_format``.
+_DISPLAY_FORMAT_NAMES = ("DATE_FORMAT", "SHORT_DATE_FORMAT", "DATETIME_FORMAT")
+
+# The two ISO ``<time datetime>`` attributes that are the machine-readable
+# contract and must not be swept into the display-format change (constraint 8).
+_ISO_DATETIME_TEMPLATES = (
+    "src/backend/templates/ads/detail.html",
+    "src/backend/templates/ads/partials/ad_list.html",
+)
+
+# Probe the resolved ``TIME_ZONE`` and localise the known instant with it, so the
+# assertion observes the zone's effect on presentation rather than the setting
+# name alone.
+_TIME_ZONE_PROBE_CODE = (
+    "import os; "
+    "import django; django.setup(); "
+    "import datetime; "
+    "from django.conf import settings; "
+    "from django.utils import timezone; "
+    "print('time_zone=' + repr(settings.TIME_ZONE)); "
+    "instant = datetime.datetime.fromisoformat(os.environ['PROBE_INSTANT']); "
+    "print('local=' + timezone.localtime(instant).isoformat())"
+)
+
+# Render each display format name in each supported locale and, beside it, the
+# same name resolved through ``get_format``. The pairs are compared in the test
+# so a typo in a format name — which the ``date`` filter silently passes through
+# as a literal instead of raising — fails the equality.
+_LOCALE_DISPLAY_FORMAT_PROBE_CODE = (
+    "import os; "
+    "import django; django.setup(); "
+    "import datetime; "
+    "from django.utils import timezone, translation; "
+    "from django.utils.formats import date_format; "
+    "instant = datetime.datetime.fromisoformat(os.environ['PROBE_INSTANT']); "
+    "local = timezone.localtime(instant); "
+    "names = os.environ['PROBE_FORMAT_NAMES'].split(','); "
+    "langs = os.environ['PROBE_LOCALES'].split(','); "
+    "\nfor lang in langs:\n"
+    "    translation.activate(lang)\n"
+    "    for name in names:\n"
+    "        expected = date_format(local, name)\n"
+    "        print(f'{lang}.{name}|' + date_format(local, name))\n"
+    "        print(f'{lang}.{name}.expected|' + expected)"
+)
+
+
+def _probe_time_zone(env_name: str) -> dict[str, str]:
+    """Resolve ``TIME_ZONE`` and the localised known instant for an env.
+
+    ``base`` is evaluated with production-like env vars so it imports cleanly;
+    ``dev``/``test`` use the ambient env (they skip .env reading). The probe
+    reads the resolved setting, so an ``env()``-sourced value would be observed.
+    """
+    if env_name == "base":
+        env = _prod_env_overrides()
+    else:
+        env = {k: v for k, v in os.environ.items()}
+        env["DJANGO_SECRET_KEY"] = TEST_SECRET_KEY
+    module_path = f"config.settings.{env_name}"
+    env["DJANGO_SETTINGS_MODULE"] = module_path
+    env["PROBE_INSTANT"] = _KNOWN_UTC_INSTANT
+    result = _run_in_subprocess(env, _TIME_ZONE_PROBE_CODE)
+    assert result.returncode == 0, result.stderr
+    resolved: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        key, _, value = line.partition("=")
+        resolved[key] = value
+    assert set(resolved) == {"time_zone", "local"}, (
+        f"the time-zone probe did not report every value for {env_name}: "
+        f"got {sorted(resolved)}"
+    )
+    return resolved
+
+
+def test_time_zone_is_the_hardcoded_ruled_value() -> None:
+    """``TIME_ZONE`` is the literal Europe/Podgorica under every module (14-I18N-004).
+
+    The Q4 ruling (Product Owner, 2026-10-03) fixed the zone as a hard-coded
+    value with no env surface. ``_prod_env_overrides`` starts from ``os.environ``,
+    so if the setting were read through ``env("TIME_ZONE", ...)`` an ambient
+    value would win — asserting the resolved setting catches that. ``dev`` and
+    ``test`` are probed too, because a per-module override would reintroduce the
+    drift the ruling closed.
+    """
+    for env_name in ("base", "dev", "test"):
+        resolved = _probe_time_zone(env_name)
+        assert resolved["time_zone"] == repr(_TIME_ZONE), resolved
+
+
+def test_known_instant_renders_to_the_expected_local_wall_time() -> None:
+    """A known UTC instant renders to the local wall time of Europe/Podgorica.
+
+    Under Django's ``America/Chicago`` default the calendar day itself is wrong
+    (2026-03-15), so this asserts the actual localised day, not merely that
+    ``America/Chicago`` is absent. The rendered value is compared to a
+    ``get_format``-derived expectation below, which is where the format
+    resolution is checked.
+    """
+    resolved = _probe_time_zone("base")
+    assert resolved["local"] == "2026-03-16T05:30:00+01:00", resolved
+
+
+def test_display_format_names_drive_the_templates_per_locale() -> None:
+    """The display templates' format names render as ``get_format`` dictates.
+
+    The ``date`` filter resolves a locale format NAME through ``get_format``; an
+    UNKNOWN name passes through as a literal and does NOT raise (the silent
+    defect this guards). The probe therefore renders each of the three names in
+    the four display templates under every ``LanguageLocale.values()`` member and
+    compares it to the expectation derived from ``get_format`` for that locale —
+    a typo in a name would leave the literal name in the output and fail here.
+    Iterating ``LanguageLocale.values()`` (not bare ``("ru", "bs", "en")``)
+    keeps this in step with the supported-locale set.
+    """
+    env = _prod_env_overrides()
+    env["PROBE_INSTANT"] = _KNOWN_UTC_INSTANT
+    env["PROBE_FORMAT_NAMES"] = ",".join(_DISPLAY_FORMAT_NAMES)
+    env["PROBE_LOCALES"] = ",".join(LanguageLocale.values())
+    result = _run_in_subprocess(
+        env,
+        _LOCALE_DISPLAY_FORMAT_PROBE_CODE,
+    )
+    assert result.returncode == 0, result.stderr
+    rendered: dict[str, str] = {}
+    expected: dict[str, str] = {}
+    for line in result.stdout.splitlines():
+        key, _, value = line.partition("|")
+        if key.endswith(".expected"):
+            expected[key.removesuffix(".expected")] = value
+        else:
+            rendered[key] = value
+    expected_keys = {
+        f"{lang}.{name}"
+        for lang in LanguageLocale.values()
+        for name in _DISPLAY_FORMAT_NAMES
+    }
+    assert set(rendered) == expected_keys, (
+        f"the locale-format probe did not report every (locale, name) pair: "
+        f"got {sorted(rendered)}"
+    )
+    for key in sorted(expected_keys):
+        assert rendered[key] == expected[key], (
+            f"{key}: rendered {rendered[key]!r} does not match the "
+            f"get_format-derived expectation {expected[key]!r} — an unknown "
+            "format name passes through as a literal instead of raising"
+        )
+
+
+def test_iso_datetime_attributes_are_byte_identical() -> None:
+    """The two ``<time datetime>`` ISO attributes keep their ``'Y-m-d'`` pattern.
+
+    Those attributes are the machine-readable contract (constraint 8), not
+    display strings. This asserts the literal source text ``|date:'Y-m-d'`` in
+    ``ads/detail.html`` and ``ads/partials/ad_list.html``, so a future sweep of
+    the display patterns cannot quietly convert the machine-readable value to a
+    locale format.
+    """
+    for rel_path in _ISO_DATETIME_TEMPLATES:
+        html = (_ROOT / rel_path).read_text(encoding="utf-8")
+        assert "datetime=\"{{ ad.published_at|date:'Y-m-d' }}\"" in html, (
+            f"{rel_path}: the ISO <time datetime> attribute no longer carries "
+            "the byte-identical 'Y-m-d' pattern"
         )

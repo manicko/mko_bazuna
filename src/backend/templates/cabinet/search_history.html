@@ -40,7 +40,7 @@ recent queries with a clear action. {% endcomment %}
                         <li class="flex items-center justify-between px-4 py-3">
                             <a href="{% url 'search:search' %}?q={{ entry.query|urlencode }}"
                                class="text-gray-800 hover:text-blue-600">{{ entry.query }}</a>
-                            <span class="text-xs text-gray-400">{{ entry.created_at|date:"M d, H:i" }}</span>
+                            <span class="text-xs text-gray-400">{{ entry.created_at|date:'DATETIME_FORMAT' }}</span>
                         </li>
                     {% endfor %}
                 </ul>
