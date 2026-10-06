@@ -84,10 +84,57 @@ Use this lightweight form instead — `--no-deps` skips the dependency chain, `-
 $dev = 'docker compose --env-file .env.dev -f docker-compose.yml -f docker-compose.dev.override.yml --project-name mko-bazuna-dev'
 ```
 
-Extract (same flags as `make makemessages`):
+### Extract — never extract against the tracked tree (safe scratch recipe)
+
+The in-place extraction command **MUTATES the tracked catalogs** in the working tree:
+
 ```powershell
+# ⚠️ MUTATES TRACKED FILES — extracts against the working tree's LOCALE_PATHS and rewrites
+# src/backend/locale/{ru,bs,en}/LC_MESSAGES/django.po. Do NOT run this for measurement/audit;
+# use the scratch recipe below.
 $dev run --rm --no-deps --entrypoint "" web python src/backend/manage.py makemessages -l ru -l bs -l en --no-location --no-obsolete
 ```
+
+**Why a scratch `LOCALE_PATHS` override is not enough (C-08-1).** `makemessages`'s directory walk
+inserts every discovered directory named `locale/` at index 0 of `self.locale_paths`
+(`django/core/management/commands/makemessages.py`, `find_files`). Because the tree contains
+`src/backend/locale`, that in-tree directory becomes the command's `default_locale_path`
+**independent of `settings.LOCALE_PATHS`**. Assigning `settings.LOCALE_PATHS` (post- **or**
+pre-`django.setup()`) therefore does **not** redirect the write — the tracked `.po` is still written.
+**Only a copy of the WHOLE source tree is safe.**
+
+**SAFE RECIPE — extract to scratch, never in place:**
+
+1. Copy the **WHOLE REPO tree** to a scratch directory **OUTSIDE the working tree** (matching the
+   image's `/app` walk root; walking a narrowed subtree instead gives a bogus extraction diff). Use
+   `git archive` for a byte-exact, tracked-only copy (excludes `.git`):
+   ```powershell
+   $scratch = Join-Path $env:TEMP "kilo\extract-$(Get-Date -Format yyyyMMdd_HHmmss)"
+   New-Item -ItemType Directory -Path $scratch | Out-Null
+   git archive HEAD | tar -x -C $scratch
+   ```
+2. Run `makemessages` **there**, from the scratch **repo root** (walk root `/app`, script
+   `src/backend/manage.py` — C-B06-1). The scratch tree has no `.env` (gitignored), so mount the
+   working tree's `.env.dev` read-only at the path settings expect (`BASE_DIR / ".env"` =
+   `/app/src/.env`) — the same mount `docker-compose.yml` uses. Use `--no-location --no-obsolete`
+   (DRIFT-1) so the diff is msgid/msgstr-only:
+   ```powershell
+   docker run --rm --entrypoint "" -w /app -v "$scratch`:/app" `
+     -v "$((Resolve-Path .env.dev).Path):/app/src/.env:ro" `
+     -e DJANGO_SETTINGS_MODULE=config.settings.dev `
+     -e PYTHONPATH=/app/src:/app/src/backend `
+     mko-bazuna-dev-web:latest `
+     python src/backend/manage.py makemessages -l ru -l bs -l en --no-location --no-obsolete `
+       --ignore=.venv --ignore=__pycache__
+   ```
+3. **Diff** the scratch `.po` msgid/msgstr sets against the tracked `.po` (e.g. via the canonical
+   parser `testing.i18n_helpers._parse_po_entries`) to enumerate the exact ADDED/REMOVED entries.
+4. **Apply ONLY the enumerated, targeted change** to the tracked catalogs **by hand**. Never copy
+   the raw scratch output verbatim — it can contain fuzzy merge artifacts that conflate distinct
+   msgids.
+
+The tracked tree must be untouched by steps 1-3: verify with
+`git status --short -- src/backend/locale` (empty). `.\Makefile.ps1 extract-messages` wraps steps 1-2.
 
 Compile (`.mo` gitignored — only needed manually after editing `.po`):
 ```powershell

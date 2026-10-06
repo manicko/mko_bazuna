@@ -56,6 +56,7 @@ function Show-Help {
     Write-Host "  format         Auto-fix lint issues (including import sorting) inside web container"
     Write-Host "  typecheck      Run basedpyright type checker inside web container"
     Write-Host "  lint-templates Run djlint on Django templates (host-side, PYTHONPATH=src/backend)"
+    Write-Host "  extract-messages  Extract translatable strings into a scratch tree (never in place; leaves scratch .po for diffing)"
     Write-Host "  profile        Run cProfile search-endpoint profiling harness (ITERATIONS/TOP/SORT env vars)"
     Write-Host "  shell          Open bash shell in web container"
     Write-Host "  migrate        Run database migrations (one-shot, advisory-locked)"
@@ -198,6 +199,36 @@ function Invoke-LintTemplates {
     $env:PYTHONPATH = "src/backend"
     uv run djlint src/backend/templates/
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+}
+
+# Extract translatable strings into a scratch tree OUTSIDE the working tree.
+# makemessages is a WRITE operation: run in place it rewrites the tracked
+# src/backend/locale/*/LC_MESSAGES/django.po (a scratch LOCALE_PATHS override does
+# NOT redirect it - see C-08-1 in .kilo/rules/commands.md). Copy the WHOLE repo
+# root via `git archive HEAD` (the authoritative walk root, matching the image's
+# /app; walking a narrowed subtree instead gives a bogus extraction diff) so only
+# the scratch tree is mutated. Leaves the scratch
+# .po files for diffing against the tracked catalogs; prints the scratch path.
+function Invoke-ExtractMessages {
+    $scratch = Join-Path $env:TEMP "kilo\extract-messages-$(Get-Date -Format yyyyMMdd_HHmmss)"
+    New-Item -ItemType Directory -Path $scratch | Out-Null
+    # Byte-exact, tracked-only copy of the whole repo root (excludes .git).
+    git archive HEAD | tar -x -C $scratch
+    if ($LASTEXITCODE -ne 0) { Write-Host "Error: failed to copy the repo tree to '$scratch'" -ForegroundColor Red; exit 1 }
+    Write-Host "Scratch tree: $scratch" -ForegroundColor Cyan
+    # Run from the scratch repo root (-w /app) so the walk spans both src/backend
+    # and src/telegram_bot; the host tracked tree is never touched. The scratch
+    # tree has no .env (gitignored), so mount the working tree's .env.dev
+    # read-only at the path settings expect (BASE_DIR/.env = /app/src/.env).
+    docker run --rm --entrypoint "" -w /app -v "$scratch`:/app" `
+        -v "$((Resolve-Path .env.dev).Path):/app/src/.env:ro" `
+        -e DJANGO_SETTINGS_MODULE=config.settings.dev `
+        -e PYTHONPATH=/app/src:/app/src/backend `
+        mko-bazuna-dev-web:latest `
+        python src/backend/manage.py makemessages -l ru -l bs -l en --no-location --no-obsolete `
+            --ignore=.venv --ignore=__pycache__
+    if ($LASTEXITCODE -ne 0) { Write-Host "Error: makemessages failed in the scratch tree" -ForegroundColor Red; exit $LASTEXITCODE }
+    Write-Host "Extracted .po files are in '$scratch\src\backend\locale' - diff them against the tracked catalogs." -ForegroundColor Green
 }
 
 # Run cProfile-based search-endpoint profiling harness (ITERATIONS/TOP/SORT env vars)
@@ -441,6 +472,7 @@ switch ($Target.ToLower()) {
     "format" { Invoke-Format }
     "typecheck" { Invoke-Typecheck }
     "lint-templates" { Invoke-LintTemplates }
+    "extract-messages" { Invoke-ExtractMessages }
     "profile" { Invoke-Profile }
     "load" { Invoke-Load }
     "shell" { Invoke-Shell }
