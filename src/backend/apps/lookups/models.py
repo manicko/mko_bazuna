@@ -87,7 +87,7 @@ class LookupItem(models.Model):
         ordering = ["group", "sort_order"]
         verbose_name = "lookup item"
 
-    def get_name(self, locale: str = LanguageLocale.RUSSIAN) -> str:
+    def get_name(self, locale: LanguageLocale = LanguageLocale.RUSSIAN) -> str:
         """Return the localized name with fallback chain: locale → ru → slug."""
         name_i18n = getattr(self, "name_i18n", None)
         if name_i18n:

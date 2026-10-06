@@ -530,7 +530,7 @@ class Ad(models.Model):
         self.save(update_fields=update_fields)
         return current
 
-    def get_title(self, locale: str = LanguageLocale.RUSSIAN) -> str:
+    def get_title(self, locale: LanguageLocale = LanguageLocale.RUSSIAN) -> str:
         """Return localized title for *locale* with a fallback to the Russian base.
 
         The Russian base lives in the ``title`` column (``title_ru`` is not a
@@ -542,7 +542,7 @@ class Ad(models.Model):
                 return val
         return ""
 
-    def get_description(self, locale: str = LanguageLocale.RUSSIAN) -> str:
+    def get_description(self, locale: LanguageLocale = LanguageLocale.RUSSIAN) -> str:
         """Return localized description for *locale* with a fallback to the Russian base.
 
         The Russian base lives in the ``description`` column

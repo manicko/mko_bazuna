@@ -19,7 +19,7 @@ from apps.search.schemas import AutocompleteSuggestion
 logger = logging.getLogger(__name__)
 
 
-def _category_path(category: Category, locale: str = LanguageLocale.RUSSIAN) -> str:
+def _category_path(category: Category, locale: LanguageLocale = LanguageLocale.RUSSIAN) -> str:
     """Build a root→leaf, human-readable path for a category suggestion.
 
     Uses ``get_ancestors(include_self=True)`` (root→leaf order) joined by
@@ -39,7 +39,7 @@ def _category_path(category: Category, locale: str = LanguageLocale.RUSSIAN) -> 
 
 
 def get_entity_suggestions(
-    prefix: str, limit: int = 5, locale: str = LanguageLocale.RUSSIAN
+    prefix: str, limit: int = 5, locale: LanguageLocale = LanguageLocale.RUSSIAN
 ) -> list[AutocompleteSuggestion]:
     """
     Get matching category and city names for autocomplete.

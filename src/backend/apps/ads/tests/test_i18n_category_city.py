@@ -19,8 +19,10 @@ from django.urls import reverse
 from django.utils import translation
 
 from apps.categories.models import Category
-from apps.core.enums import AdStatus
+from apps.core.context_processors import language as language_processor
+from apps.core.enums import AdStatus, LanguageLocale
 from apps.locations.models import City
+from apps.lookups.models import LookupGroup, LookupItem
 from apps.users.models import User
 from conftest import create_test_ad
 
@@ -239,3 +241,200 @@ class TestNonCanonicalCookieLocale:
         localized_city.refresh_from_db()
         assert localized_category.get_name(active) == "Prevoz"
         assert localized_city.get_name(active) == "Testgrad"
+
+
+@pytest.fixture
+def localized_lookup_item() -> LookupItem:
+    """Create a LookupItem with i18n names in all three locales."""
+    group = LookupGroup.objects.create(code="listing_purpose", name_i18n={})
+    return LookupItem.objects.create(
+        group=group,
+        slug="sell",
+        name_i18n={"ru": "Продать", "bs": "Prodati", "en": "Sell"},
+    )
+
+
+# Expected accessor value per locale for the shared fixtures. Parametrised from
+# ``LanguageLocale.values()`` so the expectation set and the enum cannot drift.
+_EXPECTED_CATEGORY = {
+    LanguageLocale.RUSSIAN: "Транспорт",
+    LanguageLocale.BOSNIAN: "Prevoz",
+    LanguageLocale.ENGLISH: "Transport",
+}
+_EXPECTED_CITY = {
+    LanguageLocale.RUSSIAN: "Тестград",
+    LanguageLocale.BOSNIAN: "Testgrad",
+    LanguageLocale.ENGLISH: "Testgrad",
+}
+_EXPECTED_LOOKUP = {
+    LanguageLocale.RUSSIAN: "Продать",
+    LanguageLocale.BOSNIAN: "Prodati",
+    LanguageLocale.ENGLISH: "Sell",
+}
+
+
+class TestAccessorsAcceptLanguageLocale:
+    """Every accessor returns the requested locale's value (VAL-003).
+
+    The annotation is ``LanguageLocale`` and the parameter is supplied as a
+    ``LanguageLocale`` member rather than a bare ``str``. Assertions read the
+    accessor's RETURNED VALUE, never rendered chrome — under test
+    ``settings.LANGUAGE_CODE`` is ``en`` and Django adds it as a catalogue
+    fallback, so a chrome assertion would be false-green.
+    """
+
+    @pytest.mark.parametrize("locale", list(LanguageLocale.values()))
+    def test_category_get_name(
+        self,
+        localized_category: Category,
+        locale: str,
+    ) -> None:
+        """``Category.get_name`` honours each ``LanguageLocale`` member."""
+        member = LanguageLocale(locale)
+        assert localized_category.get_name(member) == _EXPECTED_CATEGORY[member]
+
+    @pytest.mark.parametrize("locale", list(LanguageLocale.values()))
+    def test_city_get_name(
+        self,
+        localized_city: City,
+        locale: str,
+    ) -> None:
+        """``City.get_name`` honours each ``LanguageLocale`` member."""
+        member = LanguageLocale(locale)
+        assert localized_city.get_name(member) == _EXPECTED_CITY[member]
+
+    @pytest.mark.parametrize("locale", list(LanguageLocale.values()))
+    def test_lookup_item_get_name(
+        self,
+        localized_lookup_item: LookupItem,
+        locale: str,
+    ) -> None:
+        """``LookupItem.get_name`` honours each ``LanguageLocale`` member."""
+        member = LanguageLocale(locale)
+        assert localized_lookup_item.get_name(member) == _EXPECTED_LOOKUP[member]
+
+    @pytest.mark.parametrize("locale", list(LanguageLocale.values()))
+    def test_ad_get_title(
+        self,
+        seller: User,
+        localized_category: Category,
+        localized_city: City,
+        locale: str,
+    ) -> None:
+        """``Ad.get_title`` accepts a ``LanguageLocale`` member without raising."""
+        ad = create_test_ad(
+            seller,
+            localized_category,
+            localized_city,
+            title="Localized acceptance ad",
+            status=AdStatus.PUBLISHED,
+        )
+        ad.refresh_from_db()
+        title = ad.get_title(LanguageLocale(locale))
+        assert isinstance(title, str)
+        assert title
+
+
+class TestAccessorFallback:
+    """A locale with no rung degrades to the ``ru`` rung — returns, never raises.
+
+    The fallback is deliberate: these accessors accept ``LanguageLocale``, but a
+    locale whose key is absent from ``name_i18n`` must still return the Russian
+    rung rather than raising or returning the wrong locale's value.
+    """
+
+    def test_category_unmapped_locale_degrades_to_ru(
+        self, localized_category: Category
+    ) -> None:
+        """A name map lacking the requested key returns the ``ru`` value."""
+        row = Category.objects.create(
+            name="Транспорт",
+            slug="fallback-cat",
+            name_i18n={"ru": "Транспорт", "en": "Transport"},
+        )
+        # ``bs`` has no rung: the ``ru`` fallback must serve it.
+        assert row.get_name(LanguageLocale.BOSNIAN) == "Транспорт"
+
+    def test_lookup_item_unmapped_locale_degrades_to_ru(
+        self, localized_lookup_item: LookupItem
+    ) -> None:
+        """A name map lacking the requested key returns the ``ru`` value."""
+        row = LookupItem.objects.create(
+            group=localized_lookup_item.group,
+            slug="fallback-item",
+            name_i18n={"ru": "Продать"},
+        )
+        assert row.get_name(LanguageLocale.ENGLISH) == "Продать"
+
+    def test_lookup_item_missing_all_names_returns_slug(
+        self, localized_lookup_item: LookupItem
+    ) -> None:
+        """With no usable name the terminal rung is ``slug``, never ``name``.
+
+        ``LookupItem`` is the one accessor whose terminal rung is ``slug``, not
+        ``name`` (the model has no ``name`` column); a uniformity edit that
+        swapped it for ``name`` would be a regression.
+        """
+        row = LookupItem.objects.create(
+            group=localized_lookup_item.group,
+            slug="slug-only-item",
+            name_i18n=None,
+        )
+        assert row.get_name(LanguageLocale.RUSSIAN) == "slug-only-item"
+
+
+class TestLanguageContextProcessor:
+    """``context_processors.language`` emits a ``LanguageLocale`` member.
+
+    The declared emitted type matches the accessor/filter boundary. Because
+    ``str(LanguageLocale.RUSSIAN) == "ru"``, the rendered ``{{ LANGUAGE_CODE }}``
+    and ``|upper`` outputs are byte-identical to the previous bare-``str`` value.
+    """
+
+    def test_emits_language_locale_member(self) -> None:
+        """A resolved request locale is returned as a ``LanguageLocale``."""
+
+        class _Request:
+            LANGUAGE_CODE = LanguageLocale.BOSNIAN.value
+
+        assert language_processor(_Request())["LANGUAGE_CODE"] is LanguageLocale.BOSNIAN
+
+    def test_falls_back_to_settings_language_code(self) -> None:
+        """A request without ``LANGUAGE_CODE`` uses ``settings.LANGUAGE_CODE``.
+
+        The processor reads ``getattr(request, "LANGUAGE_CODE",
+        settings.LANGUAGE_CODE)`` and normalises it, so the bare-request path
+        yields the settings locale as a ``LanguageLocale`` member.
+        """
+
+        class _BareRequest:
+            pass
+
+        emitted = language_processor(_BareRequest())["LANGUAGE_CODE"]
+        assert emitted is LanguageLocale(settings.LANGUAGE_CODE)
+
+    def test_none_request_locale_normalises_to_russian(self) -> None:
+        """A ``None`` request locale hits the explicit Russian fallback."""
+
+        class _Request:
+            LANGUAGE_CODE = None
+
+        assert language_processor(_Request())["LANGUAGE_CODE"] is LanguageLocale.RUSSIAN
+
+    def test_unmapped_request_locale_normalises_to_russian(self) -> None:
+        """An unmapped request locale normalises to the Russian member."""
+
+        class _Request:
+            LANGUAGE_CODE = "de-DE"
+
+        assert language_processor(_Request())["LANGUAGE_CODE"] is LanguageLocale.RUSSIAN
+
+    def test_str_render_is_unchanged(self) -> None:
+        """``str()`` of the emitted member equals the bare locale code."""
+
+        class _Request:
+            LANGUAGE_CODE = "bs"
+
+        emitted = language_processor(_Request())["LANGUAGE_CODE"]
+        assert str(emitted) == "bs"
+        assert emitted.upper() == "BS"

@@ -11,6 +11,7 @@ from django.conf import settings
 from django.db.models import Exists, OuterRef
 from django.utils.translation import gettext as _
 
+from apps.core.enums import LanguageLocale
 from apps.core.services.site_config import get_bot_username
 
 
@@ -24,8 +25,20 @@ def plausible_host(request):
 
 
 def language(request) -> dict:
-    """Expose current language to templates."""
-    return {"LANGUAGE_CODE": getattr(request, "LANGUAGE_CODE", settings.LANGUAGE_CODE)}
+    """Expose current language to templates.
+
+    The emitted ``LANGUAGE_CODE`` is a ``LanguageLocale`` member, normalised
+    through ``from_code`` so the declared type matches the accessor/filter
+    boundary. ``str(LanguageLocale.RUSSIAN) == "ru"``, so the template renders
+    (``{{ LANGUAGE_CODE }}`` and ``|upper``) are byte-identical to the previous
+    bare-``str`` output; no template change is required.
+    """
+    return {
+        "LANGUAGE_CODE": LanguageLocale.from_code(
+            getattr(request, "LANGUAGE_CODE", settings.LANGUAGE_CODE),
+            fallback=LanguageLocale.RUSSIAN,
+        )
+    }
 
 
 def header_context(request) -> dict:

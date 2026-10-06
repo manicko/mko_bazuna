@@ -61,7 +61,7 @@ def build_currency_keyboard() -> types.InlineKeyboardMarkup:
 def build_purpose_keyboard(
     purposes: list[LookupItem],
     default_slug: str | None = None,
-    locale: str = LanguageLocale.RUSSIAN,
+    locale: LanguageLocale = LanguageLocale.RUSSIAN,
 ) -> types.InlineKeyboardMarkup:
     """Build inline keyboard for purpose selection."""
 
@@ -84,7 +84,7 @@ def build_purpose_keyboard(
 
 def build_condition_keyboard(
     conditions: list[LookupItem],
-    locale: str = LanguageLocale.RUSSIAN,
+    locale: LanguageLocale = LanguageLocale.RUSSIAN,
 ) -> types.InlineKeyboardMarkup:
     """Build inline keyboard for condition single-selection."""
     builder = InlineKeyboardBuilder()
@@ -100,7 +100,7 @@ def build_condition_keyboard(
 def build_feature_keyboard(
     features: list[LookupItem],
     selected_ids: set[int],
-    locale: str = LanguageLocale.RUSSIAN,
+    locale: LanguageLocale = LanguageLocale.RUSSIAN,
 ) -> types.InlineKeyboardMarkup:
     """Build inline keyboard for feature multi-selection."""
 

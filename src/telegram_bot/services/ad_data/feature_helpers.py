@@ -129,7 +129,7 @@ async def get_lookup_item(item_id: int | None) -> LookupItem | None:
 
 
 async def get_feature_names(
-    feature_ids: list[int], locale: str = LanguageLocale.RUSSIAN
+    feature_ids: list[int], locale: LanguageLocale = LanguageLocale.RUSSIAN
 ) -> list[str]:
     """Get feature names as localized strings."""
 

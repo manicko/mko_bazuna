@@ -531,7 +531,9 @@ class Command(BaseCommand):
             await bot.session.close()
         return sent_users
 
-    def _format_digest(self, ads: list, locale: str = LanguageLocale.RUSSIAN.value) -> str:
+    def _format_digest(
+        self, ads: list, locale: LanguageLocale = LanguageLocale.RUSSIAN
+    ) -> str:
         """Format digest message for a user in their preferred locale.
 
         The message is sent with ``parse_mode="HTML"``, so the seller-controlled

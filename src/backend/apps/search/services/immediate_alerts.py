@@ -249,7 +249,9 @@ async def _mark_delivered(pair: tuple[int, int]) -> None:
 
 
 def build_alert_message(
-    ad: Ad, saved_search: SavedSearch, locale: str = LanguageLocale.RUSSIAN.value
+    ad: Ad,
+    saved_search: SavedSearch,
+    locale: LanguageLocale = LanguageLocale.RUSSIAN,
 ) -> tuple[str, InlineKeyboardMarkup]:
     """
     Build the per-ad Telegram alert message (CR9).

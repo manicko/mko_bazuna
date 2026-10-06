@@ -43,7 +43,7 @@ class City(models.Model):
         db_table = "cities"
         verbose_name_plural = "cities"
 
-    def get_name(self, locale: str = LanguageLocale.RUSSIAN) -> str:
+    def get_name(self, locale: LanguageLocale = LanguageLocale.RUSSIAN) -> str:
         """Get localized name with fallback chain: locale → ru → name."""
         # At runtime, name_i18n is a dict or None
         name_i18n = getattr(self, "name_i18n", None)
