@@ -19,11 +19,11 @@ fast-gate CI run:
 7. ``test_plural_forms`` — each ``.po`` Plural-Forms header matches CLDR.
 8. ``test_locale_switch_re_render`` — ``{% trans %}`` re-renders in the
    active locale (bs/ru).
-9. ``test_bot_no_raw_model_field_access`` — AST-scans bot
-   ``handlers/`` and ``services/`` for raw ``name_i18n.get("ru")`` calls
-   and ``.name``/``.title``/``.description`` field access in f-strings,
-   ``%`` dict values, list comprehensions, and keyword-argument values
-   (I18N-001).
+9. ``test_bot_no_raw_model_field_access`` — AST-scans every
+   ``src/telegram_bot`` module except ``tests/`` for raw
+   ``name_i18n.get("ru")`` calls and ``.name``/``.title``/``.description``
+   field access in f-strings, ``%`` dict values, list comprehensions, and
+   keyword-argument values (I18N-001).
 10. ``test_title_tags_translated`` — page ``<title>`` tags localize per
     language (I18N-003).
 11. ``test_plural_forms_runtime`` — ``{% blocktrans count %}`` selects the
@@ -32,15 +32,26 @@ fast-gate CI run:
     carry untranslated user-visible text (I18N-008).
 13. ``test_all_languages_ltr`` — all configured languages are LTR (guards the
     I18N-006 Bidi invariant).
-14. ``test_bot_no_hardcoded_messages`` — AST-scans bot handler user-facing
-    method calls (``answer``, ``reply``, ``edit_text``, ``edit_caption``,
-    ``send_message``, ``button``) for unwrapped string/f-string text arguments.
+14. ``test_bot_no_hardcoded_messages`` — AST-scans every ``src/telegram_bot``
+    module except ``tests/`` for user-facing method calls (``answer``,
+    ``reply``, ``edit_text``, ``edit_caption``, ``send_message``, ``button``)
+    with unwrapped string/f-string text arguments.
 15. ``test_no_cyrillic_msgids`` — no ``msgid`` in any ``.po`` contains
     Cyrillic characters (msgids must be English; msgstr is exempt).
 16. ``test_no_raw_get_name_in_templates`` — public/seller-facing templates must
     use locale-aware ``|get_title`` / ``|get_category_name`` /
     ``|get_city_name`` / ``|get_lookup_name`` filters instead of raw
     ``{{ obj.get_name }}`` calls or raw ``.title`` / ``.name`` attribute access.
+
+BLOCK 8 (14-I18N-006, -007, -008) widened the collectors: the bot collectors
+walk all of ``src/telegram_bot`` except ``tests/`` and the template collector
+discovers roots by root-scoping (``_template_roots``). User-facing strings that
+are deliberately not translated are listed once in ``_BOT_EXEMPT_FUNCTIONS`` and
+consulted by enclosing-function name. ``telegram_bot/lifecycle.py``'s
+``_COMMANDS`` (``BotCommand`` literals) are NOT flagged by the bot predicate —
+it matches ``ast.Attribute`` methods, not a bare constructor — so they carry no
+exemption entry (D-C). A source-level sibling of ``test_hreflang_present``
+asserts every in-scope non-partial page template includes the locale partial.
 
 ``test_hreflang_present`` is extended with the ``x-default`` exclusion
 (spec §5f) and ``test_locale_switch_re_render`` with an ``en`` locale-switch
@@ -58,6 +69,7 @@ import re
 from pathlib import Path
 
 import pytest
+from django.apps import apps
 from django.conf import settings
 from django.template import Context, Template
 from django.template.loader import get_template
@@ -77,26 +89,66 @@ def _po_files() -> list[Path]:
     return paths
 
 
+def _template_roots() -> list[Path]:
+    """Return every in-repo template root the gate scans.
+
+    Root-scoping (BLOCK 8, 14-I18N-007): the configured ``TEMPLATES["DIRS"]``
+    unioned with each *in-repo* installed app's ``<app path>/templates``
+    directory (the ``APP_DIRS`` roots). An app root is admitted only when it
+    resolves inside ``settings.BASE_DIR`` — this keeps third-party
+    distributions (``.venv`` site-packages such as ``django.contrib.admin`` or
+    ``tailwind``) out of the scan, which would otherwise leak their own
+    templates (e.g. ``registration/password_change_form.html``) into the
+    hardcoded-text guard. Roots are returned resolved and de-duplicated, in a
+    stable order.
+
+    The caller asserts this is non-empty, so a refactor that silently moves
+    every template away fails the gate rather than scanning nothing.
+    """
+    base_dir = Path(settings.BASE_DIR).resolve()
+    roots: list[Path] = []
+
+    for tmpl_cfg in settings.TEMPLATES:
+        for d in tmpl_cfg.get("DIRS", []):
+            roots.append(Path(d))
+
+    for app_config in apps.get_app_configs():
+        app_path = Path(app_config.path)
+        if not app_path.resolve().is_relative_to(base_dir):
+            continue
+        templates_dir = app_path / "templates"
+        if templates_dir.is_dir():
+            roots.append(templates_dir)
+
+    unique: dict[str, Path] = {}
+    for root in roots:
+        resolved = root.resolve()
+        unique[str(resolved)] = resolved
+    return sorted(unique.values())
+
+
 def _collect_template_files() -> list[Path]:
     """Collect all template files to scan for hardcoded text.
 
-    Includes all templates except admin staff-only pages, moderation dashboard,
-    and feature_tag (DB-based i18n).
+    Walks every root returned by :func:`_template_roots` (configured DIRS plus
+    each in-repo app's ``templates`` directory) and skips admin staff-only
+    pages, moderation dashboard, and feature_tag (DB-based i18n). The
+    ``exclude_subpaths`` prefixes are applied relative to *each* root.
     """
     exclude_subpaths = (
         "admin/",
         "analytics/moderation_dashboard.html",
         "components/feature_tag.html",
     )
+    roots = _template_roots()
+    assert roots, "no template root discovered — the collector would scan nothing"
     files: list[Path] = []
-    for tmpl_cfg in settings.TEMPLATES:
-        for d in tmpl_cfg.get("DIRS", []):
-            d = Path(d)
-            for f in d.rglob("*.html"):
-                rel = f.relative_to(d).as_posix()
-                if any(rel.startswith(ex) for ex in exclude_subpaths):
-                    continue
-                files.append(f)
+    for root in roots:
+        for f in root.rglob("*.html"):
+            rel = f.relative_to(root).as_posix()
+            if any(rel.startswith(ex) for ex in exclude_subpaths):
+                continue
+            files.append(f)
     return files
 
 
@@ -595,6 +647,60 @@ def test_hreflang_present() -> None:
     )
 
 
+_LOCALE_HEAD_INCLUDE = 'components/locale_head.html'
+
+
+def _template_rel_path(tpl_path: Path) -> str:
+    """Return *tpl_path* relative to the root of ``_template_roots`` it lives in."""
+    for root in _template_roots():
+        if tpl_path.is_relative_to(root):
+            return tpl_path.relative_to(root).as_posix()
+    return tpl_path.as_posix()
+
+
+def _is_partial_template(rel_path: str) -> bool:
+    """Return True for a non-page template.
+
+    A partial is any template under a ``partials/`` segment or under
+    ``components/`` — these are fragments included into pages and are not
+    expected to carry the site-wide ``<head>`` alternates themselves. The
+    ``locale_head.html`` partial shares the ``components/`` prefix, so this
+    rule also excludes the partial *itself* from the assertion.
+    """
+    return "partials" in rel_path.split("/") or rel_path.startswith("components/")
+
+
+def test_hreflang_include_in_every_page_template() -> None:
+    """Every in-scope non-partial page template includes the ``locale_head``
+    partial (BLOCK 8, 14-I18N-008).
+
+    ``test_hreflang_present`` renders the partial in isolation, so a page that
+    simply forgot to ``{% include %}`` it would still pass. This source-level
+    assertion proves the site-wide property: each in-scope page template
+    contains the include. Partial templates (``partials/`` or ``components/``)
+    and the excluded templates (``admin/``, ``analytics/moderation_dashboard.html``,
+    ``components/feature_tag.html``) are out of scope — the last two are both
+    excluded *and* do include the partial, so they reconcile rather than fail.
+    """
+    page_templates = {
+        _template_rel_path(f): f
+        for f in _collect_template_files()
+        if not _is_partial_template(_template_rel_path(f))
+    }
+    assert page_templates, "no in-scope page templates discovered"
+
+    missing: list[str] = []
+    for rel_path, tpl_path in sorted(page_templates.items()):
+        content = tpl_path.read_text(encoding="utf-8")
+        if _LOCALE_HEAD_INCLUDE not in content:
+            missing.append(rel_path)
+
+    assert not missing, (
+        "Page templates missing the site-wide components/locale_head.html "
+        "include:\n" + "\n".join(sorted(missing))
+    )
+
+
 # ---------------------------------------------------------------------------
 # Page <title> localization (I18N-003)
 # ---------------------------------------------------------------------------
@@ -612,13 +718,16 @@ _TITLE_TEMPLATES = (
 
 
 def _template_source(template_name: str) -> str:
-    """Return the raw source of a template located in a configured DIR."""
-    for tpl_cfg in settings.TEMPLATES:
-        for d in tpl_cfg.get("DIRS", []):
-            candidate = Path(d) / template_name
-            if candidate.exists():
-                return candidate.read_text(encoding="utf-8")
-    pytest.fail(f"template not found in TEMPLATES DIRs: {template_name}")
+    """Return the raw source of a template located in a discovered root.
+
+    Searches the same root-scoped set as :func:`_collect_template_files`
+    (``_template_roots``), so the two cannot diverge.
+    """
+    for root in _template_roots():
+        candidate = root / template_name
+        if candidate.exists():
+            return candidate.read_text(encoding="utf-8")
+    pytest.fail(f"template not found in discovered roots: {template_name}")
 
 
 def test_title_tags_translated() -> None:
@@ -796,11 +905,76 @@ _BOT_KEYWORD_TEXT_METHODS = frozenset({"button"})
 # Reuses the same set as above.
 _NON_TRANSLATABLE = frozenset({"EUR", "RSD", "BAM"})
 
+# ---------------------------------------------------------------------------
+# Named exemption set (BLOCK 8, 14-I18N-006)
+# ---------------------------------------------------------------------------
+# ONE module-level definition of the user-facing strings that are deliberately
+# left un-translated, consulted by the bot predicate callers, the template
+# scanners, BLOCK 9 and BLOCK 11. An entry is ``(repo-relative source path,
+# enclosing function name)``; the exemption is matched by the *enclosing
+# function* so moving code within the function never drifts (never by line
+# number). Adding ``_()`` here is forbidden — the string is intentionally a
+# literal.
+#
+# First (and today only) member: ``build_currency_keyboard`` composes a currency
+# button label from an emoji flag and the ``CurrencyCode`` StrEnum value
+# (``f"{_CURRENCY_FLAGS[code]} {code.value}"``). The rendered text is a
+# currency code (EUR/RSD/BAM) plus a non-linguistic flag — there is no prose to
+# translate, and the ``.button(text=…)`` call is otherwise indistinguishable
+# from a real violation to the AST predicate (any ``JoinedStr`` fires).
+#
+# NOTE (BLOCK 8, D-C): ``telegram_bot/lifecycle.py``'s ``_COMMANDS`` carries
+# twelve ``BotCommand(command=…, description=…)`` literals that are deliberately
+# not msgids (an eager ``_()`` would freeze them to the import-time locale).
+# They are NOT flagged by the bot predicate — it matches ``ast.Attribute``
+# methods (``.answer``/``.button``/…), whereas ``BotCommand(...)`` is a bare
+# constructor — so they need no exemption entry here. This is recorded, not
+# suppressed.
+_BOT_EXEMPT_FUNCTIONS = frozenset({
+    (
+        "telegram_bot/services/ad_data/keyboards.py",
+        "build_currency_keyboard",
+    ),
+})
+
+
+def _enclosing_function_name(tree: ast.AST, target: ast.AST) -> str | None:
+    """Return the name of the innermost function enclosing *target*.
+
+    Walks the module tree tracking ``FunctionDef``/``AsyncFunctionDef`` nodes
+    and returns the name of the tightest one whose span contains *target*.
+    Returns ``None`` for module-level code. Used to consult the exemption set
+    by enclosing-function name rather than by line number.
+    """
+    best: ast.FunctionDef | ast.AsyncFunctionDef | None = None
+    for node in ast.walk(tree):
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            if (
+                node.lineno <= target.lineno <= node.end_lineno
+                and (best is None or node.lineno > best.lineno)
+            ):
+                best = node
+    return best.name if best is not None else None
+
+
+def _is_exempt_bot_violation(source: str, tree: ast.AST, target: ast.AST) -> bool:
+    """Return True if *target* lies in a named-exempt bot function."""
+    return (source, _enclosing_function_name(tree, target)) in _BOT_EXEMPT_FUNCTIONS
+
 
 def _collect_bot_handler_files() -> list[Path]:
-    """Return every ``*.py`` file under ``src/telegram_bot/handlers/``."""
-    handlers_dir = settings.BASE_DIR / "telegram_bot" / "handlers"
-    return sorted(handlers_dir.rglob("*.py"))
+    """Return every bot handler module.
+
+    Delegates to the widened :func:`_collect_bot_source_files` collector and
+    narrows it to the ``handlers`` package so both names keep working while
+    scanning the same widened root (BLOCK 8, 14-I18N-006).
+    """
+    handlers_root = settings.BASE_DIR / "telegram_bot" / "handlers"
+    return [
+        f
+        for f in _collect_bot_source_files()
+        if f.is_relative_to(handlers_root)
+    ]
 
 
 def _is_gettext_wrapped(node: ast.AST) -> bool:
@@ -833,8 +1007,18 @@ def _find_untranslated(node: ast.AST) -> bool:
     return False
 
 
-def _check_call_for_unwrapped(call: ast.Call, source: str, lineno: int) -> list[str]:
-    """Inspect a single Call node for an unwrapped user-facing string."""
+def _check_call_for_unwrapped(
+    call: ast.Call, source: str, lineno: int, tree: ast.AST
+) -> list[str]:
+    """Inspect a single Call node for an unwrapped user-facing string.
+
+    The named exemption set (``_BOT_EXEMPT_FUNCTIONS``) is consulted at this
+    caller by enclosing-function name; ``_find_untranslated`` itself is never
+    weakened.
+    """
+    if _is_exempt_bot_violation(source, tree, call):
+        return []
+
     violations: list[str] = []
     func = call.func
 
@@ -863,9 +1047,11 @@ def _check_call_for_unwrapped(call: ast.Call, source: str, lineno: int) -> list[
 
 
 def _check_append_for_unwrapped(
-    call: ast.Call, source: str, lineno: int
+    call: ast.Call, source: str, lineno: int, tree: ast.AST
 ) -> list[str]:
     """Flag translatable f-strings/literals passed to list.append()."""
+    if _is_exempt_bot_violation(source, tree, call):
+        return []
     func = call.func
     if not (isinstance(func, ast.Attribute) and func.attr == "append"):
         return []
@@ -889,30 +1075,33 @@ def _check_append_for_unwrapped(
 
 
 def test_bot_no_hardcoded_messages() -> None:
-    """Bot handler user-facing strings must be wrapped in ``gettext``.
+    """Bot user-facing strings must be wrapped in ``gettext``.
 
-    AST-scans every ``.py`` file under ``telegram_bot/handlers/`` for calls to
-    user-facing Bot/API methods (``answer``, ``reply``, ``edit_text``,
-    ``edit_caption``, ``send_message``, ``KeyboardBuilder.button``) whose text
-    argument is a bare string constant or f-string rather than a ``_()`` call.
+    AST-scans every ``.py`` file under ``src/telegram_bot`` except ``tests/``
+    (the widened scope, BLOCK 8 / 14-I18N-006) for calls to user-facing
+    Bot/API methods (``answer``, ``reply``, ``edit_text``, ``edit_caption``,
+    ``send_message``, ``KeyboardBuilder.button``) whose text argument is a bare
+    string constant or f-string rather than a ``_()`` call. The named
+    ``_BOT_EXEMPT_FUNCTIONS`` set is consulted by enclosing-function name at
+    the predicate caller — ``_find_untranslated`` is never weakened.
     """
     all_violations: list[str] = []
 
-    for py_file in _collect_bot_handler_files():
+    for py_file in _collect_bot_source_files():
         source = str(py_file.relative_to(settings.BASE_DIR))
         tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=source)
 
         for node in ast.walk(tree):
             if isinstance(node, ast.Call):
                 all_violations.extend(
-                    _check_call_for_unwrapped(node, source, node.lineno)
+                    _check_call_for_unwrapped(node, source, node.lineno, tree)
                 )
                 all_violations.extend(
-                    _check_append_for_unwrapped(node, source, node.lineno)
+                    _check_append_for_unwrapped(node, source, node.lineno, tree)
                 )
 
     assert not all_violations, (
-        "Unwrapped user-facing strings in bot handlers:\n"
+        "Unwrapped user-facing strings in the bot:\n"
         + "\n".join(all_violations)
     )
 
@@ -961,14 +1150,20 @@ _RAW_FIELD_ATTRS = frozenset({"name", "title", "description"})
 
 
 def _collect_bot_source_files() -> list[Path]:
-    """Return every ``*.py`` file under ``telegram_bot/handlers/`` and
-    ``telegram_bot/services/``.
+    """Return every ``*.py`` module under ``src/telegram_bot`` except ``tests/``.
+
+    Walks the whole bot tree (``rglob``) rather than listing ``handlers`` and
+    ``services`` so previously invisible modules — ``middlewares/``,
+    ``retry.py``, ``states.py``, ``schemas/`` and the nine-module
+    ``handlers/ad_create`` package — are scanned. The ``tests/`` subtree is the
+    only exclusion; ``__pycache__`` is skipped because it holds no ``.py``
+    source (BLOCK 8, 14-I18N-006).
     """
     base = settings.BASE_DIR / "telegram_bot"
-    files: list[Path] = []
-    for sub in ("handlers", "services"):
-        files.extend(sorted((base / sub).rglob("*.py")))
-    return files
+    tests_root = base / "tests"
+    return sorted(
+        f for f in base.rglob("*.py") if not f.is_relative_to(tests_root)
+    )
 
 
 def _root_name(node: ast.AST) -> str | None:
@@ -1101,3 +1296,132 @@ def test_bot_no_raw_model_field_access() -> None:
         "Raw model field access in bot handlers/services:\n"
         + "\n".join(all_violations)
     )
+
+
+
+# ---------------------------------------------------------------------------
+# Collector widening / positive-coverage guards (BLOCK 8, 14-I18N-006/-007/-008)
+# ---------------------------------------------------------------------------
+
+# Bot modules the widened collector must reach — modules that were invisible
+# while the collector listed only ``handlers/`` and ``services/``. Paths are
+# repo-relative and asserted by presence in the derived set, never by count.
+_REQUIRED_BOT_MODULES = (
+    "telegram_bot/retry.py",
+    "telegram_bot/states.py",
+    "telegram_bot/middlewares/__init__.py",
+    "telegram_bot/main.py",
+    "telegram_bot/handlers/ad_create/__init__.py",
+    "telegram_bot/handlers/ad_create/entry.py",
+)
+
+
+def test_bot_collector_reaches_widened_scope() -> None:
+    """The widened bot collector reaches every previously invisible module.
+
+    The old collector walked only ``handlers/`` and ``services/``; this asserts
+    the walked set (``_collect_bot_source_files``) contains the middleware
+    package, ``retry.py``, ``states.py``, ``main.py`` and the modules of the
+    ``handlers/ad_create`` package, while ``tests/`` stays excluded. Nothing
+    here hard-codes a module count.
+    """
+    collected = {
+        str(f.relative_to(settings.BASE_DIR)) for f in _collect_bot_source_files()
+    }
+    missing = [m for m in _REQUIRED_BOT_MODULES if m not in collected]
+    assert not missing, (
+        "widened bot collector did not reach: " + ", ".join(missing)
+    )
+
+    tests_root = (settings.BASE_DIR / "telegram_bot" / "tests").resolve()
+    leaked = [
+        rel
+        for rel in collected
+        if (settings.BASE_DIR / rel).resolve().is_relative_to(tests_root)
+    ]
+    assert not leaked, f"bot collector leaked test modules: {sorted(leaked)[:5]}"
+
+
+def test_bot_handler_collector_delegates_to_widened_scope() -> None:
+    """``_collect_bot_handler_files`` delegates to the widened collector.
+
+    Preserving both names, the handler collector must return exactly the
+    ``handlers`` subset of the widened set so the two cannot diverge.
+    """
+    widened = set(_collect_bot_source_files())
+    handlers = set(_collect_bot_handler_files())
+
+    assert handlers, "handler collector discovered no modules"
+    assert handlers <= widened, "handler collector returned files outside the widened set"
+
+    handlers_root = (settings.BASE_DIR / "telegram_bot" / "handlers").resolve()
+    expected = {f for f in widened if f.resolve().is_relative_to(handlers_root)}
+    assert handlers == expected, (
+        "handler collector no longer matches the handlers subset of the widened set"
+    )
+
+
+def test_bot_exemption_is_consulted_by_enclosing_function() -> None:
+    """The named exemption suppresses exactly the exempted function.
+
+    ``build_currency_keyboard`` is the first (and today only) member of
+    ``_BOT_EXEMPT_FUNCTIONS``. Asserting the predicate violations for that
+    module drop to zero *because* of the exemption — and that a synthetic
+    identical call outside the function is still flagged — proves the
+    exemption is scoped by enclosing function, not applied file-wide.
+    """
+    exempt_source = "telegram_bot/services/ad_data/keyboards.py"
+    assert (exempt_source, "build_currency_keyboard") in _BOT_EXEMPT_FUNCTIONS, (
+        "the build_currency_keyboard exemption must be named in the set"
+    )
+
+    keyboards_path = settings.BASE_DIR / exempt_source
+    tree = ast.parse(keyboards_path.read_text(encoding="utf-8"), filename=exempt_source)
+    violations = [
+        v
+        for node in ast.walk(tree)
+        if isinstance(node, ast.Call)
+        for v in _check_call_for_unwrapped(node, exempt_source, node.lineno, tree)
+    ]
+    assert not violations, (
+        "the exempted build_currency_keyboard call was still flagged: "
+        f"{violations}"
+    )
+
+    # The same call nesting, but in a non-exempt function, must still fire.
+    synthetic = ast.parse(
+        "def other():\n"
+        "    builder.button(text=f'{x} {y}')\n",
+        filename=exempt_source,
+    )
+    fired = [
+        v
+        for node in ast.walk(synthetic)
+        if isinstance(node, ast.Call)
+        for v in _check_call_for_unwrapped(node, exempt_source, node.lineno, synthetic)
+    ]
+    assert fired, "an identical unwrapped button call outside the exemption must fire"
+
+
+def test_template_roots_and_scope_are_non_empty() -> None:
+    """The root-scoped template collector discovers roots and files.
+
+    Positive guard (BLOCK 8): a refactor that moves every template away, or a
+    root-scoping bug that admits only out-of-repo roots, must fail the gate
+    rather than silently scan nothing. No root or file count is asserted.
+    """
+    roots = _template_roots()
+    assert roots, "no template root discovered"
+
+    base_dir = Path(settings.BASE_DIR).resolve()
+    assert all(r.is_relative_to(base_dir) for r in roots), (
+        "a discovered template root lies outside the repository"
+    )
+
+    files = _collect_template_files()
+    assert files, "template collector discovered no files"
+
+    # Every discovered file must live under one of the discovered roots.
+    assert all(
+        any(f.is_relative_to(r) for r in roots) for f in files
+    ), "a collected template lies outside every discovered root"

@@ -205,25 +205,35 @@ The CI pipeline (`.github/workflows/ci.yml`, `name: CI`) runs on `ubuntu-latest`
 
 ### Completeness gate
 
-`apps/ads/tests/test_i18n_completeness.py` (16 tests, marked `@pytest.mark.unit`) enforces the multilingual Definition of Done. The gate was extended (QLT-005) to also AST-scan `telegram_bot/handlers/*.py` for unwrapped user-facing bot strings:
-- `test_no_hardcoded_visible_text` — scans public/seller-facing templates for visible text not wrapped in `{% trans %}`
-- `test_extraction_completeness` — every `{% trans %}` / `{{ _("…") }}` msgid exists in all 3 `.po` files
-- `test_no_empty_msgstr` — `ru` and `bs` have 0 empty `msgstr` for non-header entries
-- `test_no_raw_get_name_in_templates` — no raw `{{ obj.get_name }}` — must use `|get_category_name:LANGUAGE_CODE` / `|get_city_name:LANGUAGE_CODE` filters
-- `test_mo_compiled` — `.mo` files exist for all 3 locales
-- `test_template_extraction_coverage` — msgids extracted from `{% trans %}` / `{{ _("…") }}` / `{% blocktrans %}` templates each exist in all 3 `.po` files
-- `test_hreflang_present` — every page template renders `<link rel="alternate" hreflang>` (I18N-004)
-- `test_plural_forms` — each `.po` `Plural-Forms` header matches CLDR rules
-- `test_locale_switch_re_render` — `?lang=bs` content re-renders in the Bosnian locale
-- `test_bot_no_hardcoded_messages` — (QLT-005, new) AST-scans bot handler files for user-facing Bot/API method calls (`.answer()`, `.reply()`, etc.) whose text argument is a bare string literal or f-string rather than a `_()` call
-- `test_no_cyrillic_msgids` — (QLT-005, new) no `msgid` in any `.po` file contains Cyrillic characters; msgids must be English
+`apps/ads/tests/test_i18n_completeness.py` (marked `@pytest.mark.unit`) enforces the multilingual Definition of Done. The gate was widened (BLOCK 8 / 14-I18N-006, -007, -008) so its collectors are **derived, never listed**:
+- The bot collector (`_collect_bot_source_files`) walks **all of `src/telegram_bot`, excluding only `tests/`** (`rglob("*.py")`). `_collect_bot_handler_files` is retained and delegates to it, narrowing to the `handlers` package. The widened set therefore reaches the `middlewares/` package (including the locale-activating `language.py`), `retry.py`, `states.py`, `main.py`, the `schemas/` package and the nine-module `handlers/ad_create/` package.
+- The template collector (`_collect_template_files`) discovers roots via `_template_roots()`: **root-scoping** — the configured `TEMPLATES["DIRS"]` unioned with each *in-repo* installed app's `<path>/templates` (an app root is admitted only when it resolves inside `settings.BASE_DIR`, so third-party `.venv` distributions are excluded). `exclude_subpaths` is applied relative to each root. The gate asserts at least one root and a non-empty in-scope set.
+- **Named exemption set (BLOCK 8, 14-I18N-006):** `_BOT_EXEMPT_FUNCTIONS` — one module-level definition read by the bot predicate callers, the template scanners, BLOCK 9 and BLOCK 11. Its first member is `("telegram_bot/services/ad_data/keyboards.py", "build_currency_keyboard")`: the currency button label is an emoji flag plus a `CurrencyCode` value (`f"{_CURRENCY_FLAGS[code]} {code.value}"`), which carries no prose to translate. It is consulted by **enclosing-function name**, never by line number, and `_find_untranslated` is never weakened.
+- **Not flagged, no exemption (BLOCK 8, D-C):** `telegram_bot/lifecycle.py`'s `_COMMANDS` holds `BotCommand(command=…, description=…)` literals that are deliberately not msgids (an eager `_()` would freeze them to the import-time locale). The bot predicate matches `ast.Attribute` methods (`.answer`/`.button`/…), so a bare `BotCommand(...)` constructor is never flagged.
+- `test_hreflang_present` renders the partial in isolation; an additive sibling assertion (`test_hreflang_include_in_every_page_template`) additionally asserts **source-level** that every in-scope non-partial page template contains the `components/locale_head.html` include. A template is a partial when its path has a `partials/` segment or starts with `components/` (so the partial itself is excluded). The two templates that are both excluded *and* include the partial (`admin/moderation/review.html`, `analytics/moderation_dashboard.html`) reconcile rather than fail.
+
+| Guard | Scope |
+|---|---|
+| `test_no_hardcoded_visible_text` | Public/seller-facing templates for visible text not wrapped in `{% trans %}` |
+| `test_extraction_completeness` | Every `{% trans %}` / `{{ _("…") }}` msgid exists in all 3 `.po` files |
+| `test_no_empty_msgstr` | `ru` and `bs` have no empty `msgstr` for non-header entries |
+| `test_no_raw_get_name_in_templates` | No raw `{{ obj.get_name }}` — must use locale-aware filters |
+| `test_mo_compiled` | `.mo` files exist for all 3 locales |
+| `test_template_extraction_coverage` | Msgids extracted from `{% trans %}` / `{{ _("…") }}` / `{% blocktrans %}` each exist in all 3 `.po` files |
+| `test_hreflang_present` | Every page template renders `<link rel="alternate" hreflang>` (I18N-004) |
+| `test_hreflang_include_in_every_page_template` | Every in-scope non-partial page template includes `components/locale_head.html` (source-level, BLOCK 8) |
+| `test_plural_forms` | Each `.po` `Plural-Forms` header matches CLDR rules |
+| `test_locale_switch_re_render` | `?lang=bs` content re-renders in the Bosnian locale |
+| `test_bot_no_hardcoded_messages` | AST-scans every `src/telegram_bot` module except `tests/` for user-facing Bot/API method calls whose text argument is a bare literal/f-string rather than a `_()` call |
+| `test_bot_no_raw_model_field_access` | AST-scans the same widened bot scope for `name_i18n.get("<literal>")` and raw `.name`/`.title`/`.description` access |
+| `test_no_cyrillic_msgids` | No `msgid` in any `.po` file contains Cyrillic characters; msgids must be English |
 
 A dedicated `i18n` CI job runs `compilemessages` + these tests on every push.
 
 ### Key facts
 - `.mo` files are **not** in version control (`.gitignore` line 55) — build-time artifacts
 - DB-based i18n (`components/feature_tag.html` via `get_lookup_name`) is exempt from the completeness gate
-- Scan scope excludes `admin/` staff templates, `analytics/moderation_dashboard.html`, and `components/feature_tag.html`
+- Scan scope excludes `admin/` staff templates, `analytics/moderation_dashboard.html`, and `components/feature_tag.html`; the excluded set is kept in sync with the `_BOT_EXEMPT_FUNCTIONS` / `exclude_subpaths` definitions in `test_i18n_completeness.py`
 
 ## Performance Discipline
 
