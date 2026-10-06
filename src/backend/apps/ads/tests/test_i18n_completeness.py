@@ -433,7 +433,11 @@ def test_no_empty_msgstr() -> None:
             continue
         text = po_path.read_text(encoding="utf-8")
         entries = _parse_po_entries(text)
-        empty = [msgid for msgid, msgstr in entries if msgid and not msgstr.strip()]
+        empty = [
+            msgid
+            for msgid, msgstr_forms in entries
+            if msgid and any(not form.strip() for form in msgstr_forms)
+        ]
         assert not empty, f"{po_path}: empty msgstr for msgids: {empty}"
 
 

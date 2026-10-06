@@ -8,15 +8,18 @@ truth for ``.po`` entry parsing (plural-aware, stdlib-only — no ``polib``).
 from __future__ import annotations
 
 
-def _parse_po_entries(text: str) -> list[tuple[str, str]]:
-    """Parse ``.po`` text into ``(msgid, msgstr)`` tuples.
+def _parse_po_entries(text: str) -> list[tuple[str, list[str]]]:
+    """Parse ``.po`` text into ``(msgid, msgstr_forms)`` tuples.
 
-    Handles both simple and plural entries. For plural entries
-    (``msgid_plural`` / ``msgstr[N]``), the singular ``msgid`` and the
-    ``msgid_plural`` are both returned as separate tuples sharing the
-    first ``msgstr`` value encountered.
+    Handles both simple and plural entries. For a simple entry the message
+    list has a single element. For a plural entry (``msgid_plural`` plus
+    ``msgstr[N]`` lines) every ``msgstr`` form is collected, in order, so a
+    blank non-final form stays visible to callers.
+
+    The singular ``msgid`` and the ``msgid_plural`` are both returned as
+    separate tuples sharing the same ordered list of ``msgstr`` forms.
     """
-    entries: list[tuple[str, str]] = []
+    entries: list[tuple[str, list[str]]] = []
     cur_msgid: list[str] = []
     cur_msgstr: list[str] = []
     cur_plural: list[str] = []
@@ -30,9 +33,9 @@ def _parse_po_entries(text: str) -> list[tuple[str, str]]:
 
     def _flush() -> None:
         if in_msgstr:
-            entries.append(("".join(cur_msgid), "".join(cur_msgstr)))
+            entries.append(("".join(cur_msgid), ["".join(f) for f in cur_msgstr]))
         if cur_plural:
-            entries.append(("".join(cur_plural), "".join(cur_msgstr)))
+            entries.append(("".join(cur_plural), ["".join(f) for f in cur_msgstr]))
 
     for line in text.splitlines():
         stripped = line.strip()
@@ -49,9 +52,9 @@ def _parse_po_entries(text: str) -> list[tuple[str, str]]:
             rest = stripped[len("msgstr") :]
             if rest.startswith("["):
                 rest = rest[rest.index("]") + 1 :]
-            cur_msgstr = [_unescape(rest)]
+            cur_msgstr.append([_unescape(rest)])
         elif stripped.startswith('"') and in_msgstr:
-            cur_msgstr.append(_unescape(stripped))
+            cur_msgstr[-1].append(_unescape(stripped))
         elif stripped.startswith('"') and cur_plural:
             cur_plural.append(_unescape(stripped))
         elif stripped.startswith('"') and cur_msgid:

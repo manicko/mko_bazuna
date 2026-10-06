@@ -55,10 +55,44 @@ def test_no_empty_msgstr() -> None:
         locale_code = po_path.parent.parent.name
         text = po_path.read_text(encoding="utf-8")
         entries = _parse_po_entries(text)
-        empty = [msgid for msgid, msgstr in entries if msgid and not msgstr.strip()]
+        empty = [
+            msgid
+            for msgid, msgstr_forms in entries
+            if msgid and any(not form.strip() for form in msgstr_forms)
+        ]
         if locale_code == "en":
             continue
         assert not empty, f"{po_path}: empty msgstr for msgids: {empty}"
+
+
+def test_parse_po_entries_reports_blank_non_final_form() -> None:
+    """A blank non-final ``msgstr[N]`` form is reported as a violation.
+
+    Uses a synthetic plural entry (never a catalogue) whose ``msgstr[0]`` is
+    blank while ``msgstr[1]`` is filled.  Before the parser kept every form,
+    only the last one survived, so this blank form was invisible.
+    """
+    sample = (
+        'msgid "%(counter)s view"\n'
+        'msgid_plural "%(counter)s views"\n'
+        'msgstr[0] ""\n'
+        'msgstr[1] "%(counter)s views filled"\n'
+    )
+    entries = _parse_po_entries(sample)
+
+    forms_by_msgid = {msgid: forms for msgid, forms in entries if msgid}
+    assert forms_by_msgid["%(counter)s view"] == ["", "%(counter)s views filled"], (
+        "parser must carry every msgstr form in order"
+    )
+
+    empty = [
+        msgid
+        for msgid, msgstr_forms in entries
+        if msgid and any(not form.strip() for form in msgstr_forms)
+    ]
+    assert empty == ["%(counter)s view", "%(counter)s views"], (
+        f"blank msgstr[0] not reported: {empty!r}"
+    )
 
 
 def test_mo_files_exist() -> None:
