@@ -272,6 +272,9 @@ msgstr "Pošalji 'confirm' za moderaciju ili 'cancel' za otkazivanje."
 msgid "Ad submitted for moderation! You'll be notified when it's published."
 msgstr "Oglas poslat na moderaciju! Bićeš obavešten kad bude objavljen."
 
+msgid "Please accept the personal data storage consent first."
+msgstr "Prvo prihvatite saglasnost za pohranu ličnih podataka."
+
 msgid "Ad failed moderation. Please check your content and try again."
 msgstr "Oglas nije prošao moderaciju. Proveri sadržaj i pokušaj ponovo."
 
@@ -525,6 +528,10 @@ msgstr "30 dana"
 
 msgid "7 Days"
 msgstr "7 dana"
+
+#, python-format
+msgid "Password does not meet the password policy: %(errors)s"
+msgstr "Lozinka ne zadovoljava politiku lozinki: %(errors)s"
 
 msgid "Contact Seller"
 msgstr "Kontaktiraj prodavca"

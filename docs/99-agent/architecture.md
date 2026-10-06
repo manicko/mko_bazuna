@@ -1016,24 +1016,36 @@ delivered**: the phase's `G-11` gate closed *by boundary* and deliberately did
 not sweep the pre-existing bare citations, so the bare `AUT-00N` references in
 source remain until their own passes qualify them (see gate `G-11`).
 
-### Deferred: Untranslated `create_admin_user` Password-Policy Msgid (04-AUT-005)
+### RESOLVED: `create_admin_user` Password-Policy Msgid (04-AUT-005)
 
-**Recorded deferral, not a fix.** The msgid
-`"Password does not meet the password policy: %(errors)s"` was added to
-`apps/core/management/commands/create_admin_user.py::Command.handle` via
+**Resolved by plan 27 BLOCK B-06** — commit subject
+`i18n(catalogs): fill the two forward-gap msgids (password policy, consent)`.
+
+The msgid `"Password does not meet the password policy: %(errors)s"` was added
+to `apps/core/management/commands/create_admin_user.py::Command.handle` via
 `gettext_lazy as _`. The string is **operator-facing** — it is surfaced by the
 `create_admin_user` one-shot service when an operator-supplied `ADMIN_PASSWORD`
-fails `validate_password`. It is **currently untranslated in `ru`, `bs` and
-`en`**: the msgid has no catalog entry in any of the three `.po` files, so a
-Russian or Bosnian operator sees the English text.
+fails `validate_password`. It was **previously untranslated in `ru`, `bs` and
+`en`**: the msgid had no catalog entry in any of the three `.po` files, so a
+Russian or Bosnian operator saw the English text.
 
-The i18n completeness gate (`test_i18n_completeness.py`) **does not cover it**:
+B-06 now carries the msgid in **all three** catalogs: `ru` and `bs` with
+non-empty translations, `en` empty per the catalog convention. The i18n
+completeness gate (`test_i18n_completeness.py`) had **not** covered the gap:
 that gate scans templates and `telegram_bot/handlers/` only, and performs no
-catalog-parity check for Python `gettext_lazy` msgids, so the gap is invisible
-to CI. This is the direct, defensible cost of the phase's "no `.po` modified"
-boundary, which existed because another agent owned the catalogs concurrently.
-The msgid is **queued for the `.po` owner**; translating it is out of scope for
-this pass. The call site carries an inline pointer back to this record.
+catalog-parity check for Python `gettext_lazy` msgids, so the gap was invisible
+to CI.
+
+> **Not previously recorded:** the same B-06 extraction revealed a **second**
+> forward-gap msgid, `"Please accept the personal data storage consent first."`
+> (from `apps/ads/services/submission.py`, also at `apps/ads/views/edit.py` and
+> `telegram_bot/handlers/ad_create/submit.py`). It is a **different** string
+> from the catalog's `"To manage ads, please accept the personal data storage
+> consent first."`, was named in no deferral record, and is now also present in
+> all three catalogs. Both msgids were required for a fresh extraction to be
+> additive-clean (`ADDED=0`); the residual `REMOVED=3` (`gettext_lazy` alias
+> strings) is owned by the N-6 fix in this cluster. The call site keeps its
+> inline pointer back to this record.
 
 ### Deferred: `login_browser_id` Missing From the Privacy Page (04-AUT-001)
 

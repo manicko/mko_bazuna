@@ -223,6 +223,9 @@ msgstr ""
 msgid "Ad submitted for moderation! You'll be notified when it's published."
 msgstr ""
 
+msgid "Please accept the personal data storage consent first."
+msgstr ""
+
 msgid "Ad failed moderation. Please check your content and try again."
 msgstr ""
 
@@ -445,6 +448,10 @@ msgid "30 Days"
 msgstr ""
 
 msgid "7 Days"
+msgstr ""
+
+#, python-format
+msgid "Password does not meet the password policy: %(errors)s"
 msgstr ""
 
 msgid "Contact Seller"

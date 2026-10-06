@@ -279,6 +279,9 @@ msgstr ""
 "Объявление отправлено на модерацию! Вы будете уведомлены, когда оно "
 "опубликовано."
 
+msgid "Please accept the personal data storage consent first."
+msgstr "Сначала примите согласие на хранение персональных данных."
+
 msgid "Ad failed moderation. Please check your content and try again."
 msgstr ""
 "Объявление не прошло модерацию. Проверьте содержимое и попробуйте снова."
@@ -536,6 +539,10 @@ msgstr "30 дней"
 
 msgid "7 Days"
 msgstr "7 дней"
+
+#, python-format
+msgid "Password does not meet the password policy: %(errors)s"
+msgstr "Пароль не соответствует политике паролей: %(errors)s"
 
 msgid "Contact Seller"
 msgstr "Связаться с продавцом"
