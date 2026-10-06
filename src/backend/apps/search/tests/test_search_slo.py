@@ -7,11 +7,14 @@ Verifies the two remaining PERF-001 deliverables:
     (≥50 PUBLISHED ads), as defined in ``docs/01-spec/search-patterns.md``
     ("Target response time: ≤2 seconds for search queries").
 
-This is a **single-sample wall-clock bound**, not a percentile measurement: one
-``/search/`` request is timed against ``SEARCH_SLO_MS`` (2000 ms), the p99 /
-search-latency target.  It is a smoke-level regression guard for the request
-path — a percentile SLO can only be established by a load run, and the CI
-``load-test`` job's p95 gate is the instrument for that.
+This is a **robust in-repo guard** — one untimed warm-up request followed by the
+**median** of N=7 timed samples — **not a percentile instrument**.  It is a
+smoke-level regression signal for the request path: the warm-up absorbs the
+dominant cold-start cost (template/tag compilation, first FTS plan, test-client
+warm-up) and the median absorbs residual single-sample host spikes, so the
+guard stays stable on a loaded Docker host.  A percentile SLO can only be
+established by a load run: the CI ``load-test`` job's p95 gate is the **sole
+percentile instrument** for that.
 
 The ``django-prometheus`` wiring (INSTALLED_APPS, MIDDLEWARE, ``/metrics``,
 nginx restriction) is already covered by ``apps/core/tests/test_observability.py``;
@@ -21,6 +24,7 @@ regression test that every PR is gated on.
 
 from __future__ import annotations
 
+import statistics
 import time
 
 import pytest
@@ -87,25 +91,30 @@ class TestSLOConstants:
 @pytest.mark.django_db
 @pytest.mark.integration
 class TestSearchResponseSLORegression:
-    """Regression guard: search at seed volume must complete within the ≤2s SLO.
+    """Robust guard: search at seed volume must complete within the ≤2s SLO.
 
     Seeds ≥50 PUBLISHED ads (approximating the seed volume referenced in the
-    spec) and times a real ``/search/`` request through the Django test client,
-    asserting the single sample's elapsed time stays within
-    ``PerformanceSLO.SEARCH_SLO_MS``.  It is a single-sample wall-clock bound,
-    not a percentile measurement.
+    spec), then issues one **untimed** warm-up ``/search/`` request followed by
+    **N=7 timed samples** of the same request; the assertion is on the **median**
+    elapsed time.  This is a robust in-repo guard, **not a percentile
+    instrument** — the CI ``load-test`` p95 job is the sole percentile
+    instrument.
     """
 
     _SEED_AD_COUNT: int = 60  # well above the ≥50 minimum
+    _SAMPLE_COUNT: int = 7  # N ≥ 5; median absorbs single-sample host spikes
 
     def test_search_at_seed_volume_meets_slo(self, seller, category, city) -> None:
         """Search at seed volume (≥50 published ads) must complete within SLO.
 
         The spec (``docs/01-spec/search-patterns.md``, "Target response time:
         ≤2 seconds for search queries") sets the bound.  This test seeds a
-        representative catalog of 60 PUBLISHED ads and times a real search
-        request through the Django test client, asserting the elapsed time
-        stays within ``PerformanceSLO.SEARCH_SLO_MS``.
+        representative catalog of 60 PUBLISHED ads, discards one untimed warm-up
+        request, then takes N=7 timed samples of a real search request through
+        the Django test client and asserts the **median** stays within
+        ``PerformanceSLO.SEARCH_SLO_MS``.  It is a robust in-repo guard
+        (warm-up + median), not a percentile instrument; the CI ``load-test``
+        job's p95 gate is the sole percentile instrument.
         """
         # Seed ≥50 PUBLISHED ads to approximate seed volume.
         # All ads contain "товар" in the title so a single FTS query
@@ -120,20 +129,35 @@ class TestSearchResponseSLORegression:
         )
 
         client = Client()
-        start = time.monotonic()
-        response = client.get("/search/?q=товар&lang=ru")
-        elapsed_ms = (time.monotonic() - start) * 1000
+        query = "/search/?q=товар&lang=ru"
 
-        # --- response is healthy ---
-        assert response.status_code == 200, (
-            f"Search returned HTTP {response.status_code}, expected 200"
+        # --- untimed warm-up: absorb cold-start cost (templates, FTS plan) ---
+        warm_up_response = client.get(query)
+        assert warm_up_response.status_code == 200, (
+            f"Search warm-up returned HTTP {warm_up_response.status_code}, "
+            f"expected 200"
         )
 
-        # --- SLO is not breached ---
+        # --- N timed samples of the same request path ---
+        samples_ms: list[float] = []
+        for _ in range(self._SAMPLE_COUNT):
+            start = time.monotonic()
+            response = client.get(query)
+            elapsed_ms = (time.monotonic() - start) * 1000
+            assert response.status_code == 200, (
+                f"Search returned HTTP {response.status_code}, expected 200"
+            )
+            samples_ms.append(elapsed_ms)
+
+        median_ms = statistics.median(samples_ms)
+
+        # --- SLO is not breached (median guard, not a percentile) ---
         slo_ms = int(PerformanceSLO.SEARCH_SLO_MS)
-        assert elapsed_ms <= slo_ms, (
-            f"Search at seed volume took {elapsed_ms:.0f}ms, exceeding SLO of "
-            f"{slo_ms}ms (PerformanceSLO.SEARCH_SLO_MS). "
+        samples_display = ", ".join(f"{sample:.0f}" for sample in samples_ms)
+        assert median_ms <= slo_ms, (
+            f"Search at seed volume had median {median_ms:.0f}ms, exceeding SLO "
+            f"of {slo_ms}ms (PerformanceSLO.SEARCH_SLO_MS). "
+            f"Samples (ms): [{samples_display}]. "
             f"Seeded {self._SEED_AD_COUNT} PUBLISHED ads. "
             f"Threshold source: docs/01-spec/search-patterns.md "
             f'("Target response time: ≤2 seconds for search queries")'
