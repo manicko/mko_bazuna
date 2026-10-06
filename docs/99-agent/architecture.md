@@ -1047,6 +1047,50 @@ to CI.
 > strings) is owned by the N-6 fix in this cluster. The call site keeps its
 > inline pointer back to this record.
 
+### Extraction-Gap Closure and the Source-Freshness Gate Hand-Off (plan 27 B-06/B-07/B-08)
+
+**Recorded 2026-10-06 (plan 27 final doc pass, BLOCK B-09).**
+
+The catalog extraction gap is **closed**. Two independent defects kept a fresh full
+`makemessages` run from being a clean no-op against the tracked catalogs, and both are now fixed:
+
+- **Forward gap (B-06, plan 27)** — commit `d7f018ad`
+  (`i18n(catalogs): fill the two forward-gap msgids (password policy, consent)`). The catalogs were
+  missing **two** source-present msgids: `"Password does not meet the password policy: %(errors)s"`
+  (the `04-AUT-005` case above) and `"Please accept the personal data storage consent first."`. Both
+  are now present in `ru`/`bs`/`en`. See the `04-AUT-005` section above for the `ru`/`bs`/`en`
+  convention (`en` msgstr intentionally empty).
+- **Reverse gap (B-07, plan 27)** — commit `2a82f39e`
+  (`i18n(bot): de-alias gettext_lazy so non-content replies are extracted`). The last
+  `gettext_lazy as _lazy` alias in `telegram_bot/handlers/ad_create/submit.py` was de-aliased to a
+  bare `gettext_lazy`, so the three `_NON_CONTENT_REPLIES` strings are again source-visible to
+  xgettext. The `_EXTRACTION_GAP_MSGIDS` exemption in `apps/ads/tests/test_i18n_completeness.py` was
+  **retired**, and the reverse stale-entry gate was **strengthened**: `reverse_orphans` no longer
+  takes a blanket exemption set, so the three former orphans are now checked against the source
+  extraction like any other catalogue entry.
+
+A fresh whole-tree extraction against the current tree is now a clean **`ADDED=0 REMOVED=0` no-op**
+(only `POT-Creation-Date` churn, kept synced across the three catalogs).
+
+**The safe scratch extraction recipe** is documented in
+[`.kilo/rules/commands.md`](../../.kilo/rules/commands.md) (plan 27 BLOCK B-08, commit `caea8e0c`).
+It records the C-08-1 mechanism: `makemessages`'s directory walk inserts every discovered directory
+named `locale/` at index 0 of its locale paths, so the in-tree `src/backend/locale` becomes the
+command's default write target **independent of `settings.LOCALE_PATHS`** — a scratch
+`LOCALE_PATHS` override (pre- or post-`django.setup()`) does **not** redirect the write. **Only a
+copy of the whole source tree is safe**; the in-place extraction command is annotated as mutating
+tracked files. The recipe uses `--no-location --no-obsolete` and is wrapped by
+`.\Makefile.ps1 extract-messages`.
+
+**Hand-off — no competing gate was created in plan 27.** The durable **source-freshness CI gate**
+(a CI step that extracts in a scratch copy and fails on a non-empty diff) is **FOLDED into plan 25
+BLOCK 11** — it is explicitly **not** created in plan 27. Plan 25 owns the catalog-gate design, its
+exemption sets and its ordering (its BLOCK 11, commit `f7d1ff73`, added the reverse stale-entry gate
+that plan 27 B-07 then strengthened). Plan 27 **made the gate addable** by closing the extraction gap
+it does not add the gate. The re-entry condition is recorded in the plan 27 execution plan §F.5: the
+plan 25 owner extends BLOCK 11 with a source-freshness check, safe under C-08-1, referencing the
+B-08 recipe. CI carries **no** `makemessages` step today (verified before this note was written).
+
 ### Deferred: `login_browser_id` Missing From the Privacy Page (04-AUT-001)
 
 **Recorded deferral, not a fix.** The login-binding cookie is described as
