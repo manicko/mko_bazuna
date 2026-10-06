@@ -2,13 +2,40 @@
 title: Multi-Plan Remediation Execution — P21 / P22 / P23 / P16 debt
 slug: 26-multi-plan-remediation-execution
 phase: 26
-status: ready
+status: shipped
 created: 2026-10-05
 source_plan: multiple
-verified_head: 8fb2c0bc
+verified_head: 302b5343
 language: en
 block_count: 12
 ---
+
+# §A.0 Execution result (recorded 2026-10-06)
+
+**All 12 blocks (B-01 … B-12) shipped.** Executed against a tree whose HEAD had advanced
+past `verified_head`; the plan's §A.1 drift rule required each Implementor to stop-and-report
+rather than adapt silently, and each did. Commit map:
+
+| Block | Commit(s) | Block | Commit(s) |
+|---|---|---|---|
+| B-01 | `d6504e45` | B-07 | `c514a8ca` |
+| B-02 | `2e4c6c05` | B-08 | `0a00f3a9`, `0efa6314` |
+| B-03 | `51e84c50` | B-09 | `6de51f40` |
+| B-04 | `b6fe7d87` | B-10 | `b28d9189` |
+| B-05 | `4ecdd3b6` | B-11 | `52276d16` |
+| B-06 | `3d908f3b` | B-12 | `23153055` |
+
+**Corrections found by the post-ship audit (recorded, not applied to block text):**
+- §A.2 is stale: `.ai/plans/20-media-remediation-execution.md` and
+  `src/backend/apps/users/services/deactivation.py` are clean, and `.ai/plans/21…26` are
+  tracked, not untracked.
+- §A.4 row 16-7 nginx counts are wrong: 4 `limit_req_zone` per file and 15/13 `location`
+  blocks (not 9/7 and 11/9).
+- Paths: `test_compose_contract.py` is at `src/backend/tests/`;
+  `test_prod_email_host_missing_warns_but_imports` is at
+  `src/backend/config/settings/tests/test_settings_secrets.py`.
+
+No block of this plan remains executable at `302b5343`.
 
 # §A Provenance, drift control, and corrections
 
