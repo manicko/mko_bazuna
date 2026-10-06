@@ -8,7 +8,7 @@ the FSM stranded. These tests pin the per-handler boundary:
 - ``process_preview`` answers the busy message and **does not clear the FSM
   state** on a lock timeout, while a genuine moderation failure still clears it.
 - ``handle_login_deep_link`` answers the busy message.
-- ``alerts._resolve_owned`` returns ``None`` (the existing failure signal).
+- ``services.alerts._resolve_owned`` returns ``None`` (the existing failure signal).
 """
 
 from __future__ import annotations
@@ -285,7 +285,7 @@ class TestResolveOwnedLockTimeout:
     """``_resolve_owned`` degrades to ``None`` on a lock timeout."""
     def test_lock_timeout_returns_none(self, seller) -> None:
         from apps.search.models import SavedSearch
-        from telegram_bot.handlers.alerts import _resolve_owned
+        from telegram_bot.services.alerts import _resolve_owned
 
         SavedSearch.objects.create(
             user=seller,
@@ -294,7 +294,7 @@ class TestResolveOwnedLockTimeout:
         )
 
         with patch(
-            "telegram_bot.handlers.alerts.SavedSearch.objects.select_for_update",
+            "telegram_bot.services.alerts.SavedSearch.objects.select_for_update",
             side_effect=_lock_timeout_error(),
         ):
             result = _resolve_owned("a" * 32, seller.chat_id, active=False)

@@ -182,7 +182,7 @@ class TestResolveOwnedLocking:
 
     def test_resolve_owned_uses_select_for_update_and_atomic(self) -> None:
         """_resolve_owned source contains select_for_update inside atomic."""
-        from telegram_bot.handlers import alerts
+        from telegram_bot.services import alerts
 
         source = inspect.getsource(alerts._resolve_owned)
         assert "transaction.atomic" in source
@@ -195,7 +195,7 @@ class TestResolveOwnedLocking:
         atomic block (not before it), so the row lock is held across the
         read-check-write.
         """
-        from telegram_bot.handlers import alerts
+        from telegram_bot.services import alerts
 
         source = inspect.getsource(alerts._resolve_owned)
         atomic_idx = source.index("transaction.atomic")
@@ -219,7 +219,7 @@ class TestResolveOwnedConcurrency:
     def test_concurrent_toggle_no_lost_update(self, owner: User) -> None:
         """A toggle blocked on the row lock runs after commit; final value is
         the last writer's (no lost update)."""
-        from telegram_bot.handlers.alerts import _resolve_owned
+        from telegram_bot.services.alerts import _resolve_owned
 
         ss = SavedSearch.objects.create(
             user=owner, query="велосипед", is_active=True
