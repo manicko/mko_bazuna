@@ -6,7 +6,6 @@ HTMX-compatible MPA (no login required).
 """
 
 import logging
-from difflib import get_close_matches
 from typing import Final
 
 from django.conf import settings
@@ -32,6 +31,7 @@ from apps.ads.services.listings_query import (
     build_listings_context,
 )
 from apps.categories.models import Category
+from apps.categories.services.fuzzy import match_category
 from apps.categories.services.lookup_resolution import CategoryLookupResolver
 from apps.core.enums import AdSort, AdStatus, AnalyticsEventType, RateLimitBudget
 from apps.core.services.analytics import record_event
@@ -323,9 +323,8 @@ def listings(
 
 
 def _suggest_category(slug: str) -> str | None:
-    """Suggest similar category slug using difflib."""
+    """Suggest similar category slug using the shared fuzzy ladder."""
     all_slugs = list(
         Category.objects.filter(is_active=True).values_list("slug", flat=True)
     )
-    matches = get_close_matches(slug, all_slugs, n=1, cutoff=0.6)
-    return matches[0] if matches else None
+    return match_category(slug, all_slugs)

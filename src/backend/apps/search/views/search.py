@@ -9,7 +9,6 @@ One-word queries trigger fuzzy category detection.
 
 import logging
 import re
-from difflib import get_close_matches
 from typing import Final, cast
 
 from django.contrib.postgres.search import SearchQuery, SearchRank
@@ -29,6 +28,7 @@ from apps.ads.services.listings_query import (
     build_listings_context,
 )
 from apps.categories.models import Category
+from apps.categories.services.fuzzy import match_category
 from apps.core.enums import AdSort, AnalyticsEventType, LanguageLocale
 from apps.core.services.analytics import record_event
 from apps.core.utils.rate_limit_response import rate_limited_response
@@ -556,8 +556,10 @@ def _fuzzy_category_match(query: str, locale: LanguageLocale) -> Category | None
     """
     Find category matching the query using the locale-appropriate name.
 
-    Matches against ``Category.get_name(locale)`` so single-word queries find
-    the category in the buyer's own language.
+    A slug exact match is tried first (slug is unique, so the match is
+    unambiguous regardless of the display-name ambiguity rule). Name resolution
+    then delegates to :func:`_fuzzy_match_by_name`, which runs the shared
+    category fuzzy ladder (the exact-name and fuzzy tiers).
 
     Args:
         query: The single-word search query
@@ -571,22 +573,17 @@ def _fuzzy_category_match(query: str, locale: LanguageLocale) -> Category | None
     by_slug = Category.objects.filter(slug__iexact=query, is_active=True).first()
     if by_slug:
         return by_slug
-    # Exact match against the locale-appropriate display name (case-insensitive).
-    # Iterates the cached name list rather than loading all active categories.
-    # Two or more matching ids means an ambiguous display name: return no guess
-    # so the search is not scoped to an arbitrary branch (08-VAL-003).
-    exact_ids = _ids_for_exact_name(query, locale)
-    if exact_ids:
-        return _resolve_unique_category(exact_ids)
     return _fuzzy_match_by_name(query, locale)
 
 
 def _fuzzy_match_by_name(query: str, locale: LanguageLocale) -> Category | None:
-    """Find the closest category name match using difflib fuzzy matching.
+    """Resolve a query against the shared category fuzzy ladder.
 
-    Uses the cached active-category name list (versioned + locale-aware), so
-    a warm cache runs the fuzzy match with zero category SELECTs. The
-    ``difflib.get_close_matches`` algorithm and cutoff are unchanged.
+    The exact-name and fuzzy tiers now come from
+    :func:`apps.categories.services.fuzzy.match_category` over the cached
+    active-category name list (versioned + locale-aware), so a warm cache runs
+    the match with zero category SELECTs. The ladder cutoff is the ruled 0.8
+    (:data:`~apps.categories.services.fuzzy.CATEGORY_FUZZY_CUTOFF`).
 
     An ambiguous display name (two or more matching ids) returns no guess so
     the search is not scoped to an arbitrary branch (08-VAL-003).
@@ -600,9 +597,7 @@ def _fuzzy_match_by_name(query: str, locale: LanguageLocale) -> Category | None:
     """
     entries = get_active_category_names(locale)
     all_names = [str(entry["name"]) for entry in entries]
-    matches = get_close_matches(query, all_names, n=1, cutoff=0.8)
-    if matches:
-        return _resolve_unique_category(
-            _ids_for_exact_name(matches[0], locale)
-        )
+    match = match_category(query, all_names)
+    if match:
+        return _resolve_unique_category(_ids_for_exact_name(match, locale))
     return None
