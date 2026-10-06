@@ -557,6 +557,11 @@ msgid "Login via Telegram"
 msgstr "Войти через Telegram"
 
 msgid ""
+"The reject reason is not valid. Select one of the listed reasons and try "
+"again."
+msgstr "Причина отклонения недействительна. Выберите одну из причин в списке и попробуйте снова."
+
+msgid ""
 "Cannot approve: the ad owner has reached the maximum number of active ads."
 msgstr ""
 "Нельзя одобрить: владелец объявления достиг максимального количества "

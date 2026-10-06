@@ -22,7 +22,7 @@ from django.test import Client
 
 from apps.ads.models import Ad, AdImage
 from apps.categories.models import Category
-from apps.core.enums import AdStatus, UserRole
+from apps.core.enums import AdStatus, CategoryRejectReason, UserRole
 from apps.locations.models import City
 from apps.moderation.models import ModeratorActionLog
 from apps.users.models import User
@@ -615,6 +615,93 @@ class TestRejectAdView:
         response = client.post(
             f"/moderation/reject/{ad.id}/",
             data={"reason_category": "spam_scam"},
+        )
+
+        assert response.status_code == 302
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.REJECTED
+
+
+# ---------------------------------------------------------------------------
+# Tests: reject_ad boundary — reason_category validated against the enum
+# ---------------------------------------------------------------------------
+
+
+class TestRejectAdBoundary:
+    """``reject_ad`` validates ``reason_category`` against ``CategoryRejectReason``.
+
+    An unknown category re-renders the review page with a translated error and
+    the moderator's typed input preserved (Q2 ruling, 2026-10-03): HTTP 200, no
+    coercion to empty, and no ``ModeratorActionLog`` row.
+    """
+
+    def test_invalid_reason_category_rerenders_without_audit_row(
+        self,
+        staff_user: User,
+        seller: User,
+        category: Category,
+        city: City,
+    ) -> None:
+        """An unknown category re-renders with error and preserved input."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+
+        client = Client()
+        client.force_login(staff_user)
+        response = client.post(
+            f"/moderation/reject/{ad.id}/",
+            data={"reason_category": "not_a_reason", "reason_text": "My note"},
+        )
+
+        assert response.status_code == 200
+        assert response.context["reason_category"] == "not_a_reason"
+        assert response.context["reason_text"] == "My note"
+        assert response.context["error"]
+        assert response.context["error"] in response.content.decode("utf-8")
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION
+        assert not ModeratorActionLog.objects.filter(ad_id=ad.id).exists()
+
+    def test_missing_reason_category_is_rejected(
+        self,
+        staff_user: User,
+        seller: User,
+        category: Category,
+        city: City,
+    ) -> None:
+        """A missing category re-renders (200), not a 302/400, with no audit row."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+
+        client = Client()
+        client.force_login(staff_user)
+        response = client.post(
+            f"/moderation/reject/{ad.id}/",
+            data={"reason_text": "My note"},
+        )
+
+        assert response.status_code == 200
+        assert not ModeratorActionLog.objects.filter(ad_id=ad.id).exists()
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION
+
+    @pytest.mark.parametrize("reason", list(CategoryRejectReason))
+    def test_every_category_reject_reason_member_is_accepted(
+        self,
+        staff_user: User,
+        seller: User,
+        category: Category,
+        city: City,
+        reason: CategoryRejectReason,
+    ) -> None:
+        """Every ``CategoryRejectReason`` member is accepted (302, REJECTED)."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+
+        client = Client()
+        client.force_login(staff_user)
+        response = client.post(
+            f"/moderation/reject/{ad.id}/",
+            data={"reason_category": reason.value},
         )
 
         assert response.status_code == 302

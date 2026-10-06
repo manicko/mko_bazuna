@@ -546,6 +546,11 @@ msgid "Login via Telegram"
 msgstr "Prijava putem Telegrama"
 
 msgid ""
+"The reject reason is not valid. Select one of the listed reasons and try "
+"again."
+msgstr "Razlog odbijanja nije važeći. Odaberite jedan od navedenih razloga i pokušajte ponovo."
+
+msgid ""
 "Cannot approve: the ad owner has reached the maximum number of active ads."
 msgstr ""
 "Ne može se odobriti: vlasnik oglasa je dostigao maksimalan broj aktivnih "

@@ -11,10 +11,11 @@ from django.db import transaction
 from django.http import HttpRequest, HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
+from django.utils.translation import gettext
 from django.views.decorators.http import require_POST
 
 from apps.ads.models import Ad
-from apps.core.enums import AdStatus, ApproveOutcome
+from apps.core.enums import AdStatus, ApproveOutcome, CategoryRejectReason
 from apps.moderation.admin_actions import BanRefusalReason, ban_refusal_reason
 from apps.moderation.views.decorators import staff_required
 
@@ -81,6 +82,28 @@ BAN_TIER_ENFORCEMENT = (
 )
 
 
+def _review_context(
+    ad: Ad,
+    *,
+    error: str | None = None,
+    reason_category: str = "",
+    reason_text: str = "",
+) -> dict[str, object]:
+    """Build the shared context for the moderation review page.
+
+    ``moderation_review`` renders the bare one-key context; ``reject_ad``
+    re-renders it with a translated error and the moderator's typed input
+    preserved when the submitted ``reason_category`` is not a
+    ``CategoryRejectReason`` member (Q2 ruling, 2026-10-03).
+    """
+    context: dict[str, object] = {"ad": ad}
+    if error is not None:
+        context["error"] = error
+        context["reason_category"] = reason_category
+        context["reason_text"] = reason_text
+    return context
+
+
 @staff_required
 def moderation_review(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
@@ -104,11 +127,7 @@ def moderation_review(request: HttpRequest, ad_id: int) -> HttpResponse:
         status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED],
     )
 
-    context = {
-        "ad": ad,
-    }
-
-    return render(request, "admin/moderation/review.html", context)
+    return render(request, "admin/moderation/review.html", _review_context(ad))
 
 
 @require_POST
@@ -173,25 +192,45 @@ def reject_ad(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
     from apps.moderation.admin_actions import reject_ad as do_reject
 
+    raw_reason_category = request.POST.get("reason_category", "") or ""
+    reason_text = (request.POST.get("reason_text") or "").strip()
+
+    try:
+        reason_category = CategoryRejectReason(raw_reason_category)
+    except ValueError:
+        ad = get_object_or_404(
+            Ad.objects.select_related("user", "category", "city").prefetch_related(
+                "images"
+            ),
+            id=ad_id,
+            status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED],
+        )
+        return render(
+            request,
+            "admin/moderation/review.html",
+            _review_context(
+                ad,
+                error=gettext(
+                    "The reject reason is not valid. "
+                    "Select one of the listed reasons and try again."
+                ),
+                reason_category=raw_reason_category,
+                reason_text=reason_text,
+            ),
+        )
+
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
         ad = get_object_or_404(
             Ad.objects.select_for_update(),
             id=ad_id,
             status__in=[AdStatus.ON_MODERATION, AdStatus.ON_MODERATION_FAILED],
         )
-        # Build reason from category + text
-        reason_category = request.POST.get("reason_category", "") or ""
-        reason_text = (request.POST.get("reason_text") or "").strip()
-
-        # Combine for internal record
-        reason = f"{reason_category}"
+        reason = f"{reason_category.value}"
         if reason_text:
-            reason = f"{reason_category}: {reason_text}"
-
+            reason = f"{reason_category.value}: {reason_text}"
         do_reject(ad, request.user.id, reason)
 
     logger.info("Admin %s rejected ad %s", request.user.id, ad_id)
-
     return redirect(
         f"{reverse('admin:ads_ad_changelist')}?status__exact=on_moderation"
     )
