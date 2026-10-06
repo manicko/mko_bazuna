@@ -38,7 +38,7 @@
                 <div class="p-4 mb-4 rounded-lg bg-red-100 text-red-800">{{ error }}</div>
             {% endif %}
             <div class="mb-4">
-                <a href="../" class="text-blue-600 hover:underline">&larr; {% trans "Back to moderation queue" %}</a>
+                <a href="{% url 'moderation:queue' %}" class="text-blue-600 hover:underline">&larr; {% trans "Back to moderation queue" %}</a>
             </div>
             <article class="bg-white rounded-lg shadow overflow-hidden">
                 <div class="p-6">
@@ -92,7 +92,7 @@
                     {% if ad.status == 'on_moderation' %}
                         <div class="border-t pt-6">
                             <h3 class="font-semibold mb-3">{% trans "Moderation Actions" %}</h3>
-                            <form method="post" action="../approve/{{ ad.id }}/" class="inline">
+                            <form method="post" action="{% url 'moderation:approve' ad.id %}" class="inline">
                                 {% csrf_token %}
                                 <button type="submit"
                                         class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium mr-2">
@@ -114,7 +114,7 @@
                         <div class="border-t pt-6">
                             <h3 class="font-semibold mb-3">{% trans "Failed Auto-Moderation" %}</h3>
                             <p class="text-gray-600 mb-4">{% trans "This ad failed automatic checks. You can approve, reject, or ban the user." %}</p>
-                            <form method="post" action="../approve/{{ ad.id }}/" class="inline">
+                            <form method="post" action="{% url 'moderation:approve' ad.id %}" class="inline">
                                 {% csrf_token %}
                                 <button type="submit"
                                         class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-medium mr-2">
@@ -141,7 +141,7 @@
                 <div class="bg-white rounded-lg max-w-lg w-full mx-4">
                     <div class="p-6">
                         <h3 class="text-lg font-bold mb-4">{% blocktrans with id=ad.id %}Reject Ad {{ id }}{% endblocktrans %}</h3>
-                        <form method="post" action="../reject/{{ ad.id }}/">
+                        <form method="post" action="{% url 'moderation:reject' ad.id %}">
                             {% csrf_token %}
                             <div class="mb-4">
                                 <label class="block text-sm font-medium mb-2">{% trans "Reject Reason (Layer-2 Checklist)" %}</label>
@@ -187,7 +187,7 @@
                 <div class="bg-white rounded-lg max-w-lg w-full mx-4">
                     <div class="p-6">
                         <h3 class="text-lg font-bold mb-4">{% blocktrans with tid=ad.user.telegram_id %}Ban User (Telegram ID: {{ tid }}){% endblocktrans %}</h3>
-                        <form method="post" action="../ban/{{ ad.id }}/">
+                        <form method="post" action="{% url 'moderation:ban' ad.id %}">
                             {% csrf_token %}
                             <div class="mb-4">
                                 <label class="block text-sm font-medium mb-2">{% trans "Ban Reason" %}</label>

@@ -19,6 +19,7 @@ import inspect
 
 import pytest
 from django.test import Client
+from django.urls import reverse
 
 from apps.ads.models import Ad, AdImage
 from apps.categories.models import Category
@@ -289,6 +290,101 @@ class TestModerationReviewView:
         assert "Транспорт" in content_ru
         assert "Тестград" in content_ru
         assert "Prevoz" not in content_ru
+
+
+# ---------------------------------------------------------------------------
+# Tests: review page URL contract (NF-1)
+# ---------------------------------------------------------------------------
+
+
+class TestModerationReviewUrls:
+    """The review template targets absolute named URLs from both render origins.
+
+    NF-1: the template previously used ``../``-relative references, which
+    resolved one path segment too deep at the trailing-slash review URL. Every
+    reference is now a named ``{% url %}`` tag, so the targets are identical
+    from ``/moderation/review/<id>/`` and from the B-4 invalid-reason
+    re-render origin ``/moderation/reject/<id>/``. The assertions build the
+    expected URLs with ``reverse()`` — never hardcoded ``/moderation/...``.
+    """
+
+    def _expected_targets(self, ad: Ad) -> dict[str, str]:
+        """The five absolute targets the review template must render."""
+        return {
+            "approve": reverse("moderation:approve", args=[ad.id]),
+            "reject": reverse("moderation:reject", args=[ad.id]),
+            "ban": reverse("moderation:ban", args=[ad.id]),
+            "queue": reverse("moderation:queue"),
+        }
+
+    def _assert_review_targets(self, content: str, ad: Ad) -> None:
+        """Assert all five action/href attributes carry the named-URL targets.
+
+        The two approve forms live in mutually exclusive status blocks
+        (``on_moderation`` / ``on_moderation_failed``), so exactly one renders
+        per page.
+        """
+        targets = self._expected_targets(ad)
+        assert content.count(f'action="{targets["approve"]}"') == 1
+        assert f'action="{targets["reject"]}"' in content
+        assert f'action="{targets["ban"]}"' in content
+        assert f'href="{targets["queue"]}"' in content
+
+    def test_review_renders_named_urls_for_on_moderation_ad(
+        self,
+        staff_user: User,
+        seller: User,
+        category: Category,
+        city: City,
+    ) -> None:
+        """Both approve forms, the modals and the back link use named URLs."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+
+        client = Client()
+        client.force_login(staff_user)
+        response = client.get(reverse("moderation:review", args=[ad.id]))
+
+        assert response.status_code == 200
+        self._assert_review_targets(response.content.decode("utf-8"), ad)
+
+    def test_review_renders_named_urls_for_on_moderation_failed_ad(
+        self,
+        staff_user: User,
+        seller: User,
+        category: Category,
+        city: City,
+    ) -> None:
+        """The on_moderation_failed approve form also uses the named URL."""
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.ON_MODERATION_FAILED
+        )
+
+        client = Client()
+        client.force_login(staff_user)
+        response = client.get(reverse("moderation:review", args=[ad.id]))
+
+        assert response.status_code == 200
+        self._assert_review_targets(response.content.decode("utf-8"), ad)
+
+    def test_invalid_reason_rerender_keeps_named_urls(
+        self,
+        staff_user: User,
+        seller: User,
+        category: Category,
+        city: City,
+    ) -> None:
+        """The B-4 invalid-reason re-render origin keeps the absolute targets."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
+
+        client = Client()
+        client.force_login(staff_user)
+        response = client.post(
+            reverse("moderation:reject", args=[ad.id]),
+            data={"reason_category": "not_a_reason", "reason_text": "My note"},
+        )
+
+        assert response.status_code == 200
+        self._assert_review_targets(response.content.decode("utf-8"), ad)
 
 
 # ---------------------------------------------------------------------------
