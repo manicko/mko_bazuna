@@ -993,7 +993,7 @@ so every limited location answers **429**, not nginx's default 503.
 
 > The zone key is the nginx-observed peer address (`$binary_remote_addr`). That is a
 > **different** mechanism from the Django-side peer gate described in
-> [Client IP Trust Model](#client-ip-trust-model), which governs how *Django* resolves a
+> the **Client IP Trust Model** section, which governs how *Django* resolves a
 > client IP from forwarding headers — see that section for the application-side rules.
 
 | Location | Zone | Rate | Burst |

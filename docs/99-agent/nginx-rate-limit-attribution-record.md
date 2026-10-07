@@ -272,8 +272,8 @@ The same list is summarised in P22 §10's Gate order.
 - **The criterion and its corrections:** `.ai/plans/22-nginx-rate-limit-deployed-gate.md` (this record
   is cited from §5.4).
 - **The aggregator script and its tests:** `scripts/measure-nginx-rate-limit-keys.py` and its unit
-  tests — **B-02**, not yet written.
-- **The measurement runbook:** `docs/ops/ops-nginx-rate-limit-gate.md` — **B-05**, not yet written.
+  tests — **B-02** (shipped).
+- **The measurement runbook:** `docs/ops/ops-nginx-rate-limit-gate.md` — **B-05** (shipped).
 - **The shipped budget constant:** `RateLimitBudget.MEDIA_GATE` in `src/backend/apps/core/enums.py`.
 - **The shipped 429 shapes:** `apps/core/utils/rate_limit_response.py`.
 - **The pinned `/media/` directive:** `test_media_location_carries_browse_limit_burst_40` in
