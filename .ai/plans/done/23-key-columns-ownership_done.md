@@ -26,7 +26,7 @@ This is an **ownership / maintenance task**, explicitly **not** a correctness fi
 
 ### Origin — BLOCK 2b's orphaned deferral
 
-`.ai/plans/20-media-remediation-execution.md` (BLOCK 2b, commit-body item 6) ships this
+`.ai/plans/done/20-media-remediation-execution_done.md` (BLOCK 2b, commit-body item 6) ships this
 deferral verbatim:
 
 > `sweep_orphaned_media._collect_referenced_keys` and `media_gate`'s `key_q` still
@@ -254,7 +254,7 @@ load-bearing after a loop build. **Isolated in its own commit** so a revert is s
 
 ### Phase 3 — Documentation
 
-**Surface:** `.ai/plans/20-media-remediation-execution.md` (BLOCK 2b commit-body
+**Surface:** `.ai/plans/done/20-media-remediation-execution_done.md` (BLOCK 2b commit-body
 deferral item 6); `docs/02-database/db-schema.md`; `docs/02-database/db-retention.md`.
 
 - **Correct, do not delete,** BLOCK 2b's "They perform *different* predicates" clause.
@@ -504,8 +504,9 @@ Four of the nine enumeration sites (§8 sites 1, 2, 3, 6) are converted;
 
 ### Phase 3 task 1 — plan 20 deferral corrected, not deleted
 
-The BLOCK 2b commit-body deferral in `.ai/plans/20-media-remediation-execution.md`
-(item 6) was **corrected in place**. The corrected clause now: (a) states the
+The BLOCK 2b commit-body deferral in `.ai/plans/done/20-media-remediation-execution_done.md`
+(item 6) was **corrected in place** (at the original path before it was moved to
+`done/`). The corrected clause now: (a) states the
 key-membership enumeration is **identical across sites** (`Q(col__in=[k])` ≡ `Q(col=k)`
 for a singleton, and the falsy filter is inert), (b) names the two genuinely independent
 semantics (**authorisation** at `media_gate`; **census-vs-probe** at

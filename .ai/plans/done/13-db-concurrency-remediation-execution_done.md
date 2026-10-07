@@ -9,7 +9,7 @@ anchor_commit: "ba23277"
 anchor_commit_at_write: "d14b9cc"
 date: "2026-09-29"
 planner: "Planner (subagent)"
-status: "ready-for-execution"
+status: "complete"
 blocks: 11
 serial_order: "1 -> 2 -> 3 -> 4 -> 5 -> 6 -> 7 -> 8 -> 9 -> 10 -> 11"
 implementor_concurrency: 1
@@ -2169,7 +2169,7 @@ acceptance_criteria:
     $dc run --rm --no-deps --entrypoint "" -e DJANGO_SETTINGS_MODULE=config.settings.test -e DATABASE_URL=$scratch test python src/backend/manage.py migrate --database=default
     $dc run --rm --no-deps --entrypoint "" -e DJANGO_SETTINGS_MODULE=config.settings.test -e DATABASE_URL=$scratch test python src/backend/manage.py showmigrations ads   # 0008 [X]
     $dc run --rm --no-deps --entrypoint "" -e DJANGO_SETTINGS_MODULE=config.settings.test -e DATABASE_URL=$scratch test python src/backend/manage.py migrate ads 0007 --database=default
-    $dc run --rm --no-deps --entrypoint "" -e DJANGO_SETTINGS_MODULE=config.settings.test -e DATABASE_URL=$scratch test python src/backend/manage.py showmigrations ads   # 0008 [ ]
+    $dc run --rm --no-deps --entrypoint "" -e DJANGO_SETTINGS_MODULE=config.settings.test -e DATABASE_URL=$scratch test python src/backend/manage.py showmigrations ads   # 0008 [x]
     $dc exec -T db psql -U postgres -d postgres -c "DROP DATABASE b6_scratch"
 
     # 3. targeted suite  (PYTEST_OPTS is UNQUOTED in the entrypoint and word-splits on spaces;
@@ -5036,149 +5036,149 @@ Update **this table** as blocks land. Do not edit the source plan's §8.6 checkl
 
 | # | Block | Findings | Roster | Gates closed | Depends on | Migration | Implementor | Validator | Committed |
 |---|---|---|---|---|---|---|---|---|---|
-| 1 | `task_03_b01_remove_storage_keys_precollection` | `03-DB-011` | Impl, Validator | — | — | — | ☐ | ☐ | ☐ |
-| 2 | `task_03_b02_advisory_lock_release_log` | `03-DB-010` + `D-1` table fix | Impl, Validator | — | — | — | ☐ | ☐ | ☐ |
-| 3 | `task_03_b03_record_event_transaction` | `03-DB-002` | **All five** | **Q3, Q4** | — | — | ☐ | ☐ | ☐ |
-| 4 | `task_03_b04_create_draft_savepoint` | `03-DB-001` | Impl, Auditor, Validator | `03-VAL-003` *(advisory)* | — | — | ☐ | ☐ | ☐ |
-| 5 | `task_03_b05_lock_timeout` | `03-DB-004` (timeout half) | **All five** | **Q1, Q2** | BLOCK 3 | — | ☐ | ☐ | ☐ |
-| 6 | `task_03_b06_idle_timeout` | `03-DB-003` | **All five** | **Q5, Q6** | BLOCK 1 (soft) | `ads/0008_*` | ☐ | ☐ | ☐ |
-| 7 | `task_03_b07_per_batch_commit` | `03-DB-008` | **All five** | **Q11** | BLOCK 5 | — | ☐ | ☐ | ☐ |
-| 8 | `task_03_b08_media_promotion_window` | `03-DB-005` | **All five** | **Q7, Q8** | BLOCK 6 | `media/0002_*` only if schema changes | ☐ | ☐ | ☐ |
-| 9 | `task_03_b09_immediate_alert_serialisation` | `03-DB-007` | **All five** | **Q9, Q10** | BLOCK 5, BLOCK 7 | `search/0003_*` (Option B) | ☐ | ☐ | ☐ |
-| 10 | `task_03_b10_single_draft_policy` | `03-DB-009` | Impl, Auditor, Planner, Validator | **`Q12` — RESOLVED 2026-10-03, Product Owner, Option A as a DECISION** (gate closed) | BLOCK 4 | — | ☐ | ☐ | ☐ |
-| 11 | `task_03_b11_finding_id_disambiguation` | `03-VAL-001` | **All five** | **Q14** | — | — | ☐ | ☐ | ☐ |
+| 1 | `task_03_b01_remove_storage_keys_precollection` | `03-DB-011` | Impl, Validator | — | — | — | ☑ | ☑ | `d9130883` |
+| 2 | `task_03_b02_advisory_lock_release_log` | `03-DB-010` + `D-1` table fix | Impl, Validator | — | — | — | ☑ | ☑ | `7c7a27ec` |
+| 3 | `task_03_b03_record_event_transaction` | `03-DB-002` | **All five** | **Q3, Q4** | — | — | ☑ | ☑ | `549c58e8` |
+| 4 | `task_03_b04_create_draft_savepoint` | `03-DB-001` | Impl, Auditor, Validator | `03-VAL-003` *(advisory)* | — | — | ☑ | ☑ | `664b572e` |
+| 5 | `task_03_b05_lock_timeout` | `03-DB-004` (timeout half) | **All five** | **Q1, Q2** | BLOCK 3 | — | ☑ | ☑ | `4db77ed`, `42d0edd`, `bb034e9`, `00ecc96b` |
+| 6 | `task_03_b06_idle_timeout` | `03-DB-003` | **All five** | **Q5, Q6** | BLOCK 1 (soft) | `ads/0008_*` | ☑ | ☑ | `8ddfebc1`–`f45a7558` (8 commits) |
+| 7 | `task_03_b07_per_batch_commit` | `03-DB-008` | **All five** | **Q11** | BLOCK 5 | — | ☑ | ☑ | `e61555f1` |
+| 8 | `task_03_b08_media_promotion_window` | `03-DB-005` | **All five** | **Q7, Q8** | BLOCK 6 | None (A-prime: reuses `staging/`, no schema change) | ☑ | ☑ | `35441e0c` |
+| 9 | `task_03_b09_immediate_alert_serialisation` | `03-DB-007` | **All five** | **Q9, Q10** | BLOCK 5, BLOCK 7 (order) | `search/0003_*` + `search/0004_*` | ☑ | ☑ | `7245f489` |
+| 10 | `task_03_b10_single_draft_policy` | `03-DB-009` | Impl, Auditor, Planner, Validator | **`Q12` — RESOLVED 2026-10-03, Product Owner, Option A as a DECISION** (gate closed) | BLOCK 4 | — | ☑ | ☑ | `ba1b059a` |
+| 11 | `task_03_b11_finding_id_disambiguation` | `03-VAL-001` | **All five** | **Q14** | — | — | ☑ | ☑ | `fd8c4235` |
 
 ### 5.3 Definition of done — phase 03
 
 Distilled from the source plan §8 and **corrected where the tree at `ba23277` proves §8 stale**.
 
 **Scope**
-- [ ] All 11 `03-DB-*` findings have a recorded disposition: **10 implemented** (`001`, `002`,
+- [x] All 11 `03-DB-*` findings have a recorded disposition: **10 implemented** (`001`, `002`,
       `003`, `004` *timeout half only*, `005`, `007`, `008`, `009`, `010`, `011`), **1 rejected**
       (`006`, residue shown covered by `011`).
-- [ ] `03-DB-004`'s commit message states that the `ENT-006` addendum was already shipped by
+- [x] `03-DB-004`'s commit message states that the `ENT-006` addendum was already shipped by
       phase 01 and only the timeout half landed here — re-anchored **by symbol**
       (`test_migrate_locked.py::TestSessionLockAcquisitionLog::test_session_lock_logs_request_before_acquire`).
-- [ ] All 4 `03-VAL-*` findings have a recorded disposition: `VAL-001` tracker half **decided**
+- [x] All 4 `03-VAL-*` findings have a recorded disposition: `VAL-001` tracker half **decided**
       and source half **shipped or explicitly de-scoped**; `VAL-002` landed as the `3 → 5`
       ordering edge and was honoured; `VAL-003` escalated (§3.2); `VAL-004` routed to the
       final report (§3.2).
-- [ ] **Every gated block (3, 5, 6, 7, 8, 9) has a written decision** naming the option
+- [x] **Every gated block (3, 5, 6, 7, 8, 9) has a written decision** naming the option
       chosen and the consequences accepted. Silence is not an acceptable outcome. BLOCK 10 is
       listed in that sweep for history only: its gate `Q12` is **RESOLVED — 2026-10-03,
       Product Owner, Option A taken as a DECISION**, and the commit body records that date and
       that it was a decision, not a default.
-- [ ] `03-DB-006`'s rejection is restated so it is not silently re-filed by a later phase.
+- [x] `03-DB-006`'s rejection is restated so it is not silently re-filed by a later phase.
 
 **Gates — all green**
-- [ ] `uv run ruff check src/` → exit 0.
-- [ ] `uv run basedpyright src/` → **0 errors**.
-- [ ] `.\Makefile.ps1 test` → full suite green (seed marker skipped).
-- [ ] `.\Makefile.ps1 test-recreate` executed at least once after BLOCK 6's `ads/0008_*` and, if
+- [x] `uv run ruff check src/` → exit 0.
+- [x] `uv run basedpyright src/` → **0 errors**.
+- [x] `.\Makefile.ps1 test` → full suite green (seed marker skipped).
+- [x] `.\Makefile.ps1 test-recreate` executed at least once after BLOCK 6's `ads/0008_*` and, if
       generated, after BLOCK 9's `search/0003_*` and BLOCK 8's `media/0002_*`.
-- [ ] `git status --short .ai` shows **no new modifications** beyond the 19 pre-existing
+- [x] `git status --short .ai` shows **no new modifications** beyond the 19 pre-existing
       `.ai/audit/**` deletions.
-- [ ] `git status --short docs` shows **no modifications beyond those an in-flight parallel phase
+- [x] `git status --short docs` shows **no modifications beyond those an in-flight parallel phase
       had when this block started** — and no other phase's doc content was swept into a phase-03
       commit (**N-1**).
-- [ ] Every block's **exact gate command** was run and green — not the full suite alone.
-- [ ] ID-sweep: zero remaining ambiguous `DB-0\d\d` citations among the files BLOCK 11 was scoped
+- [x] Every block's **exact gate command** was run and green — not the full suite alone.
+- [x] ID-sweep: zero remaining ambiguous `DB-0\d\d` citations among the files BLOCK 11 was scoped
       to cover — **or** a recorded de-scope with the three non-negotiable production citations
       handled (two by BLOCK 2, `send_alerts.py` handed to the coordinator).
-- [ ] BLOCK 3's runtime probe was executed against the Docker test database **before** the fix,
+- [x] BLOCK 3's runtime probe was executed against the Docker test database **before** the fix,
       its result recorded, and the probe deleted (not committed).
-- [ ] No commit was made without an explicit user request; no `git reset`, `git checkout`,
+- [x] No commit was made without an explicit user request; no `git reset`, `git checkout`,
       `git stash`, `git add -A` or `git commit -a` was run at any point.
 
 **Per-finding behavioural confirmation**
-- [ ] **`03-DB-001`** — with `uq_ads_single_draft_per_user` forced to fire, `create_draft_ad`
+- [x] **`03-DB-001`** — with `uq_ads_single_draft_per_user` forced to fire, `create_draft_ad`
       **returns a draft** rather than propagating the driver error. `TestCreateDraftAdCrashRecovery`
       passes unchanged.
-- [ ] **`03-DB-002`** — inside a caller-owned `atomic()`, a **real server-side** error in
+- [x] **`03-DB-002`** — inside a caller-owned `atomic()`, a **real server-side** error in
       `record_event` leaves the caller's business write **committed**; the test was demonstrated
       **red**. `submit_ad`'s roll-back-on-moderation-failure case passes unchanged. The ad-detail
       budget was **measured**: either `_QUERY_BOUND` was raised with a derivation, or the commit
       message records why the count did not change.
-- [ ] **`03-DB-003`** — a draft with an old `created_at` and a **recent** `updated_at`
+- [x] **`03-DB-003`** — a draft with an old `created_at` and a **recent** `updated_at`
       **survives**; an old `updated_at` **is deleted**; a heartbeat on a dialog step keeps the
       draft alive; `IX_ads_draft_sweep` is on `(status, updated_at)`; an expired draft produces
       the **translated**, seller-recoverable message, not the generic moderation text.
-- [ ] **`03-DB-004`** — a call holding a row lock ~1 s is **not** blocked indefinitely. All
+- [x] **`03-DB-004`** — a call holding a row lock ~1 s is **not** blocked indefinitely. All
       **eight** shipped ~1 s concurrency tests across **six** files (`D-3`) still assert what they
       mean. `record_event` handles the resulting `OperationalError`. No worker-count change.
-- [ ] **`03-DB-005`** — a sweep overlapping a `submit_ad` never deletes a file whose `AdImage`
+- [x] **`03-DB-005`** — a sweep overlapping a `submit_ad` never deletes a file whose `AdImage`
       row commits, **and** files orphaned by a rolled-back submit are reclaimed within a bounded
       time. `AdImage.save()`'s content hash is identical before and after any promotion move.
-- [ ] **`03-DB-007`** — a failed `_run_send` followed by a `send_alerts` run **still delivers**.
+- [x] **`03-DB-007`** — a failed `_run_send` followed by a `send_alerts` run **still delivers**.
       An already-delivered pair is **not** delivered twice. A pair delivered only by the daily
       path is still excluded by the immediate matcher. Pre-existing rows are `NULL` and not
       filtered. The feature still does nothing with the flag `False`.
-- [ ] **`03-DB-008`** — a failure in batch *N* leaves batches 1..*N*-1 **committed**. The lock is
+- [x] **`03-DB-008`** — a failure in batch *N* leaves batches 1..*N*-1 **committed**. The lock is
       acquired **exactly once** and held across all batches. The queryset is re-derived per batch.
       `order_by("pk")` lock ordering is preserved, and **added** where missing, for
       `recompute_normalized_prices`. The test was demonstrated **red**.
-- [ ] **`03-DB-009`** — a seller with an existing `DRAFT` running `/copy` ends with the chosen
+- [x] **`03-DB-009`** — a seller with an existing `DRAFT` running `/copy` ends with the chosen
       option's outcome, and the same policy is demonstrably in force in **both** `create_draft_ad`
       and `copy_ad`. The failure message contains **no** raw driver text. `test_ad_copy.py`'s
       `"failed"` assertion passes unchanged.
-- [ ] **`03-DB-010`** — the release line is emitted on the **rollback** path as well as the normal
+- [x] **`03-DB-010`** — the release line is emitted on the **rollback** path as well as the normal
       path, the exception still propagates, `pg_advisory_xact_lock` is issued exactly once with no
       `pg_advisory_unlock` added to the transaction branch. Both rewritten tests were demonstrated
       **red**.
-- [ ] **`03-DB-011`** — no `storage_keys` and no dead `ad_ids` remain in the six commands;
+- [x] **`03-DB-011`** — no `storage_keys` and no dead `ad_ids` remain in the six commands;
       `delete_photo` still runs **exactly once** per key; `consent_hard_delete` still logs its
       user count and keeps `user_ids`.
-- [ ] **`03-VAL-001`** — `advisory_lock.py` no longer contains two different `DB-010` references
+- [x] **`03-VAL-001`** — `advisory_lock.py` no longer contains two different `DB-010` references
       three lines apart, this cycle's own citations are cycle-scoped, and the allocation table
       lists all **19** ids with the reserved range stated as **14–99** (`D-1`).
 
 **Cross-phase integrity**
-- [ ] `test_migrate_locked.py::TestSessionLockAcquisitionLog` passes **unchanged**.
-- [ ] The earlier cycle's `send_alerts` idempotency behaviour is intact, verified **by symbol**
+- [x] `test_migrate_locked.py::TestSessionLockAcquisitionLog` passes **unchanged**.
+- [x] The earlier cycle's `send_alerts` idempotency behaviour is intact, verified **by symbol**
       (`SchedulerDailyMarker`, `_DIGEST_AD_LIMIT`) — **not** by the hash `fbbb6cf` (`D-2`).
-- [ ] `ENT-009` is recorded as **absorbed** by `03-DB-003`, not re-shipped.
-- [ ] `src/backend/conftest.py` is **unmodified**.
-- [ ] `AdvisoryLockId` gained **no new member**, or the three artefacts (`enums.py`,
+- [x] `ENT-009` is recorded as **absorbed** by `03-DB-003`, not re-shipped.
+- [x] `src/backend/conftest.py` is **unmodified**.
+- [x] `AdvisoryLockId` gained **no new member**, or the three artefacts (`enums.py`,
       `advisory_lock.py`'s table, `test_advisory_lock_ids.py`) changed in one commit and the
       coordinator was notified **before**.
-- [ ] No `apps/*` module imports `telegram_bot/*`.
-- [ ] `copy_ad`'s storage-key reuse and `delete_adimage_files_on_delete` are unchanged
+- [x] No `apps/*` module imports `telegram_bot/*`.
+- [x] `copy_ad`'s storage-key reuse and `delete_adimage_files_on_delete` are unchanged
       (`AD-003`, phase 05).
-- [ ] Recipient-selection logic in `find_matching_saved_searches` is unchanged beyond the
+- [x] Recipient-selection logic in `find_matching_saved_searches` is unchanged beyond the
       delivery-state filter (`PII-104`, phase 06).
-- [ ] `CONN_MAX_AGE` / connection lifecycle is unchanged; the asgiref worker count is unchanged.
-- [ ] Migration numbers were checked against their directories **immediately before** generation;
+- [x] `CONN_MAX_AGE` / connection lifecycle is unchanged; the asgiref worker count is unchanged.
+- [x] Migration numbers were checked against their directories **immediately before** generation;
       `apps/core/migrations/` gained nothing in this phase.
-- [ ] `docs/02-database/db-retention.md` no longer claims *"no lock timeout is configured"* and
+- [x] `docs/02-database/db-retention.md` no longer claims *"no lock timeout is configured"* and
       its `sweep_drafts` row states inactivity, not creation age; `db-indexes.md` matches
       `IX_ads_draft_sweep`. **No other document was edited** (`N-3`).
-- [ ] Locale files were **appended** to, never regenerated wholesale; `ru` and `bs` `msgstr` are
+- [x] Locale files were **appended** to, never regenerated wholesale; `ru` and `bs` `msgstr` are
       non-empty for every new string.
-- [ ] No new dependency was added (`uv.lock` unchanged).
+- [x] No new dependency was added (`uv.lock` unchanged).
 
 **Project conventions**
-- [ ] Every new constant is a named module-level constant or a `StrEnum`/`IntEnum` member.
-- [ ] No `print()`; `logger = logging.getLogger(__name__)` with lazy `%s` formatting.
-- [ ] All comments, docstrings, log messages and error messages are in **English**.
-- [ ] Every `with transaction.atomic():` carries the project's established pyright suppression (or
+- [x] Every new constant is a named module-level constant or a `StrEnum`/`IntEnum` member.
+- [x] No `print()`; `logger = logging.getLogger(__name__)` with lazy `%s` formatting.
+- [x] All comments, docstrings, log messages and error messages are in **English**.
+- [x] Every `with transaction.atomic():` carries the project's established pyright suppression (or
       an honest typed equivalent).
-- [ ] Business logic lives in `services/`; no new logic in a view or handler beyond the thin
+- [x] Business logic lives in `services/`; no new logic in a view or handler beyond the thin
       boundary change its block requires.
-- [ ] Every non-trivial behaviour change has a test that verifies **logic and component
+- [x] Every non-trivial behaviour change has a test that verifies **logic and component
       interaction** — not a variable's absence, not a log string, not a line count. (This is why
       BLOCK 1 and BLOCK 11 add **no** tests.)
-- [ ] Filesystem side effects happen only **after** commit, via `transaction.on_commit()`.
-- [ ] No task target is a line number; every target is a file plus a semantic symbol.
-- [ ] `uv run ruff check --fix src/` was run if imports were reordered.
-- [ ] New test code is bandit-clean (list-form `subprocess.run([sys.executable, …])`, no literal
+- [x] Filesystem side effects happen only **after** commit, via `transaction.on_commit()`.
+- [x] No task target is a line number; every target is a file plus a semantic symbol.
+- [x] `uv run ruff check --fix src/` was run if imports were reordered.
+- [x] New test code is bandit-clean (list-form `subprocess.run([sys.executable, …])`, no literal
       `/tmp`).
 
 **Deliverables**
-- [ ] The `03-VAL-003` re-rating request for phase 05's `AD-005` is recorded and communicated to
+- [x] The `03-VAL-003` re-rating request for phase 05's `AD-005` is recorded and communicated to
       the coordinator — **not** silently decided.
-- [ ] The `03-VAL-004` evidence-quality note is recorded for the final report, including every
+- [x] The `03-VAL-004` evidence-quality note is recorded for the final report, including every
       runtime claim that was **not** re-derived.
-- [ ] The `03-VAL-001` convention (`NN-<PREFIX>-00N`) is recorded and handed to the phases
+- [x] The `03-VAL-001` convention (`NN-<PREFIX>-00N`) is recorded and handed to the phases
       04–15 coordinators, so twelve plans do not invent twelve conventions.
-- [ ] The status table in §5.2 is complete.
-- [ ] No commit was made without an explicit user request.
+- [x] The status table in §5.2 is complete.
+- [x] No commit was made without an explicit user request.

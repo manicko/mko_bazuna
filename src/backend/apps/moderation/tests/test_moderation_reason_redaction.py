@@ -3,8 +3,9 @@
 ``ModeratorActionLog.reason`` is unbounded staff-authored free text on a row
 that deliberately survives user erasure with ``user_id = NULL``. No erasure
 sweep can reach it, so the only defence is redacting the value before the
-INSERT, at the three writers that accept caller free text
-(``log_manual_reject``, ``log_ban_account``, ``log_soft_delete``).
+INSERT, at the four writers that accept caller free text
+(``log_manual_reject``, ``log_ban_account``, ``log_soft_delete``,
+``log_photo_removed``).
 
 These tests assert on the value read back from the database, never on a
 helper's return value alone and never on an expected masked string. Pinning
@@ -29,6 +30,7 @@ from apps.moderation.services.moderation_log import (
     log_ban_account,
     log_manual_publish,
     log_manual_reject,
+    log_photo_removed,
     log_soft_delete,
 )
 from conftest import create_test_ad
@@ -97,10 +99,20 @@ def _write_via_soft_delete(seller, category, city, reason: str) -> ModeratorActi
     )
 
 
+def _write_via_photo_removed(seller, category, city, reason: str) -> ModeratorActionLog:
+    ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+    return log_photo_removed(
+        ad_id=ad.id,
+        moderator_id=seller.id,
+        reason=reason,
+    )
+
+
 _WRITERS = (
     _write_via_manual_reject,
     _write_via_ban_account,
     _write_via_soft_delete,
+    _write_via_photo_removed,
 )
 
 
@@ -111,7 +123,7 @@ def test_free_text_writer_stores_neither_phone_nor_email(
     """Each free-text writer stores a reason with the phone and e-mail removed.
 
     A test that covers one writer proves nothing about the chokepoint; this
-    one proves the rule holds for all three that accept caller free text.
+    one proves the rule holds for all four that accept caller free text.
     """
     reason = f"seller shared contact: call {_PHONE} or write to {_EMAIL}"
     log = writer(seller, category, city, reason)
@@ -219,7 +231,7 @@ def test_already_redacted_reason_is_not_corrupted(seller, category, city) -> Non
 def test_direct_insert_row_keeps_original_text(seller, category, city) -> None:
     """A row written straight through the manager keeps its un-redacted text.
 
-    Redaction is a write-time rule applied by the three service functions, not
+    Redaction is a write-time rule applied by the four free-text service functions, not
     a read-time filter: a direct insert is not touched.
     """
     ad = create_test_ad(seller, category, city, status=AdStatus.REJECTED)

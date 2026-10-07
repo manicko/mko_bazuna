@@ -66,7 +66,9 @@ def bulk_moderation_action(request: HttpRequest) -> JsonResponse:
     primary-key order (deterministic lock order, matching ``bulk_approve``), and
     a failure on one ad never rolls back or aborts the rest — that per-ad
     isolation is what the response shape already promises. ``completed`` counts
-    only ads that were actually acted upon.
+    only ads that were actually acted upon. Duplicate ids are deduplicated
+    before processing, so each ad is counted once; ``MAX_BULK_ACTIONS`` bounds
+    the unique-id count.
     """
     try:
         payload = BulkModerationRequest.model_validate_json(request.body)
@@ -78,12 +80,16 @@ def bulk_moderation_action(request: HttpRequest) -> JsonResponse:
         )
 
     action_enum = payload.action
-    ad_ids: list[int] = payload.selected_items
+    # Deduplicate: a repeated id is a client artifact, and processing it twice
+    # would re-lock, re-transition and double-count one ad. The cap applies to
+    # the deduplicated list because it bounds the actual per-row cost, not the
+    # raw payload length.
+    ad_ids: list[int] = sorted(set(payload.selected_items))
     reason: str = payload.reason
 
     if len(ad_ids) > MAX_BULK_ACTIONS:
         logger.warning(
-            "Bulk moderation rejected: %d items exceeds max %d",
+            "Bulk moderation rejected: %d unique items exceeds max %d",
             len(ad_ids),
             MAX_BULK_ACTIONS,
         )
@@ -96,11 +102,9 @@ def bulk_moderation_action(request: HttpRequest) -> JsonResponse:
 
     # Ascending pk order makes the per-row lock acquisition order deterministic,
     # matching bulk_approve's documented rationale (no deadlock between
-    # concurrent bulk writers locking overlapping rows). Duplicate ids are NOT
-    # deduplicated: the current "processed twice, counted twice" behaviour is
-    # preserved and the separate client-side duplicate mis-report (05-NEW-04)
-    # stays observable. MAX_BULK_ACTIONS bounds the per-row cost.
-    for ad_id in sorted(ad_ids):
+    # concurrent bulk writers locking overlapping rows). The list is already
+    # deduplicated and sorted, so each ad is processed and counted exactly once.
+    for ad_id in ad_ids:
         try:
             with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
                 # Lock this single row for the duration of the per-ad work. The

@@ -979,6 +979,59 @@ class TestAdReactivateDirect:
         ad.refresh_from_db()
         assert ad.status == AdStatus.ARCHIVED  # unchanged by GET
 
+    def test_reactivate_moderation_failure_surfaces_message(
+        self,
+        seller,
+        category,
+        city,
+        banning_criteria,
+    ) -> None:
+        """A failed re-moderation leaves the ad hidden and tells the seller.
+
+        The failed check commits the ad as ``ON_MODERATION_FAILED``; the view
+        must surface that outcome on the dashboard instead of redirecting
+        silently (finding AD-008, post-review code problem 1).
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        ad.transition_to(AdStatus.ARCHIVED)
+        ad.refresh_from_db()
+        Ad.objects.filter(pk=ad.pk).update(title="spam offer")
+
+        client = Client()
+        client.force_login(seller)
+        response = client.post(reverse("ads:reactivate", args=[ad.id]), follow=True)
+
+        assert response.status_code == 200
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ON_MODERATION_FAILED
+        assert "did not pass moderation" in response.content.decode()
+
+    def test_reactivate_moderation_error_keeps_ad_archived(
+        self, seller, category, city
+    ) -> None:
+        """A system error during re-moderation rolls back and reports, not 500.
+
+        ``auto_moderate`` raising (a DB/cache failure, not a content verdict)
+        used to escape as HTTP 500 after the transaction rolled back. The view
+        must report the failure and leave the ad ARCHIVED.
+        """
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        ad.transition_to(AdStatus.ARCHIVED)
+        ad.refresh_from_db()
+
+        client = Client()
+        client.force_login(seller)
+        with patch(
+            "apps.moderation.services.auto_moderation.auto_moderate",
+            side_effect=RuntimeError("boom"),
+        ):
+            response = client.post(reverse("ads:reactivate", args=[ad.id]), follow=True)
+
+        assert response.status_code == 200
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ARCHIVED
+        assert "stays archived" in response.content.decode()
+
 
 # ---------------------------------------------------------------------------
 # TST-008: Other-status direct-save branch — explicit allow-list (AD-002 / 8A)

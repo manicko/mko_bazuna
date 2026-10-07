@@ -114,6 +114,35 @@ class TestAdEditLockTimeout:
             edit.ad_edit(request, ad.id)
 
 
+class TestAdReactivateLockTimeout:
+    """``ad_reactivate`` keeps the middleware boundary (503 + ``Retry-After``).
+
+    The view's own moderation-failure handling must not intercept database
+    errors: a lock timeout is still served by ``DbLockTimeoutMiddleware``.
+    """
+
+    @pytest.mark.django_db
+    def test_lock_timeout_still_returns_503(self, seller, category, city) -> None:
+        from apps.ads.views import edit
+
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        ad.transition_to(AdStatus.ARCHIVED)
+        ad.refresh_from_db()
+
+        client = Client()
+        client.force_login(seller)
+
+        with patch.object(
+            edit.Ad.objects,
+            "select_for_update",
+            side_effect=_lock_timeout_error(),
+        ):
+            response = client.post(reverse("ads:reactivate", args=[ad.id]))
+
+        assert response.status_code == 503
+        assert "busy" in response.content.decode().lower()
+
+
 class TestBulkLockTimeout:
     """The three bulk actions fail loudly with nothing committed."""
 

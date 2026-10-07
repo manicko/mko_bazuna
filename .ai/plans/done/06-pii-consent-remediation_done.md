@@ -7842,7 +7842,7 @@ Three statements this block previously made are **wrong** and are corrected here
    would *widen* what can reach the column. The Implementor must not repair it silently.
 
 **The writer inventory, verified against the tree.** Every `ModeratorActionLog.objects.create(...)`
-in `src/` — **all six production sites** — lives in
+in `src/` — **all seven production sites** — lives in
 `src/backend/apps/moderation/services/moderation_log.py`. The only other occurrences are
 **four in test code** (`apps/analytics/tests/test_moderation_analytics.py`,
 `apps/core/tests/test_sweep_consent.py`, `apps/core/tests/test_sweep_purge_rejected.py`),
@@ -7858,6 +7858,7 @@ there is **no admin write path** for `reason` at all.
 | `log_manual_reject` | free text from the caller | **yes** |
 | `log_ban_account` | free text from the caller | **yes** |
 | `log_soft_delete` | free text from the caller | **yes** |
+| `log_photo_removed` | free text from the caller | **yes** (already redacted by BLOCK 10) |
 
 The plan's earlier claim that the fixed literals were `"Bulk rejection via admin action"`,
 `"Bulk ban via admin action"` and `"Bulk deletion via admin action"` is **also wrong** — those
@@ -7872,15 +7873,17 @@ form-driven status change routes "through the existing moderation services so th
 has exactly one writer". So this block is **not** "build a chokepoint" — it is "name the
 redaction once, inside the module that already is the chokepoint".
 
-**Chosen.** One non-truncating redactor call, applied at the **three free-text `create`
-sites**. Three call sites, one rule, no new class, no manager, no `QuerySet` override, no new
+**Chosen.** One non-truncating redactor call, applied at the **four free-text `create`
+sites** (`log_manual_reject`, `log_ban_account`, `log_soft_delete`, and
+`log_photo_removed`, the last already redacted by BLOCK 10). Three call sites
+were new in BLOCK 16; one rule, no new class, no manager, no `QuerySet` override, no new
 module, no new file.
 
 **Rejected — per-site inline `redact_search_query(...)`.** It looks cheaper (there is nothing
 new to name) but it is the exact failure mode this phase keeps filing: the
 `withdraw_consent` `update_fields` list, the analytics consent gate, the erasure inventory —
-each was correct at its sites and correct nowhere else. `moderation_log.py`'s six writers are
-stable today; the seventh will be added by whoever needs it, and three copies of one
+  each was correct at its sites and correct nowhere else. `moderation_log.py`'s seven writers are
+  stable today (the seventh, `log_photo_removed`, was added in BLOCK 10), and three copies of one
 expression is three places to forget. A **named** helper is one place to forget.
 
 **Rejected — a `ModeratorActionLogManager` or custom `QuerySet.create` override.** It would be
@@ -8002,19 +8005,21 @@ category error BLOCK 3's reason names.
 | File | Symbol / target | Operation |
 |---|---|---|
 | `src/backend/apps/core/utils/sanitize.py` | one **new** module-level function beside `redact_search_query`, reusing `_EMAIL_PATTERN`, `_PHONE_PATTERN`, `_NAME_PATTERN`, `_mask_email`, `_mask_phone`, `_mask_name` | **additive only.** Do not modify `redact_search_query`, `_MAX_QUERY_LENGTH`, `mask_telegram_id`, `sanitize_query_for_log` or `sanitize_autocomplete_query`. Contended by phase 06 BLOCK 4 and phase 08 BLOCKS 3/4 — re-read immediately before editing |
-| `src/backend/apps/moderation/services/moderation_log.py` | the `reason=` argument of the `ModeratorActionLog.objects.create(...)` call inside `log_manual_reject`, `log_ban_account` and `log_soft_delete` | **the whole production change.** `log_auto_fail`, `log_auto_publish`, `log_manual_publish`, `set_moderation_failed`, `set_rejected` and `set_published` are **not** edited |
+| `src/backend/apps/moderation/services/moderation_log.py` | the `reason=` argument of the `ModeratorActionLog.objects.create(...)` call inside `log_manual_reject`, `log_ban_account` and `log_soft_delete` — **`log_photo_removed` (added in BLOCK 10) already calls `redact_free_text(reason)` and needs no edit** | **the whole production change.** `log_auto_fail`, `log_auto_publish`, `log_manual_publish`, `log_photo_removed`, `set_moderation_failed`, `set_rejected` and `set_published` are **not** edited |
 | `src/backend/apps/moderation/models.py` | `ModeratorActionLog.reason` — `help_text` | amend. **No migration**: `help_text` is not a database column |
 | `src/backend/apps/moderation/tests/test_moderation_reason_redaction.py` | new module | new tests |
 | `docs/01-spec/technical-specification.md` | §A "Moderation model" | one sentence. **Do not touch §F or §K** (BLOCKS 2, 4, 11) |
-| `src/backend/apps/moderation/admin_actions.py` | — | **no edit.** All six of its functions reach a `create` site; verify, do not modify (§5.3) |
+| `src/backend/apps/moderation/admin_actions.py` | — | **no edit.** All seven of its functions reach a `create` site; verify, do not modify (§5.3) |
 | `src/backend/apps/ads/admin.py` `rejected_reason` | — | **read-only.** Do not add a render-time filter |
 | `src/backend/apps/users/services/pii_inventory.py` | — | **no edit.** BLOCK 3's entry is already correct |
 | `src/backend/apps/core/tests/test_sanitize.py` | — | **read-only.** Phase 06 BLOCK 4 owns it; do not add tests there |
 
 **Binding constraints**
 
-1. Redaction happens **at write time**, inside the three `ModeratorActionLog.objects.create(...)`
-   calls in `apps/moderation/services/moderation_log.py`. **No render-time or read-time filter
+1. Redaction happens **at write time**, inside the four `ModeratorActionLog.objects.create(...)`
+   calls in `apps/moderation/services/moderation_log.py` (`log_manual_reject`,
+   `log_ban_account`, `log_soft_delete` and `log_photo_removed`, the last already redacted by
+   BLOCK 10). **No render-time or read-time filter
    anywhere** — `apps/ads/admin.py::rejected_reason` must not be touched.
 2. **`redact_search_query` must not be called on `reason`.** It truncates to
    `_MAX_QUERY_LENGTH = 100` and would silently discard the moderator's text. Add and call the
@@ -8065,7 +8070,7 @@ source_blocks: ["BLOCK 16"]
 description: >
   ModeratorActionLog.reason is unbounded staff-authored free text on a row that
   deliberately survives user erasure with user_id = NULL, and no write site redacts it.
-  Add a non-truncating redactor beside redact_search_query and apply it at the three
+  Add a non-truncating redactor beside redact_search_query and apply it at the four
   free-text ModeratorActionLog.objects.create sites, which is every production writer in
   the repository. Amend the field help text and record the rule in the technical
   specification. Ad has no rejected_reason column: apps/ads/admin.py::rejected_reason is a
@@ -8124,6 +8129,7 @@ files:
         - "log_auto_fail"
         - "log_auto_publish"
         - "log_manual_publish"
+        - "log_photo_removed"
         - "set_moderation_failed"
         - "set_rejected"
         - "set_published"
@@ -8190,9 +8196,10 @@ changes:
   - action: modify_code
     description: >
       In apps/moderation/services/moderation_log.py, pass `redact_free_text(reason)`
-      instead of `reason` as the `reason=` keyword argument to the three
+      instead of `reason` as the `reason=` keyword argument to the four
       ModeratorActionLog.objects.create(...) calls, in log_manual_reject,
-      log_ban_account and log_soft_delete - the only three that accept caller free text.
+      log_ban_account, log_soft_delete and log_photo_removed (the last already
+      redacted by BLOCK 10; included so the surface is named completely).
       Add the import. Do not touch log_auto_fail, log_auto_publish, log_manual_publish or
       any of the three set_* drivers: set_rejected forwards its reason to
       log_manual_reject and is covered by this edit for free, and set_published writes only
@@ -8260,7 +8267,7 @@ changes:
       # src/backend/apps/moderation/tests/test_moderation_reason_redaction.py
       #
       # 1. every free-text writer: parametrise over log_manual_reject / log_ban_account /
-      #    log_soft_delete. Reason carries a phone number and an e-mail address with a
+      #    log_soft_delete / log_photo_removed. Reason carries a phone number and an e-mail address with a
       #    realistic local part ("ana.markovic@example.com" - a two-character local part
       #    such as "a@b.co" is deliberately preserved by _mask_email and would make the
       #    test pass for the wrong reason). Assert neither survives in the stored row.
@@ -8278,7 +8285,7 @@ changes:
       # 5. not truncated: a clean reason longer than 100 characters is stored in full.
       #    This is the regression the plan's open question was about.
 acceptance_criteria:
-  - "a reason containing a phone number and an e-mail address stores neither, for each of log_manual_reject, log_ban_account and log_soft_delete"
+  - "a reason containing a phone number and an e-mail address stores neither, for each of log_manual_reject, log_ban_account, log_soft_delete and log_photo_removed"
   - "a clean reason and each of the three fixed literals are stored byte-identical"
   - "a clean reason longer than 100 characters is stored in full - nothing is truncated"
   - "redaction is idempotent: an already-redacted reason is not corrupted and does not accumulate asterisks"
@@ -8294,8 +8301,8 @@ tests_required:
   - id: every_free_text_writer_is_redacted
     assertion: >
       A reason carrying a phone number and an e-mail address reaches the database with
-      neither present, driven separately through log_manual_reject, log_ban_account and
-      log_soft_delete. Assert on the value read back from the stored row. Use an e-mail
+      neither present, driven separately through log_manual_reject, log_ban_account,
+      log_soft_delete and log_photo_removed. Assert on the value read back from the stored row. Use an e-mail
       with a local part longer than two characters, because _mask_email preserves a
       local part of two or fewer characters and would let the test pass for the wrong
       reason. This is the test that proves the chokepoint holds for the next writer.
@@ -8362,7 +8369,9 @@ commit:
     - "src/backend/apps/moderation/tests/test_moderation_reason_redaction.py"
     - "docs/01-spec/technical-specification.md"
   body_notes:
-    - "Name the three redacted write sites and state that they are the only production ModeratorActionLog writers in the repository."
+     - "Name the four redacted write sites (log_manual_reject, log_ban_account, log_soft_delete
+       and log_photo_removed — the last already redacted by BLOCK 10) and state that they are the
+       only production ModeratorActionLog writers in the repository."
     - "State that redact_search_query was rejected for this column because it truncates to _MAX_QUERY_LENGTH = 100, and that redact_free_text is additive so redact_search_query and _MAX_QUERY_LENGTH are unchanged."
     - "State that redaction is irreversible and applies to new writes only: rows written before this commit keep their original text, and no backfill is proposed."
     - "Record the residue - set_moderation_failed's `reason` parameter is dead (declared, never used) and was deliberately left alone as a pre-existing bug out of scope."
@@ -8370,7 +8379,7 @@ commit:
 extra_context: |
   BINDING CONSTRAINTS — verbatim, not to be summarised.
 
-  1. Redaction happens at write time, inside the three
+  1. Redaction happens at write time, inside the four
      ModeratorActionLog.objects.create(...) calls in
      apps/moderation/services/moderation_log.py. No render-time or read-time filter
      anywhere — apps/ads/admin.py::rejected_reason must not be touched.
@@ -8415,12 +8424,13 @@ extra_context: |
     render-time display helper in AdAdmin.list_display that reads
     obj.moderation_logs.filter(action_type=REJECT).last() and returns log.reason[:100].
     Any target naming `Ad.rejected_reason` is a defect.
-  - All SIX production ModeratorActionLog.objects.create sites are in
+  - All SEVEN production ModeratorActionLog.objects.create sites are in
     moderation_log.py. The other four occurrences in src/ are in test code. There is no
     admin write path: ModeratorActionLogAdmin returns False from has_add_permission,
     has_change_permission and has_delete_permission.
-  - Three writers take free text (log_manual_reject, log_ban_account, log_soft_delete);
-    three pass fixed literals (log_auto_fail, log_auto_publish, log_manual_publish).
+  - Four writers take free text (log_manual_reject, log_ban_account, log_soft_delete,
+    log_photo_removed — added in BLOCK 10); three pass fixed literals (log_auto_fail,
+    log_auto_publish, log_manual_publish).
   - redact_search_query never lengthens its input: measured over 200000 randomised
     PII-heavy strings and a systematic token-pair sweep, the maximum positive length
     delta was 0. It CAN shorten by one character when a masked multi-word name contains a
@@ -8442,9 +8452,9 @@ extra_context: |
 
 1. **Every free-text writer is covered** — a reason containing a phone number and an
    e-mail address reaches the database with neither present, driven separately through
-   **each** of `log_manual_reject`, `log_ban_account` and `log_soft_delete`. A test that
-   covers one writer proves nothing about the chokepoint; this one is what proves the rule
-   survives the next writer being added.
+   **each** of `log_manual_reject`, `log_ban_account`, `log_soft_delete` and
+   `log_photo_removed`. A test that covers one writer proves nothing about the
+   chokepoint; this one is what proves the rule survives the next writer being added.
 2. **Clean text is stored byte-identical** — a reason with no phone, no e-mail and no
    consecutive capitalised words is stored exactly as given, and the three fixed literals
    are asserted byte-identical. An unconditional rewrite that reformats legitimate audit

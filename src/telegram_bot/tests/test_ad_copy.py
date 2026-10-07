@@ -139,6 +139,30 @@ class TestCmdCopy:
         assert "only copy" in called_text.lower() or "own" in called_text.lower()
 
     @pytest.mark.asyncio
+    async def test_copy_ad_not_found(self, seller, source_ad) -> None:
+        """A missing source ad yields a distinct not-found message."""
+        from telegram_bot.handlers.ad_copy import cmd_copy
+
+        state = MagicMock()
+        state.get_data = AsyncMock(return_value={"user_id": seller.id})
+
+        message = MagicMock()
+        message.from_user = MagicMock(id=seller.chat_id)
+        message.text = f"/copy {source_ad.id}"
+        message.answer = AsyncMock()
+
+        with patch(
+            "telegram_bot.handlers.ad_copy.copy_ad",
+            new=MagicMock(side_effect=Ad.DoesNotExist),
+        ):
+            await cmd_copy(message, state)
+
+        message.answer.assert_awaited_once()
+        called_text = message.answer.call_args[0][0]
+        assert "not found" in called_text.lower()
+        assert str(source_ad.id) in called_text
+
+    @pytest.mark.asyncio
     async def test_copy_unexpected_error(self, seller, source_ad) -> None:
         """An unexpected exception yields a generic error message."""
         from telegram_bot.handlers.ad_copy import cmd_copy

@@ -19,9 +19,10 @@ import logging
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
+from django.contrib import messages
 from django.contrib.auth.decorators import login_required
-from django.db import OperationalError, transaction
-from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
+from django.db import DatabaseError, OperationalError, transaction
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
@@ -460,6 +461,14 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
     Text is re-checked via auto-moderation. Ad is immediately hidden
     until moderation passes.
 
+    The auto-moderation outcome is surfaced to the seller: a failed check
+    commits the ad as ON_MODERATION_FAILED (hidden pending human review) and
+    shows a dashboard message instead of a silent redirect; an unexpected
+    non-database error raised by the check rolls the reactivation back (the ad
+    stays ARCHIVED) and reports the failure instead of returning HTTP 500.
+    Database errors keep the 03-DB-004 boundary (lock timeout -> 503 via
+    DbLockTimeoutMiddleware, anything else re-raised untouched).
+
     Args:
         request: HTTP request (authenticated user required)
         ad_id: The ad ID to reactivate
@@ -467,33 +476,67 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
     Returns:
         Redirect to dashboard or 403 Forbidden if unauthorized
     """
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  # django-stubs not installed; Atomic lacks CM stubs
-        ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
+    passed: bool | None = None
+    try:
+        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  # django-stubs not installed; Atomic lacks CM stubs
+            ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
 
-        # Authorization check
-        if ad.user_id != request.user.id:
-            logger.warning(
-                "User %s attempted to reactivate ad %s owned by %s",
-                request.user.id,
-                ad_id,
-                ad.user_id,
+            # Authorization check
+            if ad.user_id != request.user.id:
+                logger.warning(
+                    "User %s attempted to reactivate ad %s owned by %s",
+                    request.user.id,
+                    ad_id,
+                    ad.user_id,
+                )
+                return HttpResponseForbidden(
+                    _("You do not have permission to reactivate this ad.")
+                )
+
+            if not _seller_may_create_ad(request.user):
+                return _consent_required_forbidden(request.user, ad_id)
+
+            if ad.status == AdStatus.ARCHIVED:
+                # Update status to ON_MODERATION for re-check (transition_to clears archived_at)
+                ad.transition_to(AdStatus.ON_MODERATION)
+
+                # Run auto-moderation check
+                from apps.moderation.services.auto_moderation import auto_moderate
+
+                passed = auto_moderate(ad)
+    except (Http404, DatabaseError):
+        # A missing ad keeps its 404; a database error keeps the 03-DB-004
+        # boundary (a lock timeout becomes a 503 via DbLockTimeoutMiddleware,
+        # anything else is re-raised untouched). Only a non-database failure of
+        # the moderation pipeline is converted into a dashboard message below.
+        raise
+    except Exception:
+        # auto_moderate raising a non-database error (e.g. a cache failure)
+        # used to escape as HTTP 500 after the transaction rolled back. Report
+        # it and leave the ad ARCHIVED (the rollback is the safe state).
+        logger.exception("Ad %s reactivation failed during auto-moderation", ad_id)
+        messages.error(
+            request,
+            _(
+                "Reactivating ad #%(ad_id)s failed. The ad stays archived; "
+                "please try again later."
             )
-            return HttpResponseForbidden(
-                _("You do not have permission to reactivate this ad.")
+            % {"ad_id": ad_id},
+        )
+        return redirect("ads:dashboard")
+
+    if passed is False:
+        # The ad committed as ON_MODERATION_FAILED and stays hidden until human
+        # review; without this branch the seller saw a silent redirect.
+        logger.info("Ad %s failed re-moderation on reactivation", ad_id)
+        messages.warning(
+            request,
+            _(
+                "Ad #%(ad_id)s did not pass moderation and is hidden pending review."
             )
-
-        if not _seller_may_create_ad(request.user):
-            return _consent_required_forbidden(request.user, ad_id)
-
-        if ad.status == AdStatus.ARCHIVED:
-            # Update status to ON_MODERATION for re-check (transition_to clears archived_at)
-            ad.transition_to(AdStatus.ON_MODERATION)
-
-            # Run auto-moderation check
-            from apps.moderation.services.auto_moderation import auto_moderate
-
-            auto_moderate(ad)
-
-            logger.info("Ad %s reactivation initiated by user %s", ad_id, request.user.id)
+            % {"ad_id": ad_id},
+        )
+    elif passed:
+        logger.info("Ad %s reactivated by user %s", ad_id, request.user.id)
 
     return redirect("ads:dashboard")

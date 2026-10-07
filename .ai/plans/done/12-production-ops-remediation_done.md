@@ -9,7 +9,7 @@ date: "2026-09-29"
 planner: "Planner (subagent)"
 anchor_commit: "6413df5"
 report_anchor_commit: "6413df5"
-status: "planned"
+status: "done"
 findings_in_scope: 24
 findings_still_exist: 18
 findings_partial: 2

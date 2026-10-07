@@ -123,10 +123,10 @@ stored as a database column. The values carry no driver or exception text.
 | Value | Wire string | Meaning |
 |-------|-------------|---------|
 | `CRITERIA_REJECTED` | `Auto-moderation failed` | auto-moderation ran and the ad failed the criteria (the ad is set to `ON_MODERATION_FAILED`) |
-| `TRANSITION_REFUSED` | `Transition refused by ad status` | the ad was not in the approvable set, or the state machine refused the transition; no state change |
+| `TRANSITION_REFUSED` | `Transition refused by ad status` | the **approve** path: the ad was not in the approvable set, or the state machine refused the transition; no state change |
 | `AD_NOT_FOUND` | `Ad not found` | the row was absent at lock time or hard-deleted mid-transaction |
 | `MAX_ADS_EXCEEDED` | `User has reached the maximum number of active ads` | the seller's active-ads cap was reached — a business outcome, not a system fault |
-| `INVALID_TRANSITION` | `Ad is not in a modifiable state` | ordinary user input the matrix refuses (e.g. bulk-rejecting an `ARCHIVED` ad) |
+| `INVALID_TRANSITION` | `Ad is not in a modifiable state` | the **reject** path's state-machine refusal (a caught `ValueError` from `transition_to`, e.g. bulk-rejecting an `ARCHIVED` ad); no state change |
 | `PROCESSING_FAILED` | `Processing failed` | an unexpected infrastructure/DB failure; logged loudly so it is never a silent `200` |
 
 ## ApproveOutcome

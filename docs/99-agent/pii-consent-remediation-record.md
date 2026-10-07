@@ -41,11 +41,18 @@ this table was written. Both are recorded in
 [Retention framing correction](#retention-framing-correction-owner-ruling-2026-10-04), which
 governs where the two disagree.
 
+**Two supplementary findings (06-PII-001, 06-PII-002) were committed during execution as
+corrective fixes outside the plan's original 14-in-scope findings.** They are not
+owner-ratified decisions but are recorded here for discoverability (Q-D14, Q-D15). See
+[Supplementary fixes](#supplementary-fixes-06-pii-001--06-PII-002) below.
+
 | Gate | Question | Decision (ratified 2026-10-03) | Rejected alternative | Implementation |
 |---|---|---|---|---|
 | **Q-D1** | Is a consent **DECLINE** reversible? | **(a) Reversible.** `is_declined` is dropped from `can_login()`; publishing and listing/search visibility stay restricted while the decline stands. See [DECLINE-1](#decline-1-q-d1--a-decline-is-reversible) | **(b) Intentionally one-way** — leave `can_login()` alone and correct `privacy.html` §7 to say the choice is final for seller features. Rejected because it keeps a silent, effectively irreversible takedown of a live seller's listings as the side effect of clicking a cookie banner, and leaves recoverability an open design item instead of a courtesy | `8dba351` |
 | **Q-D4** | `ConsentRecord` retention: what bound, and which advisory-lock id? | **R2 — fingerprint fields (`session_key`, `user_agent`, `ip_address`, plus the `user` link): 90 days. Fresh lock id 14.** **R1 — event fields (`choice`, `categories`, `consent_version`, `consent_given_at`): retain while there is a necessity to prove consent/withdrawal and the lawfulness of the corresponding processing; after a justified period expires, delete or anonymise; anonymise, never delete.** The actor rule (`initiated_by`) was added later and is **not** part of this row — see [Retention framing correction](#retention-framing-correction-owner-ruling-2026-10-04). **R1's 2026-10-03 figure was re-grounded on 2026-10-04**: the limitation-period justification is withdrawn and the number survives only as a project decision | Reusing an existing lock id, and a retention knob (a `--older-than` flag, env var or setting) that would let the documented value and the command drift apart | `fd5201d` |
 | **Q-D8** | `LOG_MASK_KEY` provenance, production requirement, rotation policy | **Independent secret** (never derived from `SECRET_KEY`), **required and fail-fast in `prod.py`**, rotated **only on compromise, never on a schedule** | Deriving the mask key from `SECRET_KEY`. Rejected: one leak would then have two blast radii and there would be no scoped revocation | `b7ba213` |
+| **Q-D14** | **(Supplementary — not in the plan's 14-in-scope findings.)** Should consent endpoints reject actions on soft-deleted users, and should WITHDRAW be terminal? | **Guard all three consent endpoints** (`give_consent`, `consent_accept`, `consent_decline`) against `is_deleted` users; **make WITHDRAW terminal** — a withdrawn account cannot re-consent or take any further consent action | Leaving the race window open: a soft-deleted user re-recording consent or re-declining after withdrawal, mutating state on an account the erasure sweep owns | `718efb94`, `a1fb34e8`, `4b912280`, `2c941b93`, `2cccd498` |
+| **Q-D15** | **(Supplementary — not in the plan's 14-in-scope findings.)** What should `consent_hard_delete` log — user count or cascaded row total? | **Log user count** — the operator-facing number — not the cascaded row total, which mixes `ConsentRecord` rows with dependent rows and is opaque to operators | Logging cascaded row total, which obscures the user count operators actually care about and can be misleading in batch hard-deletes | `38cce5c6`, `8ffd6e0e` |
 
 ### DECLINE-1 (Q-D1) — a DECLINE is reversible
 
@@ -273,6 +280,7 @@ genuinely ambiguous, this record says so rather than choosing a figure and imply
 | **No `__Host`-style new recovery token** | The existing `LoginToken` handshake was sufficient; a second credential for the same job would be a second revocation surface |
 | **`MODERATOR` / ban-target-scope contract not restated here** | Stated once in [`technical-specification.md` §H](../01-spec/technical-specification.md) and in `apps/moderation/admin_actions.py`. A second copy is a second source of truth |
 | **No data migration for a `LOG_MASK_KEY` rotation** | Nothing persists a masked value — no model field, session, cache key or Redis key. Rotating the key changes every masked value in the log history; that is a log-correlation cost, not a data migration |
+| **`06-PII-001` / `06-PII-002` are addressed, not deferred** | These are **supplementary fixes** committed during execution as defensive correctness guards, **outside** the plan's 14-in-scope findings. They are documented in the gate table as Q-D14 and Q-D15 and in [Supplementary fixes](#supplementary-fixes-06-pii-001--06-pii-002); they are not deferred and do not need a future phase |
 
 ## Where the shipped behaviour is documented
 
@@ -291,3 +299,48 @@ genuinely ambiguous, this record says so rather than choosing a figure and imply
 | `ModeratorActionLog.reason` redaction at write time | [`technical-specification.md` §A](../01-spec/technical-specification.md) |
 | `search_query_key()` — redact-then-lower, and why a keyed digest was rejected | [`db-schema.md`](../02-database/db-schema.md#popularsearch) |
 | Support intake gated on storage consent; tickets erased on withdrawal | [`architecture.md` § Bot Support Intake Flow](../99-agent/architecture.md#bot-support-intake-flow), [`db-schema.md`](../02-database/db-schema.md#support_tickets) |
+
+## Supplementary fixes (06-PII-001, 06-PII-002)
+
+Two findings were committed during execution as **corrective fixes outside the plan's
+original 14-in-scope findings** (documented in the gate table as **Q-D14** and **Q-D15**).
+They are not owner-ratified decisions; they are defensive correctness guards the
+Validator identified and the Implementor closed. Both are correct and intentional —
+they simply were not part of the original scope and therefore have no BLOCK of their
+own.
+
+### Q-D14 — 06-PII-001: terminal-state enforcement on consent endpoints
+
+**What it does.** Guards `give_consent`, `consent_accept` and `consent_decline` against
+soft-deleted (`is_deleted`) users. Makes WITHDRAW terminal: a withdrawn account cannot
+re-consent or take any further consent action.
+
+**Why it matters.** Without the guard, a soft-deleted user could re-record a consent
+choice or re-decline after withdrawal, mutating state on an account the erasure sweep
+owns. The race window is narrow but real: the consent endpoints are reachable through
+the bot's `/start login_<token>` deep link, which sits inside the `is_declined` branch
+(see [DECLINE-1](#decline-1-q-d1--a-decline-is-reversible)). A deleted user reaching
+that path would silently flip their own state.
+
+**Decision.** Guard all three consent endpoints with the existing `is_deleted` check
+and return a refusal for a withdrawn account. No new model, field, migration or URL
+route is introduced.
+
+**Implementation.** `718efb94` (guard `give_consent`), `a1fb34e8` (guard
+`consent_accept`), `4b912280` (guard `consent_decline`), `2c941b93` / `2cccd498`
+(terminal WITHDRAW regression tests + `consent_hard_delete` log accuracy).
+
+### Q-D15 — 06-PII-002: consent_hard_delete log accuracy
+
+**What it does.** `consent_hard_delete` logs **user count** instead of **cascaded row
+total**.
+
+**Why it matters.** The hard-delete sweep uses `on_delete=CASCADE` through
+`ConsentRecord.user`, so the actual row count includes dependent rows from every
+cascaded table — a number no operator can interpret. Logging user count keeps the
+output meaningful and matches what the operator asked for.
+
+**Decision.** Log the input queryset's user count (`qs.count()`) before the cascade,
+not the post-cascade row delta.
+
+**Implementation.** `38cce5c6` (log user count), `8ffd6e0e` (caplog regression test).

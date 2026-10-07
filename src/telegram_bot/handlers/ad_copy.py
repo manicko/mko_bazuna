@@ -14,6 +14,7 @@ from aiogram.fsm.context import FSMContext
 from asgiref.sync import sync_to_async
 from django.utils.translation import get_language, gettext as _
 
+from apps.ads.models import Ad
 from apps.ads.services.copy_service import copy_ad
 from apps.currencies.enums import CurrencyCode
 from telegram_bot.states import AdCreateState
@@ -55,6 +56,11 @@ async def cmd_copy(message: types.Message, state: FSMContext) -> None:
         logger.info("Ad %d copied to draft %d by user %d", ad_id, new_ad.id, user_id)
     except PermissionError:
         await message.answer(_("You can only copy your own ads."))
+        return
+    except Ad.DoesNotExist:
+        # The source ad does not exist (or was hard-deleted): a distinct,
+        # seller-actionable reply, not the generic failure message.
+        await message.answer(_("Ad #%(ad_id)s not found.") % {"ad_id": ad_id})
         return
     except Exception:
         logger.exception("Failed to copy ad %d for user %d", ad_id, user_id)

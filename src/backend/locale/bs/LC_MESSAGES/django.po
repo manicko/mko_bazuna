@@ -1710,3 +1710,22 @@ msgstr "Pregledaj sve oglase"
 #: src/backend/apps/cabinet/views/saved_searches.py
 msgid "Price must not be negative."
 msgstr "Cijena ne može biti negativna."
+
+#: src/backend/apps/ads/views/edit.py
+#, python-format
+msgid ""
+"Reactivating ad #%(ad_id)s failed. The ad stays archived; "
+"please try again later."
+msgstr ""
+"Ponovna aktivacija oglasa #%(ad_id)s nije uspjela. Oglas ostaje arhiviran; "
+"pokušajte ponovo kasnije."
+
+#: src/backend/apps/ads/views/edit.py
+#, python-format
+msgid "Ad #%(ad_id)s did not pass moderation and is hidden pending review."
+msgstr "Oglas #%(ad_id)s nije prošao moderaciju i skriven je do pregleda."
+
+#: src/telegram_bot/handlers/ad_copy.py
+#, python-format
+msgid "Ad #%(ad_id)s not found."
+msgstr "Oglas #%(ad_id)s nije pronađen."

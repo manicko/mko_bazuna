@@ -52,6 +52,8 @@ class Ad(models.Model):
     - ARCHIVED -> ON_MODERATION (edit-then-re-moderate)
     - PUBLISHED -> ON_MODERATION (text edits, hidden)
     - any -> DELETED
+    - ON_MODERATION_FAILED -> REJECTED (human review only)
+    - REJECTED, DELETED are terminal (no outgoing transitions)
 
     published_at resets on every PUBLISHED transition; original_published_at immutable.
     moderation_failed_at and rejected_at are mutually exclusive.
@@ -408,6 +410,8 @@ class Ad(models.Model):
         - ARCHIVED -> PUBLISHED | ON_MODERATION
         - PUBLISHED -> ON_MODERATION
         - any -> DELETED
+        - ON_MODERATION_FAILED -> REJECTED (human review only)
+        - REJECTED, DELETED are terminal (no outgoing transitions)
 
         Side-effects:
         - -> PUBLISHED: published_at = now(); original_published_at set once if None

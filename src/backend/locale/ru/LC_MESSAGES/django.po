@@ -1729,3 +1729,22 @@ msgstr "Смотреть все объявления"
 #: src/backend/apps/cabinet/views/saved_searches.py
 msgid "Price must not be negative."
 msgstr "Цена не может быть отрицательной."
+
+#: src/backend/apps/ads/views/edit.py
+#, python-format
+msgid ""
+"Reactivating ad #%(ad_id)s failed. The ad stays archived; "
+"please try again later."
+msgstr ""
+"Не удалось повторно активировать объявление #%(ad_id)s. Объявление осталось "
+"в архиве; повторите попытку позже."
+
+#: src/backend/apps/ads/views/edit.py
+#, python-format
+msgid "Ad #%(ad_id)s did not pass moderation and is hidden pending review."
+msgstr "Объявление #%(ad_id)s не прошло модерацию и скрыто до проверки."
+
+#: src/telegram_bot/handlers/ad_copy.py
+#, python-format
+msgid "Ad #%(ad_id)s not found."
+msgstr "Объявление #%(ad_id)s не найдено."

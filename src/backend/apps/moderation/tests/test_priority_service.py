@@ -902,6 +902,79 @@ class TestBulkModerationActionView:
         assert data["completed"] == 0
         assert len(data["errors"]) == MAX_BULK_ACTIONS
 
+    def test_bulk_duplicate_ids_counted_once(self, category, city) -> None:
+        """A duplicated id is processed and counted exactly once.
+
+        Duplicate ids are a client artifact; the endpoint deduplicates them
+        instead of re-locking, re-transitioning and double-counting one ad
+        (post-review code problem 5).
+        """
+        ad = create_test_ad(
+            self.user,
+            category,
+            city,
+            title="Duplicate Id Ad",
+            status=AdStatus.ON_MODERATION,
+        )
+        AdImage.objects.create(ad=ad, image="img-dup.jpg", position=0)
+
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
+            self.bulk_url,
+            data=json.dumps(
+                {
+                    "action": BulkModerationAction.APPROVE.value,
+                    "selected_items": [ad.id, ad.id, ad.id],
+                }
+            ),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["completed"] == 1
+        assert data["errors"] == []
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED
+
+    def test_bulk_duplicates_do_not_trip_max_actions(self, category, city) -> None:
+        """MAX_BULK_ACTIONS bounds the deduplicated list, not the raw payload.
+
+        A raw payload larger than the cap that collapses to one unique id is
+        processed once (the cap exists to bound the per-row cost).
+        """
+        ad = create_test_ad(
+            self.user,
+            category,
+            city,
+            title="Duplicate Cap Ad",
+            status=AdStatus.ON_MODERATION,
+        )
+        AdImage.objects.create(ad=ad, image="img-dup-cap.jpg", position=0)
+
+        client = Client()
+        client.force_login(self.staff_user)
+        response = client.post(
+            self.bulk_url,
+            data=json.dumps(
+                {
+                    "action": BulkModerationAction.APPROVE.value,
+                    "selected_items": [ad.id] * (MAX_BULK_ACTIONS + 5),
+                }
+            ),
+            content_type="application/json",
+        )
+
+        assert response.status_code == 200
+        data = response.json()
+        assert data["completed"] == 1
+        assert data["errors"] == []
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED
+
     def test_unknown_version_returns_404(self) -> None:
         """POST to an unknown API version (/api/v2/) degrades to 404 (not 500)."""
         client = Client()

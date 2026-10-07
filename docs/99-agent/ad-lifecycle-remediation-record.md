@@ -62,7 +62,7 @@ scheduled.
 | Gate | Question | Deferred block | State |
 |---|---|---|---|
 | Q1 | May a moderator move an ad's `status`, and through which seam? | BLOCK 6B, making `status` read-only | Open. `status` is deliberately still editable after 6A |
-| Q2 | How should `ON_MODERATION` be made durably committable? | BLOCK 5 (`AD-008`) | Open. No code shipped |
+| Q2 | How should `ON_MODERATION` be made durably committable? | BLOCK 5 (`AD-008`) | Open. The durability change is not shipped; the feedback half was applied post-review (see "Post-review code-problem resolutions") |
 | Q4 | Which retention anchor is correct for `delete_sweep`? | BLOCK 7 (`AD-004`, `VAL-005`) | Open. No code shipped; the sweep still filters on `archived_at` |
 | Q5 | What may a seller do to an auto-failed ad: re-moderate, refuse, or hide the affordance? | BLOCK 8B | Open. `purge_failed_ads`' 7-day timer is still not reset, and no `ON_MODERATION_FAILED → ON_MODERATION` matrix edge was added |
 | Q6 | Is `MEDIA-002`'s promoted-file reclaim in scope? | BLOCK 13 (`AD-006`) | Open. No code shipped |
@@ -114,3 +114,17 @@ extraction.**
 | `published_at` reset on reactivation and on a price-only edit | [db-schema.md](../02-database/db-schema.md), [seller-stories.md](../04-user-stories/seller-stories.md) |
 | Admin form audit row and the seller-side edit refusal | [admin-stories.md](../04-user-stories/admin-stories.md), [seller-stories.md](../04-user-stories/seller-stories.md) |
 | Test-factory status contract and its guard test | [rules.md](rules.md) |
+
+## Post-review code-problem resolutions
+
+The post-execution review recorded five code-level problems in
+`.ai/audit/problems/05-ad-lifecycle-code-problems.md`. Resolutions (post-review
+working-tree fixes, applied after the phase-05 execution commits):
+
+| # | Problem | Resolution |
+|---|---|---|
+| 1 | `ad_reactivate` discarded `auto_moderate()`'s return value — a failed re-moderation was a silent redirect | **Fixed.** The view branches on the outcome: `False` leaves the ad in `ON_MODERATION_FAILED` and shows a dashboard warning; an unexpected non-database error raised by the check rolls the reactivation back (the ad stays `ARCHIVED`) and shows an error instead of HTTP 500, while database errors keep the 03-DB-004 boundary (lock timeout → 503). Two new seller strings, translated for `ru` and `bs`. **Q2 remains open and is unaffected** — the feedback half asserts nothing about commit durability |
+| 2 | `BulkModerationError.INVALID_TRANSITION` and `TRANSITION_REFUSED` overlap | **No code change — deliberate.** Both wire values are a declared public contract; `TRANSITION_REFUSED` is the approve path's typed outcome and `INVALID_TRANSITION` the reject path's caught `ValueError`. `db-enums.md` now names each producer |
+| 3 | Model docstrings omitted `ON_MODERATION_FAILED → REJECTED` and the terminal states | **Fixed** (docstrings only, no behaviour change) |
+| 4 | `cmd_copy`'s bare `except Exception` collapsed `Ad.DoesNotExist` into the generic failure | **Fixed.** A distinct "Ad #N not found." reply, translated for `ru` and `bs` |
+| 5 | `bulk_moderation_action` processed duplicate `selected_items` twice and double-counted them | **Fixed.** Ids are deduplicated (`sorted(set(...))`); `MAX_BULK_ACTIONS` bounds the deduplicated list; `completed` counts each ad once. A duplicated id is now a no-op instead of a double-count (the recorded `05-NEW-04` client-side mis-report) |

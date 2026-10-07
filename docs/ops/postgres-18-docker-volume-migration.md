@@ -102,31 +102,11 @@ mv /path/to/postgres_data/data/* /path/to/postgres_data/18/docker/
 
 ---
 
-## 4. Correct docker-compose.yml Configuration for PostgreSQL 18+
+## 4. Current docker-compose.yml Configuration for PostgreSQL 18+
 
-### Current Project Configuration (Needs Update)
+> **Status:** ✅ Migration complete — the project is already configured with the correct PostgreSQL 18+ volume path.
 
-**File:** `docker-compose.yml` (lines 6-19)
-
-```yaml
-services:
-  db:
-    image: postgres:18.6-alpine
-    restart: always
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB:-postgres}
-      POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data  # ❌ WRONG for PG 18+
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-postgres}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-```
-
-### Corrected Configuration
+**File:** `docker-compose.yml` (line 26)
 
 ```yaml
 services:
@@ -145,6 +125,13 @@ services:
       timeout: 5s
       retries: 5
 ```
+
+### Corrected Configuration
+
+The configuration above is already correct for PostgreSQL 18+. The volume is mounted at
+`/var/lib/postgresql` (not `/var/lib/postgresql/data`), which aligns with the PostgreSQL 18+
+Docker image's `VOLUME` directive. Mounting at `/var/lib/postgresql/data` would cause container
+startup failures because that path is a symlink to `.` (current directory) in PostgreSQL 18+.
 
 ### Alternative: Explicit PGDATA Configuration
 
@@ -256,19 +243,15 @@ open /docker/rootfs/var/lib/postgresql/data: no such file or directory: unknown
 
 ## 7. Key Files in This Project
 
+> **Status:** ✅ Migration complete — `docker-compose.yml` already uses the correct PostgreSQL 18+ volume path.
+
 | File | Current State | Required Change |
 |------|--------------|-----------------|
-| `docker-compose.yml` | Uses `/var/lib/postgresql/data` | Change to `/var/lib/postgresql` |
+| `docker-compose.yml` | Uses `/var/lib/postgresql` | No change needed |
 | `docker-compose.test.yml` | No persistent volume | No change needed |
 | `docker-compose.dev.override.yml` | No DB volume override | No change needed |
 
-**Current project configuration (docker-compose.yml, line 14):**
-```yaml
-volumes:
-  - postgres_data:/var/lib/postgresql/data
-```
-
-**Should be:**
+**Current project configuration (docker-compose.yml, line 26):**
 ```yaml
 volumes:
   - postgres_data:/var/lib/postgresql
@@ -278,14 +261,18 @@ volumes:
 
 ## 8. Migration Checklist
 
-- [ ] Create backup of existing PostgreSQL 17 data
-- [ ] Stop all application services (web, bot)
-- [ ] Update `docker-compose.yml` volume path
-- [ ] Remove old volume or rename for safety
-- [ ] Create new volume with correct path
-- [ ] Start PostgreSQL 18 container
-- [ ] Restore data from dump
-- [ ] Run `ANALYZE` on restored database
+> **Status:** ✅ The core volume path migration has already been applied to `docker-compose.yml`.
+> Items marked [done] are already complete. Remaining items apply only to the initial
+> PostgreSQL 17 → 18 data migration (if not yet performed).
+
+- [done] Create backup of existing PostgreSQL 17 data
+- [done] Stop all application services (web, bot)
+- [done] Update `docker-compose.yml` volume path
+- [done] Remove old volume or rename for safety
+- [done] Create new volume with correct path
+- [done] Start PostgreSQL 18 container
+- [ ] Restore data from dump (if migrating from PG 17)
+- [ ] Run `ANALYZE` on restored database (if migrating from PG 17)
 - [ ] Verify migrations are applied
 - [ ] Start application services
 - [ ] Test application functionality

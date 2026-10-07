@@ -2,8 +2,11 @@
 PostgreSQL advisory lock context manager for idempotent, locked operations.
 
 Uses transaction-scoped locks (pg_advisory_xact_lock) which are safe under PgBouncer.
-For the migrate service, session-scoped lock (pg_advisory_lock) is used because it runs
-before PgBouncer is attached to the database.
+Session-scoped locks (pg_advisory_lock) are used for the migrate service (before
+PgBouncer attaches to the database) and for archive_sweep and
+recompute_normalized_prices, whose per-batch commits would release a
+transaction-scoped lock at the first batch boundary — see the lock ID allocation
+table below for the full assignment and the PgBouncer caveat.
 """
 
 import logging
@@ -37,7 +40,6 @@ def advisory_lock(lock_id: int, *, session: bool = False):
 
     Transaction-scoped (pg_advisory_xact_lock; safe under PgBouncer, held
     inside transaction.atomic()):
-          1  ARCHIVE_SWEEP                archive sweep
           2  DELETE_SWEEP                 hard-delete sweep
           3  CONSENT_HARD_DELETE          consent hard delete
           4  SWEEP_DRAFTS                 draft sweep
@@ -47,19 +49,36 @@ def advisory_lock(lock_id: int, *, session: bool = False):
           8  ROLLUP_DAILY_METRICS         daily metrics rollup
           9  ALERT_DELIVERY_TASK          search-alert delivery (production path)
           11  PURGE_DELETED_ADS            deleted-ad purge
-          12  RECOMPUTE_NORMALIZED_PRICES  price normalization
-          13  REPAIR_BOT_USERNAME          BOT_USERNAME repair
+          13  REPAIR_BOT_USERNAME           BOT_USERNAME repair
           14  CONSENT_RECORD_SWEEP         consent-record retention sweep
           15  PURGE_MEDIA_DELETION_ERRORS  deletion-error retention purge
           102  BACKFILL_THUMBNAILS          thumbnail backfill
           103  SWEEP_ORPHANED_MEDIA         orphaned media sweep
 
     Session-scoped (pg_advisory_lock; spans the connection, pre-PgBouncer):
+          1  ARCHIVE_SWEEP                archive sweep (per-batch commits)
+          12  RECOMPUTE_NORMALIZED_PRICES  price normalization (per-batch commits)
           100  MIGRATE                      post-migration setup (runs pre-PgBouncer)
           101  CREATE_ADMIN                 admin creation
           104  CATALOG_LOAD                 catalog load
           110  SEED                         seed service
           111  TEST_SCHEMA_SETUP            test schema setup (serializes xdist workers)
+
+    IDs 1 (ARCHIVE_SWEEP) and 12 (RECOMPUTE_NORMALIZED_PRICES) are session-scoped
+    because their sweeps commit per batch: a transaction-scoped lock
+    (pg_advisory_xact_lock) would be released by the first batch COMMIT, allowing
+    a second scheduler worker to enter the sweep. They take ``session=True`` once
+    and release via ``pg_advisory_unlock`` in a ``finally`` when the sweep ends —
+    and therefore run OUTSIDE an enclosing ``transaction.atomic()`` (an
+    enclosing ``atomic()`` would turn each per-batch ``atomic()`` into a
+    savepoint, so no batch would ever truly commit). See BLOCK 7 / finding
+    03-DB-008 and ``test_sweep_lock_structure.py::_SESSION_SCOPED_BATCHERS``.
+
+    PgBouncer caveat (Q11 / 03-DB-008 resolution): a session-scoped lock is
+    bound to the pooled backend connection and is NOT safe under PgBouncer
+    transaction-mode pooling — ``session=True`` is the documented pre-PgBouncer
+    deployment shape and is only correct where the scheduler runs before
+    PgBouncer attaches the pool (or on a dedicated non-pooled connection).
 
     ID 10 is intentionally unused/reserved; it was formerly QUEUE_PROCESSING and
     was removed. IDs 16-99 are reserved for future scheduled jobs.

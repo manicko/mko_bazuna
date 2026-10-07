@@ -83,7 +83,7 @@ symbol list to **code that does not exist** or to **a wrong mental model of the 
 | **API-009** open | `config/settings/prod.py` carries the `EMAIL_HOST` fail-fast guard with the comment *"transactional emails (password resets, alert notifications, seller confirmations) are deliverable"*. `send_mail` has exactly one call site (`send_support_notification_email`); `set_password` has exactly one (`create_admin_user`); there is no `PasswordResetView`, `PasswordResetForm`, `token_generator` or password-reset URL/template anywhere under `src/` |
 | **API-010** / **API-014** / **API-015** open in both configs | `nginx.conf`: the `:80` block is `listen 80;` + `return 301 https://$host$request_uri;` with **no** `server_name`; the `:443` block **does** declare `server_name _;`. No `ssl_protocols`, `ssl_ciphers`, `ssl_session_cache` or `ssl_session_tickets` in either file. No proxied location sets `X-Forwarded-Host`. `location = /metrics` carries `allow 127.0.0.1; deny all;`. `location /csp-report/` uses `login_limit` (10r/s). `apps/moderation/views/decorators.py::staff_required_api` sends 401 with `headers={"WWW-Authenticate": "Bearer"}`. `config/urls.py` mounts `path("", include("django_prometheus.urls"))` at the **root** |
 | **API-011** open | `docker-compose.prod.yml` binds `./.env.prod:/app/src/.env:ro` and sets `env_file` on eight app services; `config/settings/prod.py` has an unconditional `if not BOT_TOKEN: raise ImproperlyConfigured(...)` inside `if not _SKIP_SECRET_VALIDATION:`; `config/settings/base.py::read_env` loads the bind-mounted file into `os.environ` at import. Two `Bot` construction sites outside the bot process: `immediate_alerts.py::_send_payloads` (latent) and `send_alerts.py::Command._send_user_digests` (live) |
-| **API-012** open | `apps/search/views/save_search.py::save_search` reads `query = (request.POST.get("query") or "").strip()` and passes `query=query or None` straight into `SavedSearch.objects.create(...)`. No `redact_search_query` import |
+| **API-012** open | `apps/search/views/save_search.py::save_search` reads `query = (request.POST.get("query") or "").strip()` and passes `query=query or None` straight into `SavedSearch.objects.create(...)`. No `redact_free_text` import | **RESOLVED (BLOCK 13, 2026-10-03):** `redact_free_text` was applied at the write boundary (commit `a8eeecbd`). **Deviation from plan (P1):** the plan prescribed `redact_search_query()`, but the code uses `redact_free_text` — the same PII masks with **no 100-char truncation**, chosen because `SavedSearch.query` is `VARCHAR(200)` and truncating to 100 would silently change what the saved search matches. The never-lengthen invariant of both functions is preserved |
 | **API-013** open, all three weaknesses | `immediate_alerts.py`: module-level `_executor: ThreadPoolExecutor` with `_MAX_DELIVERY_THREADS = 5`; `::deliver_immediate_alerts` calls `_executor.submit(_run_send, payloads)` and **discards** the `Future`; `::_run_send` catches `AiogramError` only. **`09-VAL-009`:** `::_send_payloads` has its **own** uncapped `float(exc.retry_after)` sleep on the retry path — a second instance of API-004's defect (1) that the report does not list |
 | **API-015** open | `apps/core/views.py::csp_report` validates with `CSPReportPayload(**report["csp-report"])` (422 on schema failure) then logs the **whole, unfiltered** report dict at INFO. The method guard is a **hand-written** `if request.method != "POST"` returning 405 — the validator's correction confirmed |
 | **API-016** open | `docker-compose.yml`: `postgres:18-alpine`, `redis:7-alpine`, `nginx:alpine`. `docker-compose.prod.yml`: **eight** services at `${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:-latest}`, plus `${TLS_CERT_PATH:-/etc/nginx/certs}:/etc/nginx/certs:ro` and `edoburu/pgbouncer:1.25.2` (the **only** pinned tag) |
@@ -214,7 +214,7 @@ consequences. **Silence is not an acceptable outcome for any of them.**
 | **Q2** | **By what mechanism is `/metrics` restricted in Django as well as nginx?** A middleware, a `config/urls.py`-level wrapper, or `django_prometheus`'s own hook. Adjacent to phase 15's authorization territory | **11** | Researcher (mechanism) + **phase 15 boundary check** before building | **GATED.** The hardening is defence in depth; the *shape* is a design choice with a cross-phase boundary | **RESOLVED 2026-10-01 — a `urls.py` gate view keyed on loopback `REMOTE_ADDR`.** The decisive constraint is INVERTED: Django's `RequestFactory` hard-codes `127.0.0.1`, so `test_metrics_endpoint` stays green. See §0.6 |
 | **Q3** | **Is the `/metrics` "reachable from every sibling container" impact model correct?** The tree says `allow 127.0.0.1; deny all;` **denies** Docker-bridge `172.x` peers (C-4) | **11** | **Researcher — one `curl` from a sibling container (U13)** | **Pre-block step, not a gate.** An inverted impact model produces a runbook that warns about the wrong thing |
 | **Q4** | **What is the shape of the translation-failure signal?** *Minimal* (compare the result to the source, leave the column `NULL`, count a `fallback` total) keeps `translate_text`'s `str` signature and the whole `test_translation.py` suite green. *Status object* + a `translation_failed_at` column changes the return type, breaks every test in that file, and needs a migration whose number must be checked against phase 05's `ads/0008_*` | **8** | **Planner, with phase 05 / 06 migration coordination** | **GATED.** Effort S vs M **plus** a schema change. BLOCK 8 carries both options | **RESOLVED 2026-10-01 — option (a): NULL column + an `int` fallback count, SCOPED to the backfill command.** `translate_text`'s signature is unchanged; the signal is a side-channel. See §0.6 |
-| **Q5** | **Is redacting `SavedSearch.query` on write the right product call?** The report itself calls the raw form for a buyer's *own* saved search a legitimate alternative, conditional on a documented retention rule and no third-party rendering | **13** | **Product Owner** (answered 2026-10-03) | **RESOLVED 2026-10-03 (Product Owner) — YES: redact at write.** `SavedSearch.query` is stored **REDACTED** via `redact_search_query()`. Phase 09 now **implements** the `save_search` call plus a test in BLOCK 13; the *"unless the owner rules…"* clause in `09-API-012` is **removed**. See §0.7 |
+| **Q5** | **Is redacting `SavedSearch.query` on write the right product call?** The report itself calls the raw form for a buyer's *own* saved search a legitimate alternative, conditional on a documented retention rule and no third-party rendering | **13** | **Product Owner** (answered 2026-10-03) | **RESOLVED 2026-10-03 (Product Owner) — YES: redact at write.** `SavedSearch.query` is stored **REDACTED** via `redact_free_text()` (commit `a8eeecbd`). **Deviation from plan (P1):** the plan prescribed `redact_search_query()`, which truncates to `_MAX_QUERY_LENGTH=100`. The code uses `redact_free_text` — the same PII masks without truncation — because `SavedSearch.query` is `VARCHAR(200)` and truncating to 100 would silently change what the saved search matches against. Phase 09 now **implements** the `save_search` call plus a test in BLOCK 13; the *"unless the owner rules…"* clause in `09-API-012` is **removed**. See §0.7 |
 | **Q6** | **Should `query_normalized` be keyed on redacted or raw text (`09-VAL-002`)?** It is the persisted, indexed dedup/lookup key that migration `0002_redact_search_queries` deliberately preserved. Redacting it changes dedup semantics (two users searching different phone numbers collapse) and needs a follow-up **data** migration | **13** | **Product Owner** (answered 2026-10-03) | **RESOLVED 2026-10-03 (Product Owner) — key it on the REDACTED form.** One rule for all query-persistence paths. The **follow-up data migration** for existing rows is a **propagation obligation on phase 06** (PII policy owner), because `apps/search/migrations/` is three-way reserved. See §0.7 |
 | **Q7** | **Where does the API-013 shutdown hook actually run?** `gunicorn.conf.py` sets `preload_app = True`, so a module-import-time registration lands in the **master**, not in the forked workers that hold the in-flight sends (C-7) | **7** | **Researcher** (confirm against the pinned gunicorn version and the actual signal path) + **Planner** (choose the registration point) | **GATED.** A hook in the wrong process is a no-op that *looks* like a fix | **RESOLVED 2026-10-01 — `gunicorn.conf.py::worker_exit`, the worker-side hook.** The fork/executor defect is **NOT present** (the import is lazy); worker-side-ness must be pinned by a test. See §0.6 |
 | **Q8** | **What ceiling for the alert-path retry (`09-VAL-009`)?** `_send_payloads` sleeps `float(exc.retry_after)` uncapped, separately from `retry_transient`, and `test_429_retry_after_honored` pins an exact sleep value | **6** (and **7**) | **Researcher (read the fixture) + Planner (set the ceiling)** | **GATED.** A cap above the pinned fixture is untested; below it, the test must change **in the same commit** | **RESOLVED 2026-10-01 — a per-module `RETRY_AFTER_CEILING = 30.0` clamping ONE retry.** There is no loop, so this is a single-sleep ceiling, not a budget. See §0.6 |
@@ -357,7 +357,7 @@ now ships a bounded change, and a block that shipped a raising guard now ships a
 | Gate | Ruling (2026-10-03, Product Owner) | Chosen option | Block-level consequence |
 |---|---|---|---|
 | **Q1** — `EMAIL_HOST` in production | **A LOUD WARNING at startup, NOT a hard boot gate.** The settings guard **must NOT raise `ImproperlyConfigured`**, and **no test may assert that it fires** | **(b)**, on the owner's own severity | **BLOCK 9 is rewritten**: it ships a `logging.getLogger(__name__).warning` in place of the guard, plus the **six** comment-site corrections and the compromise-response procedure. **This supersedes §0.6.2's "the guard is CODE, not a decision" reading** — the evidence in that section stands (the three named flows are fictional; no test asserts the guard fires), but the conclusion is replaced by the owner's severity choice. Acceptance criteria and test expectations are restated: the new test asserts a **WARNING is emitted and the import succeeds**, and a test asserting the raise **must not exist**. `test_deploy_check_env_parity.py`'s "six guards raise `ImproperlyConfigured`" taxonomy must lose one entry in the same commit |
-| **Q5** — redacting `SavedSearch.query` on write | **Yes — redact at write.** `SavedSearch.query` is stored **REDACTED** via `redact_search_query()` | **the product rule** | **`09-API-012` moves from "routed, not implemented" to IMPLEMENTED IN PHASE 09.** BLOCK 13 gains the `save_search` redaction call **plus a test**. The *"unless the owner rules that the buyer's own saved search keeps the raw form"* clause in `09-API-012` and in BLOCK 13's acceptance table is **removed**. BLOCK 13 is therefore **no longer a zero-production-code handoff block** — see §3 and §8.1 for the corrected block count |
+| **Q5** — redacting `SavedSearch.query` on write | **Yes — redact at write.** `SavedSearch.query` is stored **REDACTED** via `redact_free_text()` (commit `a8eeecbd`). **Deviation from plan (P1):** plan prescribed `redact_search_query()` (truncates to 100); code uses `redact_free_text` (no truncation) because `VARCHAR(200)` would lose matches. Both share the same PII masks and "never lengthen" invariant | **the product rule** | **`09-API-012` moves from "routed, not implemented" to IMPLEMENTED IN PHASE 09.** BLOCK 13 gains the `redact_free_text` call **plus a test**. The *"unless the owner rules that the buyer's own saved search keeps the raw form"* clause in `09-API-012` and in BLOCK 13's acceptance table is **removed**. BLOCK 13 is therefore **no longer a zero-production-code handoff block** — see §3 and §8.1 for the corrected block count |
 | **Q6** — the `query_normalized` storage key (`09-VAL-002`) | **Key `query_normalized` on the REDACTED form.** One rule for **all** query-persistence paths | **the product rule** | **`09-VAL-002` is decided.** Two consequences phase 09 **does not** implement, and records as a **propagation obligation on phase 06** (the PII policy owner): the **follow-up data migration** that repairs existing `PopularSearch.query_normalized` and `SearchHistory.query_normalized` rows, and the **explicit statement of what happens to dedup semantics** when two users search different phone numbers and their keys now collapse. Both need `apps/search/migrations/`, which is **three-way reserved** (phase 06 BLOCK 7, phase 03 BLOCK 9 option B, phase 08 BLOCKS 5/8) |
 
 **Rulings that do not change phase 09's work, recorded so they are not re-litigated.**
@@ -621,11 +621,11 @@ decision the Implementor was told not to make.
 | `09-API-009` | **implement — Q1 RESOLVED 2026-10-03: option (b), a LOUD WARNING, not a boot gate.** The reason must be corrected at **all six** comment sites either way, and the compromise-response procedure with them. The guard is **replaced by** the warning; it is **not** justified in place | **9** | **MEDIUM (P2 priority — but first in decision order)** | A fail-open, single-purpose, best-effort integration is a **hard boot gate for the entire system**, justified by a rationale the codebase does not support, and the fiction is repeated inside the compromise-response procedure. **The owner chose the warning**, so the finding's remedy is now decided: the cost of that choice is that a host which never noticed the warning loses support escalations, so the warning must be loud and the runbook must say what is lost |
 | `09-API-010` + `09-API-014` | **implement as one nginx/config change — gated on Q14.** `:80` `server_name`; the unsatisfiable `Bearer` challenge dropped; `reject_ad` / `ban_user` → `@require_POST`; a Django-side `/metrics` gate (gated on Q2, boundary-checked against phase 15); `X-Forwarded-Host` on every proxied location; `ssl_protocols` / `ssl_session_cache` pinned | **11** | **LOW** | Five small contract observations that together are the maintenance tax of an API layer grown by accretion. `(4)` is one network-policy line from a public metrics scrape. **The LOW grade must not suppress the fix** — the missing `server_name` is a real misconfiguration trap |
 | `09-API-011` | **implement the role-conditional guard + the `env_file` removal. Removing the three explicit `BOT_TOKEN:` compose lines alone is a NO-OP (C-3)** | **14** | **MEDIUM** | Eight Django containers hold the credential via `env_file` + the `.env` bind mount, and the root cause is a **settings guard**, not a compose line: any process importing `prod.py` must hold the token to satisfy a guard it never exercises. Two `Bot` sites are active (C-9). The report's "Effort S" does not price the `test_settings_secrets.py` rewrite |
-| `09-API-012` | **CHANGED 2026-10-03 — now IMPLEMENTED here, not routed.** Q5 is resolved (redact at write), so BLOCK 13 applies `redact_search_query()` in `save_search` **and adds a test**. The *"unless the owner rules…"* clause is **removed**. Still **not** phase 09's: `apps/search/migrations/` and the PII policy statement | **13** | MEDIUM (was "absorbed"; now partly implemented) | Fixing the view alone would let the tracker record *"search PII is handled"* while the indexed dedup key still holds the raw query. The **owner decided**, so the view fix is a bounded one-line-plus-test change — but `save_search.py` is **also phase 08 BLOCK 8's file** (§5.3) |
+| `09-API-012` | **CHANGED 2026-10-03 — now IMPLEMENTED here, not routed.** Q5 is resolved (redact at write), so BLOCK 13 applies `redact_free_text()` in `save_search` **and adds a test**. The *"unless the owner rules…"* clause is **removed**. Still **not** phase 09's: `apps/search/migrations/` and the PII policy statement. **Deviation from plan (P1):** code uses `redact_free_text` instead of `redact_search_query` — same masks, no truncation, chosen for the `VARCHAR(200)` column | **13** | MEDIUM (was "absorbed"; now partly implemented) | Fixing the view alone would let the tracker record *"search PII is handled"* while the indexed dedup key still holds the raw query. The **owner decided**, so the view fix is a bounded one-line-plus-test change — but `save_search.py` is **also phase 08 BLOCK 8's file** (§5.3) |
 | `09-VAL-002` | **Q6 RESOLVED 2026-10-03 — key `query_normalized` on the REDACTED form.** The *decision* is closed; the **follow-up data migration** and the explicit dedup-semantics statement are **routed to phase 06** (PII policy owner) because `apps/search/migrations/` is three-way reserved | **13** (decision) · phase 06 (migration) | MEDIUM → **decision closed, migration outstanding** | `query_normalized` stores the raw query on **both** tables the project believes it redacts, and migration `0002_redact_search_queries` preserved it on purpose. The owner has now ruled; what remains is the data repair, and it is not this plan's file |
 | `09-API-013` | **implement — gated on Q7.** A done-callback that retrieves `future.exception()`; a backpressure gate or a settings-tunable thread count; a **worker-side** shutdown hook; the `AiogramError`-only catch in `_run_send` raised to `Exception` with `logger.exception` | **7** | **MEDIUM** | The result is never inspected, the backlog is unbounded, and `preload_app = True` means an import-time hook lands in the gunicorn **master** (C-7). Latent today (`IMMEDIATE_ALERTS_ENABLED=false`); live the moment an operator opts in — **fix before flipping the flag** |
 | `09-API-015` | **implement.** Log only the fields an operator acts on, drop `document-uri`'s query string and `referrer`, tighten the nginx zone. The full 200/400/405/422 response contract is unchanged | **12** | **LOW** | An unauthenticated caller can push 10 r/s of arbitrary JSON, each producing a full-dict INFO line, and page URLs routinely carry buyer search text. **The PII-minimisation policy half is phase 06's** (`06-PII-102`); phase 09 owns the ingress field selection and the zone. Do **not** add `@require_POST` to this view while BLOCK 11 standardises its siblings |
-| `09-API-016` | **implement.** `IMAGE_TAG` fails loudly instead of defaulting to `latest`; third-party datastore tags pinned; `TLS_CERT_PATH`'s default changed to the in-repo path | **15** | **LOW** | `docker-compose pull` on two hosts running "the current compose file" can move **the entire application** to different code with no repository change — the higher-consequence half the auditor missed. The `${TLS_CERT_PATH:-…}` default mounts an empty directory rather than failing, so a missing export yields a crash-looping proxy whose compose output looks successful |
+| `09-API-016` | **implement.** `IMAGE_TAG` fails loudly instead of defaulting to `latest`; third-party datastore tags pinned; **`TLS_CERT_PATH` DEFERRED (P4)** — `.env.prod.example` explicitly marks the decision deferral; `docker-compose.prod.yml:109` keeps `${TLS_CERT_PATH:-/etc/nginx/certs}`. The in-repo path is a candidate, not a default | **15** | **LOW (P4)** | `docker-compose pull` on two hosts running "the current compose file" can move **the entire application** to different code with no repository change — the higher-consequence half the auditor missed. The `${TLS_CERT_PATH:-…}` default mounts an empty directory rather than failing, so a missing export yields a crash-looping proxy whose compose output looks successful |
 | `09-API-017` | **implement the counter half here; the sanitiser swap is reviewed against phase 06.** `translation_requests_total`, `translation_fallback_total`, `translation_circuit_open` on the existing `/metrics`; ad text redacted-then-truncated in `translate_text`'s log sites; a module-docstring note on which sanitiser applies to which text | **16** | **LOW** | The breaker being open means **every ad ships untranslated**, and that state has no counter, no gauge and no threshold. The DEBUG success line also logs the **translated output**, which survives masking the input alone. `django_prometheus` is already wired and multiprocess counters are already the established pattern |
 | `09-VAL-001` | **respected as a boundary — no merge, no re-file** | §5 | MEDIUM (process) | API-008 ↔ `03-DB-008` and API-009 ↔ `02-CFG-004` are adjacent pairs with **different mechanisms and different fixes**. They compose; fixing either does not fix the other. Phase 02 owns the email *backend* selection, phase 09 owns the *existence-of-consumers* question — action both in one pass, report as two findings |
 | `09-VAL-002` | **routed to phase 06 / phase 08 via BLOCK 13 — it has no owner today** | **13** | MEDIUM (product defect) | `query_normalized` stores the raw query on **both** tables the project believes it redacts, and migration `0002_redact_search_queries` preserved it on purpose. The correct owner is a **storage-layer decision**, not a missing call at a view |
@@ -2951,7 +2951,7 @@ tests_to_run:
 
 ---
 
-### BLOCK 13 — Route `09-API-012` and `09-VAL-002` to their owners (handoff, no production code)
+### BLOCK 13 — `redact_free_text` at the `save_search` boundary + route `09-VAL-002` (production code + handoff)
 
 | | |
 |---|---|
@@ -2965,10 +2965,15 @@ tests_to_run:
 **This block changed class on 2026-10-03. It previously shipped no production code.**
 
 **The ruling that changed it.** Q5 is **resolved**: `SavedSearch.query` is stored **REDACTED**
-via `redact_search_query()`. An Implementor can therefore be told *what* to do, and the
-*"unless the owner rules…"* conditional that used to sit in this block's acceptance table is
-**removed**. BLOCK 13 now delivers the **call plus a test**, and records the one thing it still
-cannot deliver: the **follow-up data migration** for `query_normalized`.
+via `redact_free_text()` (commit `a8eeecbd`). **Deviation from plan (P1):** the plan prescribed
+`redact_search_query()`, which truncates to `_MAX_QUERY_LENGTH=100`; the code uses
+`redact_free_text` — the same PII masks without truncation — because
+`SavedSearch.query` is `VARCHAR(200)` and truncating to 100 would silently change what the
+saved search matches against. Both functions share the "never lengthen" invariant. An
+Implementor can therefore be told *what* to do, and the *"unless the owner rules…"* conditional
+that used to sit in this block's acceptance table is **removed**. BLOCK 13 now delivers the
+**call plus a test**, and records the one thing it still cannot deliver: the **follow-up
+data migration** for `query_normalized`.
 
 **Why phase 09 implements the view fix but not the storage migration.** Phase 08's plan has
 **already parked** `SavedSearch.query` redaction as its **Q5, a forward dependency on phase 06**
@@ -2983,7 +2988,7 @@ not this plan's to schedule.
 
 | Finding | The defect | The disposition | Who owns what now |
 |---|---|---|---|
-| `09-API-012` | `apps/search/views/save_search.py::save_search` takes raw `request.POST["query"]` and writes it straight into `SavedSearch.query`. Two of the three query-persistence write paths use `redact_search_query()`; the third, the view, does not | **IMPLEMENTED HERE (2026-10-03):** one `redact_search_query()` call at the boundary, **plus a test**. The raw-form alternative is **closed** — the owner chose redaction | **Phase 09, BLOCK 13** |
+| `09-API-012` | `apps/search/views/save_search.py::save_search` takes raw `request.POST["query"]` and writes it straight into `SavedSearch.query`. Two of the three query-persistence write paths use `redact_search_query()`; the third, the view, does not | **IMPLEMENTED HERE (2026-10-03):** one `redact_free_text()` call at the boundary (**deviation from plan P1:** code uses `redact_free_text` instead of `redact_search_query` — same masks, no truncation, chosen for the `VARCHAR(200)` column — **plus a test**). The raw-form alternative is **closed** — the owner chose redaction | **Phase 09, BLOCK 13** |
 | `09-VAL-002` | `SearchHistory.query_normalized` and `PopularSearch.query_normalized` are written with the **raw** query in both paths that *do* redact. `query_normalized` is a persisted, **indexed** `CharField(max_length=200)` — the dedup/lookup key. Migration `0002_redact_search_queries` rewrote **only** the `query` column and states that `query_normalized` is preserved intact | **DECIDED (Q6, 2026-10-03): key it on the redacted form.** The **follow-up data migration** repairing existing rows is **routed to phase 06**, with the dedup-semantics consequence stated in writing | **Phase 06** (PII policy owner) — propagation obligation, §5.5 |
 
 **Why `09-VAL-002` is not merged into `09-API-012`:** they have **different files and different
@@ -2996,9 +3001,10 @@ dedup key keeps the raw query until phase 06's migration lands.
 
 **Deliverable of this block**
 
-1. `redact_search_query()` applied in `save_search` before `SavedSearch.objects.create`, **and
+1. `redact_free_text()` applied in `save_search` before `SavedSearch.objects.create`, **and
    a test** asserting that a `SavedSearch` created from `"+382 69 000 123"` stores no raw
-   digits.
+   digits. **Deviation from plan (P1):** code uses `redact_free_text` (no truncation) instead
+   of `redact_search_query` (truncates to 100) — correct for `VARCHAR(200)`.
 2. A written record — in this plan's §2 and §5, and in a single commit's message — naming the
    `09-VAL-002` ruling, the **dedup-semantics** consequence, and the phase-06 obligation.
 3. The explicit statement that **fixing `09-API-012` alone does not close the search-PII
@@ -3010,7 +3016,7 @@ dedup key keeps the raw query until phase 06's migration lands.
 
 | Item | Must satisfy |
 |---|---|
-| **`09-API-012` — phase 09, BLOCK 13** | `redact_search_query()` is applied in `save_search` before `SavedSearch.objects.create`, **with a test** asserting a `SavedSearch` created from `"+382 69 000 123"` stores no raw digits. The **one rule for all query-persistence paths** is stated in the commit body: redact at write. **Do not rename the view function or the URL name.** `test_saved_search_create.py::test_create_saved_search_with_filters_and_language` posts `"велосипед"` and asserts `ss.query == "велосипед"` — `redact_search_query` is a no-op on that string, so it stays green unchanged. If the privacy page documents search-history retention, its search-history paragraph is amended **in the same change** |
+| **`09-API-012` — phase 09, BLOCK 13** | `redact_free_text()` is applied in `save_search` before `SavedSearch.objects.create`, **with a test** asserting a `SavedSearch` created from `"+382 69 000 123"` stores no raw digits. **Deviation from plan (P1):** code uses `redact_free_text` instead of `redact_search_query` — same PII masks, no 100-char truncation, chosen because `SavedSearch.query` is `VARCHAR(200)` and truncating would silently change match semantics. The **one rule for all query-persistence paths** is stated in the commit body: redact at write. **Do not rename the view function or the URL name.** `test_saved_search_create.py::test_create_saved_search_with_filters_and_language` posts `"велосипед"` and asserts `ss.query == "велосипед"` — `redact_free_text` is a no-op on that string, so it stays green unchanged. If the privacy page documents search-history retention, its search-history paragraph is amended **in the same change** |
 | **`09-VAL-002` — phase 06, PII policy owner** | A **follow-up data migration** repairing existing `PopularSearch.query_normalized` and `SearchHistory.query_normalized` rows onto the redacted form, with an **explicit statement of what happens to dedup semantics** when two users search different phone numbers and their keys collapse into one row. Its number is checked against `apps/search/migrations/` **immediately before** generation (next free `0003_*`, subject to phase 06 BLOCK 7 and phase 08 BLOCKS 5/8). The session path — `search_history.py::_record_session_history` for anonymous users — is the **same raw/redacted split** and must be part of the same migration, not a third door |
 
 **Implementor task**
@@ -3028,6 +3034,8 @@ description: >
   the three query-persistence write paths call redact_search_query(); this one does not. The
   Product Owner ruled on 2026-10-03 that SavedSearch.query is stored REDACTED and that
   query_normalized is keyed on the redacted form - one rule for all query-persistence paths.
+  **Deviation from plan (P1):** the code applies `redact_free_text` (same masks, no truncation)
+  rather than `redact_search_query` (truncates to 100) — correct for the VARCHAR(200) column.
   Apply the call at the view boundary and add a test. The follow-up data migration that repairs
   existing query_normalized rows belongs to phase 06 and must only be recorded here.
 goals:
@@ -3044,14 +3052,16 @@ files:
 changes:
   - action: modify_code
     description: >
-      Apply redact_search_query() to the query read before SavedSearch.objects.create. Do NOT
+      Apply redact_free_text() to the query read before SavedSearch.objects.create. Do NOT
       rename the view function or the URL name. Do NOT touch apps/search/services/**,
       apps/search/migrations/**, apps/core/utils/sanitize.py, or any locale file.
+      **Deviation from plan (P1):** code uses redact_free_text (no truncation) instead of
+      redact_search_query (truncates to 100) — correct for the VARCHAR(200) column.
   - action: modify_test
     description: >
       Add a test asserting a SavedSearch created from "+382 69 000 123" stores no raw digits.
       test_create_saved_search_with_filters_and_language posts "велосипед" and must stay green
-      unchanged - redact_search_query is a no-op on that string.
+      unchanged - redact_free_text is a no-op on that string.
   - action: modify_doc
     description: >
       If the privacy page documents search-history retention, amend its search-history paragraph
@@ -3349,9 +3359,11 @@ successful. It must be paired with the runbook line, which is **phase 12's**.
 
 **Binding constraints**
 
-1. **`TLS_CERT_PATH`'s default becomes the in-repo path**
-   (`${TLS_CERT_PATH:-./docker/nginx/certs}`), and the runbook must state that the path
-   resolves on the **host**.
+1. **`TLS_CERT_PATH` DEFERRED (P4)** — the binding constraint is **not** satisfied by phase 09.
+    `${TLS_CERT_PATH:-/etc/nginx/certs}` in `docker-compose.prod.yml:109` is **unchanged**;
+    `.env.prod.example` marks the decision as deferred ("DEFERRED DECISION (09-API-016)"). The
+    in-repo path is a candidate; the owner has not yet ruled on the host filesystem layout. The
+    runbook must state that the path resolves on the **host** once the owner names it.
 2. **Pin the third-party datastores to a patch version or a digest.** Follow
    `edoburu/pgbouncer:1.25.2`. **Never** repin across a PostgreSQL major-version boundary
    as part of this change — that is its own operation with its own runbook.
@@ -3520,16 +3532,18 @@ so `GOOGLE_TRANSLATE_API_KEY` cannot leak through them. **Do not weaken that.**
 | File | Symbol / target | Notes |
 |---|---|---|
 | `src/backend/apps/core/services/translation.py` | `translate_text` (five log sites that include ad text) · `TranslationCircuitBreaker` | The **cleanest ownership in the whole phase** — no plan claims this module. The sites are the open-circuit INFO line, the DEBUG success line (**input and output**), the transport-failure WARNING and two HTTP 4xx/5xx WARNINGs |
-| `src/backend/apps/core/utils/sanitize.py` | `sanitize_query_for_log` vs `redact_search_query` | **Phase 08's file.** Two sanitisers exist for two different audiences and the boundary was never stated — the translation path picked the wrong one by name similarity. **Compose redact-then-truncate**; do not modify either function |
+| `src/backend/apps/core/utils/sanitize.py` | `sanitize_query_for_log` vs `redact_free_text` | **Phase 08's file.** Two sanitisers exist for two different audiences: `redact_search_query` (masks + truncates to 100, for stored search queries) and `redact_free_text` (masks only, no truncation, for staff-authored free text in unbounded fields). **Deviation from plan (P6):** the plan prescribed `redact_search_query` for ad text, but the code correctly uses `redact_free_text` — ad text lands in an unbounded `TextField` where a 100-char cap would silently discard the operator's words. **Compose redact-then-truncate**; do not modify either function |
 | `src/backend/apps/core/tests/test_translation.py` | `TestTranslateTextFallback::test_translation_error_log_does_not_leak_api_key`, `TestTranslationCircuitBreaker::*` | The first is a **security** regression guard — do not weaken it |
 | `src/backend/apps/core/tests/test_sanitize.py` · `apps/search/tests/test_redact_search_query.py` | the two sanitisers' contracts | `redact_search_query` has a **"never lengthen"** invariant. Phase 08's plan explicitly forbids changing it |
 | `src/backend/apps/core/tests/test_observability.py` | the `/metrics` surface the counters land on | No new wiring needed |
 
 **Binding constraints**
 
-1. **Compose, do not replace.** Redact with `redact_search_query`, **then** truncate with
-   `sanitize_query_for_log`, respecting the "never lengthen" invariant. Do not modify
-   either function — `sanitize.py` is phase 08's.
+1. **Compose, do not replace.** Redact with `redact_free_text` (**deviation from plan P6:**
+   code uses `redact_free_text` instead of `redact_search_query` — ad text is staff-authored
+   free text in an unbounded `TextField`, so a 100-char truncation cap would silently discard
+   the operator's words), **then** truncate with `sanitize_query_for_log`, respecting the
+   "never lengthen" invariant. Do not modify either function — `sanitize.py` is phase 08's.
 2. **The DEBUG success line logs the translated output as well as the input.** Masking the
    input alone is insufficient: a phone number survives translation into the recipient
    language. **The report does not name this second sink.**
@@ -3557,7 +3571,9 @@ source_blocks: ["BLOCK 16"]
 description: >
   Every log line in apps/core/services/translation.py that includes ad text routes it
   through sanitize_query_for_log, which strips control characters and truncates to 100 but
-  does NOT mask PII. The project ships redact_search_query for exactly that. A seller who
+  does NOT mask PII. The project ships both redact_search_query (masks + truncates to 100,
+  for stored search queries) and redact_free_text (masks only, no truncation, for
+  staff-authored free text in unbounded fields) for exactly this. A seller who
   writes a phone number into a title therefore has it written to production logs at INFO and
   WARNING by the translator's own diagnostics - and the DEBUG success line logs the
   TRANSLATED OUTPUT as well as the input, so a number survives into the recipient language.
@@ -3589,19 +3605,23 @@ files:
 changes:
   - action: modify_code
     description: >
-      Route ad text in every translate_text log site through redact_search_query FIRST
-      and sanitize_query_for_log SECOND, respecting redact_search_query's "never lengthen"
-      invariant. Cover the DEBUG success line's OUTPUT as well as its input - a phone
-      number survives translation. Add three prometheus_client.Counters following the
-      existing multiprocess pattern: translation_requests_total,
-      translation_fallback_total and translation_circuit_open. Note in the module
-      docstring which sanitiser applies to which kind of text, so the next caller picks
-      correctly. Do NOT change apps/core/utils/sanitize.py - it is phase 08's file.
+      Route ad text in every translate_text log site through redact_free_text FIRST
+      (**deviation from plan P6:** code uses `redact_free_text` instead of
+      `redact_search_query` — ad text is staff-authored free text in an unbounded
+      `TextField`, where a 100-char truncation cap would silently discard the
+      operator's words) and sanitize_query_for_log SECOND, respecting
+      redact_free_text's "never lengthen" invariant. Cover the DEBUG success line's
+      OUTPUT as well as its input - a phone number survives translation. Add three
+      prometheus_client.Counters following the existing multiprocess pattern:
+      translation_requests_total, translation_fallback_total and
+      translation_circuit_open. Note in the module docstring which sanitiser applies to
+      which kind of text, so the next caller picks correctly. Do NOT change
+      apps/core/utils/sanitize.py - it is phase 08's file.
     code_hint: |
       # Two sanitisers, two audiences. Compose them; do not pick one by name similarity.
       def _safe_log_text(text: str) -> str:
-          """Redact first, then truncate - redact_search_query never lengthens."""
-          return sanitize_query_for_log(redact_search_query(text))
+          """Redact first, then truncate - redact_free_text never lengthens."""
+          return sanitize_query_for_log(redact_free_text(text))
 
       TRANSLATION_REQUESTS = Counter("translation_requests_total", "...")
       TRANSLATION_FALLBACKS = Counter("translation_fallback_total", "...")
@@ -3618,7 +3638,7 @@ acceptance_criteria:
   - "the HTTP-failure lines still strip the GOOGLE_TRANSLATE_API_KEY query parameter - test_translation_error_log_does_not_leak_api_key passes UNCHANGED"
   - "a title with no identifiers still logs its text (the control that stops a blanket log-nothing change)"
   - "translation_requests_total, translation_fallback_total and translation_circuit_open are exposed on /metrics and the breaker gauge tracks is_open"
-  - "apps/core/utils/sanitize.py was NOT modified; redact_search_query's never-lengthen invariant is respected"
+  - "apps/core/utils/sanitize.py was NOT modified; redact_free_text's never-lengthen invariant is respected"
   - "no new dependency, no new endpoint, no new env var, no new user-visible string"
   - "test_translation.py passes; the commit body records that the log-field-selection half was reviewed against phase 06's 06-PII-102 redaction tests so the assertions land in one place"
 tests_to_run:
@@ -3730,7 +3750,10 @@ One Implementor, strictly sequential. Every block is one commit (§1.3).
 | **4 → 2** | There is **no** edge. They are independent — bot handler retry policy versus a cache-failure helper in the backend's shared utils. The one-Implementor rule serialises them without a dependency |
 | **8 ↔ 16** | **Deliberately no edge** — see §4.3 |
 | **1 → 2** (soft, not a hard edge) | Same module (`apps/core/utils/cache.py`), different helpers, different reasons. Serialised by §1.3. BLOCK 2's commit will show BLOCK 1's helper in its diff context, which is fine |
-| **Any block → 13** | **No edge.** BLOCK 13 ships no code and consumes nothing. It can run at any point and is *encouraged* to run early so the routing is on the record before any other phase touches `apps/search/**` |
+| **Any block → 13** | **No edge.** BLOCK 13 now ships a bounded production change and can run at any point —
+  it is *encouraged* to run early so the routing is on the record before any other phase
+  touches `apps/search/**`. Its only consumer is `save_search.py`, which is **also
+  phase 08 BLOCK 8's file** (§5.3); the Coordinator sequences the two |
 | **13 → phase 06 / phase 08** (external) | The handoff is the edge. It is **published**, not consumed — no block in this plan depends on phase 06 or phase 08 answering Q5/Q6 |
 
 ### 4.3 Where there is deliberately no edge, and why
@@ -3823,8 +3846,8 @@ agents.
 |---|---|---|
 | **Phase 02 — the env allowlist, `EMAIL_BACKEND`, bot-token guards, the `prod.py` deploy gate** | Phase 09 must not edit `ALLOWED_ENV_VARS`, must not add an env var without its allowlist entry **and** all four `.env*.example` updates in one commit, must not change `EMAIL_BACKEND`, and must not change the `_validate_production_secret` strength rules for any variable other than the one its block names | `config/settings/tests/test_env_allowlist.py` is the gate **any new secret must pass**, and it runs in **both** directions. The `prod.py` deploy gate is phase 02's: phase 09's BLOCK 9 changes the *policy* of one guard and BLOCK 14 the *scope* of another, never the gate's machinery. **`prod.py` is four-block contended** (phase 02 BLOCKS 3/5/7/9, phase 06 BLOCK 4) — the Coordinator sequences |
 | **Phase 03 — `alert_query.py`, `immediate_alerts.py`, `DB-004`, `DB-008`** | Phase 09 must not edit `apps/search/services/alert_query.py`, and must not redo the delivery-state or notification-contract work | **Three-way reservation**: phase 06 BLOCKS 5/7 (eligibility), phase 03 BLOCK 9 (delivery state), phase 09 BLOCKS 6/7 (body and dispatch). `DB-004` (`statement_timeout`) **complements** `09-API-001`/`002` as an *instance* of the same untested-failure-posture class — record it in phase 03's roll-up, do not re-file it |
-| **Phase 06 — `LOG_MASK_KEY`, the settings base, `06-PII-102`, `06-PII-108`, `06-PII-104`** | Phase 09 must not implement `LOG_MASK_KEY` (**it does not exist in the tree yet** — phase 06 has not landed), must not build the logging-policy `Filter`, must not touch the alert-audience predicate, and must not edit `apps/search/services/search_history.py`, `popular_search.py` or `apps/search/migrations/` | `LOG_MASK_KEY`'s absence is load-bearing for BLOCK 16: the redaction must go through `redact_search_query`, not through a phase-06 mechanism that does not exist. `06-PII-102` owns log-hygiene policy and already has regression tests — **BLOCK 16's log-field selection must be reviewed against them so the assertions land in one place, not two**. `06-PII-108` owns `SearchHistory.query_normalized` — which is why `09-VAL-002` is **routed** (BLOCK 13) and not implemented |
-| **Phase 08 — the `SavedSearch.query` / `query_normalized` parking, the client-IP trust item, `sanitize.py`, `IMMEDIATE_ALERTS_ENABLED`** | Phase 09 must **not decide Q5 or Q6**, must not edit `apps/search/**`, must not extend `redact_search_query` or change its "never lengthen" invariant, and must not change `IMMEDIATE_ALERTS_ENABLED` | **This is the explicit instruction in the brief and it matches phase 08's own plan.** Phase 08's §5.5 lists *"06 — Q5: whether `SavedSearch.query` needs redaction, not just a bound"* as an **open forward dependency**. Phase 08's BLOCK 8 owns the **bound**; phase 06 owns the **content**. Phase 09 publishes both (BLOCK 13) and edits neither. On the client-IP trust item: BLOCK 10's optional app-level limiter **inherits** `contact_rate_limit._get_client_ip`'s `HTTP_X_FORWARDED_FOR` trust — phase 09 must not change that trust model, and phase 08 must know a phase-09 guard now sits behind it |
+| **Phase 06 — `LOG_MASK_KEY`, the settings base, `06-PII-102`, `06-PII-108`, `06-PII-104`** | Phase 09 must not implement `LOG_MASK_KEY` (**it does not exist in the tree yet** — phase 06 has not landed), must not build the logging-policy `Filter`, must not touch the alert-audience predicate, and must not edit `apps/search/services/search_history.py`, `popular_search.py` or `apps/search/migrations/` | `LOG_MASK_KEY`'s absence is load-bearing for BLOCK 16: the redaction must go through `redact_free_text`, not through a phase-06 mechanism that does not exist. `06-PII-102` owns log-hygiene policy and already has regression tests — **BLOCK 16's log-field selection must be reviewed against them so the assertions land in one place, not two**. `06-PII-108` owns `SearchHistory.query_normalized` — which is why `09-VAL-002` is **routed** (BLOCK 13) and not implemented |
+| **Phase 08 — the `SavedSearch.query` / `query_normalized` parking, the client-IP trust item, `sanitize.py`, `IMMEDIATE_ALERTS_ENABLED`** | Phase 09 was instructed **not to decide Q5 or Q6** and **not to edit `apps/search/services/**` or `apps/search/migrations/`**. **Q5 is now resolved by the Product Owner (2026-10-03): BLOCK 13 implements `redact_free_text` in `views/save_search.py` only.** Phase 09 must still **not** edit `apps/search/services/**`, `apps/search/models.py`, `apps/search/migrations/`, or extend `redact_search_query`/`redact_free_text` or change either function's "never lengthen" invariant, and must not change `IMMEDIATE_ALERTS_ENABLED` | **This is the explicit instruction in the brief and it matches phase 08's own plan.** Phase 08's §5.5 lists *"06 — Q5: whether `SavedSearch.query` needs redaction, not just a bound"* as an **open forward dependency** that is now **resolved**. Phase 08's BLOCK 8 owns the **bound** on the same read as `save_search.py`; the two are **sequenced** (§5.3). Phase 09 publishes the view fix (BLOCK 13) and edits nothing else in `apps/search/**`. On the client-IP trust item: BLOCK 10's optional app-level limiter **inherits** `contact_rate_limit._get_client_ip`'s `HTTP_X_FORWARDED_FOR` trust — phase 09 must not change that trust model, and phase 08 must know a phase-09 guard now sits behind it |
 | **Phase 10 — code quality** | Phase 09 must not fold BLOCKS 2 and 16's helper work into a general "consolidate the cache layer" or "consolidate the outbound layer" change | `09-API-002`'s seven-copy consolidation **is** a code-quality-shaped change, but it is triggered by a HIGH availability defect and its blast radius is the finding. Phase 10 must not claim it |
 | **Phase 11 — test coverage** | Phase 09 must not grow the four required test rewrites into new coverage | BLOCKS 4, 6, 7 and 8 rewrite tests that **encode defects**. Those are *incidental rewrites required by a behaviour change*, the convention phases 03/06/08 all adopted. Phase 11 must not claim them, and phase 09 must not expand them while rewriting |
 | **Phase 12 — production ops** | Phase 09 must not write a runbook | BLOCKS 5, 9, 11, 14 and 15 all state a parameter; phase 12 writes the procedure — the ECB sentence, the password-reset corrections, the `server_name` rollout, the `BOT_TOKEN` rotation obligation, the `IMAGE_TAG` requirement. **Adding a fifth editor to `docs/ops/docker-deployment.md` needs the Coordinator** |
@@ -3854,7 +3877,8 @@ agents.
 | **`src/backend/tests/test_nginx_config.py`** | **Phase 09: BLOCKS 10, 11, 12** | The established structural-test home; it parses `nginx.conf` only today, and BLOCK 10 extends it to the dev config |
 | **`docs/ops/docker-deployment.md`, `docs/ops/rollback.md`, `docs/ops/migration-workflow.md`** | **Phase 09: BLOCKS 5, 9, 11, 14, 15** | **Phase 12 owns the runbooks.** Phase 01, 02 and 08 have all touched `docker-deployment.md`. **Re-read immediately before editing; stop and report on a concurrent change.** No phase-09 block rewrites a runbook — it corrects a false claim or states a parameter |
 | **`docs/01-spec/architecture-structure.md`** | **Phase 09: BLOCK 11** (one new section) | No other phase claims it. Phase 06 holds `docs/01-spec/technical-specification.md` — a **different** file |
-| **`src/backend/apps/search/views/save_search.py`, `services/search_history.py`, `services/popular_search.py`, `apps/search/models.py`, `apps/search/migrations/`** | **Phase 09: NONE** | **Three-way reserved** (phase 06 BLOCK 7, phase 03 BLOCK 9 option B, phase 08 BLOCKS 5/8). BLOCK 13's file surface is **empty by design** |
+| **`src/backend/apps/search/views/save_search.py`** | **Phase 09: BLOCK 13** (Q5 ruled 2026-10-03: implement `redact_free_text` at the view boundary). The **view function** and **URL name** are unchanged; only the `redact_free_text` call + bounded-length guard + test are added. Phase 08 BLOCK 8 still owns the `max_length=200` **model** bound (§5.3 contention row) | **Three-way reserved** (phase 06 BLOCK 7, phase 03 BLOCK 9 option B, phase 08 BLOCKS 5/8) for **`services/search_history.py`, `services/popular_search.py`, `apps/search/models.py`, `apps/search/migrations/`** only. BLOCK 13 edits **`save_search.py`** — a one-line-plus-guard change, not a handoff |
+| **`src/backend/apps/search/services/search_history.py`, `services/popular_search.py`, `apps/search/models.py`, `apps/search/migrations/`** | **Phase 09: NONE** | **Three-way reserved** (phase 06 BLOCK 7, phase 03 BLOCK 9 option B, phase 08 BLOCKS 5/8). These files are **not** touched by BLOCK 13 — only `views/save_search.py` is |
 | **`apps/ads/migrations/`** | **Phase 09: BLOCK 8 only, under Q4 option (b)** | Phase 05 plans `ads/0008_*`; phase 06 also touches `apps/users/models.py` migrations. **Re-check the directory immediately before generating**; never renumber |
 | **`src/backend/conftest.py`** | **Nobody in this plan** | The most contended file in the repository. **No phase-09 block may edit it.** If a block appears to need a new fixture, that is a signal the test is over-fitted |
 | **`.ai/audit/**`** | **Nobody.** Unmodifiable by mandate | Nineteen tracked deletions. `git status --short .ai` must show no new modifications |
@@ -4228,7 +4252,10 @@ Phase 09 is complete when **all** of the following hold.
       commit; `test_compose_contract.py` unchanged.
 - [ ] **`09-API-012` / `09-VAL-002`** — BLOCK 13's record exists and names both owners, both
       candidate fixes, both acceptance-criteria sets, **and** that the view fix alone is not
-      sufficient. **Zero lines of `apps/search/**` were changed.**
+      sufficient. BLOCK 13 changed **only** `apps/search/views/save_search.py` (one line + guard
+      + test); no file under `apps/search/services/`, `apps/search/migrations/`,
+      `apps/search/models.py` or `apps/search/tests/test_redact_search_query.py` was edited by
+      phase 09.
 - [ ] **`09-API-013`** — a non-`AiogramError` dispatch leaves a retrievable ERROR log with the
       payload count; a backlog above the threshold warns and sends nothing **without
       blocking**; the shutdown hook is shown to run in the **worker**, not only the master;
@@ -4238,7 +4265,8 @@ Phase 09 is complete when **all** of the following hold.
       emitted and no WARNING is; the 200/400/405/422 contract is unchanged; `@require_POST`
       was **not** added.
 - [ ] **`09-API-016`** — no production service resolves to a floating tag; no `IMAGE_TAG`
-      `latest` default remains; the TLS volume default is the repository's own path; every
+      `latest` default remains; **`TLS_CERT_PATH` is DEFERRED (P4, not decided here)** —
+      `docker-compose.prod.yml:109` still uses `${TLS_CERT_PATH:-/etc/nginx/certs}`; every
       repinned image's **previous digest** is recorded; a structural test asserts both.
 - [ ] **`09-API-017`** — a title with a phone number and an e-mail reaches no log record on
       **any** site including the DEBUG **output** line; the API-key non-leakage test is
@@ -4300,9 +4328,11 @@ Phase 09 is complete when **all** of the following hold.
 
 ### 8.6 Deliverables
 
-- [ ] **16 commits**, one per block, each with a `"{type}({scope}): {description}"` message
-      in the repo's style and a body that names the option chosen, the tests changed, and any
-      cross-phase note the next reader needs.
+- [ ] **23 commits** shipped across the 16 blocks (15 implementation + 1 decision/handoff that became
+      implementation on 2026-10-03). Seven blocks had correction, test-only or doc follow-up
+      commits — each in the same `"{type}({scope}): {description}"` repo style with a body naming
+      the option chosen, the tests changed, and any cross-phase note. The count exceeds 16
+      because BLOCKS 4, 6, 8, 11, 13, 14, 16 each produced one or more follow-ups.
 - [ ] `apps/core/utils/cache.py` carries **one** documented cache-failure policy, two
       helpers, and no second contract.
 - [ ] Seven request-path guards share **one** helper; the `add`/`incr` duplication is gone
