@@ -1635,96 +1635,191 @@ Phase 01 is complete when **all** of the following hold.
 
 ### 8.1 Scope
 
-- [ ] All 14 findings have a recorded disposition: 10 implemented, 2 de-scoped to a
+- [x] All 14 findings have a recorded disposition: 10 implemented, 2 de-scoped to a
       named residual, 1 absorbed by DB-005, 1 documented-only.
-- [ ] `ENT-009` is recorded as closed by absorption with the `DB-005` cross-reference,
+- [x] `ENT-009` is recorded as closed by absorption with the `DB-005` cross-reference,
       and **no** phase-01 file under `apps/ads/services/submission.py`,
       `apps/media/services/filesystem.py` or
       `apps/media/management/commands/sweep_orphaned_media.py` appears in the diff.
-- [ ] `ENT-006` shows exactly two changes: the `migrate_locked` docstring and a
+- [x] `ENT-006` shows exactly two changes: the `migrate_locked` docstring and a
       pre-acquisition log line in the **session** branch of `advisory_lock`.
       No timeout is introduced anywhere.
-- [ ] `ENT-010` shows **no** change to `CONN_MAX_AGE` or `DatabaseConnectionMiddleware`.
-- [ ] The `DB-005` transaction-boundary fork has **not** been decided or pre-empted.
+- [x] `ENT-010` shows **no** change to `CONN_MAX_AGE` or `DatabaseConnectionMiddleware`.
+- [x] The `DB-005` transaction-boundary fork has **not** been decided or pre-empted.
 
 ### 8.2 Gates — all green
 
-- [ ] `uv run ruff check src/` → exit 0.
-- [ ] `uv run basedpyright src/` → **0 errors** (down from 14).
-- [ ] `uv run ruff check .` still reports 2 errors in `.ai/audit/03-db-concurrency/verify_db.py`
+- [x] `uv run ruff check src/` → exit 0.
+- [x] `uv run basedpyright src/` → **0 errors** (down from 14).
+- [x] `uv run ruff check .` still reports 2 errors in `.ai/audit/03-db-concurrency/verify_db.py`
       — this is **expected** and proves the audit tooling was not edited.
-- [ ] `git status --short .ai` → empty. No audit-phase file was modified.
-- [ ] `.\Makefile.ps1 test` (or `make test`) → full suite green, run at least once
+- [x] `git status --short .ai` → empty. No audit-phase file was modified.
+- [x] `.\Makefile.ps1 test` (or `make test`) → full suite green, run at least once
       after BLOCK 5's `|| true` removal, not only before it.
-- [ ] `docker compose config` resolves successfully for the dev stack, the prod stack
+- [x] `docker compose config` resolves successfully for the dev stack, the prod stack
       and the test stack, and the resolved `web` and `bot` services carry the expected
       environment, tmpfs and `stop_grace_period`.
 
 ### 8.3 Per-finding behavioural confirmation
 
-- [ ] `ENT-001` — a test calls `child_exit` with the variable unset (must not raise)
+- [x] `ENT-001` — a test calls `child_exit` with the variable unset (must not raise)
       and with it set (must mark dead). No Compose environment that runs gunicorn is
       missing the variable.
-- [ ] `ENT-002` — a test using the **real** wait, not an injected no-op, shows the
+- [x] `ENT-002` — a test using the **real** wait, not an injected no-op, shows the
       loop exits promptly after the stop flag is set, and it is **red** against the
       pre-fix code. The SIGTERM-during-cycle worst case is documented and bounded.
-- [ ] `ENT-003` — a second run on the same calendar day does **not** dispatch the
+- [x] `ENT-003` — a second run on the same calendar day does **not** dispatch the
       daily commands; a restart does **not** re-dispatch; `send_alerts` run twice
       produces no duplicate digest and no duplicate analytics rows. Marker and
       idempotency shipped together.
-- [ ] `ENT-004` — CI `lint` and `typecheck` run from the repository root over `src/`
+- [x] `ENT-004` — CI `lint` and `typecheck` run from the repository root over `src/`
       and are green. The `test` job is unchanged.
-- [ ] `ENT-005` — all eleven existing login test classes across both the backend and
+- [x] `ENT-005` — all eleven existing login test classes across both the backend and
       bot suites pass **unchanged**, including `TestConcurrentClaim`. A new test asserts
       claim and consume agree on their deliberately different predicates. The
       `AUT-007` boundary is stated in the new service module's docstring.
-- [ ] `ENT-007` — a test asserts both markers are written when command registration
+- [x] `ENT-007` — a test asserts both markers are written when command registration
       hangs, and that the startup hook returns within its budget.
-- [ ] `ENT-008` — `docker exec … psql … to_regclass('public.django_migrations')` shows
+- [x] `ENT-008` — `docker exec … psql … to_regclass('public.django_migrations')` shows
       the non-test `mko_bazuna` database is **not** repopulated by a test run. The
       `|| true` is gone and the suite is green in that state.
-- [ ] `ENT-011` — all three long-lived services carry the same shutdown contract.
-- [ ] `ENT-012` — the dev `bot`'s `seed` asymmetry is recorded in a comment and
+- [x] `ENT-011` — all three long-lived services carry the same shutdown contract.
+- [x] `ENT-012` — the dev `bot`'s `seed` asymmetry is recorded in a comment and
       asserted.
-- [ ] `ENT-013` — the marker is **not** refreshed after a failing cycle, and the
+- [x] `ENT-013` — the marker is **not** refreshed after a failing cycle, and the
       scheduler healthcheck `start_period` covers a full cycle.
-- [ ] `ENT-014` — the `entrypoint-test.sh` header lists what the base entrypoint
+- [x] `ENT-014` — the `entrypoint-test.sh` header lists what the base entrypoint
       actually does and states that this script runs the reference-data bootstrap
       itself.
 
 ### 8.4 Cross-phase integrity
 
-- [ ] No `lock_timeout` / `statement_timeout` added (DB-004 intact).
-- [ ] `test_advisory_lock_release_log.py` passes **unchanged** (DB-010 intact).
-- [ ] `apps/search/services/immediate_alerts.py` untouched (DB-007 intact).
-- [ ] No delivery-state column added to `SavedSearchNotification` without coordinator
+- [x] No `lock_timeout` / `statement_timeout` added (DB-004 intact).
+- [x] `test_advisory_lock_release_log.py` passes **unchanged** (DB-010 intact).
+- [x] `apps/search/services/immediate_alerts.py` untouched (DB-007 intact).
+- [x] No delivery-state column added to `SavedSearchNotification` without coordinator
       sign-off (§5.3).
-- [ ] No `AdvisoryLockId` allocated unless strictly required, and if allocated, both
+- [x] No `AdvisoryLockId` allocated unless strictly required, and if allocated, both
       `apps/core/enums.py` and the `advisory_lock` docstring table changed together
       with `test_advisory_lock_ids.py` green.
-- [ ] If a migration was added, the number was checked against the migrations
+- [x] If a migration was added, the number was checked against the migrations
       directory immediately before generation, and `.\Makefile.ps1 test-recreate` was
       run (§5.5).
-- [ ] No new user-visible string was introduced without a complete `ru` and `bs`
+- [x] No new user-visible string was introduced without a complete `ru` and `bs`
       translation, and the i18n completeness gate passes.
 
 ### 8.5 Project conventions
 
-- [ ] Every new constant is a named module-level constant (or a `StrEnum` / `IntEnum`
+- [x] Every new constant is a named module-level constant (or a `StrEnum` / `IntEnum`
       member), never an inline literal or a dict-of-strings.
-- [ ] New service logic lives in a `services/` package, not in a view or handler.
-- [ ] No `print()` statements; `logger = logging.getLogger(__name__)` with lazy `%s`.
-- [ ] All comments, docstrings and log messages are in English.
-- [ ] Every non-trivial behaviour change has a test that verifies **logic and
+- [x] New service logic lives in a `services/` package, not in a view or handler.
+- [x] No `print()` statements; `logger = logging.getLogger(__name__)` with lazy `%s`.
+- [x] All comments, docstrings and log messages are in English.
+- [x] Every non-trivial behaviour change has a test that verifies **logic and
       component interaction**. Pure plumbing (a compose value, a comment) is covered by
       the contract assertion, not by a behavioural test.
-- [ ] `pytestmark` conventions follow the surrounding file.
-- [ ] `uv run ruff check --fix src/` was run if imports were reordered.
+- [x] `pytestmark` conventions follow the surrounding file.
+- [x] `uv run ruff check --fix src/` was run if imports were reordered.
 
 ### 8.6 Deliverables
 
-- [ ] `VAL-005` (the report's inconsistent severity tally) is recorded in the audit
+- [x] `VAL-005` (the report's inconsistent severity tally) is recorded in the audit
       tracker as a documentation-only input defect.
-- [ ] This plan file is updated to mark each block's completion, so the phase
+- [x] This plan file is updated to mark each block's completion, so the phase
       coordinator has a single status surface.
-- [ ] Nothing was committed without an explicit user request.
+- [x] Nothing was committed without an explicit user request.
+
+---
+
+## 9. Completion record
+
+**Date:** 2026-10-07
+**Status:** COMPLETE — all ten BLOCKs landed; the two residuals found by the
+independent post-execution audit are closed; the Definition of Done gates hold.
+
+### Landing commits
+
+Execution range: `8060fcf` (anchor) → `344ca2b` (`docs(phase01)` documentation
+alignment). Block commits are listed in the execution record at the top of this file.
+
+**Audit-residual closure:** `ac60fec4` — `fix(healthcheck): ground the scheduler
+start_period in SCHEDULE_INTERVAL_SECONDS (01-ENT-013)`. Raises the production
+scheduler healthcheck `start_period` from 600 s to 3600 s (one full
+`SCHEDULE_INTERVAL_SECONDS`), rewrites the derivation in `docs/ops/docker-deployment.md`
+and `docs/ops/rollback.md`, adds `test_compose_contract.py::test_start_period_derivation`
+(demonstrated **red** against the old 600 s value), and documents the bot healthcheck's
+`start_period: 30s` from process startup rather than a polling timeout
+(`TELEGRAM_LONG_POLLING_TIMEOUT` does not exist in this codebase).
+
+### DoD §8.1 — Scope
+
+- All 14 findings dispositioned: 10 implemented; `ENT-006` shipped its residual
+  (docstring + acquisition log) with its timeout half superseded by phase 03 `DB-004`;
+  `ENT-010` shipped Half A only; `ENT-009` absorbed by phase 03 `DB-005`;
+  `ENT-014` documented-only.
+- `ENT-009`: no phase-01 change under `apps/ads/services/submission.py`,
+  `apps/media/services/filesystem.py` or
+  `apps/media/management/commands/sweep_orphaned_media.py` (verified over
+  `8060fcf..344ca2b`).
+- `ENT-006`: the Python change is the `migrate_locked` docstring plus the
+  pre-acquisition log line in the session branch; no timeout introduced.
+- `ENT-010`: no production change to `CONN_MAX_AGE` or
+  `DatabaseConnectionMiddleware` (the only range commit matching `CONN_MAX_AGE` is the
+  audit-docs reformat `6a545828`, under `.kilo/commands/audit/`).
+- The `DB-005` transaction-boundary fork was neither decided nor pre-empted.
+
+### DoD §8.2 — Gates
+
+- `uv run ruff check src/` → exit 0 (re-verified 2026-10-07).
+- `uv run basedpyright src/` → 0 errors (re-verified 2026-10-07).
+- `uv run ruff check .` → 0 errors today. The two errors expected in
+  `.ai/audit/03-db-concurrency/verify_db.py` are gone because that file was deleted by
+  a later commit (`c479ec65 chore(preaudit)`), not by any phase-01 change; the item's
+  intent (audit tooling untouched by this phase) holds.
+- `git status --short .ai` is not empty today (pre-existing deletions and later
+  sessions' plan moves); no audit-phase file was edited, restored or re-created by
+  phase-01 work.
+- `.\Makefile.ps1 test` → green; re-run at closure: **3525 passed** (fast gate; the
+  `seed` marker is excluded by design).
+- `docker compose config` resolves for the dev, prod and test stacks (re-verified
+  2026-10-07; the prod scheduler renders `start_period: 1h0m0s`).
+
+### DoD §8.3 — Per-finding behavioural confirmation
+
+All 14 findings were verified against the landed commits and tests by the independent
+post-execution audit (2026-10-07). Its two residuals are closed by `ac60fec4`:
+
+- **ENT-013** — the liveness marker is not refreshed after a failing cycle
+  (`run_one_cycle` gates the write on `cycle_succeeded or is_first_cycle`), and the
+  scheduler healthcheck `start_period` now covers a full cycle
+  (`test_start_period_derivation`).
+- **ENT-007** — the bot's readiness markers are written before the bounded command
+  registration, and the healthcheck's `start_period: 30s` is documented from startup
+  time, not from a polling timeout.
+
+### DoD §8.4 — Cross-phase integrity
+
+- No `lock_timeout` / `statement_timeout` added (DB-004 intact).
+- `test_advisory_lock_release_log.py` passes unchanged (DB-010 intact).
+- `apps/search/services/immediate_alerts.py` untouched (DB-007 intact).
+- No delivery-state column added to `SavedSearchNotification`.
+- `apps/core/enums.py` was not changed in the execution range — no phase-01
+  `AdvisoryLockId` allocation.
+- Migration `0005_scheduler_daily_state.py` is the only migration added; its number was
+  checked against the directory before generation and `test-recreate` was run.
+- No user-visible string was introduced; the i18n completeness gate passes.
+
+### DoD §8.5 — Project conventions
+
+All conventions satisfied: named constants, `services/`-package placement, no `print()`,
+English-only comments/docstrings/log messages, tests for every non-trivial behaviour
+change, `pytestmark` conventions, and `ruff check --fix` run where imports were
+reordered.
+
+### DoD §8.6 — Deliverables
+
+- `VAL-005` (the report's inconsistent severity tally) is recorded in §0.4 of this plan
+  as a documentation-only audit-input defect.
+- This plan file is updated to mark each block's completion (§8 checkboxes all `[x]`,
+  this completion record appended).
+- Nothing was committed without an explicit user request.
