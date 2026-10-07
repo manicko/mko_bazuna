@@ -1,0 +1,142 @@
+# Task brief — Plan 27 BLOCK B-08 (N-8)  ⚑ CLUSTER 3/3
+# Implements: document the safe scratch extraction recipe (N-8 Option A).
+# Follows .ai/tasks/templates/task_template.yaml.
+
+id: task_27_b08_makemessages_guardrail
+
+title: N-8 — Document the whole-tree scratch extraction recipe (never extract in place)
+
+priority: high
+
+depends_on:
+  - task_27_b06_stale_catalog_gap
+  - task_27_b07_lazy_alias_extraction
+  - task_27_b02_djlint_importability
+
+source_reference: .ai/audit/problems/08-makemessages-mutates-tracked-catalogs.md
+source_section: "N-8 §2 Exact finding, §6 Option A, §8 Acceptance criteria, §9 Test contract; CORRECTION C-08-1"
+source_plan: .ai/plans/27-multi-problem-remediation-execution.md
+source_blocks:
+  - "B-08 — N-8: makemessages guardrail — document the scratch recipe (CLUSTER 3/3)"
+
+description: >
+  The documented extraction command runs manage.py makemessages -l ru -l bs -l en against the working
+  tree's LOCALE_PATHS, writing directly to the checked-in src/backend/locale/*/LC_MESSAGES/django.po
+  files. Any tooling run (audit, implementation, a freshness probe) therefore MUTATES tracked files as
+  a side effect. CORRECTION C-08-1: assigning settings.LOCALE_PATHS (post- OR pre-django.setup()) does
+  NOT redirect the write — makemessages' directory walk inserts every discovered locale/ dir at index 0,
+  so the in-tree src/backend/locale becomes default_locale_path. Only a WHOLE-SOURCE-TREE copy is safe.
+  The safe pattern is currently undocumented. Apply Option A: document the scratch recipe and add an
+  optional wrapper target.
+
+goals:
+  - document the "extract to scratch, never in place" recipe in .kilo/rules/commands.md
+  - state the C-08-1 mechanism (a scratch LOCALE_PATHS alone is insufficient)
+  - optionally add a Makefile.ps1 scratch-extract target
+  - annotate the in-place command as mutating tracked files
+  - do NOT create a durable guard (folded into plan 25 BLOCK 11)
+
+# ── CORRECTIONS folded in (must be honoured) ──
+# C-08-1: the recipe is a WHOLE-SOURCE-TREE copy. Do NOT document a naive LOCALE_PATHS helper.
+# DRIFT-1: the documented recipe uses --no-location --no-obsolete (plan 25 BLOCK 10).
+# Option B (non-mutating helper) is OUT OF SCOPE; Option C (durable guard) is FOLDED into plan 25 BLOCK 11.
+
+files:
+
+  - path: .kilo/rules/commands.md
+    targets:
+      - type: markdown_section
+        name: Extract
+    semantic_anchors:
+      note: >
+        Add the scratch recipe; annotate the in-place command as mutating tracked files. The Lint
+        templates section is owned by B-02 (serialized — B-02 runs first). Edit the Extract section only.
+
+  - path: Makefile.ps1
+    targets:
+      - type: function
+        name: new scratch-extract function (optional)
+      - type: help_line
+        name: Show-Help entry (optional)
+    semantic_anchors:
+      note: >
+        OPTIONAL. If added, performs the whole-source-tree copy + extraction outside the working tree;
+        follows the existing host-side-script idiom. A lint-templates target was added by B-02 (serialized).
+
+changes:
+
+  - action: update_doc
+    description: >
+      .kilo/rules/commands.md — Extract: document the safe recipe. Do NOT document a LOCALE_PATHS-only
+      redirect.
+    code_hint: |
+      # SAFE EXTRACTION RECIPE — never extract against the tracked tree.
+      # 1. Copy the WHOLE src/ tree to a scratch dir OUTSIDE the working tree.
+      #    (A scratch LOCALE_PATHS override does NOT work: makemessages' directory walk inserts the
+      #     in-tree locale/ at index 0, so the tracked .po is still written. C-08-1.)
+      # 2. Run makemessages there:
+      #      python backend/manage.py makemessages -l ru -l bs -l en --no-location --no-obsolete \
+      #        --ignore=.venv --ignore=__pycache__
+      # 3. Diff the scratch .po against the tracked .po (msgid/msgstr sets).
+      # 4. Apply ONLY the enumerated, targeted change to the tracked catalogs by hand.
+      #
+      # The in-place command (`... $dev run ... web python ... makemessages ...`) MUTATES the tracked
+      # catalogs. Use it only via the scratch recipe above.
+
+  - action: add_code
+    description: >
+      (OPTIONAL) Makefile.ps1 — add a scratch-extract function + Show-Help line that performs the
+      whole-tree copy + extraction outside the working tree.
+
+  - action: no_catalog_change
+    description: >
+      This documentation/helper commit introduces NO catalog content change.
+
+acceptance_criteria:
+  - after following the documented recipe, git status --short -- src/backend/locale is EMPTY
+  - the safe recipe (whole-tree scratch -> extract -> diff -> enumerated targeted change) is written in
+    .kilo/rules/commands.md (and/or a wrapper), replacing or clearly annotating the in-place command
+  - the recipe uses --no-location --no-obsolete; the C-08-1 mechanism is stated
+  - no catalog content change is introduced by this commit
+  - if a Makefile.ps1 target is added, validation runs it on Windows and quotes the clean-tree result
+  - i18n gates remain green
+  - no durable guard / no second freshness gate created
+
+test_contract:
+  how: >
+    The contract is the clean-tree proof: run the documented recipe and assert
+    git status --short -- src/backend/locale is empty.
+  commands:
+    - "git status --short -- src/backend/locale   # must be empty after the recipe"
+    - "$dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'"
+    - "$dc run --rm -e PYTEST_OPTS=\"src/backend/apps/ads/tests/test_i18n_completeness.py src/backend/apps/ads/tests/test_i18n_pipeline.py --tb=short\" test"
+  assertion_level: >
+    Tracked tree clean after the documented recipe; i18n gates green; no catalog content change.
+
+binding_constraints:
+  - the recipe is a WHOLE-SOURCE-TREE copy (C-08-1) — a naive LOCALE_PATHS helper is FORBIDDEN
+  - Option A only; Option B (non-mutating helper) out of scope; Option C (durable guard) folded into
+    plan 25 BLOCK 11
+  - use --no-location --no-obsolete (DRIFT-1)
+  - do NOT gitignore the catalogs; do NOT remove the extraction workflow
+  - serialize .kilo/rules/commands.md / Makefile.ps1 behind B-02 (B-02 first)
+  - never modify .ai/audit/**
+  - serialize: B-08 runs AFTER B-06 and B-07 (cluster order, plan §C.4)
+
+rollback: >
+  Revert the .kilo/rules/commands.md edit and any Makefile.ps1 target. No code path, no data, no schema.
+
+dod:
+  - recipe documented (whole-tree copy, C-08-1 mechanism stated); clean-tree proof recorded
+  - verify-do-not-assume: that the documented recipe actually leaves the tracked tree clean (run it; do
+    not trust the note)
+  - "git add .kilo/rules/commands.md Makefile.ps1   # (Makefile.ps1 only if a target was added)"
+  - explicit-path staging only; never git add -A; never git reset/checkout/stash
+
+agents:
+  auditor: no          # the C-08-1 mechanism is established
+  researcher: no       # the practice is known (isolated whole-tree copy)
+  planner: no
+  implementor: yes
+  validator: yes       # run the recipe and assert the tracked tree stays clean
+  docs_specialist: yes # the .kilo/rules/commands.md portion

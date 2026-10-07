@@ -1,0 +1,151 @@
+# Task brief — Plan 27 BLOCK B-02 (NF-5)
+# Implements: djlint importability — canonicalize the PYTHONPATH workaround.
+# Follows .ai/tasks/templates/task_template.yaml.
+
+id: task_27_b02_djlint_importability
+
+title: NF-5 — Canonicalize the PYTHONPATH djlint invocation (doc + Makefile.ps1 + pyproject comment)
+
+priority: high
+
+depends_on: []
+
+source_reference: .ai/audit/problems/05-djlint-custom-rules-import.md
+source_section: "NF-5 §2 Exact finding, §6 Option B, §8 Acceptance criteria, §9 Test contract"
+source_plan: .ai/plans/27-multi-problem-remediation-execution.md
+source_blocks:
+  - "B-02 — NF-5: uv run djlint importability (canonicalize the workaround)"
+
+description: >
+  The documented local command `uv run djlint src/backend/templates/` fails with
+  ModuleNotFoundError: No module named 'djlint_custom_rules'. The module exists at
+  src/backend/djlint_custom_rules.py and is wired via .djlint_rules.yaml (rule H901), but the
+  local uv environment never installs the project (no [build-system] in pyproject.toml), so the
+  module is importable only when src/backend is on PYTHONPATH. CI works because its djlint step
+  sets PYTHONPATH: .; the Makefile target runs djlint inside Docker (image sets
+  PYTHONPATH=/app/src:/app/src/backend); Makefile.ps1 has NO djlint target. The pyproject.toml
+  comment falsely claims an editable install exposes the module. Apply Option B: document the
+  working PYTHONPATH invocation, add a Makefile.ps1 target, and correct the false comment.
+
+goals:
+  - fix the documented local djlint command so it succeeds without a traceback
+  - add a lint-templates target to Makefile.ps1 mirroring the Makefile Docker target
+  - correct or delete the false editable-install claim in the pyproject.toml comment
+  - keep CI and Docker untouched (they are correct and green)
+  - keep H901 enforced; do NOT remove the custom rule from .djlint_rules.yaml
+
+# ── Option choice (recorded, NOT open) ──
+# Option B is the fix. Option A (add [build-system] / packaging) is REJECTED for this pass
+# (plan §F.3) because it changes pytest import roots and Docker --no-install-project.
+
+files:
+
+  - path: .kilo/rules/commands.md
+
+    targets:
+      - type: markdown_section
+        name: Lint templates
+
+    semantic_anchors:
+      note: >
+        Replace the bare `uv run djlint src/backend/templates/` (the failing command) with the
+        PYTHONPATH form (or point it at the new Makefile.ps1 target), matching CI's mechanism.
+        NOTE: this file is ALSO reserved by B-08 (Extract section). B-02 runs FIRST (plan §C.3);
+        B-08 edits a different section later. Do not touch the Extract section here.
+
+  - path: Makefile.ps1
+
+    targets:
+      - type: function
+        name: new lint-templates function (e.g. Invoke-LintTemplates)
+
+      - type: switch_arm
+        name: switch dispatch
+
+      - type: help_line
+        name: Show-Help entry
+
+    semantic_anchors:
+      note: >
+        Follow the existing host-side-script idiom (no compose project name) and the env-override
+        idiom ($x = if ($env:X) { $env:X } else { "default" }). Show-Help lines use
+        Write-Host "  <target>       <description>". Mirrors Makefile:135 (docker) OR runs djlint
+        with PYTHONPATH=src/backend. NOTE: Makefile.ps1 is ALSO reserved by B-08 (optional target);
+        B-02 runs first.
+
+  - path: pyproject.toml
+
+    targets:
+      - type: comment_block
+        name: the editable-install comment above py-modules
+
+    semantic_anchors:
+      note: >
+        The comment claims "the editable install exposes it on sys.path for `uv run djlint` outside
+        Docker, where PYTHONPATH is not set". There is NO editable install. Correct it to describe
+        the PYTHONPATH mechanism, or delete it. COMMENT-ONLY edit.
+
+changes:
+
+  - action: update_doc
+    description: >
+      .kilo/rules/commands.md — Lint templates: document the working invocation.
+    code_hint: |
+      $env:PYTHONPATH='src/backend'; uv run djlint src/backend/templates/
+      # or: .\Makefile.ps1 lint-templates
+
+  - action: add_code
+    description: >
+      Makefile.ps1 — add a lint-templates function + switch arm + Show-Help line.
+    code_hint: |
+      function Invoke-LintTemplates {
+        $env:PYTHONPATH = 'src/backend'
+        uv run djlint src/backend/templates/
+      }
+
+  - action: update_comment
+    description: >
+      pyproject.toml — correct the false editable-install claim to name the PYTHONPATH mechanism
+      (or remove the comment). No [build-system]; no dependency change; no py-modules change.
+
+acceptance_criteria:
+  - the documented local command(s) succeed from the repo root on Windows without a traceback
+  - .kilo/rules/commands.md, Makefile.ps1 (if a target is added), Makefile and CI are consistent —
+    one documented way to lint templates locally, matching CI's mechanism
+  - H901 is still enforced: linting a scratch template INSIDE the project template tree with a
+    multi-line {# … #} comment produces the H901 diagnostic (scratch file removed afterward)
+  - no .djlint_rules.yaml semantic change; no template changes; CI and Docker paths unchanged
+  - the pyproject.toml comment no longer asserts a non-existent editable install
+  - Makefile.ps1 line-ending reality preserved where practical (no whole-file rewrite)
+
+test_contract:
+  how: >
+    Manual verification commands are the contract. No new pytest test.
+  commands:
+    - "$env:PYTHONPATH='src/backend'; uv run djlint src/backend/templates/admin/moderation/review.html"
+    - "# negative control: create a scratch template INSIDE src/backend/templates with a multi-line {# ... #}, run djlint, expect H901, then DELETE the scratch file"
+    - ".\Makefile.ps1 lint-templates   # if a target is added"
+    - "uv run ruff check .   # if any Python changed (none expected)"
+  assertion_level: >
+    The documented command exits 0 with "Linted … found 0 errors"; the H901 negative control
+    exits non-zero and prints H901. The H901 proof MUST be inside the project template tree
+    (.djlint_rules.yaml resolves relative to the project templates; a temp-dir file does NOT fire it).
+
+binding_constraints:
+  - Option B only — do NOT add [build-system]; do NOT change the packaging model; do NOT touch
+    pytest pythonpath/--import-mode=importlib roots or Docker --no-install-project
+  - never "fix" the failure by removing the custom rule from .djlint_rules.yaml
+  - CI and Docker are correct and green — do not change ci.yml or docker/Dockerfile
+  - pyproject.toml edit is comment-only (or deletes the comment); no dependency, no build-system
+  - serialize with B-08 on .kilo/rules/commands.md and Makefile.ps1 (B-02 first)
+
+rollback: >
+  Revert .kilo/rules/commands.md, Makefile.ps1 (and the pyproject.toml comment). No product, DB,
+  or i18n surface.
+
+dod:
+  - documented command fixed; target added; false comment corrected; H901 still fires
+  - verify-do-not-assume: (i) H901 still fires INSIDE the template tree (the outside-tree non-firing
+    is a fact, not a bug); (ii) no existing Makefile.ps1 arm shadows the new target
+  - "git add .kilo/rules/commands.md Makefile.ps1 pyproject.toml"
+  - explicit-path staging only; never git add -A; never git reset/checkout/stash

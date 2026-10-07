@@ -1,0 +1,212 @@
+# Task brief — Plan 27 BLOCK B-03 (NF-2) — IMPLEMENTATION
+# Researcher resolves A-vs-B first (short decision note, internal sub-artifact), then the Implementor
+# lands the chosen option, then an independent Validator reviews. Full implementation block.
+# Follows .ai/tasks/templates/task_template.yaml.
+
+id: task_27_b03_city_fuzzy_cutoff
+
+title: NF-2 — Land the shared city fuzzy helper (CITY_FUZZY_CUTOFF = 0.6) and route both city sites through it
+
+priority: medium
+
+depends_on: []
+
+source_reference: .ai/audit/problems/02-bot-city-fuzzy-cutoff.md
+source_section: "NF-2 §2 Exact finding, §6 Fix options, §8 Acceptance criteria, §9 Test contract"
+source_plan: .ai/plans/27-multi-problem-remediation-execution.md
+source_blocks:
+  - "B-03 — NF-2: shared city fuzzy helper (implementation)"
+
+type: implementation
+
+status: pending
+
+description: >
+  telegram_bot/handlers/ad_create/city.py::process_city performs its own fuzzy city match with an
+  inline literal cutoff=0.6, n=3, over localized city names (c.get_name(get_language())). The web tier
+  has its own city matcher, apps/locations/services/city_suggestions.py::suggest_city, with a named
+  _CUTOFF = 0.6, n=1, over city slugs. This is the FOURTH fuzzy site and the only one with a bare
+  cutoff literal. Q1 (product ruling) requires this be IMPLEMENTED in this pass, not merely decided:
+  the Researcher resolves A-vs-B (recording why A over B in a short internal decision note), then the
+  Implementor lands the chosen option and an independent Validator reviews. Per the plan the pass lands
+  OPTION A: a new src/backend/apps/locations/services/city_fuzzy.py mirroring
+  apps/categories/services/fuzzy.py. The bot matches localized NAMES, the web matches SLUGS, so the
+  candidate list MUST be injected (never assumed). 0.6 must not change.
+
+goals:
+  - Researcher resolves A-vs-B and records the decision note FIRST (why Option A over Option B)
+  - Implementor lands the chosen option (Option A: shared helper) and refactors BOTH call sites
+  - keep the cutoff value fixed: CITY_FUZZY_CUTOFF: Final[float] = 0.6 (Q7(b)-ruled value — do NOT change)
+  - inject the candidate list into match_city (bot = localized names, web = slugs); never assume one list
+  - make n an injected parameter of the helper, defaulting per caller (bot n=3 precedent, web n=1)
+  - preserve existing behavior: bot keeps its get_city_by_name re-lookup; web keeps n=1
+  - add a boundary test that distinguishes 0.6 through BEHAVIOR (do NOT assert the literal 0.6)
+  - no user-visible string change; no i18n extraction; test_bot_no_hardcoded_messages stays green
+
+# ── Option space (Researcher ranks A/B, records the choice; the pass lands the chosen option) ──
+#   A — shared apps/locations/services/city_fuzzy.py mirroring apps/categories/services/fuzzy.py:
+#       CITY_FUZZY_CUTOFF = 0.6; match_city(query, candidates) with an exact-tier + get_close_matches
+#       ladder; candidates INJECTED (the match_category pattern). PRECONDITION CONFIRMED (Stage-0):
+#       the bot tier already imports backend modules incl. apps.locations and apps.categories.services,
+#       so a shared backend service module adds NO new cross-tier edge. RECOMMENDED shape for B-03.
+#   B — keep the two sites separate; hoist the bot literal into a named module constant only; decide
+#       n=3 vs n=1; record the entity-specific divergence. No new module, no cross-tier import.
+#   (C — decline — is not landed by this pass; Q1 requires a chosen option to be implemented.)
+#   Researcher resolves A vs B first; either way 0.6 is preserved and the bare literal is removed.
+
+# ── Design recorded (Q1/Q4-ruled; Researcher confirms + derives, Implementor lands) ──
+#   Option A is the landed shape. The helper takes the candidates as an injected parameter AND takes
+#   `n` as an injected parameter with a per-caller default. The bot keeps its get_city_by_name
+#   re-lookup (name -> City via exact-name re-lookup); the web keeps n=1. 0.6 must NOT change.
+
+files:
+
+  - path: src/backend/apps/locations/services/city_fuzzy.py
+    targets:
+      - type: module
+        name: city_fuzzy (new)
+      - type: constant
+        name: CITY_FUZZY_CUTOFF
+      - type: function
+        name: match_city
+    semantic_anchors:
+      insert_after:
+        type: module
+        value: apps/locations/services/__init__.py
+      mirror:
+        type: module
+        value: apps/categories/services/fuzzy.py
+
+  - path: src/telegram_bot/handlers/ad_create/city.py
+    targets:
+      - type: function
+        name: process_city
+    semantic_anchors:
+      replace:
+        type: literal
+        value: "cutoff=0.6 (the inline difflib.get_close_matches call in process_city)"
+
+  - path: src/backend/apps/locations/services/city_suggestions.py
+    targets:
+      - type: function
+        name: suggest_city
+      - type: constant
+        name: _CUTOFF
+    semantic_anchors:
+      remove:
+        type: constant
+        value: "_CUTOFF: Final[float] = 0.6 (the local module constant)"
+
+  - path: src/backend/apps/locations/tests/test_city_suggestions.py
+    targets:
+      - type: test_case
+        name: the web-city boundary test (new)
+
+  - path: src/telegram_bot/tests/test_city.py
+    targets:
+      - type: test_class
+        name: TestProcessCity
+    semantic_anchors:
+      add:
+        type: test_method
+        value: "the bot-city boundary test (new method in TestProcessCity)"
+
+changes:
+
+  - action: add_module
+    file: src/backend/apps/locations/services/city_fuzzy.py
+    description: >
+      Create the shared city-fuzzy helper mirroring apps/categories/services/fuzzy.py.
+      Define CITY_FUZZY_CUTOFF: Final[float] = 0.6. Define match_city(query, candidates, *, n=1) -> str | None
+      using an exact-tier check (exact/normalised equality first) + difflib.get_close_matches with
+      cutoff=CITY_FUZZY_CUTOFF. candidates is an INJECTED list (localized names for the bot, slugs for the
+      web); the module must NOT assume a candidate source. Import only stdlib + Django-free code (no
+      ads/search imports). Keep the module small and single-purpose.
+
+  - action: refactor
+    file: src/telegram_bot/handlers/ad_create/city.py
+    target: process_city
+    description: >
+      Replace the inline difflib.get_close_matches(..., n=3, cutoff=0.6) block with a call to
+      city_fuzzy.match_city(city_name, [c.get_name(get_language()) for c in all_cities], n=<bot n>).
+      The candidate list is built AT THE CALL SITE from localized names (never moved into the helper).
+      Preserve the existing behavior: the matched localized name is fed back through get_city_by_name
+      (the exact-name re-lookup). Decide and document the bot's n (the n=3 precedent of the old block —
+      dead work if only close_matches[0] is used — vs n=1); the helper takes n as an injected parameter,
+      defaulting per caller. Remove the bare cutoff=0.6 literal.
+
+  - action: refactor
+    file: src/backend/apps/locations/services/city_suggestions.py
+    target: suggest_city
+    description: >
+      Remove the local _CUTOFF constant and route suggest_city through city_fuzzy.match_city(slug,
+      all_slugs, n=1) with the injected slug list. Preserve behavior: n=1, same returned suggestion for
+      the same input.
+
+  - action: add_test
+    file: src/backend/apps/locations/tests/test_city_suggestions.py
+    description: >
+      Add the web-city BOUNDARY test: a below-cutoff query is REJECTED (no match) and an above-cutoff
+      query RESOLVES (a match), asserted through BEHAVIOR — never by asserting the literal 0.6. Because
+      the existing fixtures (budav/budva = 0.8) do not distinguish 0.6 from 0.8, add a case whose
+      SequenceMatcher ratio lies strictly between 0.6 and 0.8 (~e.g. ratio in (0.6, 0.8)).
+
+  - action: add_test
+    file: src/telegram_bot/tests/test_city.py
+    description: >
+      Add the bot-handler BOUNDARY test to TestProcessCity: a below-cutoff query does NOT resolve a city
+      and an above-cutoff query DOES resolve (through the handler path / the shared helper's behavior).
+      Assert through behavior, not the literal 0.6. Keep the existing mocked tests byte-unchanged.
+
+acceptance_criteria:
+  - the Researcher's short decision note is recorded and names Option A over Option B with rationale
+  - src/backend/apps/locations/services/city_fuzzy.py exists with CITY_FUZZY_CUTOFF = 0.6 (unchanged) and
+    an injected-candidate ladder match_city(query, candidates, *, n=...)
+  - both call sites route through the helper; no bare `cutoff=0.6` literal remains at either city site
+  - the helper imports only stdlib + Django-free code (no ads/search imports); no new ads<->search edge
+  - behavior is unchanged: the web slug path returns the same suggestion; the bot resolves the same city
+    for the same input (0.6 preserved, single best match, get_city_by_name re-lookup preserved)
+  - a boundary test proves a below-cutoff query is rejected and an above-cutoff query resolves for BOTH
+    the bot handler and the web service, asserted through behavior (not the literal 0.6)
+  - a case with ratio strictly between 0.6 and 0.8 is added (no existing fixture distinguishes the two)
+  - no user-visible string change; test_bot_no_hardcoded_messages stays green; no i18n extraction
+  - existing tests (test_city_suggestions.py, test_city.py) remain green
+
+test_contract:
+  how: >
+    Behavior-level boundary tests (below-cutoff rejected, above-cutoff resolved) for both the web
+    service and the bot handler; existing city tests unchanged and green; bot hardcoded-message gate
+    green; lint + typecheck clean on the touched Python paths; fast gate green.
+  commands:
+    - "$dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'"
+    - "$dc run --rm -e PYTEST_OPTS=\"src/backend/apps/locations/tests/test_city_suggestions.py src/telegram_bot/tests/test_city.py --tb=short\" test"
+    - "$dc run --rm -e PYTEST_OPTS=\"src/telegram_bot/tests/test_city.py::TestProcessCity --tb=short\" test"
+    - "uv run ruff check src/backend/apps/locations/services/city_fuzzy.py src/backend/apps/locations/services/city_suggestions.py src/telegram_bot/handlers/ad_create/city.py src/backend/apps/locations/tests/test_city_suggestions.py src/telegram_bot/tests/test_city.py"
+    - "uv run basedpyright src/backend/apps/locations/services/city_fuzzy.py src/backend/apps/locations/services/city_suggestions.py src/telegram_bot/handlers/ad_create/city.py"
+    - ".\Makefile.ps1 test"
+  notes: >
+    The i18n completeness gates and test_bot_no_hardcoded_messages run within the fast gate. No
+    makemessages / extraction is required (no user-visible string added or changed).
+
+rollback: >
+  Single-commit revert: delete src/backend/apps/locations/services/city_fuzzy.py, restore the inline
+  cutoff in city.py and the local _CUTOFF in city_suggestions.py, and remove the two added test methods.
+  No DB, no schema, no migration, no i18n surface. No git checkout/reset/stash — revert by explicit path.
+
+dod:
+  - Researcher's A-over-B decision note recorded; Option A landed; both call sites refactored
+  - boundary test (below-cutoff rejected / above-cutoff resolved) present for both bot and web
+  - verify-do-not-assume: (i) the four-site get_close_matches census at this HEAD (re-run the sweep);
+    (ii) the bot's apps.locations / apps.categories.services import precedent; (iii) the current ratios
+    (Podgoric/Podgorica = 0.9412, budav/budva = 0.8) and that the new case is strictly in (0.6, 0.8)
+  - CITY_FUZZY_CUTOFF is exactly 0.6 (unchanged)
+  - `git add src/backend/apps/locations/services/city_fuzzy.py src/backend/apps/locations/services/city_suggestions.py src/telegram_bot/handlers/ad_create/city.py src/backend/apps/locations/tests/test_city_suggestions.py src/telegram_bot/tests/test_city.py` — explicit paths only
+
+agents:
+  auditor: no
+  researcher: yes     # resolves A-vs-B first and records a short decision note (internal sub-artifact)
+  planner: no
+  test_engineer: no
+  docs_specialist: no
+  implementor: yes    # lands the chosen option (Option A) after the Researcher's note
+  validator: yes      # independent review: behavior preserved, no cutoff drift, candidate injection correct

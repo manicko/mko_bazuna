@@ -1,0 +1,108 @@
+# Task brief — Plan 27 BLOCK B-09
+# Final documentation pass + fold the durable freshness gate into plan 25 BLOCK 11.
+# Doc-only. Follows .ai/tasks/templates/task_template.yaml.
+
+id: task_27_b09_final_doc_pass
+
+title: Plan 27 final doc pass — record gap closure, recipe, and the plan-25 gate hand-off
+
+priority: medium
+
+depends_on:
+  - task_27_b06_stale_catalog_gap
+  - task_27_b07_lazy_alias_extraction
+  - task_27_b08_makemessages_guardrail
+
+source_reference: .ai/plans/27-multi-problem-remediation-execution.md
+source_section: "§B B-09, §F.5 (durable gate folded into plan 25 BLOCK 11)"
+source_plan: .ai/plans/27-multi-problem-remediation-execution.md
+source_blocks:
+  - "B-09 — Final doc pass + fold the freshness gate into plan 25 BLOCK 11"
+
+description: >
+  Record the pass-wide documentation currency: the catalog surface is now stable (B-06/B-07), the
+  scratch extraction recipe is documented (B-08), and any durable source-freshness CI gate is FOLDED
+  into plan 25 BLOCK 11 — NOT created here. Close the status of the executed blocks and record the
+  deferred design gates (B-03/B-04/B-05) as pending.
+
+goals:
+  - record in docs/99-agent/architecture.md that the extraction gap is closed and the recipe documented
+  - state the durable-gate hand-off to plan 25 BLOCK 11 explicitly (no competing gate)
+  - update this plan's status header / run history
+  - record any HOLD or documented variant taken by a block
+  - documentation only — no .py, no .po, no compose, no CI change
+
+files:
+
+  - path: docs/99-agent/architecture.md
+    targets:
+      - type: markdown_section
+        name: i18n freshness / deferral area
+    semantic_anchors:
+      note: >
+        Add a dated note: gap closed (B-06/B-07), recipe documented (B-08), durable gate FOLDED into
+        plan 25 BLOCK 11. This file is also edited by B-06 (the 04-AUT-005 deferral); serial B-06 -> B-09.
+
+  - path: .ai/plans/27-multi-problem-remediation-execution.md
+    targets:
+      - type: frontmatter
+        name: status header
+    semantic_anchors:
+      note: update status / record the run history per repo doc conventions.
+
+changes:
+
+  - action: update_doc
+    description: >
+      docs/99-agent/architecture.md — record the gap closure (B-06/B-07 commit pointers), the scratch
+      recipe (B-08), and the durable-gate hand-off to plan 25 BLOCK 11.
+
+  - action: update_plan
+    description: >
+      .ai/plans/27-… — update the status header and record the executed blocks and any HOLD/variant.
+
+  - action: no_code_change
+    description: >
+      No .py, no .po, no compose, no CI change. No .ai/audit/** change (audit material is immutable).
+
+acceptance_criteria:
+  - docs/99-agent/architecture.md records the gap closure and the recipe, with commit pointers
+  - the durable-gate hand-off to plan 25 BLOCK 11 is stated explicitly; NO new gate exists in this pass
+  - this plan's status header reflects the executed blocks
+  - git diff shows documentation only — no .py/.po/compose/CI file touched
+  - no .ai/audit/** file is modified
+
+test_contract:
+  how: >
+    No new tests. The existing i18n gates remain green (no code and no catalog change).
+  commands:
+    - "$dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'"
+    - "$dc run --rm -e PYTEST_OPTS=\"src/backend/apps/ads/tests/test_i18n_completeness.py src/backend/apps/ads/tests/test_i18n_pipeline.py --tb=short\" test"
+    - "# verify no new CI makemessages step: Select-String -Path .github/workflows/ci.yml -Pattern 'makemessages'"
+  assertion_level: >
+    Docs-only diff; i18n gates green; no new freshness gate anywhere.
+
+binding_constraints:
+  - do NOT create a competing freshness gate — the durable gate belongs to plan 25 BLOCK 11
+  - en stays empty per convention; no new user-visible strings
+  - do NOT edit .ai/audit/** (immutable)
+  - documentation only; no .py, no .po, no compose, no CI change
+  - record any HOLD or documented variant taken by a block
+
+rollback: >
+  Revert the documentation edit and this plan's header. Nothing depends on it at runtime.
+
+dod:
+  - gap closure + recipe + gate hand-off recorded; no competing gate; audit material untouched
+  - verify-do-not-assume: that no freshness gate was added anywhere in this pass (grep for a new
+    makemessages-in-CI step) before recording the hand-off
+  - "git add docs/99-agent/architecture.md .ai/plans/27-multi-problem-remediation-execution.md"
+  - explicit-path staging only; never git add -A; never git reset/checkout/stash
+
+agents:
+  auditor: no
+  researcher: no
+  planner: no
+  implementor: yes
+  validator: no        # doc-only; the failure mode (a competing gate) is checkable by reading the diff
+  docs_specialist: yes

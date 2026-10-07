@@ -1,0 +1,171 @@
+# Task brief — Plan 27 BLOCK B-05 (N-7) — IMPLEMENTATION
+# Researcher chooses A/B/C first (short decision note, internal sub-artifact), then the Implementor lands
+# it, then an independent Validator reviews (with a forced-recreate measurement).
+# Full implementation block. Follows .ai/tasks/templates/task_template.yaml.
+
+id: task_27_b05_testdb_readiness
+
+title: N-7 — Make test-DB readiness imply recovery completion (healthcheck/wait) so the fast gate is reliable
+
+priority: high
+
+depends_on: []
+
+source_reference: .ai/audit/problems/07-test-db-readiness-flakiness.md
+source_section: "N-7 §2 Exact finding, §6 Fix options, §8 Acceptance criteria, §9 Test contract"
+source_plan: .ai/plans/27-multi-problem-remediation-execution.md
+source_blocks:
+  - "B-05 — N-7: test-DB recovery-aware readiness (implementation)"
+
+type: implementation
+
+status: pending
+
+description: >
+  The test PostgreSQL container uses a persistent, reused volume, so initdb does not recur; the only
+  startup work is crash recovery after an interrupted prior run. pg_isready reports the server ready
+  BEFORE recovery finishes (it is a liveness probe, not a readiness guarantee), and the test db service
+  declares start_period: 10s (docker-compose.test.yml), shorter than the base db service's 30s whose own
+  comment warns about "a healthy-but-recovering server". When recovery outlasts the db-wait / the first
+  xdist workers' connections, spurious DB-connection failures and teardown races appear WITHOUT any code
+  change (observed: 23 failed -> 1 failed -> 2 failed across disjoint, untouched files). Q1 requires this
+  be IMPLEMENTED in this pass. The Researcher chooses among A (recovery-aware healthcheck / raised
+  start_period), B (serialize/pre-warm), C (retry-tolerant wait); the Implementor lands the chosen
+  strategy; an independent Validator reviews with a forced-recreate measurement.
+
+goals:
+  - Researcher chooses A/B/C FIRST and records the decision note (short internal sub-artifact) with the re-derived recovery window
+  - Implementor lands the chosen strategy so readiness implies RECOVERY COMPLETION, not mere liveness
+  - bound the retries; surface a clear error on exhaustion (an unbounded retry is FORBIDDEN)
+  - address CI parity explicitly (ci.yml:89-92, :261-264, :413-416 use the same pg_isready shape)
+  - do NOT weaken, skip, or delete any test to "fix" this (the NF-4 trap)
+  - record/derive the forced-recreate validation cost (N >= 3 consecutive fast-gate runs); re-derive the recovery window (never copy it from plan 25)
+
+# ── Option space (Researcher ranks A/B/C, records the choice; the pass lands the chosen strategy) ──
+#   A — align the healthcheck and the wait to recovery: raise the test db start_period (30s+, matching the
+#       base service), and/or strengthen the probe so service_healthy implies recovery completion
+#       (pg_isready PLUS a successful SELECT 1 against mko_bazuna in a CMD-SHELL chain), and/or harden
+#       entrypoint.sh wait_for_db() to retry on "database system is starting up". Recommended shape;
+#       smallest change that removes the false signal.
+#   B — serialize/pre-warm the DB before xdist: a pre-gate readiness await, or drop --maxprocesses to 1
+#       for the first connection. More invasive; changes the test cadence.
+#   C — make the DB wait retry-tolerant in code: entrypoint.sh / the pytest session fixture retries
+#       connection errors classified as "starting up"/"is being accessed". Broadest blast radius.
+#   The chosen strategy must make readiness imply recovery completion; pg_isready is liveness-only (confirmed).
+
+files:
+
+  - path: docker-compose.test.yml
+    targets:
+      - type: service
+        name: db
+      - type: healthcheck
+        name: db healthcheck (test: pg_isready; start_period)
+    semantic_anchors:
+      replace:
+        type: field
+        value: "start_period (raise from 10s toward the base service's 30s) and/or the healthcheck test"
+
+  - path: docker/entrypoint.sh
+    targets:
+      - type: function
+        name: wait_for_db
+    semantic_anchors:
+      modify:
+        type: retry_loop
+        value: "the psycopg.connect retry loop (classify 'database system is starting up' for a BOUNDED period)"
+
+  - path: docker-compose.yml
+    targets:
+      - type: service
+        name: db
+    semantic_anchors:
+      note: "REFERENCE ONLY (base start_period: 30s) — do not weaken; touch only if the chosen strategy requires parity"
+
+  - path: .github/workflows/ci.yml
+    targets:
+      - type: job
+        name: test jobs healthcheck settings
+    semantic_anchors:
+      note: "CONDITIONAL — edit ONLY if the chosen strategy requires CI parity; enumerate the exact change; keep it minimal"
+
+changes:
+
+  - action: modify_healthcheck
+    file: docker-compose.test.yml
+    target: db service healthcheck
+    description: >
+      Apply the Researcher's chosen strategy so the db's healthy state implies recovery completion:
+      raise start_period (toward/at the base service's 30s or higher on Windows) and/or strengthen the
+      probe (pg_isready PLUS a successful SELECT 1 against mko_bazuna). Keep the probe bounded and
+      deterministic. Do not weaken any other service.
+
+  - action: harden_wait
+    file: docker/entrypoint.sh
+    target: wait_for_db
+    description: >
+      If (and only if) the chosen strategy includes it, harden wait_for_db() to retry connection errors
+      classified as "database system is starting up" for a BOUNDED period, surfacing a clear error on
+      exhaustion (an unbounded retry is forbidden).
+
+  - action: ci_parity
+    file: .github/workflows/ci.yml
+    target: test-job healthcheck settings
+    description: >
+      CONDITIONAL: only if the chosen strategy requires it, bring the CI healthcheck settings
+      (ci.yml:89-92, :261-264, :413-416) into parity so CI also waits for recovery, not mere liveness.
+      This edit is allowed for THIS block only, must be minimal, and must be enumerated explicitly in
+      the decision note. If CI needs no change, state that and why.
+
+acceptance_criteria:
+  - the Researcher's decision note records the chosen strategy (A/B/C), the re-derived recovery window,
+    and the CI-parity disposition (changed vs unaffected-and-why)
+  - readiness implies recovery completion: a connection attempt during the former recovery window
+    SUCCEEDS (or the wait retries until it does), bounded with a clear error on exhaustion
+  - recreating the test DB container and running the fast gate N >= 3 consecutive times produces ZERO
+    spurious failures on untouched modules (quote the runs)
+  - the numeric recovery window is re-derived by measurement, never copied from plan 25
+  - CI healthcheck settings remain consistent with the compose change (or CI is explicitly shown unaffected)
+  - no test bound, assertion, or module is weakened or deleted
+  - no application/migration/settings behaviour change; no product surface touched
+
+test_contract:
+  how: >
+    The contract is the FORCED-RECREATE MEASUREMENT: recreate the test DB container so crash recovery
+    is exercised, then run the fast gate N >= 3 consecutive times and quote the results (zero spurious
+    failures on untouched modules). Re-derive the recovery window from the container logs during recreate
+    (never copy the plan-25 ~50s/80s figures). No new pytest test (infrastructure); the existing suite is
+    the subject.
+  commands:
+    - "$dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'"
+    - "$dc down ; $dc up -d db   # force recreate so recovery is exercised"
+    - "docker logs mko-bazuna-test-db-1   # re-derive the recovery window (do not copy plan 25)"
+    - "$dc run --rm --env PYTEST_SKIP_MARKERS=seed test   # fast gate, run N>=3 consecutive times"
+    - ".\Makefile.ps1 test   # canonical fast gate (run >=3 times, dev stack up)"
+  notes: >
+    The test DB container is currently Up (healthy). The Validator MAY recreate it (it is the test DB,
+    not dev data) but must stop-and-report if recreation fails. Record the before/after flake rates.
+    Do not run makemessages / any state-mutating repo command.
+
+rollback: >
+  Revert docker-compose.test.yml (and docker/entrypoint.sh, and ci.yml only if changed) to HEAD. No
+  schema, no data, no product code. The test DB volume is infrastructure, not data. Revert by explicit
+  path (no git checkout/reset/stash).
+
+dod:
+  - Researcher's strategy chosen + recovery window re-derived; strategy landed; bounded retries with a clear error
+  - verify-do-not-assume: (i) the current start_period values in BOTH compose files; (ii) the
+    entrypoint.sh wait_for_db shape; (iii) CI healthcheck settings at ci.yml:89-92/:261-264/:413-416 —
+    the material summarises, not quotes, them
+  - forced-recreate measurement done: N >= 3 consecutive fast-gate runs, zero spurious failures (quoted)
+  - CI parity addressed explicitly; this block is the SOLE ci.yml owner for this pass (no other block edits ci.yml)
+  - `git add docker-compose.test.yml docker/entrypoint.sh` — explicit paths only (plus .github/workflows/ci.yml ONLY if the enumerated CI-parity change is required)
+
+agents:
+  auditor: no
+  researcher: yes     # chooses A/B/C first and records the decision note + re-derived recovery window
+  planner: no
+  test_engineer: yes  # test-infrastructure quality decision
+  docs_specialist: no
+  implementor: yes    # lands the chosen strategy
+  validator: yes      # forced-recreate measurement: N>=3 fast-gate runs, no test weakened

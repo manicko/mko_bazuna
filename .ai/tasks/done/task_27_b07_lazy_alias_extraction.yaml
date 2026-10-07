@@ -1,0 +1,157 @@
+# Task brief — Plan 27 BLOCK B-07 (N-6)  ⚑ CLUSTER 2/3
+# Implements: remove the gettext_lazy as _lazy alias so the three _NON_CONTENT_REPLIES strings
+# are extractable; retire the extraction-gap exemption.
+# Follows .ai/tasks/templates/task_template.yaml.
+
+id: task_27_b07_lazy_alias_extraction
+
+title: N-6 — De-alias gettext_lazy in submit.py so the three _NON_CONTENT_REPLIES strings are extracted
+
+priority: critical
+
+depends_on:
+  - task_27_b06_stale_catalog_gap
+
+source_reference: .ai/audit/problems/06-lazy-alias-extraction-gap.md
+source_section: "N-6 §2 Exact finding, §6 Option B, §8 Acceptance criteria, §9 Test contract"
+source_plan: .ai/plans/27-multi-problem-remediation-execution.md
+source_blocks:
+  - "B-07 — N-6: _lazy alias extraction gap (CLUSTER 2/3)"
+
+description: >
+  telegram_bot/handlers/ad_create/submit.py imports the translation function under a private alias:
+  "from django.utils.translation import gettext as _, gettext_lazy as _lazy" (commit d0a3ac2a). Three
+  module-level seller-facing replies in _NON_CONTENT_REPLIES (DRAFT_GONE, INVALID_TRANSITION,
+  PHOTO_UNAVAILABLE) are wrapped with _lazy(...). Django's makemessages passes xgettext --keyword=
+  gettext_lazy (not _lazy), so those three msgids are NEVER extracted; a fresh extraction DROPS them
+  from the catalog. They exist today (added pre-rename) and are runtime-live: removing them breaks
+  telegram_bot/tests/test_lock_timeout_boundary.py. Apply Option B: de-alias (import un-aliased
+  gettext_lazy; replace the three _lazy calls), matching contact.py/support.py/permissions.py; retire
+  the _EXTRACTION_GAP_MSGIDS exemption.
+
+goals:
+  - replace the aliased import with un-aliased gettext_lazy
+  - replace the three _lazy(...) calls with gettext_lazy(...)
+  - keep the three msgids present in all three catalogs (non-empty ru/bs)
+  - retire the _EXTRACTION_GAP_MSGIDS exemption (or retain with a pointer, per the ruling)
+  - keep the lock-timeout tests green
+
+# ── Option ruling (recorded, NOT open) ──
+# Option B (de-alias) is the RULED fix: smallest, removes the root cause, restores consistency with
+# contact.py/support.py/permissions.py (un-aliased gettext_lazy). Option A (--keyword=_lazy) is a
+# belt-and-braces alternative, NOT the primary fix here; it is NOT plumbed in this pass.
+# Option C (permanent exemption) is REJECTED without an explicit standardisation ruling.
+# If de-aliasing would break a runtime path, STOP AND REPORT — do not silently switch to A.
+
+files:
+
+  - path: src/telegram_bot/handlers/ad_create/submit.py
+    targets:
+      - type: import
+        name: gettext aliased import (gettext_lazy as _lazy)
+      - type: class_or_module_attr
+        name: _NON_CONTENT_REPLIES
+      - type: call_site
+        name: _lazy(...) call for DRAFT_GONE
+      - type: call_site
+        name: _lazy(...) call for INVALID_TRANSITION
+      - type: call_site
+        name: _lazy(...) call for PHOTO_UNAVAILABLE
+    semantic_anchors:
+      note: >
+        Import line: change to "from django.utils.translation import gettext as _, gettext_lazy"
+        (drop the alias). Calls: _lazy(...) -> gettext_lazy(...) at the three _NON_CONTENT_REPLIES
+        values. No other module aliases a gettext callee under a non-keyword name.
+
+  - path: src/backend/apps/ads/tests/test_i18n_completeness.py
+    targets:
+      - type: module_attr
+        name: _EXTRACTION_GAP_MSGIDS
+      - type: comment
+        name: the extraction-gap module comment
+    semantic_anchors:
+      note: >
+        Retire the three-msgid exemption (or retain with a pointer to the ruling); align the module
+        comment. The gate's in-process _PY_GETTEXT_KEYWORDS set must remain aligned if the exemption
+        is retired. The three msgids must still be present in all three catalogs.
+
+changes:
+
+  - action: replace_code
+    description: De-alias the gettext import in submit.py.
+    code_hint: |
+      from django.utils.translation import gettext as _, gettext_lazy
+
+  - action: replace_code
+    description: Replace the three _lazy(...) calls with gettext_lazy(...).
+    code_hint: |
+      # DRAFT_GONE / INVALID_TRANSITION / PHOTO_UNAVAILABLE values in _NON_CONTENT_REPLIES
+      gettext_lazy("Your ad could not be submitted from its current state. A fresh draft was prepared ...")
+      # (etc. — the exact existing msgid text is unchanged)
+
+  - action: update_test
+    description: >
+      Retire the _EXTRACTION_GAP_MSGIDS exemption for the three msgids (or retain it with an explicit
+      pointer to the ruling); align the module comment to the de-aliased state.
+
+  - action: verify_catalog
+    description: >
+      Confirm the three _NON_CONTENT_REPLIES msgids remain present in all three catalogs with
+      non-empty ru/bs msgstr; a fresh extraction (scratch whole-tree copy, --no-location
+      --no-obsolete) KEEPS them (no removal). Do NOT remove them from any catalog.
+
+acceptance_criteria:
+  - a fresh full extraction KEEPS the three _NON_CONTENT_REPLIES msgids (no removal)
+  - telegram_bot/tests/test_lock_timeout_boundary.py is green (the three replies render in ru/bs)
+  - the three msgids remain present in all three catalogs with non-empty ru/bs msgstr
+  - _EXTRACTION_GAP_MSGIDS is retired (or retained with a pointer to the ruling); the reverse gate
+    stays green
+  - no "gettext_lazy as _lazy" alias remains anywhere in src/
+  - i18n gates (test_i18n_completeness.py, test_i18n_pipeline.py, test_i18n_category_city.py) and the
+    fast gate are green; ruff/basedpyright clean on the touched module
+  - POT-Creation-Date stays synced across the three catalogs
+
+test_contract:
+  how: >
+    The existing TestProcessPreviewLocalisedErrors (lock-timeout) tests are the runtime contract. A
+    fresh extraction (scratch whole-tree copy) must show the three msgids EXTRACTED (not removed).
+  commands:
+    - "$dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'"
+    - "$dc run --rm -e PYTEST_OPTS=\"src/telegram_bot/tests/test_lock_timeout_boundary.py --tb=short\" test"
+    - "$dc run --rm -e PYTEST_OPTS=\"src/backend/apps/ads/tests/test_i18n_completeness.py src/backend/apps/ads/tests/test_i18n_pipeline.py src/backend/apps/ads/tests/test_i18n_category_city.py --tb=short\" test"
+    - "uv run ruff check src/telegram_bot/handlers/ad_create/submit.py"
+    - "uv run basedpyright src/telegram_bot/handlers/ad_create/submit.py"
+  assertion_level: >
+    Lock-timeout tests green (ru/bs rendering); fresh extraction keeps the three msgids; reverse
+    stale-entry gate green without the exemption.
+
+binding_constraints:
+  - de-alias — do NOT add --keyword=_lazy plumbing in this pass
+  - do NOT remove the three msgids from any catalog (breaks the lock-timeout tests)
+  - retire the exemption ONLY if a fresh extraction proves the three are extracted without it;
+    otherwise retain it with a recorded reason
+  - runtime-live module — run the bot/lock-timeout tests
+  - POT-Creation-Date stays synced across the three catalogs
+  - do NOT create a second freshness gate (plan 25 BLOCK 11 owns it)
+  - extract into a scratch whole-tree copy only (C-08-1); --no-location --no-obsolete (DRIFT-1)
+  - never modify .ai/audit/**
+  - serialize: B-07 runs AFTER B-06 and BEFORE B-08 (cluster order, plan §C.4)
+
+rollback: >
+  Revert src/telegram_bot/handlers/ad_create/submit.py and the test_i18n_completeness.py edit. No
+  schema, no DB.
+
+dod:
+  - alias removed; three msgids extractable; exemption retired; lock-timeout tests green
+  - verify-do-not-assume: (i) that submit.py is still the ONLY aliased gettext callee (re-run the
+    sweep); (ii) the current _EXTRACTION_GAP_MSGIDS shape at this HEAD
+  - "git add src/telegram_bot/handlers/ad_create/submit.py src/backend/apps/ads/tests/test_i18n_completeness.py"
+  - explicit-path staging only; never git add -A; never git reset/checkout/stash
+
+agents:
+  auditor: yes         # re-establish the aliased-callee inventory
+  researcher: no       # the direction is recorded; the reference shape is established
+  planner: no
+  implementor: yes
+  validator: yes       # fresh extraction + lock-timeout tests
+  docs_specialist: no

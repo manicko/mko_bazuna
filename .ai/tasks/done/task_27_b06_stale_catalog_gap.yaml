@@ -1,0 +1,155 @@
+# Task brief — Plan 27 BLOCK B-06 (NF-3)  ⚑ CLUSTER 1/3
+# Implements: fill the TWO forward-gap msgids so a fresh extraction is a clean no-op.
+# Follows .ai/tasks/templates/task_template.yaml.
+
+id: task_27_b06_stale_catalog_gap
+
+title: NF-3 — Fill both forward-gap msgids in all three catalogs (extraction no-op)
+
+priority: critical
+
+depends_on: []
+
+source_reference: .ai/audit/problems/03-stale-locale-catalogs.md
+source_section: "NF-3 §2 Exact finding, §6 Option A, §8 Acceptance criteria, §9 Test contract; CORRECTION C-03-1"
+source_plan: .ai/plans/27-multi-problem-remediation-execution.md
+source_blocks:
+  - "B-06 — NF-3: fill the two forward-gap msgids (CLUSTER 1/3)"
+
+description: >
+  A legitimate full makemessages run surfaces msgids absent from the checked-in catalogs. The
+  Stage-0 audit's isolated extraction (CORRECTION C-03-1) proves the forward gap is TWO msgids per
+  locale, not one: (1) "Password does not meet the password policy: %(errors)s" (create_admin_user.py,
+  gettext_lazy) and (2) the bare string "Please accept the personal data storage consent first."
+  (apps/ads/services/submission.py:229, also at apps/ads/views/edit.py:153 and
+  telegram_bot/handlers/ad_create/submit.py:188). The catalogs today hold only the DIFFERENT string
+  "To manage ads, please accept the personal data storage consent first." A fix filling only the
+  password-policy msgid still produces a non-empty extraction diff and a red test_no_empty_msgstr.
+  Fill BOTH msgids in all three catalogs (ru/bs non-empty; en empty per convention).
+
+goals:
+  - add BOTH forward-gap msgids to ru, bs and en catalogs
+  - fill ru/bs msgstr; leave en msgstr empty per convention
+  - keep POT-Creation-Date synced across the three catalogs
+  - mark the architecture.md deferral section resolved
+  - do NOT create a second freshness gate (plan 25 BLOCK 11 owns it)
+
+# ── CORRECTIONS folded in (must be honoured) ──
+# C-03-1: the forward gap is TWO msgids. Both are IN SCOPE (NF-3's own AC "a fresh extraction is a
+#         no-op" is unreachable otherwise). Not a new product gate — the second string is already a
+#         live, user-facing consent message with gettext_lazy at three call sites.
+# DRIFT-1: every extraction uses --no-location --no-obsolete (plan 25 BLOCK 10). NEVER --no-location only.
+
+files:
+
+  - path: src/backend/locale/ru/LC_MESSAGES/django.po
+    targets:
+      - type: catalog_entry
+        name: "Password does not meet the password policy: %(errors)s"
+      - type: catalog_entry
+        name: "Please accept the personal data storage consent first."
+    semantic_anchors:
+      note: non-empty ru msgstr for both; POT-Creation-Date must equal the other two catalogs.
+
+  - path: src/backend/locale/bs/LC_MESSAGES/django.po
+    targets:
+      - type: catalog_entry
+        name: "Password does not meet the password policy: %(errors)s"
+      - type: catalog_entry
+        name: "Please accept the personal data storage consent first."
+    semantic_anchors:
+      note: non-empty bs msgstr for both; POT-Creation-Date must equal the other two catalogs.
+
+  - path: src/backend/locale/en/LC_MESSAGES/django.po
+    targets:
+      - type: catalog_entry
+        name: "Password does not meet the password policy: %(errors)s"
+      - type: catalog_entry
+        name: "Please accept the personal data storage consent first."
+    semantic_anchors:
+      note: en msgstr stays EMPTY per convention; POT-Creation-Date must equal the other two catalogs.
+
+  - path: docs/99-agent/architecture.md
+    targets:
+      - type: markdown_section
+        name: "Deferred: Untranslated create_admin_user Password-Policy Msgid (04-AUT-005)"
+    semantic_anchors:
+      note: mark RESOLVED with the commit pointer; note the second msgid was not previously recorded.
+
+changes:
+
+  - action: update_catalog
+    description: >
+      Add both msgids to all three catalogs. Extract FIRST into a WHOLE-SOURCE-TREE scratch copy
+      (outside the working tree), diff against the tracked .po, then apply only the enumerated
+      targeted additive change. Extraction command (both flags):
+    code_hint: |
+      # scratch only (NEVER against the tracked tree):
+      #   copy the WHOLE src/ tree to a scratch dir; run makemessages there:
+      python backend/manage.py makemessages -l ru -l bs -l en --no-location --no-obsolete \
+        --ignore=.venv --ignore=__pycache__
+      # then hand-apply ONLY the two ADDED msgids; do NOT apply the REMOVED (three _lazy) entries.
+
+  - action: update_doc
+    description: >
+      docs/99-agent/architecture.md — mark the 04-AUT-005 deferral RESOLVED with the commit pointer;
+      record that the second consent msgid (submission.py et al.) is now also in the catalog.
+
+  - action: no_source_change
+    description: >
+      No source-code change: both call sites already use gettext_lazy. Do NOT edit any .py.
+
+acceptance_criteria:
+  - BOTH msgids exist in ALL THREE catalogs; ru/bs msgstr non-empty; en msgstr empty per convention
+  - a fresh full extraction produces NO msgid/msgstr changes (only POT-Creation-Date may differ, and it
+    must be byte-identical across all three catalogs)
+  - test_i18n_completeness.py and test_i18n_pipeline.py are green; the fast gate is green
+  - docs/99-agent/architecture.md's deferral section is marked resolved with the commit pointer
+  - no catalog change beyond the enumerated extraction diff (no unrelated re-ordering, no --no-obsolete
+    prune of the three _lazy entries — those are B-07's concern)
+  - no source-code change
+  - no second freshness gate created
+
+test_contract:
+  how: >
+    The existing i18n gates are the contract. The Validator re-runs the extraction against a fresh
+    whole-tree scratch copy and proves the msgid/msgstr diff is empty.
+  commands:
+    - "$dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'"
+    - "$dc run --rm -e PYTEST_OPTS=\"src/backend/apps/ads/tests/test_i18n_completeness.py src/backend/apps/ads/tests/test_i18n_pipeline.py --tb=short\" test"
+    - ".\Makefile.ps1 test   # fast gate"
+    - "# validator: fresh extraction in a whole-tree scratch copy; assert msgid/msgstr diff empty"
+  assertion_level: >
+    Non-empty ru/bs msgstr for both msgids in all three catalogs; extraction diff empty (only
+    POT-Creation-Date, equal across the three).
+
+binding_constraints:
+  - extract into a WHOLE-SOURCE-TREE scratch copy, NEVER in place (C-08-1: a scratch LOCALE_PATHS
+    alone does NOT redirect the write — makemessages' directory walk inserts the in-tree locale/ at index 0)
+  - BOTH msgids are in scope (C-03-1); a password-policy-only fix is INCOMPLETE
+  - use --no-location --no-obsolete for every extraction (DRIFT-1)
+  - .po-only change; no .py, no view, no migration
+  - POT-Creation-Date must stay byte-identical across the three catalogs (one invocation, all locales)
+  - do NOT prune the three _lazy entries (B-07 owns them); do NOT create a second freshness gate
+  - never modify .ai/audit/**
+  - serialize: B-06 runs BEFORE B-07 and B-08 (cluster order, plan §C.4)
+
+rollback: >
+  Revert the three catalog files (text; no schema) and the architecture.md edit. One concern; revert by
+  explicit path.
+
+dod:
+  - both msgids filled in all three catalogs; extraction is a no-op; deferral marked resolved
+  - verify-do-not-assume: (i) the full extraction diff at this HEAD — re-enumerate it, do not trust the
+    Stage-0 snapshot; (ii) that the _lazy entries are NOT removed by this block; (iii) that
+    test_pot_creation_date_sync still passes
+  - "git add src/backend/locale/ru/LC_MESSAGES/django.po src/backend/locale/bs/LC_MESSAGES/django.po src/backend/locale/en/LC_MESSAGES/django.po docs/99-agent/architecture.md"
+  - explicit-path staging only; never git add -A; never git reset/checkout/stash
+
+agents:
+  auditor: yes         # re-enumerate the full extraction diff (C-03-1)
+  researcher: no       # the direction (fill the gap) is recorded
+  planner: no
+  implementor: yes
+  validator: yes       # re-run the extraction and prove the diff is empty
+  docs_specialist: yes # the architecture.md deferral record
