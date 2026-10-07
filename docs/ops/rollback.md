@@ -389,6 +389,13 @@ file-based marker:
 3. **Marker freshness** — if `BOT_HEALTH_STALE_SECONDS > 0`, the marker's mtime
    must be within that window (detects retry-loop / stuck polling)
 
+The bot healthcheck's `start_period: 30s` covers process startup: Django setup,
+dispatcher wiring, and the startup hook that writes the readiness marker before any
+Telegram network I/O. It is **not** derived from a Telegram polling timeout — readiness
+means "polling is about to start". The catalog is already loaded by the `load_catalog`
+dependency, and command-menu registration runs after the marker under a bounded 10 s
+budget (`_BOT_COMMANDS_SETUP_TIMEOUT`), so it cannot gate readiness (ENT-007).
+
 This file-based check is the bot's own alert mechanism and works independently of
 web readiness. The bot process also writes a Redis-based `bot:liveness` marker
 (epoch timestamp) on startup and on every inbound update via `LivenessMiddleware`
@@ -425,7 +432,7 @@ docker compose --env-file .env.prod \
 
 The scheduler container's healthcheck runs `docker/healthcheck-scheduler.sh`
 (defined in the `scheduler` service `healthcheck:` block of `docker-compose.prod.yml`,
-interval 30s, `start_period: 600s`). It performs three checks against the file-based
+interval 30s, `start_period: 3600s`). It performs three checks against the file-based
 marker:
 
 1. **PID 1 alive** — `kill -0 1`

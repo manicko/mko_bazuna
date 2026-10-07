@@ -328,6 +328,11 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
+      # Covers process startup (Django setup, dispatcher wiring, and the
+      # startup hook that writes the readiness marker before any Telegram
+      # network I/O) - not a polling timeout. The catalog is already loaded by
+      # the load_catalog dependency, and command registration runs after the
+      # marker under a bounded 10 s budget, so it cannot gate readiness.
       start_period: 30s
   nginx:
     # Pinned patch, not a floating `nginx:alpine` (09-API-016). The floating

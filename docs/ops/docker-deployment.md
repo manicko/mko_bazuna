@@ -908,7 +908,7 @@ notification row and are collected by the next run).
 ### Scheduler Healthcheck
 
 The scheduler container is monitored by `docker/healthcheck-scheduler.sh`
-(`docker-compose.prod.yml` `healthcheck:` block, interval 30s, `start_period: 600s`).
+(`docker-compose.prod.yml` `healthcheck:` block, interval 30s, `start_period: 3600s`).
 It performs three checks:
 
 1. **PID 1 alive** — `kill -0 1`
@@ -922,11 +922,22 @@ It performs three checks:
 In test settings, `SCHEDULER_LIVENESS_FILE = ""` disables the marker so the scheduler
 loop never blocks on file writes during testing.
 
-`start_period` is 600 s because the marker is a success signal, refreshed only after a
-cycle in which every dispatched command exited `0` (plus an unconditional refresh on the
-process's first cycle). A legitimately slow first cycle — a full hourly set, each command
-bounded by `SCHEDULER_COMMAND_TIMEOUT` — would otherwise consume the `3 × 30 s` retry
-budget and mark a healthy container `unhealthy`.
+`start_period` is one full loop interval — `SCHEDULE_INTERVAL_SECONDS` (3600 s) — because
+the marker is a success signal, refreshed only after a cycle in which every dispatched
+command exited `0` (plus an unconditional refresh on the process's first cycle). The
+first marker therefore cannot appear before the first cycle completes, and the loop's
+contract is one cycle per interval, so the startup grace is sized to that cadence: a
+first cycle that has not produced the marker within a full interval has exceeded the
+cadence the loop promises, and `unhealthy` from then on is the intended signal rather
+than a false positive.
+
+The theoretical worst case is deliberately **not** covered: ten hourly commands plus up
+to three daily commands, each bounded by `SCHEDULER_COMMAND_TIMEOUT` (1800 s), sum to
+13 × 1800 s = 23,400 s. That bound is a failure state (every command timing out), and
+sizing `start_period` for it would mask a genuinely stuck scheduler for 6.5 hours. The
+steady-state detector for a stuck or failing loop is the marker staleness window
+(`SCHEDULER_HEALTH_STALE_SECONDS`, 7200 s on the prod service); once a probe fails, the
+`3 × 30 s` retry budget marks the container `unhealthy`.
 
 #### What `unhealthy` means and how to respond
 

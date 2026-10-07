@@ -69,7 +69,7 @@ correction is here and the plan is built on the tree's answer.
 
 | # | Claim | Report / context says | **Tree at `6413df5` says** (✔ = verified by this Planner) | Consequence |
 |---|---|---|---|---|
-| **C-1** | `OPS-019`: `db`/`redis` healthchecks in `docker-compose.yml` lack `start_period`; the report did not name the test override | two sites | ✔ **Four** healthcheck blocks across **three** files lack it: `docker-compose.yml` `db` (interval 5s / timeout 5s / retries 5) and `redis` (5s / 3s / 5); `docker-compose.test.yml` `db` override (5s / 5s / 5); and — **not named by the report and not named by the code context** — `docker-compose.prod.yml` `pgbouncer` (5s / 5s / 5). Every other healthcheck (`web` 5 s, `bot` 30 s, prod `scheduler` 600 s) declares one | In scope and BLOCK 1, **including** the test override. The report's "safe in every environment" claim becomes "must be re-verified per file", because `docker-compose.test.yml` is the file every phase's test command reads |
+| **C-1** | `OPS-019`: `db`/`redis` healthchecks in `docker-compose.yml` lack `start_period`; the report did not name the test override | two sites | ✔ **Four** healthcheck blocks across **three** files lack it: `docker-compose.yml` `db` (interval 5s / timeout 5s / retries 5) and `redis` (5s / 3s / 5); `docker-compose.test.yml` `db` override (5s / 5s / 5); and — **not named by the report and not named by the code context** — `docker-compose.prod.yml` `pgbouncer` (5s / 5s / 5). Every other healthcheck (`web` 5 s, `bot` 30 s, prod `scheduler` 3600 s) declares one | In scope and BLOCK 1, **including** the test override. The report's "safe in every environment" claim becomes "must be re-verified per file", because `docker-compose.test.yml` is the file every phase's test command reads |
 | **C-2** | `OPS-018`: "all seven services in `docker-compose.prod.yml` (lines 8, 18, 28, 36, 44, 54, 63)" | seven services, those line numbers | ✔ `docker-compose.prod.yml` declares **eight** `image:` lines (`web`, `bot`, `migrate`, `create_admin`, `seed`, `load_cities`, `load_catalog`, `scheduler`) and the `pgbouncer` service adds a ninth service with no `image:` reference to `IMAGE_TAG`. The "seven services" sentence is wrong in count and in every cited offset | BLOCK 14 corrects the count **and** the sentence, and does not encode the wrong number in the parity test |
 | **C-3** | `OPS-014`: the backup service "runs as UID 0" because its `command:` override bypasses `docker-entrypoint.sh` | root by mechanism | ✔ Confirmed structurally: `backup` declares `image: postgres:18-alpine`, a three-element `command: ["/bin/sh", "-c", …]`, `read_only: true`, `cap_drop: ["ALL"]`, `tmpfs`, `no-new-privileges`, `mem_limit`, `cpus`, `restart: unless-stopped`, `volumes: ./backups:/backups` — and **no `user:` and no `healthcheck:`**. The runtime uid was **not** observed. The `db` service, by contrast, has no `command:` override | The **fix** is in scope; the **mechanism claim** must be re-derived before it is asserted in a test or a commit body. BLOCK 2 makes the *absence* the assertion, not the inferred uid |
 | **C-4** | `_HARDENING_KEYS` in `test_compose_hardening.py` is the list the OPS-014 guard uses | five keys | ✔ Exactly `["read_only: true", "tmpfs:", "no-new-privileges:true", "mem_limit:", "cpus:"]`, and it is iterated by **twelve** service assertions: `web`, `bot`, `db`, `redis`, `scheduler`, `backup`, `pgbouncer`, `migrate`, `load_cities`, `load_catalog`, `create_admin`, `seed`. ✔ **`redis` is the only service in that list that declares `user:`** — `db` has none **by design** (its privilege drop is the image entrypoint's job) and `nginx`, which is separately documented as an exception, is not iterated at all | Adding `user:` to the shared list turns **eleven** green assertions red for a key they should not have. BLOCK 2 introduces an **exception list**; it does **not** extend the shared constant. See 0.2.2 item 2 |
@@ -633,7 +633,7 @@ the code context named**. All four are in scope for this block.
 | `docker-compose.prod.yml` | `pgbouncer` | `interval: 5s` / `timeout: 5s` / `retries: 5` | Add `start_period`. **Unfiled by the report** |
 
 The existing `start_period` values are the precedent for the scale: `web` 5 s, `bot` 30 s,
-prod `scheduler` 600 s. **Choose the value from the recovery characteristics of the service,
+prod `scheduler` 3600 s. **Choose the value from the recovery characteristics of the service,
 not by copying a neighbour** — and say which value and why in the commit body.
 
 **Binding constraints**
@@ -3663,7 +3663,7 @@ boundaries lie. It does **not** attempt to contact the other agents.
 | **Phase 01 `ENT-001`** | ✔ `gunicorn.conf.py::child_exit` guard | BLOCK 17 edits that file and **must not remove, move or re-shape the hook** |
 | **Phase 01 `ENT-002`** | ✔ Interruptible, bounded scheduler stop | BLOCK 8 recreates the scheduler container; the bounded stop is what makes that safe |
 | **Phase 01 `ENT-003`** | ✔ Durable daily marker + `send_alerts` idempotency | **OPS-007's rollout constraint is discharged.** BLOCK 8 lands without waiting. Do not add a second dedupe mechanism |
-| **Phase 01 `ENT-005` / `ENT-013`** | ✔ `docker/healthcheck-bot.sh`, `healthcheck-scheduler.sh`; the scheduler healthcheck with `start_period: 600s` | ✔ BLOCK 2's `healthcheck-backup.sh` **follows this shape**; BLOCK 1 must not regress the scheduler's `start_period` |
+| **Phase 01 `ENT-005` / `ENT-013`** | ✔ `docker/healthcheck-bot.sh`, `healthcheck-scheduler.sh`; the scheduler healthcheck with `start_period: 3600s` | ✔ BLOCK 2's `healthcheck-backup.sh` **follows this shape**; BLOCK 1 must not regress the scheduler's `start_period` |
 | **Phase 01 `ENT-011` / `ENT-012`** | ✔ `stop_grace_period` contract; the dev `bot`/`seed` asymmetry | ✔ Locked by `test_compose_contract.py`. **BLOCK 1 adds guards beside these, not over them** |
 | **Phase 01 `ENT-004`** | ✔ CI lint/typecheck scoped to `src/` | The bot is inside both gates; **no phase-12 precondition is unmet here** |
 | **Phase 02 `CFG-002`** | ✔ `ci.yml`'s `deploy-check` env block + `test_deploy_check_env_parity.py` | ✔ **OPS-002's gate precondition is met.** BLOCK 3 must not modify that `env:` block; BLOCK 10 relies on the gate actually executing |
@@ -4099,7 +4099,7 @@ Phase 12 is complete when **all** of the following hold.
 - [ ] The scheduler's durable daily marker and `send_alerts` idempotency (phase 01 `ENT-003`) are
       present and unchanged; no second dedupe mechanism exists.
 - [ ] `docker/healthcheck-bot.sh` and `healthcheck-scheduler.sh` are unchanged, and the scheduler
-      healthcheck's `start_period: 600s` is intact.
+      healthcheck's `start_period: 3600s` is intact.
 - [ ] `ci.yml`'s `deploy-check` `env:` block is byte-identical (phase 02 `CFG-002`).
 - [ ] `config/settings/tests/test_deploy_check_env_parity.py` is byte-identical (phase 02).
 - [ ] `ALLOWED_ENV_VARS` is a **superset** of every key in all four `.env.*.example` files, and no

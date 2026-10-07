@@ -153,7 +153,12 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-      start_period: 600s
+      # One full loop interval (SCHEDULE_INTERVAL_SECONDS, 3600 s): the
+      # liveness marker cannot appear until the first cycle completes, and the
+      # loop's contract is one cycle per interval. The worst-case cycle (every
+      # command hitting SCHEDULER_COMMAND_TIMEOUT) is a failure state and is
+      # deliberately not covered; the 7200 s staleness window detects it.
+      start_period: 3600s
 
   # Backup service: daily database dumps with 7-day retention
   # Opt-in via --profile backup to prevent storage consumption before needed

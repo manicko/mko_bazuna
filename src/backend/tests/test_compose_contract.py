@@ -19,6 +19,11 @@ from pathlib import Path
 import pytest
 from ruamel.yaml import YAML
 
+# ``apps.core.utils.scheduler`` imports only the standard library at module
+# level (Django imports are deferred inside its functions), so this keeps the
+# module's "no Django settings dependency" property.
+from apps.core.utils.scheduler import SCHEDULE_INTERVAL_SECONDS
+
 pytestmark = [pytest.mark.unit]
 
 # Resolve the repository root by walking upward to pyproject.toml (it exists
@@ -271,6 +276,55 @@ def test_is_parseable_duration_rejects_non_durations() -> None:
         assert _is_parseable_duration(good), f"{good!r} must parse"
     for bad in ("banana", "", "15", "5sec", "5 s", None, 30):
         assert not _is_parseable_duration(bad), f"{bad!r} must not parse"
+
+
+# Compose duration grammar unit -> seconds. Used only to compare a parsed
+# ``start_period`` against a Python constant; the grammar itself is validated
+# by ``_is_parseable_duration`` above.
+_DURATION_UNIT_SECONDS: dict[str, float] = {
+    "ns": 1e-9,
+    "us": 1e-6,
+    "ms": 1e-3,
+    "s": 1.0,
+    "m": 60.0,
+    "h": 3600.0,
+}
+_DURATION_TOKEN_PARTS_RE = re.compile(r"(\d+(?:\.\d+)?)(ns|us|ms|s|m|h)")
+
+
+def _duration_seconds(value: object) -> float:
+    """Convert a validated Compose duration (``30s``, ``1m30s``) to seconds.
+
+    ``_is_parseable_duration`` has already accepted the grammar; the assertion
+    here keeps the helper total, so a caller passing a malformed value fails
+    loudly instead of receiving a partial sum.
+    """
+    assert isinstance(value, str) and _is_parseable_duration(value), (
+        f"not a parseable Compose duration: {value!r}"
+    )
+    return sum(
+        float(number) * _DURATION_UNIT_SECONDS[unit]
+        for number, unit in _DURATION_TOKEN_PARTS_RE.findall(value)
+    )
+
+
+def test_start_period_derivation() -> None:
+    """The scheduler's start_period is grounded in SCHEDULE_INTERVAL_SECONDS.
+
+    The liveness marker cannot appear until the first scheduler cycle
+    completes, and the loop's cadence is one full interval, so the startup
+    grace window must cover at least ``SCHEDULE_INTERVAL_SECONDS`` (ENT-013).
+    Importing the constant means the two cannot drift: raising the interval
+    without raising the grace window fails here instead of silently marking a
+    healthy container ``unhealthy`` during a slow first cycle.
+    """
+    healthcheck = _load_yaml(_PROD_COMPOSE)["services"]["scheduler"]["healthcheck"]
+    start_period = _duration_seconds(healthcheck["start_period"])
+    assert start_period >= SCHEDULE_INTERVAL_SECONDS, (
+        "prod scheduler healthcheck start_period must cover at least one full "
+        f"SCHEDULE_INTERVAL_SECONDS ({SCHEDULE_INTERVAL_SECONDS:g}s); got "
+        f"{healthcheck['start_period']!r} (ENT-013)"
+    )
 
 
 def test_start_period_does_not_alter_probe_cadence() -> None:
