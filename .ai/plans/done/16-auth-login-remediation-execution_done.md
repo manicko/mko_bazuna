@@ -3,7 +3,7 @@ slug: 16-auth-login-remediation-execution
 phase: 04
 status: decomposition only — no implementation code in this document
 created: 2026-09-30
-source_plan: .ai/plans/04-auth-login-remediation.md
+source_plan: .ai/plans/04-auth-login-remediation_fix.md
 source_report: C:/Users/Om/.local/share/kilo/tool-output/tool_0f459358f001EIIcec4ipUxVO3
 verified_head: f93e7fb
 source_plan_anchor: 4fd8bd0
