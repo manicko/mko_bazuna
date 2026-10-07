@@ -639,6 +639,61 @@ class TestImageGeneratorTruthfulness:
         with pytest.raises(ValueError, match="cannot decode"):
             gen._preprocess_one("seed/fail_01.jpg", str(seed_dir), service)
 
+    @pytest.mark.seed
+    def test_original_written_atomically(
+        self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+    ) -> None:
+        """Original image is published via atomic temp+replace, not truncate-write.
+
+        Guards against the non-atomic ``open(path, "wb")`` regression: a
+        concurrent ``media_gate`` reader during seed regeneration must never
+        observe a truncated or empty original file. The original must be
+        published through the same ``ThumbnailService._publish`` temp+replace
+        contract used by thumbnails.
+        """
+        seed_dir = self._isolate(monkeypatch, tmp_path, ["atomic_01.jpg"])
+        gen = ImageGenerator({"faker_seed": 42}, [self.ad])
+        service = ThumbnailService(storage_dir=str(seed_dir))
+
+        publish_calls: list[tuple[str, WriteMode]] = []
+        real_publish = ThumbnailService._publish
+
+        def _track_publish(
+            content: bytes, target_path: str, mode: WriteMode
+        ) -> None:
+            publish_calls.append((target_path, mode))
+            real_publish(content, target_path, mode)
+
+        monkeypatch.setattr(
+            ThumbnailService, "_publish", staticmethod(_track_publish)
+        )
+
+        result = gen._preprocess_one("seed/atomic_01.jpg", str(seed_dir), service)
+        assert result is not None
+
+        # _publish called for original (1) + 3 thumbnail sizes = 4 total
+        assert len(publish_calls) == 4
+
+        # Original was published via _publish (not open(..., "wb"))
+        original_calls = [
+            c for c in publish_calls if c[0].endswith("atomic_01.jpg")
+        ]
+        assert len(original_calls) == 1, "original was not published via _publish"
+
+        # All calls used REPLACE mode (atomic overwrite)
+        assert all(mode == WriteMode.REPLACE for _, mode in publish_calls)
+
+        # Original file exists, is non-empty, and is valid JPEG
+        original = seed_dir / "atomic_01.jpg"
+        assert original.exists()
+        data = original.read_bytes()
+        assert len(data) > 0
+        assert data[:3] == b"\xff\xd8\xff"
+
+        # No leftover temp files in the seed directory
+        temps = list(seed_dir.glob(".*.tmp"))
+        assert temps == [], f"leftover temp files: {temps}"
+
 
 # ─── AnalyticsGenerator tests ────────────────────────────────────────────
 

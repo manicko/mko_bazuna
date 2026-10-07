@@ -324,9 +324,14 @@ class ImageGenerator(BaseGenerator):
         # unifies the sanitization contract with the user-upload path.
         img_bytes = strip_photo_exif(img_bytes)
 
-        # Write original image
-        with open(original_path, "wb") as f:
-            f.write(img_bytes)
+        # Write original image atomically — a concurrent reader (e.g.
+        # ``media_gate`` serving a live request while seed regenerates) must
+        # never observe a truncated or empty file.  This mirrors
+        # ``ThumbnailService._publish``'s temp+replace contract so the original
+        # and its thumbnails share the same atomic publish surface.
+        ThumbnailService._publish(
+            img_bytes, original_path, WriteMode.REPLACE
+        )
 
         mapping = {
             size: self._thumbnail_key(storage_key, size.value)
