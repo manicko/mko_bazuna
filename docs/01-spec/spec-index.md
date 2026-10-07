@@ -210,7 +210,7 @@ Analytical specifications for identified bugs and gaps. Full details in `.ai/pro
 | Fresh schema | `make test-recreate` |
 | Clean stale test DBs | `make test-clean-db` |
 | Lint | `uv run ruff check <path>` |
-| Template lint | `uv run djlint src/backend/templates/` |
+| Lint templates | `.\Makefile.ps1 lint-templates` (or `$env:PYTHONPATH='src/backend'; uv run djlint src/backend/templates/`) |
 | Type check | `uv run basedpyright <path>` |
 | i18n extract | `make makemessages` |
 | i18n compile | `make compilemessages` |
