@@ -74,6 +74,15 @@ _MEDIA_GATE_429_SVG: Final[str] = (
     "</svg>"
 )
 
+# 200 responses on media_gate carry a 24h CDN/browser TTL. ``public`` lets nginx
+# and shared caches store the response (the view itself is unauthenticated —
+# access is gated per-IP by the rate limiter and per-status at the DB lookup).
+# ``immutable`` is deliberately omitted: image keys are UUID v4 (uploads) or
+# fixed ``seed/<filename>.jpg`` names, NOT content-addressed. Seed files are
+# regenerated with WriteMode.REPLACE at the same URL, so a stale cached body
+# would be served if ``immutable`` were present.
+_MEDIA_CACHE_CONTROL_200: Final[str] = "public, max-age=86400"
+
 
 def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
@@ -240,11 +249,11 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponseBase:
     if request.user.is_staff:
         if settings.DEBUG:
             response = _serve_image(image_key)
-            response["Cache-Control"] = "no-cache"
+            response["Cache-Control"] = _MEDIA_CACHE_CONTROL_200
             return response
         response = HttpResponse()
         response["X-Accel-Redirect"] = f"/protected-media/{image_key}"
-        response["Cache-Control"] = "no-store"
+        response["Cache-Control"] = _MEDIA_CACHE_CONTROL_200
         return response
 
     # Non-staff users: only serve images referenced by a PUBLISHED ad owned by
@@ -263,12 +272,12 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponseBase:
 
     if settings.DEBUG:
         response = _serve_image(image_key)
-        response["Cache-Control"] = "no-cache"
+        response["Cache-Control"] = _MEDIA_CACHE_CONTROL_200
         return response
 
     response = HttpResponse()
     response["X-Accel-Redirect"] = f"/protected-media/{image_key}"
-    response["Cache-Control"] = "no-store"
+    response["Cache-Control"] = _MEDIA_CACHE_CONTROL_200
     return response
 
 

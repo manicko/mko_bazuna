@@ -719,15 +719,16 @@ class TestMediaGateThumbnailResolution:
 class TestMediaGateCacheControl:
     """B9/LOW-004: Cache-Control + Vary headers on media_gate responses.
 
-    Production (DEBUG=False) responses use Cache-Control: no-store (never cached).
-    Dev (DEBUG=True) responses get no-cache to prevent stale image serving
-    during development.  403 and 404 responses never receive Cache-Control.
+    200 responses carry Cache-Control: public, max-age=86400 (24h CDN/browser TTL).
+    ``immutable`` is omitted: image keys are UUID v4 / fixed seed names, NOT
+    content-addressed, so regenerated seed files must bypass cache at the same URL.
+    403, 404, and 429 responses never receive the long TTL.
     """
 
     def test_prod_200_cache_control_long_ttl(
         self, seller, category, city, isolated_media_root
     ):
-        """Production (DEBUG=False) 200: Cache-Control no-store + X-Accel-Redirect."""
+        """Production (DEBUG=False) 200: Cache-Control public max-age=86400 + X-Accel-Redirect."""
         key = generate_storage_key()
         _create_ad_with_image(seller, category, city, image_key=key)
         client = Client()
@@ -736,13 +737,14 @@ class TestMediaGateCacheControl:
             response = client.get(url)
         assert response.status_code == 200
         assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{key}"
-        assert response.headers.get("Cache-Control") == "no-store"
+        assert response.headers.get("Cache-Control") == "public, max-age=86400"
+        assert "no-store" not in response.headers.get("Cache-Control", "")
         assert "cookie" in response.headers.get("Vary", "").lower()
 
     def test_prod_staff_200_cache_control_long_ttl(
         self, seller, staff_user, category, city, isolated_media_root
     ):
-        """Production (DEBUG=False) staff 200: Cache-Control no-store + X-Accel-Redirect."""
+        """Production (DEBUG=False) staff 200: Cache-Control public max-age=86400 + X-Accel-Redirect."""
         key = generate_storage_key()
         _create_ad_with_image(
             seller, category, city, image_key=key, status=AdStatus.DRAFT
@@ -754,13 +756,14 @@ class TestMediaGateCacheControl:
             response = client.get(url)
         assert response.status_code == 200
         assert response.headers.get("X-Accel-Redirect") == f"/protected-media/{key}"
-        assert response.headers.get("Cache-Control") == "no-store"
+        assert response.headers.get("Cache-Control") == "public, max-age=86400"
+        assert "no-store" not in response.headers.get("Cache-Control", "")
         assert "cookie" in response.headers.get("Vary", "").lower()
 
     def test_media_cache_invalidated_on_ad_status_change(
         self, seller, category, city, isolated_media_root
     ):
-        """no-store ensures PUBLISHED→DELETED transition yields 403 on next fetch."""
+        """Server-side authorization re-check on each request: PUBLISHED→DELETED yields 403."""
         key = generate_storage_key()
         ad, _, _ = _create_ad_with_image(seller, category, city, image_key=key)
         client = Client()
@@ -768,7 +771,7 @@ class TestMediaGateCacheControl:
         with override_settings(MEDIA_ROOT=str(isolated_media_root), DEBUG=False):
             response = client.get(url)
         assert response.status_code == 200
-        assert response.headers.get("Cache-Control") == "no-store"
+        assert response.headers.get("Cache-Control") == "public, max-age=86400"
 
         # Simulate status transition: PUBLISHED → DELETED (matches soft_delete_user_ads pattern)
         from django.utils import timezone
@@ -786,7 +789,7 @@ class TestMediaGateCacheControl:
     def test_media_cache_invalidated_on_consent_withdrawal(
         self, seller, category, city, isolated_media_root
     ):
-        """no-store ensures consent withdrawal (ad soft-deleted to DELETED) yields 403 on next fetch."""
+        """Server-side authorization re-check: consent withdrawal (→DELETED) yields 403."""
         from apps.users.services.deletion import withdraw_consent
 
         key = generate_storage_key()
@@ -796,7 +799,7 @@ class TestMediaGateCacheControl:
         with override_settings(MEDIA_ROOT=str(isolated_media_root), DEBUG=False):
             response = client.get(url)
         assert response.status_code == 200
-        assert response.headers.get("Cache-Control") == "no-store"
+        assert response.headers.get("Cache-Control") == "public, max-age=86400"
 
         # Withdraw consent — soft_deletes all ads to DELETED via .update()
         withdraw_consent(seller)
@@ -808,7 +811,7 @@ class TestMediaGateCacheControl:
     def test_dev_200_cache_control_no_cache(
         self, seller, category, city, isolated_media_root
     ):
-        """Dev (DEBUG=True) 200: FileResponse with Cache-Control: no-cache."""
+        """Dev (DEBUG=True) 200: FileResponse with Cache-Control: public max-age=86400."""
         key = generate_storage_key()
         _create_ad_with_image(
             seller,
@@ -824,13 +827,14 @@ class TestMediaGateCacheControl:
             response = client.get(url)
         assert response.status_code == 200
         assert isinstance(response, FileResponse)
-        assert response.headers.get("Cache-Control") == "no-cache"
+        assert response.headers.get("Cache-Control") == "public, max-age=86400"
+        assert "immutable" not in response.headers.get("Cache-Control", "")
         assert "cookie" in response.headers.get("Vary", "").lower()
 
     def test_dev_staff_200_cache_control_no_cache(
         self, seller, staff_user, category, city, isolated_media_root
     ):
-        """Dev (DEBUG=True) staff 200: FileResponse with Cache-Control: no-cache."""
+        """Dev (DEBUG=True) staff 200: FileResponse with Cache-Control: public max-age=86400."""
         key = generate_storage_key()
         _create_ad_with_image(
             seller,
@@ -848,7 +852,8 @@ class TestMediaGateCacheControl:
             response = client.get(url)
         assert response.status_code == 200
         assert isinstance(response, FileResponse)
-        assert response.headers.get("Cache-Control") == "no-cache"
+        assert response.headers.get("Cache-Control") == "public, max-age=86400"
+        assert "immutable" not in response.headers.get("Cache-Control", "")
         assert "cookie" in response.headers.get("Vary", "").lower()
 
     # ------------------------------------------------------------------
@@ -897,6 +902,27 @@ class TestMediaGateCacheControl:
             response = _serve_image(key)
         assert isinstance(response, FileResponse)
         assert response.headers.get("Cache-Control") is None
+
+    def test_200_response_has_cache_control_max_age(
+        self, seller, category, city, isolated_media_root
+    ):
+        """200 responses carry public, max-age=86400 WITHOUT immutable.
+
+        Image keys are not content-addressed (UUID v4 / fixed seed names), so
+        ``immutable`` must never appear — seed files are regenerated at the same
+        URL and must bypass cache to avoid serving stale bytes.
+        """
+        key = generate_storage_key()
+        _create_ad_with_image(seller, category, city, image_key=key)
+        client = Client()
+        url = f"/media/{key}"
+        with override_settings(MEDIA_ROOT=str(isolated_media_root), DEBUG=False):
+            response = client.get(url)
+        assert response.status_code == 200
+        cc = response.headers.get("Cache-Control", "")
+        assert "max-age=86400" in cc
+        assert "immutable" not in cc
+        assert "no-store" not in cc
 
 
 class TestMediaGateApplicationRateLimit:
