@@ -42,7 +42,7 @@ class RateLimitBudget(StrEnum):
         Telegram contact deep-links; a side effect, not a query cost.
     LOGIN_ISSUE: 10 requests / 60 s. Issuing a login token is
         security-sensitive, so it is the tightest budget.
-    MEDIA_GATE: 60 requests / 60 s. Anonymous DB-backed media serving; protects
+    MEDIA_GATE: 240 requests / 60 s. Anonymous DB-backed media serving; protects
         the database from an over-budget client (09-API-005).
     """
 
@@ -60,7 +60,7 @@ class RateLimitBudget(StrEnum):
             RateLimitBudget.AUTOCOMPLETE: 30,
             RateLimitBudget.DEEP_LINK_RENDER: 60,
             RateLimitBudget.LOGIN_ISSUE: 10,
-            RateLimitBudget.MEDIA_GATE: 60,
+            RateLimitBudget.MEDIA_GATE: 240,
         }[self]
 
     @property

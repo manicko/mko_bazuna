@@ -79,7 +79,7 @@ class TestRateLimitBudgetTable:
         assert (RateLimitBudget.AUTOCOMPLETE.requests, RateLimitBudget.AUTOCOMPLETE.period) == (30, 60)
         assert (RateLimitBudget.DEEP_LINK_RENDER.requests, RateLimitBudget.DEEP_LINK_RENDER.period) == (60, 600)
         assert (RateLimitBudget.LOGIN_ISSUE.requests, RateLimitBudget.LOGIN_ISSUE.period) == (10, 60)
-        assert (RateLimitBudget.MEDIA_GATE.requests, RateLimitBudget.MEDIA_GATE.period) == (60, 60)
+        assert (RateLimitBudget.MEDIA_GATE.requests, RateLimitBudget.MEDIA_GATE.period) == (240, 60)
 
 
 class TestOneResponseShape:

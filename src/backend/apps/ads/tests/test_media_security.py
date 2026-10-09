@@ -968,6 +968,23 @@ class TestMediaGateApplicationRateLimit:
         assert response.headers.get("Content-Type") == "image/svg+xml"
         assert response.headers.get("Cache-Control") == "no-store"
 
+    def test_media_gate_budget_allows_ten_page_loads(self, seller, category, city):
+        """240 requests within the 60s window are all allowed, the 241st is refused.
+
+        The ``media_gate`` budget (240/60s) accommodates ten 24-image gallery
+        page loads without tripping the limiter (09-API-005).
+        """
+        key = self._published_key(seller, category, city)
+        client = Client()
+        url = f"/media/{key}"
+
+        with override_settings(DEBUG=False):
+            for _ in range(MEDIA_RATE_LIMIT_REQUESTS):
+                assert client.get(url).status_code == 200
+            response = client.get(url)
+
+        assert response.status_code == 429
+
     def test_over_budget_is_refused_before_the_db_lookup(self, seller, category, city):
         """The limiter runs before the AdImage query.
 
@@ -1028,7 +1045,7 @@ class TestMediaGateApplicationRateLimit:
 
     def test_period_constant_is_the_documented_window(self) -> None:
         """The window pair is the reviewed budget, not an inline literal."""
-        assert (MEDIA_RATE_LIMIT_REQUESTS, MEDIA_RATE_LIMIT_PERIOD) == (60, 60)
+        assert (MEDIA_RATE_LIMIT_REQUESTS, MEDIA_RATE_LIMIT_PERIOD) == (240, 60)
 
     def test_429_has_retry_after_header(self, seller, category, city):
         """The 429 response advertises how long the client should wait."""
