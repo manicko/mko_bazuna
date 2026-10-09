@@ -27,6 +27,7 @@ from PIL import Image
 from PIL.ExifTags import Base as ExifBase
 
 from apps.ads.views.listings import (
+    _MEDIA_GATE_429_SVG,
     MEDIA_RATE_LIMIT_PERIOD,
     MEDIA_RATE_LIMIT_REQUESTS,
     _serve_image,
@@ -936,6 +937,10 @@ class TestMediaGateApplicationRateLimit:
             response = client.get(url)
 
         assert response.status_code == 429
+        assert response.headers.get("Retry-After") == str(MEDIA_RATE_LIMIT_PERIOD)
+        assert "<svg" in response.content.decode()
+        assert response.headers.get("Content-Type") == "image/svg+xml"
+        assert response.headers.get("Cache-Control") == "no-store"
 
     def test_over_budget_is_refused_before_the_db_lookup(self, seller, category, city):
         """The limiter runs before the AdImage query.
@@ -954,6 +959,10 @@ class TestMediaGateApplicationRateLimit:
             response = client.get(url)
 
         assert response.status_code == 429
+        assert response.headers.get("Retry-After") == str(MEDIA_RATE_LIMIT_PERIOD)
+        assert "<svg" in response.content.decode()
+        assert response.headers.get("Content-Type") == "image/svg+xml"
+        assert response.headers.get("Cache-Control") == "no-store"
 
     def test_independent_per_ip(self, seller, category, city):
         """Exhausting one IP's budget does not affect a different IP."""
@@ -994,4 +1003,49 @@ class TestMediaGateApplicationRateLimit:
     def test_period_constant_is_the_documented_window(self) -> None:
         """The window pair is the reviewed budget, not an inline literal."""
         assert (MEDIA_RATE_LIMIT_REQUESTS, MEDIA_RATE_LIMIT_PERIOD) == (60, 60)
+
+    def test_429_has_retry_after_header(self, seller, category, city):
+        """The 429 response advertises how long the client should wait."""
+        key = self._published_key(seller, category, city)
+        client = Client()
+        url = f"/media/{key}"
+
+        with override_settings(DEBUG=False):
+            for _ in range(MEDIA_RATE_LIMIT_REQUESTS):
+                client.get(url)
+            response = client.get(url)
+
+        assert response.status_code == 429
+        assert response.headers.get("Retry-After") == str(MEDIA_RATE_LIMIT_PERIOD)
+
+    def test_429_returns_svg_placeholder(self, seller, category, city):
+        """The 429 body is an SVG rectangle matching the 240×180 thumbnail slot."""
+        key = self._published_key(seller, category, city)
+        client = Client()
+        url = f"/media/{key}"
+
+        with override_settings(DEBUG=False):
+            for _ in range(MEDIA_RATE_LIMIT_REQUESTS):
+                client.get(url)
+            response = client.get(url)
+
+        assert response.status_code == 429
+        body = response.content.decode()
+        assert "<svg" in body
+        assert response.headers.get("Content-Type") == "image/svg+xml"
+        assert _MEDIA_GATE_429_SVG in body
+
+    def test_429_has_no_store_cache_control(self, seller, category, city):
+        """The 429 response must never be cached by intermediary proxies."""
+        key = self._published_key(seller, category, city)
+        client = Client()
+        url = f"/media/{key}"
+
+        with override_settings(DEBUG=False):
+            for _ in range(MEDIA_RATE_LIMIT_REQUESTS):
+                client.get(url)
+            response = client.get(url)
+
+        assert response.status_code == 429
+        assert response.headers.get("Cache-Control") == "no-store"
 

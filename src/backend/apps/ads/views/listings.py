@@ -63,6 +63,17 @@ MEDIA_RATE_LIMIT_PERIOD: int = RateLimitBudget.MEDIA_GATE.period
 
 _MEDIA_RATE_LIMIT_KEY_PATTERN: Final[str] = "media_gate_rl:{ip}"
 
+# 240×180 gray SVG placeholder returned on 429 so the browser renders the
+# thumbnail slot with the same ``bg-gray-200`` (#e5e7eb) fallback the CSS
+# uses.  No text content: avoids the i18n completeness gate and keeps the
+# body cacheable as a static fallback.
+_MEDIA_GATE_429_SVG: Final[str] = (
+    '<svg xmlns="http://www.w3.org/2000/svg" '
+    'width="240" height="180" viewBox="0 0 240 180">'
+    '<rect width="240" height="180" fill="#e5e7eb"/>'
+    "</svg>"
+)
+
 
 def ad_detail(request: HttpRequest, ad_id: int) -> HttpResponse:
     """
@@ -188,7 +199,13 @@ def media_gate(request: HttpRequest, image_key: str) -> HttpResponseBase:
         media_key, MEDIA_RATE_LIMIT_REQUESTS, MEDIA_RATE_LIMIT_PERIOD
     ):
         logger.warning("Media gate rate limit exceeded")
-        return rate_limited_response(json=False)
+        response = rate_limited_response(
+            json=False,
+            retry_after=MEDIA_RATE_LIMIT_PERIOD,
+            body=_MEDIA_GATE_429_SVG,
+        )
+        response["Content-Type"] = "image/svg+xml"
+        return response
 
     # Reject malformed storage keys early. A NUL byte (or other control
     # characters) can never occur in a valid key (``<uuid>.jpg`` or
