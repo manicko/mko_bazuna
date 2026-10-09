@@ -122,12 +122,49 @@ class TestOneResponseShape:
         json_resp = rate_limited_response()
         assert json_resp.status_code == 429
         assert json_resp.content == b'{"error": "rate_limit"}'
+        assert json_resp["Cache-Control"] == "no-store"
 
     def test_builder_emits_empty_html_shape(self) -> None:
         """The builder's HTML form is a bare-status 429 with no body."""
         html_resp = rate_limited_response(json=False)
         assert html_resp.status_code == 429
         assert html_resp.content == b""
+        assert html_resp["Cache-Control"] == "no-store"
+
+    def test_html_429_carries_no_store(self) -> None:
+        """Every 429 HTML response must not be cached by clients or proxies."""
+        response = rate_limited_response(json=False)
+        assert response["Cache-Control"] == "no-store"
+
+    def test_json_429_carries_no_store(self) -> None:
+        """Every 429 JSON response must not be cached by clients or proxies."""
+        response = rate_limited_response()
+        assert response["Cache-Control"] == "no-store"
+
+    def test_retry_after_header_when_specified(self) -> None:
+        """A ``retry_after`` value is rendered as a string in the header."""
+        response = rate_limited_response(retry_after=30)
+        assert response["Retry-After"] == "30"
+
+    def test_no_retry_after_when_omitted(self) -> None:
+        """Omitting ``retry_after`` leaves the header absent on both shapes."""
+        json_resp = rate_limited_response()
+        html_resp = rate_limited_response(json=False)
+        assert "Retry-After" not in json_resp
+        assert "Retry-After" not in html_resp
+
+    def test_body_content_when_specified(self) -> None:
+        """A ``body`` value overrides the response content."""
+        response = rate_limited_response(json=False, body="foo")
+        assert response.content == b"foo"
+
+    def test_backward_compatibility(self) -> None:
+        """Callers that pass only ``json`` get the original shape plus ``no-store``."""
+        html_resp = rate_limited_response(json=False)
+        assert html_resp.status_code == 429
+        assert html_resp.content == b""
+        assert html_resp["Cache-Control"] == "no-store"
+        assert "Retry-After" not in html_resp
 
 
 class TestNamespaceIsolation:
