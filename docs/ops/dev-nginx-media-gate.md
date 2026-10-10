@@ -84,7 +84,7 @@ value is printed at the top of every run.
 
 | Variable | Default | Effect |
 |---|---|---|
-| `NGINX_BURST` | `45` | Concurrent `/media/` requests sent by the burst probe. Documented burst is `40`, so the extra 5 must overshoot it while the total stays under the application window of `60`. |
+  | `NGINX_BURST` | `45` | Concurrent `/media/` requests sent by the burst probe. Documented burst is `40`, so the extra 5 must overshoot it while the total stays under the application window of `240`. |
 | `NGINX_SETTLE` | `15` | Seconds to wait for the nginx leaky bucket to drain before the settle probe. |
 | `NGINX_POLL_ATTEMPTS` | `15` | Readiness poll attempts before giving up. |
 | `NGINX_POLL_INTERVAL` | `1` | Seconds between readiness poll attempts. |
@@ -97,11 +97,11 @@ On the dev stack `/media/` is limited **twice**, and **both limiters return HTTP
 | Limiter | Where | Behaviour |
 |---|---|---|
 | nginx `browse_limit` | `location /media/` in `docker/nginx/nginx.dev.conf` | `burst=40 nodelay` at `20 r/s` |
-| Application `RateLimitBudget.MEDIA_GATE` | `apps/ads/views/listings.py::media_gate` | `60 requests / 60 s` |
+| Application `RateLimitBudget.MEDIA_GATE` | `apps/ads/views/listings.py::media_gate` | `240 requests / 60 s` |
 
-The burst probe keeps its total **strictly below `60`** for exactly this reason: any 429 it observes
+The burst probe keeps its total **strictly below `240`** for exactly this reason: any 429 it observes
 is then attributable to nginx's `burst=40` rejection and not to the application limiter. **Do not
-raise `NGINX_BURST` to or above `60`** — the probe loses its attribution and the gate becomes unable
+raise `NGINX_BURST` to or above `240`** — the probe loses its attribution and the gate becomes unable
 to tell the two 429 sources apart.
 
 ## Scope limit — the production configuration is a permanent deferral

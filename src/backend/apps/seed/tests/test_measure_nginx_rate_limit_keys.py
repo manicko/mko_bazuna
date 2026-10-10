@@ -11,6 +11,17 @@ never-zip-the-two-channels rule, the ``GET``-only filter, the fixed-bucket
 exposure boundary, and the GDPR "counts only" guarantee.
 """
 
+# ── Known limitation (P-003 remediation, commit cb798afa) ──────────────────
+# The ``$body_bytes_sent == 0`` discriminator documented in
+# ``docs/99-agent/nginx-rate-limit-attribution-record.md`` assumes Django-origin
+# 429s have an empty body. After commit ``cb798afa``, ``media_gate`` 429s now return
+# a non-empty SVG placeholder body (~159 bytes), so ``body_bytes_sent == 0`` no
+# longer identifies them as Django-origin. The synthetic test lines below still
+# use ``body_empty=True`` for Django-origin by convention — they test the
+# *aggregator's attribution logic*, not the live response shape. The durable fix
+# is the deferred ``$limit_req_status`` successor (see the attribution record §6).
+# ──────────────────────────────────────────────────────────────────────────────
+
 from __future__ import annotations
 
 import importlib.util

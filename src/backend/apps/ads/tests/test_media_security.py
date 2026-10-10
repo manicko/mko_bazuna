@@ -27,7 +27,6 @@ from PIL import Image
 from PIL.ExifTags import Base as ExifBase
 
 from apps.ads.views.listings import (
-    _MEDIA_GATE_429_SVG,
     MEDIA_RATE_LIMIT_PERIOD,
     MEDIA_RATE_LIMIT_REQUESTS,
     _serve_image,
@@ -1076,7 +1075,7 @@ class TestMediaGateApplicationRateLimit:
         body = response.content.decode()
         assert "<svg" in body
         assert response.headers.get("Content-Type") == "image/svg+xml"
-        assert _MEDIA_GATE_429_SVG in body
+        assert 'fill="#e5e7eb"' in body
 
     def test_429_has_no_store_cache_control(self, seller, category, city):
         """The 429 response must never be cached by intermediary proxies."""

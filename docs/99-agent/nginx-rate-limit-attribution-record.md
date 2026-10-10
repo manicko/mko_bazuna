@@ -40,12 +40,12 @@ would enter the pinned-image and doc-parity sweeps for no benefit.
 
 | Concept | Meaning in this gate |
 |---|---|
-| **Django-origin 429** | A 429 emitted by `apps/ads/views/listings.py::media_gate`, which calls `rate_limited_response(json=False)` → a bare `HttpResponse(status=429)` with an **empty body**. It lands in nginx's **access** log with **no** matching `limiting requests` **error** line. |
+| **Django-origin 429** | A 429 emitted by `apps/ads/views/listings.py::media_gate`, which calls `rate_limited_response(json=False, retry_after=..., body=_MEDIA_GATE_429_SVG)` → an `HttpResponse(status=429)` with a **~159-byte SVG body** and `Retry-After`, `Cache-Control: no-store`, `Content-Type: image/svg+xml`. It lands in nginx's **access** log with **no** matching `limiting requests` **error** line. ⚠ The body is non-empty, so `$body_bytes_sent == 0` no longer attributes it as Django-origin — see Corrected fact #12 and the Deferred successor (§6). |
 | **nginx-origin 429** | A 429 emitted by `limit_req zone=browse_limit` on `location /media/`. It writes **both** an access line and a `limiting requests` `[error]` line. |
 | **Access channel** | nginx `log_format main` lines. Sees **both** origins. `$body_bytes_sent` is the free discriminator: `0` ⇒ Django-origin, non-zero ⇒ nginx-origin candidate. |
 | **Error channel** | nginx `limiting requests` `[error]` lines. Sees **nginx-origin only**. |
 | **Attribution** | Splitting the access-channel `/media/` `GET` 429s into the two origins by `$body_bytes_sent`. |
-| **Exposure precondition** | A key that issued **> 60** `/media/` requests in one **fixed** 60 s window. Derived from config (`RateLimitBudget.MEDIA_GATE`), not measured from traffic. |
+| **Exposure precondition** | A key that issued **> 240** `/media/` requests in one **fixed** 60 s window. Derived from config (`RateLimitBudget.MEDIA_GATE`), not measured from traffic. |
 
 ## The criterion
 
@@ -60,7 +60,7 @@ The measurement counts `/media/` **`GET`** `429`s and attributes each by `$body_
 | `error_media_limit_rejected` | `limiting requests` `[error]` lines, zone `browse_limit`, `request:` path starts `/media/`, method `GET` |
 | **`attribution_delta`** | **`requests_media_429_nonempty_body` − `error_media_limit_rejected`** |
 | `requests_media_other_status` | `/media/` lines with a status outside {200, 403, 404, 429} |
-| `keys_over_media_budget` | distinct keys with **> 60** `/media/` requests in one **fixed** 60 s window |
+| `keys_over_media_budget` | distinct keys with **> 240** `/media/` requests in one **fixed** 60 s window |
 | `burst_regime` | per rejecting key: share of rejections with burst width `W ≤ 1 s` vs `W > 1 s` (**diagnostic only**) |
 
 **Only `attribution_delta` participates in a soundness check.** Every other count is a finding.
@@ -79,7 +79,7 @@ The criterion is human-ruled; the script emits **no** verdict.
 
 **One sentence:** count `/media/` `GET` 429s; those with `$body_bytes_sent == 0` are Django's, the rest
 are nginx's candidates; `attribution_delta == 0` is a **soundness precondition, not a verdict**; PASS
-requires zero rejections of either origin over a window where at least one key exceeded 60 `/media/`
+requires zero rejections of either origin over a window where at least one key exceeded 240 `/media/`
 requests in a fixed 60 s window.
 
 **The one hard rule.** Use the **ONE-SIDED** test `Django-origin ⟺ $body_bytes_sent == 0`.
@@ -87,8 +87,7 @@ requests in a fixed 60 s window.
 a comment, not as an "informational" note, not in a test name. The only legal byte comparison is
 `== 0`. The nginx 429 body length is a property of the **pinned build's error page**, not a constant:
 it changes on an nginx patch bump, on `server_tokens off`, and on `msie_padding on` (making it
-User-Agent-dependent). `0`, by contrast, **is** contractual — the Django 429 has an empty body, pinned
-by an existing test.
+User-Agent-dependent). `0`, by contrast, **was** contractual — the Django 429 had an empty body before commit `cb798afa`; `media_gate` now returns a non-empty SVG fallback, so `body_bytes_sent == 0` no longer reliably identifies Django-origin 429s on `/media/`. See **Corrected fact #12** (§7) and the **Deferred successor** (§6).
 
 **Why one-sided strictly dominates.** Every failure mode of the one-sided rule is a **VOID** — loud and
 non-reportable. A two-sided `== <literal>` rule has a **silent false-PASS** mode: the day a Django 429
@@ -103,13 +102,13 @@ spurious VOID.
 **The exposure precondition** (P22 option (g)) is config-derived and replaces the withdrawn
 `at_risk_pairs` proxy. Per key per fixed 60 s window, with `R` requests and burst width `W`, nginx at
 `rate=20r/s burst=40 nodelay` forwards `f = min(R, 40 + 20·W)` and rejects `max(0, R − 40 − 20·W)`;
-Django at `RateLimitBudget.MEDIA_GATE` (60 / 60 s) rejects `max(0, f − 60)`. Therefore:
+Django at `RateLimitBudget.MEDIA_GATE` (240 / 60 s) rejects `max(0, f − 240)`. Therefore:
 
-> **⟺ `R > 60` per key per 60 s window, at least one limiter rejects.**
+> **⟺ `R > 240` per key per 60 s window, at least one limiter rejects.**
 
-The precondition is **`> 60`, not `≥ 60`** — at exactly `R = 60` neither limiter rejects; rejection
-begins at 61. The window is **fixed, disjoint 60 s buckets, not sliding**: a sliding window inflates
-every key's count and manufactures a vacuous PASS. The `60` is already shipped as
+The precondition is **`> 240`, not `≥ 240`** — at exactly `R = 240` neither limiter rejects; rejection
+begins at 241. The window is **fixed, disjoint 60 s buckets, not sliding**: a sliding window inflates
+every key's count and manufactures a vacuous PASS. The `240` is already shipped as
 `RateLimitBudget.MEDIA_GATE` in `src/backend/apps/core/enums.py` — **no new constant**.
 
 **What `attribution_delta` is allowed to be on a healthy stack: exactly 0.** And
@@ -167,7 +166,7 @@ VOID is **not**:
 
 C1 holds (`attribution_delta == 0`); C2 holds (all lines parsed, buckets sum); C3 holds
 (`requests_media_429 == 0` **and** `keys_over_media_budget ≥ 1`). ⇒ **PASS.** The window was provably
-exposed — three keys each exceeded 60 `/media/` requests in a fixed 60 s bucket — so zero rejections is
+exposed — three keys each exceeded 240 `/media/` requests in a fixed 60 s bucket — so zero rejections is
 a positive finding, not a truncated sample. `burst_regime` is "no rejections sampled" (C6) and must be
 stated.
 
@@ -214,9 +213,9 @@ has 500 refusals from *something*, C3′ has none.
 | **(b)** | demote the delta to a reported diagnostic | adopted **inside** (a) as the interpretation rule | The delta is still printed, but it is the **soundness precondition** (C1), never the verdict. A diagnostic that is allowed to void is not demoted; a diagnostic that decides is not a diagnostic. |
 | **(c)** | real discriminator (`$limit_req_status`, or a header on the Django 429) | **DEFERRED** | Only option that makes a strict cross-check exact, but it touches shared config or production Python. See [Deferred successor and its trigger](#deferred-successor-and-its-trigger). |
 | **(d)** | nginx-side evidence only | **REJECTED** | Strictly weaker: it discards the access channel and cannot distinguish a Django-origin 429 from an nginx one — the exact attribution the gate needs. |
-| **(e)** | ordering / dominance / ratio invariant | **REJECTED as a gate** — falsified | For `W ≤ 1 s` Django is **structurally incapable** of rejecting (`f ≤ 60`); for `W > 1 s` every nginx rejection is accompanied by ≥ `20·(W−1)` Django rejections. HTTP/2 multiplexing, thumbnail count and CGNAT all move `W`, so any ratio gate is environment-dependent **by construction**. Kept only as the `burst_regime` diagnostic annotation. |
+| **(e)** | ordering / dominance / ratio invariant | **REJECTED as a gate** — falsified | For `W ≤ 1 s` Django is **structurally incapable** of rejecting (`f ≤ 240`); for `W > 1 s` every nginx rejection is accompanied by ≥ `20·(W−1)` Django rejections. HTTP/2 multiplexing, thumbnail count and CGNAT all move `W`, so any ratio gate is environment-dependent **by construction**. Kept only as the `burst_regime` diagnostic annotation. |
 | **(f)** | restrict **both** channels to `GET` | **ADOPTED inside (a)** | nginx returns **headers only** for a rejected `HEAD`, so `$body_bytes_sent == 0` ⇒ misclassified as Django ⇒ spurious VOID. |
-| **(g)** | config-derived exposure precondition | **ADOPTED, replacing `at_risk_pairs`** | The old proxy demanded "≥ 2 page loads of ≥ 13 tokens in 2 s" ⇒ R=26, but 26 requests in 2 s is rejected by neither limiter — it never established exposure. `R > 60` per key per fixed 60 s window **⟺** at least one limiter rejects, and the `60` is already shipped as `RateLimitBudget.MEDIA_GATE`. |
+| **(g)** | config-derived exposure precondition | **ADOPTED, replacing `at_risk_pairs`** | The old proxy demanded "≥ 2 page loads of ≥ 13 tokens in 2 s" ⇒ R=26, but 26 requests in 2 s is rejected by neither limiter — it never established exposure. `R > 240` per key per fixed 60 s window **⟺** at least one limiter rejects, and the `240` is already shipped as `RateLimitBudget.MEDIA_GATE`. |
 
 ## Deferred successor and its trigger
 
@@ -225,8 +224,10 @@ has 500 refusals from *something*, C3′ has none.
 change** overturning P22's settled D1 ("no config edit"), for a human-ruled measurement.
 **DEFERRED — do not specify it as in-pass work.**
 
-**Trigger:** if the error channel is ever lost, or `limit_req_log_level` / `error_log` level is ever
-changed such that `[error]` lines stop being written, the delta check dies. At that point
+**Trigger:** if the error channel is ever lost, if `limit_req_log_level` / `error_log` level is ever
+changed such that `[error]` lines stop being written, **or** if the `$body_bytes_sent == 0` discriminator
+becomes unreliable because a Django-origin `/media/` 429 carries a non-empty body (as `media_gate` did
+after commit `cb798afa`), the delta check dies. At that point
 `log_format main` must gain `$limit_req_status` and the criterion collapses to the single-channel
 exact form `429 AND $limit_req_status == REJECTED`, needing no second channel.
 
@@ -237,7 +238,7 @@ strings, never line offsets.
 
 | # | P22 anchor | Stale claim | Corrected fact |
 |---|---|---|---|
-| 1 | §7 (the `media_gate` "returns exclusively 200/403/404" sentence) | `media_gate` returns exclusively 200/403/404 | It **also** returns 429 — `rate_limited_response(json=False)` → a bare `HttpResponse(status=429)` with an empty body under `/media/<path:image_key>`. Separately, a Django-origin **400** carrying a large HTML body was observed on `/media/` in the shipped dev stack; stated **descriptively**, it is never a threshold or comparison. |
+| 1 | §7 (the `media_gate` "returns exclusively 200/403/404" sentence) | `media_gate` returns exclusively 200/403/404 | It **also** returns 429 — `rate_limited_response(json=False, retry_after=MEDIA_RATE_LIMIT_PERIOD, body=_MEDIA_GATE_429_SVG)` → an `HttpResponse(status=429)` with a ~159-byte SVG body (`Content-Type: image/svg+xml`), `Retry-After: 60`, and `Cache-Control: no-store`. `X-Content-Type-Options: nosniff` is **not** set on this path (only on the 200/403/404 `FileResponse`/`X-Accel-Redirect` paths). Separately, a Django-origin **400** carrying a large HTML body was observed on `/media/` in the shipped dev stack; stated **descriptively**, it is never a threshold or comparison. |
 | 2 | §7 / §7.1 (`listings.py` ×2) | `listings.py` carries ×2 429 emitters | **×3**: `ad_detail`, `media_gate`, `listings`. Tree-wide there are **8 call sites in 5 files**. |
 | 3 | §7.1 (`_location_block` "exactly two anchors") | `_location_block` has exactly **two** anchors | **Three**: `= /metrics` (×4), `location /health/ {` (×1), `/protected-media/` (×1). The correct mechanism is that `_iter_location_blocks` uses anchored `re.match(r"\s*location\b", line)`, so a `#` comment can never match — `/media/` is **not** shadowable. |
 | 4 | §9.1 (`len(zones) == 3`) | `len(zones) == 3` | **`== 4`** — 09-API-015 added the `csp_report_limit` zone. |
@@ -248,6 +249,7 @@ strings, never line offsets.
 | 9 | §5.2 (the error-line shape) | The error line carries a `burst:` token | It is `limiting requests, excess: <n> by zone "<zone>"` — **no `burst:` token** — at `error` level. `limit_req_log_level` defaults to `error` and is absent from both confs; `error` is more severe than the configured `warn`, so the line **is** written. `error_log_level` is absent tree-wide and no `location`-level `error_log` override exists. |
 | 10 | §5.2 / §6.1 (the stream model) | The two streams can be read together | Access and error go to different files symlinked to `/dev/stdout` and `/dev/stderr`, so ONE capture carries both — but they are **independent Docker streams**. Error blocks arrive **detached** from their access lines and one connection emits many rejection lines: **count independently and sum; never zip, never pair by adjacency.** |
 | 11 | §5.3 / §6.3 (log growth) | Rotation may bound the capture | `LogConfig=json-file map[]` — no `max-size`, no `max-file`, no rotation anywhere. |
+| 12 | §3 (the `media_gate` "returns ... with an empty body" claim) + §The one hard rule (`$body_bytes_sent == 0`) | The `media_gate` 429 has an empty body, pinned by an existing test; `$body_bytes_sent == 0` reliably identifies Django-origin 429s | **REFUTED** — `media_gate` now returns a non-empty SVG fallback body (~159 bytes) on 429 (commit `cb798afa`), so `$body_bytes_sent > 0`; the one-sided `== 0` test mis-classifies Django-origin 429s as nginx-origin candidates, producing false `attribution_delta != 0` and VOID results on a healthy stack. The durable fix is the **Deferred successor** (§6): add `$limit_req_status` to `log_format main` and attribute on `REJECTED`. The `test_builder_emits_empty_html_shape` test still pins `rate_limited_response(json=False)` without the `body` param to empty body — but `media_gate` overrides with `body=_MEDIA_GATE_429_SVG`, so the test's coverage of the *generic* builder does not cover the *specific* `media_gate` call site. |
 
 ## Verify, do not assume
 

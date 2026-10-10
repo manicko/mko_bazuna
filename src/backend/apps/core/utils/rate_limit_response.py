@@ -44,7 +44,10 @@ def rate_limited_response(
         retry_after: When given, sets the ``Retry-After`` header to the number
             of seconds (as a string) the client should wait before retrying.
         body: When given, overrides the response content with the provided
-            string. Ignored for the default JSON shape unless explicitly set.
+            string. Callers passing ``body`` should use ``json=False`` so the
+            Content-Type remains ``text/html``; passing ``body`` with the
+            default ``json=True`` shapes would replace the JSON payload while
+            the Content-Type stays ``application/json``.
 
     Returns:
         An HTTP 429 response in the requested shape, with

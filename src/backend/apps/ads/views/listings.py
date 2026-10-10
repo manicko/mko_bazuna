@@ -54,7 +54,7 @@ logger = logging.getLogger(__name__)
 # `.ai/plans/22-*` hold that exact directive as a deployed-stack measurement
 # basis. This limiter is the half that survives the proxy being bypassed.
 #
-# The budget (60 requests / 60 s per client IP) now lives in the shared
+# The budget (240 requests / 60 s per client IP) now lives in the shared
 # ``RateLimitBudget.MEDIA_GATE`` table (08-SRCH-010); the module constants below
 # remain so existing callers and tests keep their import surface.
 MEDIA_RATE_LIMIT_REQUESTS: int = RateLimitBudget.MEDIA_GATE.requests

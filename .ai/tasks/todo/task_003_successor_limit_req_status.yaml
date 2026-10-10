@@ -1,0 +1,60 @@
+id: task_003_successor_limit_req_status
+title: "Phase 2 successor: migrate /media/ 429 attribution to $limit_req_status"
+owner: implementor
+status: pending
+priority: medium
+related_plan: .ai/plans/001-media-rate-limit-remediation.md
+related_blocker: P-003-media-rate-limit-blankout
+related_record: docs/99-agent/nginx-rate-limit-attribution-record.md
+
+context: |
+  Phase 1 (P-003 remediation) changed `media_gate` 429s to return an SVG body
+  (~159 bytes), which broke the `$body_bytes_sent == 0` discriminator documented
+  in the attribution record. The record already names `$limit_req_status` as the
+  deferred successor (§6), and three researchers confirmed it is available in the
+  pinned nginx 1.30.5 (introduced in nginx 1.17.6). The trigger condition has
+  been partially met: the body-bytes discriminator is no longer reliable.
+
+  Research confirmed:
+  - `$limit_req_status` emits `PASSED` (non-rejected) or `REJECTED` (nginx-origin 429)
+    under `nodelay` (the only values possible when DELAYED never occurs)
+  - It is empty for locations without `limit_req` (irrelevant for /media/)
+  - It disambiguates HEAD requests (unlike body_bytes_sent)
+  - The discriminator becomes: `429 AND $limit_req_status == REJECTED` ⟺ nginx-origin
+
+goal: |
+  Replace the `$body_bytes_sent == 0` discriminator with `$limit_req_status` in the
+  deployed-stack /media/ 429 attribution methodology, making it exact and robust
+  against body-content changes.
+
+scope:
+  in:
+    - Add `$limit_req_status` to `log_format main` in `docker/nginx/nginx.conf` and `docker/nginx/nginx.dev.conf`
+    - Update `ACCESS_LINE_PATTERN` regex in `scripts/measure-nginx-rate-limit-keys.py` to parse the new field
+    - Rewrite `attribute_media_429()` to use `$limit_req_status == REJECTED` as the origin discriminator
+    - Update the attribution criterion (C1-C6) in the record to use the new discriminator
+    - Lift the GET-only restriction (HEAD now works correctly)
+    - Update test fixtures (`fixtures/nginx_media_capture.txt`) and synthetic test lines
+    - Update `docs/99-agent/nginx-rate-limit-attribution-record.md`: remove DEFERRED status,
+      update Corrected Facts, update Main Concepts table
+    - Update `docs/ops/dev-nginx-media-gate.md` if burst-attribution logic changes
+    - Update `docs/ops/ops-nginx-rate-limit-gate.md` runbook if it references body-bytes
+
+  out:
+    - Changing the actual nginx limit_req zone names or burst values (unchanged)
+    - Changing MEDIA_GATE budget (already done in Phase 1, Block B)
+    - Any Django code changes (the SVG body stays)
+
+acceptance_criteria:
+  - `$limit_req_status` appears in both nginx `log_format main` definitions
+  - `scripts/measure-nginx-rate-limit-keys.py` parses the new field correctly
+  - All tests in `src/backend/apps/seed/tests/test_measure_nginx_rate_limit_keys.py` pass
+  - Attribution record §6 (Deferred successor) updated to "ACTIVATED" or "COMPLETED"
+  - No remaining references to `$body_bytes_sent == 0` as the origin discriminator
+  - `make test` fast gate passes (3544+ tests)
+
+successor_to:
+  - task_003_a_media_cache_control
+  - task_003_b_raise_media_budget
+  - task_003_c1_rate_limited_response
+  - task_003_c2_media_gate_svg_429

@@ -35,11 +35,11 @@ from typing import Final, TextIO
 
 # ─── Config-derived constants ────────────────────────────────────────────
 # MEDIA_WINDOW_SECONDS / MEDIA_BUDGET mirror RateLimitBudget.MEDIA_GATE in
-# ``src/backend/apps/core/enums.py`` (60 requests / 60 s). They are a **derived**
-# input, not a new magic number: the exposure precondition is `R > 60` per key
-# per fixed 60 s window because at exactly 60 neither limiter rejects.
+# ``src/backend/apps/core/enums.py`` (240 requests / 60 s). They are a **derived**
+# input, not a new magic number: the exposure precondition is `R > 240` per key
+# per fixed 60 s window because at exactly 240 neither limiter rejects.
 MEDIA_WINDOW_SECONDS: Final[int] = 60
-MEDIA_BUDGET: Final[int] = 60
+MEDIA_BUDGET: Final[int] = 240
 MEDIA_REQUEST_METHOD: Final[str] = "GET"
 MEDIA_PATH_PREFIX: Final[str] = "/media/"
 MEDIA_ZONE: Final[str] = "browse_limit"

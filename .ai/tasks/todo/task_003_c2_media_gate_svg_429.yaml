@@ -1,0 +1,123 @@
+# Task brief — Plan 003 BLOCK C-2
+# media_gate returns an SVG placeholder + Retry-After on 429, so <img> tags
+# degrade to a gray rectangle instead of a broken-image icon.
+
+id: task_003_c2_media_gate_svg_429
+
+title: Block C-2 — media_gate 429 returns SVG placeholder + Retry-After
+
+priority: high
+
+depends_on:
+  - task_003_c1_rate_limited_response
+
+source_reference: .ai/plans/001-media-rate-limit-remediation.md
+source_section: "§4 — Work Block C (Task C-2)"
+source_plan: .ai/plans/001-media-rate-limit-remediation.md
+source_blocks:
+  - "BLOCK C-2 — media_gate passes SVG placeholder + retry_after on 429"
+
+description: >
+  Currently when the MEDIA_GATE rate limiter is exhausted, media_gate calls
+  `rate_limited_response(json=False)` which returns a 429 with an empty body.
+  The browser renders a broken-image icon. This block changes that single call
+  site (listings.py:191) to pass `retry_after=MEDIA_RATE_LIMIT_PERIOD` (60s) and
+  `body=_MEDIA_GATE_429_SVG` (a 240×180 gray rectangle SVG matching ad_list.html
+  dimensions), and sets `Content-Type: image/svg+xml` on the response.
+
+goals:
+  - media_gate 429 carries Retry-After header (= MEDIA_RATE_LIMIT_PERIOD)
+  - media_gate 429 returns an SVG placeholder body (no broken-image icon)
+  - media_gate 429 has Content-Type: image/svg+xml
+  - SVG dimensions match ad_list.html <img> (240×180), color matches bg-gray-200
+
+files:
+  - path: src/backend/apps/ads/views/listings.py
+    targets:
+      - type: module_constant
+        name: _MEDIA_GATE_429_SVG
+      - type: function
+        name: media_gate
+    semantic_anchors:
+      insert_after:
+        type: module_constant
+        value: "_MEDIA_RATE_LIMIT_KEY_PATTERN"
+      replace:
+        type: return_statement
+        value: "return rate_limited_response(json=False)"
+
+changes:
+  - action: add_constant
+    description: >
+      Add `_MEDIA_GATE_429_SVG` SVG placeholder constant near the existing
+      `_MEDIA_RATE_LIMIT_KEY_PATTERN` (line 64). 240×180, rounded corners,
+      bg-gray-200 color (#e5e7eb), no text (no i18n concern).
+    code_hint: |
+      _MEDIA_GATE_429_SVG: Final[str] = (
+          '<svg xmlns="http://www.w3.org/2000/svg" width="240" height="180" '
+          'viewBox="0 0 240 180" role="img" aria-label="Image unavailable">'
+          '<rect width="240" height="180" rx="8" fill="#e5e7eb"/></svg>'
+      )
+
+  - action: modify_call
+    description: >
+      Change the 429 return in media_gate from `return rate_limited_response(json=False)`
+      to build the response with retry_after and body params, set Content-Type
+      to image/svg+xml, then return.
+    code_hint: |
+      response = rate_limited_response(
+          json=False,
+          retry_after=MEDIA_RATE_LIMIT_PERIOD,
+          body=_MEDIA_GATE_429_SVG,
+      )
+      response["Content-Type"] = "image/svg+xml"
+      return response
+
+acceptance_criteria:
+  - media_gate 429 response has Retry-After header equal to MEDIA_RATE_LIMIT_PERIOD (60)
+  - media_gate 429 response body contains <svg
+  - media_gate 429 response Content-Type is image/svg+xml
+  - media_gate 429 response has Cache-Control: no-store (from C-1)
+  - existing rate-limit tests still pass (status_code == 429)
+  - test_i18n_completeness.py still passes (SVG has no translatable strings)
+
+test_contract:
+  how: >
+    Update test_burst_over_budget_is_refused and test_over_budget_is_refused_before_the_db_lookup
+    to also assert SVG body + Retry-After. Add new tests for SVG content-type and Retry-After.
+  commands:
+    - "$dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'"
+    - "$dc run --rm -e PYTEST_OPTS='src/backend/apps/ads/tests/test_media_security.py::TestMediaGateApplicationRateLimit --tb=short' test"
+    - "$dc run --rm -e PYTEST_OPTS='src/backend/apps/core/tests/test_i18n_completeness.py --tb=short' test"
+    - "uv run ruff check src/backend/apps/ads/views/listings.py"
+    - "uv run basedpyright src/backend/apps/ads/views/listings.py"
+  assertion_level: >
+    media_gate 429 degrades gracefully (SVG placeholder) and signals retry timing.
+
+binding_constraints:
+  - SVG must have no translatable text (no gettext calls)
+  - SVG dimensions must match ad_list.html img (240×180)
+  - must depend on C-1 (uses retry_after and body params from C-1)
+  - do NOT change the rate-limit guard logic itself (only the 429 response shape)
+  - no .ai/audit/** changes
+
+rollback: >
+  Revert the two edits (constant + call site) in listings.py and revert test
+  updates. The rate-limit behavior is unchanged (still returns 429).
+
+dod:
+  - _MEDIA_GATE_429_SVG constant added near line 64
+  - media_gate 429 return passes retry_after and body, sets Content-Type
+  - 429 response has Retry-After: 60, Content-Type: image/svg+xml, body contains <svg
+  - existing 429 tests updated to assert new behavior
+  - new tests added and pass
+  - ruff + basedpyright clean
+  - git add <specific-files> && git commit -m "feat(media_gate): 429 returns SVG placeholder + Retry-After for graceful degradation"
+
+agents:
+  auditor: no
+  researcher: no
+  planner: no
+  implementor: yes
+  validator: yes
+  docs_specialist: no

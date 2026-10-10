@@ -29,13 +29,13 @@
 .IMPORTANT: 429 AMBIGUITY ON THE DEV STACK
     `/media/` is limited twice: nginx's `limit_req zone=browse_limit burst=40
     nodelay` in `docker/nginx/nginx.dev.conf`, and the application-level
-    `RateLimitBudget.MEDIA_GATE` limiter (60 requests / 60 s) in
+    `RateLimitBudget.MEDIA_GATE` limiter (240 requests / 60 s) in
     `apps/ads/views/listings.py::media_gate`. Both return HTTP 429, so a bare
     429 is ambiguous. The burst probe therefore sends `NGINX_BURST + 5`
     requests (default 45) and keeps the total *strictly* below the application
-    window (60), so any 429 it observes is attributable to nginx's `burst=40`
+    window (240), so any 429 it observes is attributable to nginx's `burst=40`
     rejection and not to the application limiter. Do not raise `NGINX_BURST` to
-    or above 60 or the probe loses its attribution.
+    or above 240 or the probe loses its attribution.
 
 .EXIT CODES (distinct per outcome; the gate reports, a human decides)
     0   PASS       - container running; static parse consistent; both probes
@@ -67,7 +67,7 @@
     NGINX_BURST          Concurrent `/media/` requests used by the burst probe.
                          Default: 45 (documented burst is 40; the extra 5 must
                          overshoot it while the total stays under the
-                         application window of 60).
+                          application window of 240).
     NGINX_SETTLE         Seconds to wait for the nginx leaky bucket to drain
                          before the settle probe. Default: 15.
     NGINX_POLL_ATTEMPTS  Readiness poll attempts before giving up. Default: 15.
@@ -384,16 +384,16 @@ if (-not (Test-EndpointReady)) {
 }
 Write-Host "[OK] endpoint reachable."
 
-# Burst probe: send more concurrent requests than the documented burst (40).
-# Keep the total strictly below the application window (60) so any observed 429
-# is attributable to nginx's burst=40, not to RateLimitBudget.MEDIA_GATE.
-if ($Burst -ge 60) {
-    Write-Host ""
-    Write-Host "[PROBE FAIL] NGINX_BURST=$Burst is >= the application window (60)."
-    Write-Host "[PROBE FAIL] A 429 would be ambiguous between nginx and the media_gate"
-    Write-Host "[PROBE FAIL] application limiter. Keep NGINX_BURST < 60."
-    exit $ExitProbeFail
-}
+    # Burst probe: send more concurrent requests than the documented burst (40).
+    # Keep the total strictly below the application window (240) so any observed 429
+    # is attributable to nginx's burst=40, not to RateLimitBudget.MEDIA_GATE.
+    if ($Burst -ge 240) {
+        Write-Host ""
+        Write-Host "[PROBE FAIL] NGINX_BURST=$Burst is >= the application window (240)."
+        Write-Host "[PROBE FAIL] A 429 would be ambiguous between nginx and the media_gate"
+        Write-Host "[PROBE FAIL] application limiter. Keep NGINX_BURST < 240."
+        exit $ExitProbeFail
+    }
 
 Write-Host ""
 Write-Host "--- Burst probe ---"
@@ -411,7 +411,7 @@ if ($burst429 -eq 0) {
     exit $ExitProbeFail
 }
 Write-Host "[OK] excess requests refused with 429 (attributable to nginx burst=40;"
-Write-Host "     total $Burst < application window 60, so media_gate cannot have 429'd)."
+    Write-Host "     total $Burst < application window 240, so media_gate cannot have 429'd)."
 
 # Settle probe: let the nginx leaky bucket drain, then issue a count at or below
 # the burst and expect success (no 429).
