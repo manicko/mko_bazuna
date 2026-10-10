@@ -1,16 +1,59 @@
 version: 2
 updates:
-  # GitHub Actions versions in .github/workflows/*.yml
+  # ---------------------------------------------------------------------------
+  # GitHub Actions — every action is pinned to a full 40-hex commit SHA with a
+  # version comment (12-OPS-017). Dependabot bumps the SHA and the trailing
+  # version comment simultaneously, keeping the supply-chain pin auditable.
+  #
+  # Split into two groups so security tooling lands in reviewable PRs separate
+  # from routine CI infrastructure.
+  # ---------------------------------------------------------------------------
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     groups:
-      github-actions:
+      # Security-critical actions: vulnerability scanners and SARIF upload.
+      # Keep current for timely CVE coverage.
+      security-actions:
         patterns:
-          - "*"
+          - "aquasecurity/trivy-action"
+          - "github/codeql-action/upload-sarif"
+      # Routine build/CI tooling — weekly updates suffice.
+      build-actions:
+        patterns:
+          - "actions/checkout"
+          - "actions/upload-artifact"
+          - "astral-sh/setup-uv"
+          - "docker/login-action"
+          - "docker/setup-buildx-action"
+          - "docker/build-push-action"
+    # appleboy/ssh-action receives the production SSH private key during deploy
+    # (deploy.yml). Per 12-OPS-017, this trust boundary is deliberately excluded
+    # from auto-update: any SHA bump requires manual security review.
+    # (Commit e11b421e pinned it to v1.2.5 for this reason.)
+    ignore:
+      - dependency-name: "appleboy/ssh-action"
+    open-pull-requests-limit: 10
 
-  # Python dependencies in pyproject.toml + uv.lock
+  # ---------------------------------------------------------------------------
+  # Docker base image — python:3.14-slim (matches requires-python >=3.14,<3.15).
+    # Container images in docker-compose.yml (postgres, redis, nginx) are
+    # intentionally pinned to patch versions with rollback values and are
+    # managed manually — not tracked by Dependabot.
+  # ---------------------------------------------------------------------------
+  - package-ecosystem: "docker"
+    directory: "/docker"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+
+  # ---------------------------------------------------------------------------
+  # Python dependencies via uv (pyproject.toml + uv.lock).
+    # Every entry in [project.dependencies] and [dependency-groups.dev] carries
+    # an upper version bound that constrains breaking changes
+    # (e.g. django<6.0, aiogram<4.0, bandit<2.0). No exclusions needed.
+  # ---------------------------------------------------------------------------
   - package-ecosystem: "uv"
     directory: "/"
     schedule:
@@ -19,3 +62,4 @@ updates:
       python-dependencies:
         patterns:
           - "*"
+    open-pull-requests-limit: 5
