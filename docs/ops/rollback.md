@@ -105,7 +105,7 @@ Before starting a rollback:
 Production image tags are resolved in `docker-compose.prod.yml`:
 
 ```yaml
-image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-mko-bazuna/mko_bazuna}:${IMAGE_TAG:?IMAGE_TAG must be set}
+image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-manicko/mko_bazuna}:${IMAGE_TAG:?IMAGE_TAG must be set}
 ```
 `IMAGE_TAG` is set in `.env.prod` (see
   [.env.prod.example](../../.env.prod.example)). To find the
@@ -115,16 +115,16 @@ image: ${REGISTRY:-ghcr.io}/${REPOSITORY:-mko-bazuna/mko_bazuna}:${IMAGE_TAG:?IM
 # .env.prod is gitignored — its history is NOT in git. Read the current tag from
 # the file on the production host, and enumerate published image tags from GHCR.
 grep '^IMAGE_TAG=' .env.prod
-gh api repos/mko-bazuna/mko_bazuna/packages/container/mko_bazuna/versions --jq '.[].metadata.container.tags[]'
+gh api repos/manicko/mko_bazuna/packages/container/mko_bazuna/versions --jq '.[].metadata.container.tags[]'
 ```
 
 If image tags map to git tags, you can also enumerate published tags:
 
 ```bash
 # List recent image tags from GHCR (if using GitHub Packages)
-# NOTE: the bare repository path is NOT the registry namespace — the canonical
-# coordinate is ghcr.io/mko-bazuna/mko_bazuna.
-gh api repos/mko-bazuna/mko_bazuna/packages/container/mko_bazuna/versions \
+# NOTE: the GHCR namespace is the GitHub owner — `manicko/mko_bazuna` IS the
+# container-registry namespace (ghcr.io/manicko/mko_bazuna).
+gh api repos/manicko/mko_bazuna/packages/container/mko_bazuna/versions \
   --jq '.[].metadata.container.tags[]'
 ```
 

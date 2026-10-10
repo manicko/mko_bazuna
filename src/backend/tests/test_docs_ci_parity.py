@@ -501,7 +501,7 @@ def test_docs_ops_production_compose_invocations_carry_env_file() -> None:
 def test_docs_ops_registry_coordinate_matches_the_manifest() -> None:
     """Every `ghcr.io` coordinate quoted in docs/ops matches the manifest default.
 
-    The canonical coordinate is ``ghcr.io/mko-bazuna/mko_bazuna``; the manifest
+    The canonical coordinate is ``ghcr.io/manicko/mko_bazuna``; the manifest
     derives it from ``${REGISTRY:-...}`` / ``${REPOSITORY:-...}``. A doc that
     quotes a stale owner or repository sends an operator to an image the stack
     does not pull. The expected value is derived from the manifest, so this

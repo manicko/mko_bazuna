@@ -28,7 +28,7 @@ jobs:
     # separate workflow and cannot read this output; it derives its coordinate
     # from REGISTRY/REPOSITORY in .env.prod instead (see docker-compose.prod.yml).
     env:
-      IMAGE_REPOSITORY: mko-bazuna/mko_bazuna
+      IMAGE_REPOSITORY: manicko/mko_bazuna
     outputs:
       image_tag: ${{ github.sha }}
     steps:

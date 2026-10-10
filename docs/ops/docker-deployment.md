@@ -321,7 +321,7 @@ environment approval gate, the workflow performs a backup-then-pull-then-health-
 procedure over SSH:
 
 1. **Pre-deploy backup** — `pg_dump -F c` into `./backups/` (safety net before each deploy)
-2. **Pull** the CI-built SHA-tagged image (`ghcr.io/mko-bazuna/mko_bazuna:${SHA}`)
+2. **Pull** the CI-built SHA-tagged image (`ghcr.io/manicko/mko_bazuna:${SHA}`)
 3. **Recreate** all services (`docker compose up -d --remove-orphans`)
 4. **Health-check gate** — poll `/health/ready/` until HTTP 200 or 60-second timeout;
    on failure the workflow exits `1` and references the

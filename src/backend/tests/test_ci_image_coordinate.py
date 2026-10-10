@@ -4,10 +4,15 @@ One image coordinate and workflow concurrency (12-OPS-009).
 Before this guard there were four live ``ghcr.io/<owner>/<repo>`` strings and the
 build cache was silently split: ``ci.yml``'s ``cache-from`` named
 ``ghcr.io/manicko/mko_bazuna:buildcache`` while its ``cache-to`` named
-``ghcr.io/manicko/mko-bazuna:buildcache`` (underscore vs hyphen). Neither
-``ci.yml`` nor ``deploy.yml`` declared a ``concurrency`` group, so two pushes
-raced the shared buildcache reference and two manual deploys interleaved pull
-and ``up -d`` against one production host.
+``ghcr.io/mko-bazuna:buildcache`` (missing the repo path). Worse, the coordinate
+was later unified to ``mko-bazuna/mko_bazuna`` — a namespace that does not exist
+as a GitHub account, so GHCR rejects every push with
+``denied: not_found: owner not found``.
+
+The repository is owned by ``manicko`` and lives at ``manicko/mko_bazuna`` on
+GitHub. GHCR namespaces packages by the owning GitHub account, so the canonical
+coordinate is ``ghcr.io/manicko/mko_bazuna`` — GHCR has no concept of a separate
+"container-registry namespace" distinct from the GitHub owner.
 
 These are structural tests (string-level reads of the workflow files and the
 compose/env templates), following the ``test_docs_ci_parity.py`` precedent: no
@@ -34,11 +39,14 @@ _RESTORE_TEST_YML = _ROOT / ".github" / "workflows" / "restore-test.yml"
 _PROD_COMPOSE = _ROOT / "docker-compose.prod.yml"
 _ENV_PROD_EXAMPLE = _ROOT / ".env.prod.example"
 
-# The canonical GHCR coordinate. Chosen because it is the shape GHCR guarantees
-# for the repository owner (`mko-bazuna`), and the only namespace the CI job's
-# `packages: write` token can push to. `manicko/mko_bazuna` is the GitHub
-# repository path, not the container-registry namespace.
-_CANONICAL_REPOSITORY = "mko-bazuna/mko_bazuna"
+# The canonical GHCR coordinate. GHCR namespaces packages by the owning GitHub
+# account; the repository is `manicko/mko_bazuna`, so the only valid coordinate
+# is `ghcr.io/manicko/mko_bazuna`. A prior revision of this guard unified the
+# coordinate to `mko-bazuna/mko_bazuna`, but no GitHub account named
+# `mko-bazuna` exists — GHCR rejects every push with
+# `denied: not_found: owner not found`. `manicko/mko_bazuna` is both the GitHub
+# repository path and the container-registry namespace; they are one and the same.
+_CANONICAL_REPOSITORY = "manicko/mko_bazuna"
 _CANONICAL_COORDINATE = f"ghcr.io/{_CANONICAL_REPOSITORY}"
 
 
@@ -121,9 +129,10 @@ def test_prod_compose_repository_default_is_canonical() -> None:
         "docker-compose.prod.yml must default REPOSITORY to "
         f"{_CANONICAL_REPOSITORY}"
     )
-    assert "${REPOSITORY:-manicko/mko_bazuna}" not in text, (
+    assert "${REPOSITORY:-mko-bazuna/mko_bazuna}" not in text, (
         "docker-compose.prod.yml still defaults REPOSITORY to the "
-        "non-canonical manicko/mko_bazuna namespace"
+        "non-canonical mko-bazuna/mko_bazuna namespace — GHCR rejects it with "
+        "not_found: owner not found"
     )
 
 
@@ -133,9 +142,10 @@ def test_env_prod_example_repository_is_canonical() -> None:
     assert f"REPOSITORY={_CANONICAL_REPOSITORY}" in text, (
         f".env.prod.example must ship REPOSITORY={_CANONICAL_REPOSITORY}"
     )
-    assert "REPOSITORY=manicko/mko_bazuna" not in text, (
+    assert "REPOSITORY=mko-bazuna/mko_bazuna" not in text, (
         ".env.prod.example still ships the non-canonical "
-        "manicko/mko_bazuna REPOSITORY value"
+        "mko-bazuna/mko_bazuna REPOSITORY value — GHCR rejects it with "
+        "not_found: owner not found"
     )
 
 

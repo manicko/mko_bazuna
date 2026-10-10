@@ -120,7 +120,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Pull recorded known-good app image
-        run: docker pull ghcr.io/mko-bazuna/mko_bazuna:${{ env.RESTORE_APP_IMAGE_TAG }}
+        run: docker pull ghcr.io/manicko/mko_bazuna:${{ env.RESTORE_APP_IMAGE_TAG }}
 
       - name: Run restore-test with migrate --plan --check
-        run: make restore-test BACKUP_FILE=backups/test_backup.dump APP_IMAGE=ghcr.io/mko-bazuna/mko_bazuna:${{ env.RESTORE_APP_IMAGE_TAG }}
+        run: make restore-test BACKUP_FILE=backups/test_backup.dump APP_IMAGE=ghcr.io/manicko/mko_bazuna:${{ env.RESTORE_APP_IMAGE_TAG }}

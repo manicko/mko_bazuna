@@ -68,10 +68,10 @@ jobs:
           fi
           echo "image_tag=$TAG" >> "$GITHUB_OUTPUT"
           # Coordinate note (12-OPS-009): the image is built by ci.yml under the
-          # canonical ghcr.io/mko-bazuna/mko_bazuna coordinate. On the host, the
+          # canonical ghcr.io/manicko/mko_bazuna coordinate. On the host, the
           # same coordinate is resolved by compose from .env.prod's
           # REGISTRY/REPOSITORY (docker-compose.prod.yml default matches).
-          echo "Deploying coordinate: ghcr.io/mko-bazuna/mko_bazuna:$TAG"
+          echo "Deploying coordinate: ghcr.io/manicko/mko_bazuna:$TAG"
 
       # Q11 option (a), 2026-10-03 (12-OPS-002): the deploy is derived from a
       # *verified* build, not from a free-text input plus a human checkbox. The

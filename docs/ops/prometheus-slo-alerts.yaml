@@ -93,7 +93,7 @@ groups:
             Burn rate: {{ $value | humanizePercentage }}
             Threshold:  PerformanceSLO.SEARCH_SLO_MS = 2000ms
             Reference: docs/01-spec/search-patterns.md:360
-          runbook_url: https://github.com/mko-bazuna/mko_bazuna/blob/main/docs/ops/prometheus-slo-alerts.yaml
+          runbook_url: https://github.com/manicko/mko_bazuna/blob/main/docs/ops/prometheus-slo-alerts.yaml
 
       # -----------------------------------------------------------------
       # search_p95_latency_slo
@@ -121,7 +121,7 @@ groups:
             The 95th-percentile search/listing response time exceeded 500ms
             (PerformanceSLO.P95_SLO_MS = 500) for more than 5 minutes.
             {{ $value | humanize }}ms observed.
-          runbook_url: https://github.com/mko-bazuna/mko_bazuna/blob/main/docs/ops/prometheus-slo-alerts.yaml
+          runbook_url: https://github.com/manicko/mko_bazuna/blob/main/docs/ops/prometheus-slo-alerts.yaml
 
 # ---------------------------------------------------------------------------
 # RETIRED (12-OPS-003): the `cache_hit_rate_slo` rule.
