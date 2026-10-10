@@ -253,6 +253,40 @@ def test_dockerfile_runtime_upgrades_os_packages() -> None:
     )
 
 
+def test_dockerfile_removes_system_setuptools() -> None:
+    """The runtime stage uninstalls system-level setuptools.
+
+    ``python:3.14-slim`` ships ``setuptools`` 70.3.0 in system site-packages,
+    which is vulnerable to CVE-2025-47273 (fixed in 78.1.1) and
+    CVE-2026-59890 (fixed in 83.0.0). setuptools is not needed at runtime —
+    the venv at ``/opt/venv`` is self-contained. Removing it eliminates the
+    HIGH-severity findings from the Trivy image scan.
+    """
+    content = _read("docker", "Dockerfile")
+    assert "setuptools" in content, (
+        "Dockerfile must reference setuptools so the removal step is present"
+    )
+    assert "uninstall" in content, (
+        "Dockerfile runtime stage must uninstall setuptools, not merely comment about it"
+    )
+
+
+def test_dockerfile_has_cache_bust_arg() -> None:
+    """The builder stage has a CACHEBUST ARG to invalidate stale BuildKit cache.
+
+    Without an explicit cache-busting mechanism, a stale registry cache can
+    serve an ``uv sync`` layer that installed outdated package versions (e.g.
+    ``msgpack`` 1.1.2 when the lockfile specifies 1.2.2). The CACHEBUST arg
+    changes the cache key for all subsequent layers, forcing a fresh install
+    when its value is incremented.
+    """
+    content = _read("docker", "Dockerfile")
+    assert "ARG CACHEBUST" in content, (
+        "Dockerfile must declare a CACHEBUST ARG so stale BuildKit registry "
+        "cache can be invalidated by incrementing its value"
+    )
+
+
 def test_gitleaks_config_exists() -> None:
     """.gitleaks.toml exists for allowlist configuration."""
     gitleaks_path = _PROJECT_ROOT / ".gitleaks.toml"
