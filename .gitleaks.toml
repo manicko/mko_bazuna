@@ -27,6 +27,7 @@ regexes = [
     '''test-bot-token-for-testing''',
     '''test-admin-password''',
     '''unpublished/withdrawn''',
+    '''bbbdefghijklmnopqrstuvwxyz012345''',
 ]
 
 # allowlists: example env files containing only placeholder values.

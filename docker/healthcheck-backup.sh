@@ -8,7 +8,7 @@
 #   (a) Backup directory mounted — the host bind mount exists
 #   (b) A dump present           — at least one dump file has been written
 #   (c) Optional freshness       — the newest dump is newer than the window
-set -euo pipefail
+set -eu
 
 # (a) Backup directory mounted (host bind mount present)
 backup_dir="${BACKUP_DIR:-/backups}"

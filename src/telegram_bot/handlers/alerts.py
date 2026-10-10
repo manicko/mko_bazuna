@@ -65,7 +65,7 @@ async def cmd_alerts(message: types.Message, state: FSMContext) -> None:
     lines = [_("Your saved searches:")]
     for i, ss in enumerate(saved_searches, 1):
         status = _("ON") if ss.is_active else _("OFF")
-        query_display = ss.query or _("any")
+        query_display = str(ss.query or _("any"))
         city_display = ss.city.get_name(get_language()) if ss.city else _("any")
         cat_display = ss.category.get_name(get_language()) if ss.category else _("any")
 

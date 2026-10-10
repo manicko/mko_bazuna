@@ -102,7 +102,7 @@ if not env_path.exists():
         os.getenv("DJANGO_SETTINGS_MODULE")
         and "test" not in os.getenv("DJANGO_SETTINGS_MODULE", "")
         and not os.getenv("DJANGO_BUILD")
-        and not os.getenv("DJANGO_SECRET_KEY")
+        and os.getenv("DJANGO_SECRET_KEY") is None
     ):
         _env_file_name = (
             ".env.prod"

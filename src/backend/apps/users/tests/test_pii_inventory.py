@@ -164,6 +164,7 @@ def _unusable_db_env() -> dict[str, str]:
     # construction itself must not connect.
     env["POSTGRES_HOST"] = "127.0.0.1"
     env["POSTGRES_PORT"] = "1"
+    env["POSTGRES_PASSWORD"] = "dummy-not-used"
     return env
 
 

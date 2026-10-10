@@ -70,6 +70,7 @@ _PROD_ENV_ALLOWLIST = frozenset(
         "DEFAULT_FROM_EMAIL",
         "SUPPORT_NOTIFICATION_RECIPIENTS",
         "SENTRY_DSN",
+        "DATABASE_URL",
         "PATH",
         "HOME",
     }

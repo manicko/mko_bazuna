@@ -11,7 +11,7 @@ Implements zone R2 conditions and anonymous forwarding.
 import logging
 import re
 from enum import StrEnum
-from typing import Final
+from typing import Final, cast
 
 from aiogram import Bot, F, Router, types
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
@@ -311,7 +311,7 @@ async def handle_contact_orm(
     @sync_to_async
     def _handle() -> tuple[bool, int | None, bool]:
         is_available, seller = get_seller_for_contact(ad_id)
-        seller_telegram_id: int | None = seller.telegram_id if seller else None
+        seller_telegram_id: int | None = cast(int | None, seller.telegram_id) if seller else None
 
         seller_rate_limited = False
         if is_available and seller is not None:
