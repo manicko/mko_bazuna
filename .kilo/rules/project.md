@@ -46,4 +46,7 @@
 
 16. **Internationalization is part of DoD**
 
+17. **Workspace Cleanliness**  
+    Before creating any file, ask: 1) Is there an exact place for this in the task or module architecture? 2) Is it needed for project operation and future maintenance? If both are no — write only to `.ai/tmp`.
+
 

@@ -139,29 +139,29 @@ jobs:
           exit 1
         working-directory: src/backend
 
-       - name: Run migrations + seed reference data
-         env:
-           DJANGO_SETTINGS_MODULE: config.settings.test
-           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
-           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-         run: uv run python manage.py bootstrap_reference_data
-         working-directory: src/backend
+      - name: Run migrations + seed reference data
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run python manage.py bootstrap_reference_data
+        working-directory: src/backend
 
-       - name: Load cities
-         env:
-           DJANGO_SETTINGS_MODULE: config.settings.test
-           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
-           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-         run: uv run python manage.py load_cities
-         working-directory: src/backend
+      - name: Load cities
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run python manage.py load_cities
+        working-directory: src/backend
 
-       - name: Load catalog (categories)
-         env:
-           DJANGO_SETTINGS_MODULE: config.settings.test
-           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
-           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-         run: uv run python manage.py load_catalog
-         working-directory: src/backend
+      - name: Load catalog (categories)
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run python manage.py load_catalog
+        working-directory: src/backend
 
       - name: Seed 10k published ads (production-like scale)
         env:
