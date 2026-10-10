@@ -130,7 +130,12 @@ else:
 # See https://docs.djangoproject.com/en/stable/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env("DJANGO_SECRET_KEY")
+# During Docker build (DJANGO_BUILD=1), DJANGO_SECRET_KEY is absent — the real
+# value is injected at runtime. Use a build-time placeholder so collectstatic
+# can run without baking a secret into the image. At runtime (DJANGO_BUILD
+# unset), require a real key: omitting default raises ImproperlyConfigured.
+_BUILD_SECRET_KEY = "build-placeholder-do-not-use-in-production"
+SECRET_KEY = env("DJANGO_SECRET_KEY", default=_BUILD_SECRET_KEY if os.getenv("DJANGO_BUILD") else env.NOTSET)
 
 # HMAC key for the Telegram-ID log mask (apps/core/utils/sanitize.py). Required
 # in production - guard-enforced in prod.py. Independent of SECRET_KEY on

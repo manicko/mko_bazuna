@@ -69,7 +69,7 @@ def test_django_secret_key_required() -> None:
     env = {
         k: v
         for k, v in os.environ.items()
-        if k != "DJANGO_SECRET_KEY" and k != "BOT_TOKEN"
+        if k not in ("DJANGO_SECRET_KEY", "BOT_TOKEN", "DJANGO_BUILD")
     }
     env["DJANGO_SETTINGS_MODULE"] = "config.settings.test"
     stderr = _run_in_subprocess(
@@ -77,6 +77,31 @@ def test_django_secret_key_required() -> None:
         "import django; django.setup()",
     )
     assert "ImproperlyConfigured" in stderr
+
+
+def test_django_secret_key_absent_allowed_during_build() -> None:
+    """Config.settings.prod imports with DJANGO_BUILD=1 and no DJANGO_SECRET_KEY.
+
+    The Docker builder stage runs ``collectstatic`` with ``DJANGO_BUILD=1`` and no
+    ``.env`` file. ``base.py`` provides a build-time placeholder SECRET_KEY in this case
+    so the builder never needs DJANGO_SECRET_KEY (which would require a SecretsUsedInArgOrEnv
+    lint violation if baked into the Dockerfile as ENV).
+    """
+    env = {
+        k: v
+        for k, v in os.environ.items()
+        if k not in ("DJANGO_SECRET_KEY", "BOT_TOKEN", "DJANGO_BUILD")
+    }
+    env["DJANGO_SETTINGS_MODULE"] = "config.settings.prod"
+    env["DJANGO_BUILD"] = "1"
+    env["ALLOWED_HOSTS"] = "localhost,127.0.0.1,0.0.0.0"
+    env["DATABASE_URL"] = (
+        "postgres://postgres:build-placeholder@localhost:5432/postgres"
+    )
+    env["PYTHONPATH"] = os.pathsep.join(sys.path)
+    stderr = _run_in_subprocess(env, "import django; django.setup()")
+    assert "ImproperlyConfigured" not in stderr
+    assert "ModuleNotFoundError" not in stderr
 
 
 def test_django_secret_key_rejects_empty() -> None:

@@ -170,10 +170,12 @@ When multiple mechanisms provide the same variable, the following precedence app
    reference `${VAR}`, so it is lower priority than the explicit `env_file:` and `environment:`
    keys.
 4. **Image `ENV` (Dockerfile)** — the lowest priority. Placeholder build-time values such as
-   `DJANGO_SECRET_KEY=build-placeholder-do-not-use-in-production`,
    `DATABASE_URL=postgres://postgres:build-placeholder@localhost:5432/postgres`, and
    `DJANGO_SETTINGS_MODULE=config.settings.prod` (`docker/Dockerfile` lines 68–75) are baked
    into the image but are overridden by any compose `environment:` / `env_file:` value at
+   runtime. `DJANGO_SECRET_KEY` is **not** baked into the image (to avoid a
+   `SecretsUsedInArgOrEnv` lint violation); instead, `settings/base.py` provides a
+   build-time placeholder when `DJANGO_BUILD=1` is set, and the real key is injected at
    runtime. `docker build` itself sets `DJANGO_BUILD=1`, which the settings module checks to
    skip `.env` validation (see [Deployment Checks](../ops/docker-deployment.md#deployment-checks)).
 

@@ -73,7 +73,8 @@ ENV DJANGO_SETTINGS_MODULE=config.settings.prod
 # DJANGO_BUILD=1 skips .env validation during Docker build (collectstatic runs before runtime env is available)
 ENV DJANGO_BUILD=1
 # Placeholder values for required settings during build (real values provided at runtime via .env)
-ENV DJANGO_SECRET_KEY=build-placeholder-do-not-use-in-production
+# DJANGO_SECRET_KEY is intentionally NOT set here: settings/base.py provides a build-time placeholder
+# when DJANGO_BUILD=1, avoiding a SecretsUsedInArgOrEnv lint violation. The real key is injected at runtime.
 ENV ALLOWED_HOSTS=localhost,127.0.0.1,0.0.0.0
 # Placeholder database URL for collectstatic (doesn't connect to DB but settings must be valid)
 ENV DATABASE_URL=postgres://postgres:build-placeholder@localhost:5432/postgres
