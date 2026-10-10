@@ -78,7 +78,7 @@ def test_deploy_workflow_uses_ssh_action() -> None:
     """deploy.yml must use appleboy/ssh-action for remote deployment."""
     text = _DEPLOY_YML.read_text()
     assert "appleboy/ssh-action" in text, (
-        "deploy.yml must use appleboy/ssh-action@v1.2.0 for SSH-based deployment"
+        "deploy.yml must use appleboy/ssh-action@v1.2.5 for SSH-based deployment"
     )
 
 
