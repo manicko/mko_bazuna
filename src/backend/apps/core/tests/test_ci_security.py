@@ -199,6 +199,60 @@ def test_build_job_has_trivy_image_scan() -> None:
     assert "trivy" in content.lower()
 
 
+def test_build_job_targets_runtime_stage() -> None:
+    """Build job must build the production ``runtime`` stage, not test-runtime.
+
+    The ``test-runtime`` stage (the Dockerfile's final stage) installs
+    ``[tool.uv]`` dev dependencies — including ``basedpyright`` which bundles
+    Node.js — whose transitive CVEs inflate the Trivy image scan. No CI job
+    executes this image (all CI jobs run on the runner); production consumes the
+    ``runtime`` stage. Local Compose testing explicitly targets ``test-runtime``
+    via ``docker-compose.test.yml``.
+    """
+    content = _read(".github", "workflows", "ci.yml")
+    assert any(
+        line.strip() == "target: runtime" for line in content.splitlines()
+    ), (
+        "ci.yml build job must pass target: runtime to docker/build-push-action "
+        "so the pushed image excludes dev dependencies (12-OPS-013)"
+    )
+    assert "target: test-runtime" not in content, (
+        "ci.yml build job must not target test-runtime — only local Compose should (12-OPS-013)"
+    )
+
+
+def test_trivy_image_scan_ignores_unfixed() -> None:
+    """The Trivy image scan must set ignore-unfixed: true.
+
+    Mirrors the existing fs-mode Trivy scan in the security job (which already
+    has ``ignore-unfixed: true``). Only vulnerabilities with known fixes are
+    reported; CVEs without an upstream fix do not block CI.
+    """
+    content = _read(".github", "workflows", "ci.yml")
+    # The image scan section starts at the "Scan Docker image" step header and
+    # extends until the next step ("Upload Trivy SARIF artifact").
+    start = content.index("Scan Docker image for vulnerabilities")
+    end = content.index("Upload Trivy SARIF", start)
+    image_scan_section = content[start:end]
+    assert "ignore-unfixed: true" in image_scan_section, (
+        "the Trivy image scan in the build job must set ignore-unfixed: true "
+        "to match the fs-mode scan policy (12-OPS-013)"
+    )
+
+
+def test_dockerfile_runtime_upgrades_os_packages() -> None:
+    """The runtime stage runs apt-get upgrade to patch OS-level CVEs.
+
+    The base ``python:3.14-slim`` image may ship stale Debian packages; the
+    runtime stage upgrades them to the latest available versions before cleanup
+    (12-OPS-013).
+    """
+    content = _read("docker", "Dockerfile")
+    assert "apt-get upgrade" in content, (
+        "Dockerfile runtime stage must run apt-get upgrade to patch OS CVEs (12-OPS-013)"
+    )
+
+
 def test_gitleaks_config_exists() -> None:
     """.gitleaks.toml exists for allowlist configuration."""
     gitleaks_path = _PROJECT_ROOT / ".gitleaks.toml"

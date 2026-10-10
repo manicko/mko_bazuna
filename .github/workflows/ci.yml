@@ -50,6 +50,14 @@ jobs:
         with:
           context: .
           file: docker/Dockerfile
+          # Build the production `runtime` stage, not the default `test-runtime`
+          # final stage. The test-runtime stage installs [tool.uv] dev dependencies
+          # (basedpyright bundles Node.js, ruff, pytest, etc.) whose transitive
+          # CVEs inflate the Trivy image scan. No CI job executes this image —
+          # all CI jobs run on the runner — and production/deploy consume the
+          # runtime stage. Local Compose testing still explicitly targets
+          # test-runtime (docker-compose.test.yml).
+          target: runtime
           push: true
           tags: |
             ghcr.io/${{ env.IMAGE_REPOSITORY }}:ci
@@ -66,6 +74,7 @@ jobs:
           format: sarif
           output: trivy-image-results.sarif
           severity: CRITICAL,HIGH
+          ignore-unfixed: true
 
       - name: Upload Trivy SARIF artifact
         if: always()
