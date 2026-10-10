@@ -313,6 +313,11 @@ class Ad(models.Model):
                 condition=Q(price_normalized_eur__isnull=False),
             ),
             models.Index(
+                name="IX_ads_pub_price_sort",
+                fields=["price_normalized_eur"],
+                condition=Q(status=AdStatus.PUBLISHED),
+            ),
+            models.Index(
                 name="IX_ads_archive_sweep",
                 fields=["status", "published_at"],
                 condition=Q(status=AdStatus.PUBLISHED),

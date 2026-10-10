@@ -56,6 +56,129 @@ def test_dependabot_config_exists() -> None:
     assert "uv" in content
 
 
+# ---------------------------------------------------------------------------
+# Dependabot configuration — PR #7 / PR #8 prevention
+# ---------------------------------------------------------------------------
+# PR #7 proposed major-version GitHub Action upgrades (actions/checkout v4→v7,
+# astral-sh/setup-uv v5→v10) as auto-filed Dependabot PRs. PR #8 proposed
+# Django 5→6 and django-prometheus 2.5.0→2.6.0.dev22. The dependabot.yml must
+# gate these behind manual review by restricting update types per ecosystem
+# and entry.
+
+def _find_dependabot_entry(ecosystem: str, group_name: str | None = None) -> dict | None:
+    """Locate a dependabot update entry by ecosystem, optionally by group name.
+
+    Returns the first entry dict whose ``package-ecosystem`` matches, or
+    ``None`` if no entry matches. When ``group_name`` is given, only entries
+    whose ``groups`` dict contains that key are considered.
+    """
+    from ruamel.yaml import YAML
+
+    path = _PROJECT_ROOT / ".github" / "dependabot.yml"
+    if not path.exists():
+        return None
+    document = YAML(typ="safe").load(path.read_text(encoding="utf-8"))
+    if not isinstance(document, dict):
+        return None
+    updates = document.get("updates")
+    if not isinstance(updates, list):
+        return None
+    for entry in updates:
+        if not isinstance(entry, dict):
+            continue
+        if entry.get("package-ecosystem") != ecosystem:
+            continue
+        if group_name is not None:
+            groups = entry.get("groups")
+            if isinstance(groups, dict) and group_name in groups:
+                return entry
+            continue
+        return entry
+    return None
+
+
+def test_dependabot_uv_restricted_to_semver_minor_patch() -> None:
+    """The uv ecosystem only allows semver-minor and semver-patch updates.
+
+    Blocks major-version bumps (e.g., Django 5→6) and pre-release/dev versions
+    (e.g., django-prometheus 2.5.0→2.6.0.dev22) from being auto-filed —
+    the root cause of PR #8.
+    """
+    entry = _find_dependabot_entry("uv")
+    assert entry is not None, "uv ecosystem entry not found in dependabot.yml"
+    allow = entry.get("allow", [])
+    assert allow, "uv ecosystem must specify an `allow` list"
+    update_types = {item.get("update-type") for item in allow if isinstance(item, dict)}
+    assert "version-update:semver-major" not in update_types, (
+        "uv ecosystem must not allow major-version updates"
+    )
+    assert "version-update:semver-minor" in update_types, (
+        "uv ecosystem must allow semver-minor updates"
+    )
+    assert "version-update:semver-patch" in update_types, (
+        "uv ecosystem must allow semver-patch updates"
+    )
+
+
+def test_dependabot_django_prometheus_prerelease_ignored() -> None:
+    """The uv ecosystem ignores pre-release updates for django-prometheus.
+
+    Belt-and-suspenders alongside the `allow` restriction: even if a pre-release
+    version type slips through the allow filter, this `ignore` entry blocks it.
+    """
+    entry = _find_dependabot_entry("uv")
+    assert entry is not None
+    ignore_list = entry.get("ignore", [])
+    prometheus_ignores = [
+        i
+        for i in ignore_list
+        if isinstance(i, dict) and i.get("dependency-name") == "django-prometheus"
+    ]
+    assert prometheus_ignores, "django-prometheus must appear in the uv ignore list"
+    all_update_types: set[str] = set()
+    for ign in prometheus_ignores:
+        all_update_types.update(ign.get("update-types", []))
+    assert "version-update:semver-prerelease" in all_update_types, (
+        "django-prometheus must ignore pre-release updates"
+    )
+
+
+def test_dependabot_build_actions_restricted_to_minor_patch() -> None:
+    """The build-actions entry only allows semver-minor and semver-patch.
+
+    Major-version action upgrades (actions/checkout v4→v7, astral-sh/setup-uv
+    v5→v10) require manual review (12-OPS-017) — root cause of PR #7.
+    """
+    entry = _find_dependabot_entry("github-actions", "build-actions")
+    assert entry is not None, "build-actions github-actions entry not found"
+    allow = entry.get("allow", [])
+    assert allow, "build-actions entry must specify an `allow` list"
+    update_types = {
+        item.get("update-type", "any") for item in allow if isinstance(item, dict)
+    }
+    assert "version-update:semver-major" not in update_types, (
+        "build-actions entry must not allow major-version updates"
+    )
+    assert "version-update:semver-minor" in update_types
+    assert "version-update:semver-patch" in update_types
+
+
+def test_dependabot_security_actions_allows_all_types() -> None:
+    """The security-actions entry allows all update types (incl. majors).
+
+    trivy-action and codeql upload-sarif need timely major-version upgrades
+    for CVE coverage.
+    """
+    entry = _find_dependabot_entry("github-actions", "security-actions")
+    assert entry is not None, "security-actions github-actions entry not found"
+    allow = entry.get("allow", [])
+    assert allow, "security-actions entry must specify an `allow` list"
+    for item in allow:
+        assert "update-type" not in item, (
+            f"security-actions allow entry must not restrict update-type: {item}"
+        )
+
+
 def test_dockerfile_has_sbom_generation() -> None:
     """Dockerfile builder stage generates a CycloneDX SBOM (via syft)."""
     content = _read("docker", "Dockerfile")

@@ -5,21 +5,35 @@ updates:
   # version comment (12-OPS-017). Dependabot bumps the SHA and the trailing
   # version comment simultaneously, keeping the supply-chain pin auditable.
   #
-  # Split into two groups so security tooling lands in reviewable PRs separate
-  # from routine CI infrastructure.
+  # Two entries split security actions (all update types, incl. majors) from
+  # build/CI actions (minor/patch only) so that major-version upgrades like
+  # actions/checkout v4→v7 or astral-sh/setup-uv v5→v10 require manual review
+  # rather than auto-filing (see PR #7).
   # ---------------------------------------------------------------------------
+
+  # Security-critical actions: vulnerability scanners and SARIF upload.
+  # Major-version upgrades are allowed for timely CVE coverage.
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
       interval: "weekly"
     groups:
-      # Security-critical actions: vulnerability scanners and SARIF upload.
-      # Keep current for timely CVE coverage.
       security-actions:
         patterns:
           - "aquasecurity/trivy-action"
           - "github/codeql-action/upload-sarif"
-      # Routine build/CI tooling — weekly updates suffice.
+    allow:
+      - dependency-name: "aquasecurity/trivy-action"
+      - dependency-name: "github/codeql-action/upload-sarif"
+    open-pull-requests-limit: 5
+
+  # Routine build/CI tooling — only semver-minor and semver-patch bumps are
+  # auto-filed; major bumps require manual review (12-OPS-017).
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    groups:
       build-actions:
         patterns:
           - "actions/checkout"
@@ -28,6 +42,31 @@ updates:
           - "docker/login-action"
           - "docker/setup-buildx-action"
           - "docker/build-push-action"
+    allow:
+      - dependency-name: "actions/checkout"
+        update-type: "version-update:semver-minor"
+      - dependency-name: "actions/checkout"
+        update-type: "version-update:semver-patch"
+      - dependency-name: "actions/upload-artifact"
+        update-type: "version-update:semver-minor"
+      - dependency-name: "actions/upload-artifact"
+        update-type: "version-update:semver-patch"
+      - dependency-name: "astral-sh/setup-uv"
+        update-type: "version-update:semver-minor"
+      - dependency-name: "astral-sh/setup-uv"
+        update-type: "version-update:semver-patch"
+      - dependency-name: "docker/login-action"
+        update-type: "version-update:semver-minor"
+      - dependency-name: "docker/login-action"
+        update-type: "version-update:semver-patch"
+      - dependency-name: "docker/setup-buildx-action"
+        update-type: "version-update:semver-minor"
+      - dependency-name: "docker/setup-buildx-action"
+        update-type: "version-update:semver-patch"
+      - dependency-name: "docker/build-push-action"
+        update-type: "version-update:semver-minor"
+      - dependency-name: "docker/build-push-action"
+        update-type: "version-update:semver-patch"
     # appleboy/ssh-action receives the production SSH private key during deploy
     # (deploy.yml). Per 12-OPS-017, this trust boundary is deliberately excluded
     # from auto-update: any SHA bump requires manual security review.
@@ -38,9 +77,9 @@ updates:
 
   # ---------------------------------------------------------------------------
   # Docker base image — python:3.14-slim (matches requires-python >=3.14,<3.15).
-    # Container images in docker-compose.yml (postgres, redis, nginx) are
-    # intentionally pinned to patch versions with rollback values and are
-    # managed manually — not tracked by Dependabot.
+  # Container images in docker-compose.yml (postgres, redis, nginx) are
+  # intentionally pinned to patch versions with rollback values and are
+  # managed manually — not tracked by Dependabot.
   # ---------------------------------------------------------------------------
   - package-ecosystem: "docker"
     directory: "/docker"
@@ -50,9 +89,11 @@ updates:
 
   # ---------------------------------------------------------------------------
   # Python dependencies via uv (pyproject.toml + uv.lock).
-    # Every entry in [project.dependencies] and [dependency-groups.dev] carries
-    # an upper version bound that constrains breaking changes
-    # (e.g. django<6.0, aiogram<4.0, bandit<2.0). No exclusions needed.
+  # Every entry in [project.dependencies] and [dependency-groups.dev] carries
+  # an upper version bound that constrains breaking changes
+  # (e.g. django<6.0, aiogram<4.0, bandit<2.0). Dependabot is additionally
+  # restricted to semver-minor/patch so major-version bumps and pre-releases
+  # are never auto-filed (see PR #8 which proposed Django 5→6).
   # ---------------------------------------------------------------------------
   - package-ecosystem: "uv"
     directory: "/"
@@ -62,4 +103,15 @@ updates:
       python-dependencies:
         patterns:
           - "*"
+    allow:
+      - dependency-type: "direct"
+        update-type: "version-update:semver-minor"
+      - dependency-type: "direct"
+        update-type: "version-update:semver-patch"
+    # Block pre-release/dev versions of django-prometheus (e.g., 2.6.0.dev22)
+    # as a belt-and-suspenders guard alongside the `allow` restriction above.
+    ignore:
+      - dependency-name: "django-prometheus"
+        update-types:
+          - "version-update:semver-prerelease"
     open-pull-requests-limit: 5

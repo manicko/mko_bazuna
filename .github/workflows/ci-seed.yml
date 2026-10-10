@@ -139,13 +139,29 @@ jobs:
           exit 1
         working-directory: src/backend
 
-      - name: Run migrations + seed reference data
-        env:
-          DJANGO_SETTINGS_MODULE: config.settings.test
-          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
-          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-        run: uv run python manage.py bootstrap_reference_data
-        working-directory: src/backend
+       - name: Run migrations + seed reference data
+         env:
+           DJANGO_SETTINGS_MODULE: config.settings.test
+           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+         run: uv run python manage.py bootstrap_reference_data
+         working-directory: src/backend
+
+       - name: Load cities
+         env:
+           DJANGO_SETTINGS_MODULE: config.settings.test
+           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+         run: uv run python manage.py load_cities
+         working-directory: src/backend
+
+       - name: Load catalog (categories)
+         env:
+           DJANGO_SETTINGS_MODULE: config.settings.test
+           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+         run: uv run python manage.py load_catalog
+         working-directory: src/backend
 
       - name: Seed 10k published ads (production-like scale)
         env:
@@ -157,6 +173,7 @@ jobs:
           from decimal import Decimal
           from django.contrib.auth import get_user_model
           from django.db import transaction
+          from django.utils import timezone
           from apps.ads.models import Ad, AdStatus
           from apps.categories.models import Category
           from apps.locations.models import City
@@ -169,8 +186,11 @@ jobs:
                   title=f'Profiler ad {i}',
                   category=cat,
                   city=city,
-                  seller=seller,
-                  price=Decimal('100'),
+                  user=seller,
+                  price_amount=Decimal('100'),
+                  price_currency='EUR',
+                  price_normalized_eur=Decimal('100'),
+                  published_at=timezone.now(),
                   status=AdStatus.PUBLISHED,
               )
               for i in range(10000)
