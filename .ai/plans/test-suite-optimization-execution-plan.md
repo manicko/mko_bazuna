@@ -196,19 +196,21 @@ uv run pytest ${PYTEST_OPTS:-} ${PYTEST_DEFAULTS} "${PYTEST_MARK_ARGS[@]}"
 
 ## Execution Order
 
-**COMPLETED (Blocks 1-4):**
+**COMPLETED (Blocks 1-5):**
+
+| Commit | Block | Change |
+|--------|-------|--------|
+| `d6e69173` | Block 5 (F1) | Class-scoped `seeded_test_data` fixture; `TestSeedFilterCoverage` runs seed once per class |
+| `d9f153fb` | Block 1 (G3) | `entrypoint-test.sh`: `PYTEST_OPTS` + `${PYTEST_DEFAULTS:-}` merge |
+| `87ccdcf0` | Block 2 (S1+L2+G2) | `ci.yml`: `-m "not (seed or slow or real_images)"`, `--maxprocesses=4`, no `--cov` |
+| `5fb4935d` | Block 3 (P3+P4) | 7 concurrent sites: `xdist_group("concurrent")` + `flaky(reruns=1)` |
+| `4ab67487` | Block 4 (C1+F3) | `no_cover` marker registered + applied to 9 files; 3 tests reclassified to `integration` |
+
+**REMAINING (Blocks 6-8):**
 
 ```
-Block 1 (G3) → Block 2 (S1+L2+G2) → Block 3 (P3+P4) → Block 4 (C1+F3)
-   ✅        →         ✅          →         ✅        →         ✅
-  d9f153fb      87ccdcf0            5fb4935d             4ab67487
-```
-
-**REMAINING (Blocks 5-8):**
-
-```
-Block 5 (F1: seed fixture)   Block 6 (F2: subprocess fixture)   Block 7 (G4: nightly)
-      ↓                            ↓                  ↓
+Block 6 (F2: subprocess fixture)   Block 7 (G4: nightly)   Block 8 (Full CI + G1)
+    ↓                      ↓
 Block 8 (Full CI + G1)
 ```
 
@@ -217,7 +219,7 @@ Block 8 (Full CI + G1)
 - Block 7 and Block 8 are independent but require sequential Implementors
 
 **Sequential blocks** (1 at a time):
-1. ~~Block 1 → 2 → 3 → 4~~ (done) → Block 5 → 6 → 7 → 8
+1. ~~Block 1 → 2 → 3 → 4~~ (done) → ~~Block 5~~ (done) → Block 6 → 7 → 8
 
 ## Acceptance Criteria Per Block
 
