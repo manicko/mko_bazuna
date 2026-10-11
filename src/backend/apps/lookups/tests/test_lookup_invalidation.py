@@ -176,3 +176,45 @@ class TestLookupItemCacheInvalidation:
             "bs": "Prodam",
             "en": "Updated despite cache failure",
         }
+
+    def test_through_model_cache_failure_does_not_rollback_save(
+        self,
+        purpose_binding: tuple,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Cache-backend failure must not roll back a through-model DB save.
+
+        Simulates a Redis outage by making ``cache.incr`` raise
+        ``ConnectionInterrupted``. The signal handler catches this exception
+        (best-effort), so the ``CategoryListingPurpose`` through-row creation
+        must still commit.
+        """
+        category, item = purpose_binding
+
+        # Prime the cache so the version key exists.
+        CategoryLookupResolver.get_resolved_purposes(category)
+
+        failing_incr = Mock(
+            side_effect=ConnectionInterrupted("Simulated Redis outage")
+        )
+        monkeypatch.setattr(cache, "incr", failing_incr, raising=False)
+
+        # Create a second listing purpose and bind it via a through-model row
+        # while cache.incr is failing. The through-model's post_save triggers
+        # invalidate_category_lookup_cache → resolver.invalidate_category →
+        # bump_lookup_resolve_version → cache.incr (fails, caught by handler).
+        group = item.group
+        second_item = LookupItem.objects.create(
+            group=group,
+            slug="rent",
+            name_i18n={"ru": "Сдам", "bs": "Izdam", "en": "Rent"},
+            is_active=True,
+        )
+        binding = CategoryListingPurpose.objects.create(
+            category=category, listing_purpose=second_item
+        )
+
+        # The DB through-row was committed — cache failure did not roll back the save.
+        refreshed = CategoryListingPurpose.objects.get(id=binding.id)
+        assert refreshed.listing_purpose_id == second_item.id
+        assert refreshed.category_id == category.id

@@ -51,16 +51,29 @@ def bump_tree_version_on_structure_change(sender, instance, **kwargs):  # type: 
 @receiver(post_save, sender="categories.CategoryListingCondition")
 @receiver(post_delete, sender="categories.CategoryListingCondition")
 def invalidate_category_lookup_cache(sender, instance, **kwargs):  # type: ignore[no-untyped-def]
-    """Invalidate resolved lookup caches when through-table bindings change."""
+    """Invalidate resolved lookup caches when through-table bindings change.
+
+    Cache invalidation is best-effort: a cache backend failure must never
+    prevent the originating DB save from committing. A stale cache will simply
+    be refreshed on the next read.
+    """
     from apps.categories.services.lookup_resolution import CategoryLookupResolver
 
     resolver = CategoryLookupResolver()
-    resolver.invalidate_category(instance.category_id)
-    logger.debug(
-        "Invalidated lookup cache for category %d due to %s change",
-        instance.category_id,
-        sender.__name__,
-    )
+    try:
+        resolver.invalidate_category(instance.category_id)
+    except ConnectionInterrupted, redis.RedisError:
+        logger.warning(
+            "Cache backend unavailable — resolved lookup caches not "
+            "invalidated after %s change; cache will refresh on next read",
+            sender.__name__,
+        )
+    else:
+        logger.debug(
+            "Invalidated lookup cache for category %d due to %s change",
+            instance.category_id,
+            sender.__name__,
+        )
 
 
 @receiver(post_save, sender="lookups.LookupItem")
