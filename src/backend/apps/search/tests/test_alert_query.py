@@ -863,14 +863,17 @@ class TestDeliverImmediateAlerts:
 
         Pins D-2 (03-DB-007): the marker is written AFTER a successful send, so
         a failure yields ``delivered_at IS NULL`` and the pair is retried.
+
+        The production send path catches ``Exception`` in ``_run_send`` and
+        captures non-Telegram exceptions via ``asyncio.gather(return_exceptions=True)``
+        in ``_send_payloads``, so a ``ValueError`` from ``Bot.send_message`` never
+        escapes to ``deliver_immediate_alerts``.
         """
 
-        def _boom(payloads: list) -> None:
-            raise RuntimeError("send failed")
+        async def _raise_send_message(*args, **kwargs) -> None:
+            raise ValueError("network unavailable")
 
-        monkeypatch.setattr(
-            "apps.search.services.immediate_alerts._run_send", _boom
-        )
+        monkeypatch.setattr("aiogram.Bot.send_message", _raise_send_message)
 
         from apps.search.services.immediate_alerts import deliver_immediate_alerts
 
@@ -879,8 +882,7 @@ class TestDeliverImmediateAlerts:
         )
         saved_search = SavedSearch.objects.create(user=buyer, is_active=True)
 
-        with pytest.raises(RuntimeError, match="send failed"):
-            deliver_immediate_alerts(ad.id)
+        deliver_immediate_alerts(ad.id)
 
         row = SavedSearchNotification.objects.get(saved_search=saved_search, ad=ad)
         assert row.delivered_at is None

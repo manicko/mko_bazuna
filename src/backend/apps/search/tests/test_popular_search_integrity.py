@@ -25,6 +25,7 @@ population can be constructed, exactly as it exists in a real deployment when
 from __future__ import annotations
 
 import importlib
+import logging
 from datetime import timedelta
 
 import pytest
@@ -34,6 +35,8 @@ from django.test import Client
 from django.utils import timezone
 
 from apps.search.models import PopularSearch
+
+logger = logging.getLogger(__name__)
 
 pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.integration]
 
@@ -75,8 +78,14 @@ class _ConstraintDropped:
             editor.remove_constraint(PopularSearch, _CONSTRAINT)
 
     def __exit__(self, exc_type, exc_value, traceback) -> None:
-        with connection.schema_editor() as editor:
-            editor.add_constraint(PopularSearch, _CONSTRAINT)
+        try:
+            with connection.schema_editor() as editor:
+                editor.add_constraint(PopularSearch, _CONSTRAINT)
+        except Exception:
+            logger.exception(
+                "Failed to restore unique constraint on PopularSearch"
+            )
+            raise
 
 
 class TestVerifiedIndexShape:

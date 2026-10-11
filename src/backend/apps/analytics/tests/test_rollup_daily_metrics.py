@@ -9,6 +9,7 @@ produces the same result), and seed-source event exclusion.
 from __future__ import annotations
 
 import datetime as _dt
+import threading
 from datetime import timedelta
 
 import pytest
@@ -240,22 +241,34 @@ class TestRollupDailyMetricsLock:
         metrics = DailyAdMetrics.objects.get(ad=ad1, date=yesterday)
         assert metrics.views_count == 3
 
+    @pytest.mark.django_db(transaction=True)
     def test_concurrent_lock_attempt(self, rollup_data) -> None:
-        """A second call while inside the advisory lock is blocked.
+        """Two concurrent calls serialize on the advisory lock without deadlock.
 
-        PostgreSQL advisory locks are session-scoped; attempting to acquire
-        the same lock in the same transaction blocks. This test verifies that
-        the command properly acquires and releases the lock by ensuring the
-        outer transaction can acquire it after the command completes.
+        PostgreSQL advisory locks (Q8) are transaction-scoped: the second call
+        blocks on ``pg_advisory_xact_lock`` until the first commits and releases
+        the lock, then proceeds. This verifies true concurrency — both threads
+        complete without deadlock.
         """
         ad1 = rollup_data["ad1"]
+        errors: list[BaseException] = []
+        barrier = threading.Barrier(2, timeout=30)
 
-        # The command should complete and release its lock normally.
-        call_command("rollup_daily_metrics")
+        def _run() -> None:
+            try:
+                barrier.wait()
+                call_command("rollup_daily_metrics")
+            except Exception as exc:
+                errors.append(exc)
 
-        # After the command, the lock is released, so this second call
-        # should also succeed.
-        call_command("rollup_daily_metrics")
+        t1 = threading.Thread(target=_run)
+        t2 = threading.Thread(target=_run)
+        t1.start()
+        t2.start()
+        t1.join()
+        t2.join()
+
+        assert not errors
 
         yesterday = timezone.now().date() - timedelta(days=1)
         metrics = DailyAdMetrics.objects.get(ad=ad1, date=yesterday)
