@@ -90,8 +90,8 @@ def test_cache_reference_uses_the_canonical_coordinate() -> None:
     assert f"IMAGE_REPOSITORY: {_CANONICAL_REPOSITORY}" in text, (
         "ci.yml must define IMAGE_REPOSITORY to the canonical coordinate"
     )
-    assert "type=registry,ref=ghcr.io/${{ env.IMAGE_REPOSITORY }}:buildcache" in text, (
-        "ci.yml build-cache reference must consume env.IMAGE_REPOSITORY"
+    assert "type=registry,ref=ghcr.io/${{ env.IMAGE_REPOSITORY }}:buildcache-${{ github.ref_name }}" in text, (
+        "ci.yml build-cache reference must consume env.IMAGE_REPOSITORY and be branch-scoped"
     )
 
 

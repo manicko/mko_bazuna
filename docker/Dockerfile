@@ -33,12 +33,6 @@ ENV UV_COMPILE_BYTECODE=1
 
 WORKDIR /app
 
-# Cache-busting arg: increment to force a rebuild of dependency layers even
-# when pyproject.toml/uv.lock content is unchanged. Prevents stale BuildKit
-# registry cache from serving outdated package versions (e.g. msgpack 1.1.2
-# when the lockfile specifies 1.2.2).
-ARG CACHEBUST=1
-
 # Cache: copy dependency files first (most stable layer)
 COPY pyproject.toml uv.lock* ./
 
@@ -130,7 +124,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # Remove system-level setuptools (CVE-2025-47273, CVE-2026-59890).
 # python:3.14-slim ships setuptools 70.3.0 in system site-packages;
 # it is not needed at runtime — the venv at /opt/venv is self-contained.
-RUN python3 -m pip uninstall -y setuptools || true
+# Filesystem deletion is used because pip's metadata does not track the
+# base image's system-level installation.
+RUN rm -rf /usr/local/lib/python3.14/site-packages/setuptools*
 
 # Create non-root user with uid 1000 (security baseline)
 RUN groupadd -r -g 1000 app && \

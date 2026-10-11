@@ -254,36 +254,45 @@ def test_dockerfile_runtime_upgrades_os_packages() -> None:
 
 
 def test_dockerfile_removes_system_setuptools() -> None:
-    """The runtime stage uninstalls system-level setuptools.
+    """The runtime stage removes system-level setuptools via filesystem deletion.
 
     ``python:3.14-slim`` ships ``setuptools`` 70.3.0 in system site-packages,
     which is vulnerable to CVE-2025-47273 (fixed in 78.1.1) and
     CVE-2026-59890 (fixed in 83.0.0). setuptools is not needed at runtime —
     the venv at ``/opt/venv`` is self-contained. Removing it eliminates the
     HIGH-severity findings from the Trivy image scan.
+
+    Uses ``rm -rf`` against the site-packages directory rather than
+    ``pip uninstall`` because pip's metadata does not track the base image's
+    system-level installation, making ``pip uninstall`` a silent no-op.
     """
     content = _read("docker", "Dockerfile")
     assert "setuptools" in content, (
         "Dockerfile must reference setuptools so the removal step is present"
     )
-    assert "uninstall" in content, (
-        "Dockerfile runtime stage must uninstall setuptools, not merely comment about it"
+    assert "rm -rf" in content, (
+        "Dockerfile runtime stage must remove setuptools via filesystem deletion (rm -rf), "
+        "not pip uninstall (which is a no-op for system-level packages)"
+    )
+    assert "pip uninstall" not in content, (
+        "Dockerfile must not use pip uninstall for setuptools removal — "
+        "it is a no-op for the base image's system-level installation"
     )
 
 
-def test_dockerfile_has_cache_bust_arg() -> None:
-    """The builder stage has a CACHEBUST ARG to invalidate stale BuildKit cache.
+def test_dockerfile_has_no_dead_cache_bust_arg() -> None:
+    """The builder stage has no dead CACHEBUST ARG.
 
-    Without an explicit cache-busting mechanism, a stale registry cache can
-    serve an ``uv sync`` layer that installed outdated package versions (e.g.
-    ``msgpack`` 1.1.2 when the lockfile specifies 1.2.2). The CACHEBUST arg
-    changes the cache key for all subsequent layers, forcing a fresh install
-    when its value is incremented.
+    A previous revision declared ``ARG CACHEBUST=1`` but never referenced it
+    in a subsequent ``COPY`` — the variable had no effect on cache invalidation.
+    Stale BuildKit registry cache is instead mitigated by the branch-scoped
+    cache refs in ci.yml (see test_cache_reference_uses_the_canonical_coordinate
+    in test_ci_image_coordinate.py). Dead CACHEBUST args must not be reintroduced.
     """
     content = _read("docker", "Dockerfile")
-    assert "ARG CACHEBUST" in content, (
-        "Dockerfile must declare a CACHEBUST ARG so stale BuildKit registry "
-        "cache can be invalidated by incrementing its value"
+    assert "ARG CACHEBUST" not in content, (
+        "Dockerfile must not declare a dead CACHEBUST ARG — "
+        "cache invalidation is handled by branch-scoped BuildKit cache refs in ci.yml"
     )
 
 
@@ -625,4 +634,48 @@ def test_dockerfile_downloads_are_pinned() -> None:
     )
     assert "tailwindcss/releases/download/v4.3.3/" in content, (
         "Dockerfile must pin the Tailwind CLI to a released version"
+    )
+
+
+def test_build_job_has_security_events_permission() -> None:
+    """The build job grants security-events: write for upload-sarif.
+
+    The build job uploads Trivy SARIF results via
+    github/codeql-action/upload-sarif, which requires the ``security-events: write``
+    permission. Without it, the ``Upload Docker image scan results`` step fails
+    with a 403 Forbidden. ``actions: read`` is also required for
+    actions/upload-artifact and workflow run metadata.
+    """
+    content = _read(".github", "workflows", "ci.yml")
+    # Extract the build job's permissions block (lines between "  build:"
+    # and the next top-level key like "  env:" that has steps).
+    build_start = content.index("  build:")
+    # The permissions block is between "  build:" and "    env:".
+    build_section = content[build_start:content.index("    env:", build_start)]
+    assert "security-events: write" in build_section, (
+        "build job must grant security-events: write for upload-sarif (12-OPS-013)"
+    )
+    assert "actions: read" in build_section, (
+        "build job must grant actions: read (required by upload-artifact and workflow metadata)"
+    )
+
+
+def test_build_job_trivy_action_disables_cache() -> None:
+    """The Trivy image scan step sets cache: false.
+
+    The ``aquasecurity/trivy-action`` defaults its ``cache`` input to ``true``,
+    which restores a date-keyed cache from a prior run. A stale cache serves
+    outdated SARIF results (e.g. msgpack 1.1.2 when lockfile says 1.2.2) instead
+    of scanning the freshly-built image. Setting ``cache: false`` forces a fresh
+    scan on every run.
+    """
+    content = _read(".github", "workflows", "ci.yml")
+    # The image scan section starts at "Scan Docker image" and extends until
+    # the next step ("Upload Trivy SARIF artifact").
+    start = content.index("Scan Docker image for vulnerabilities")
+    end = content.index("Upload Trivy SARIF artifact", start)
+    image_scan_section = content[start:end]
+    assert "cache: false" in image_scan_section, (
+        "the Trivy image scan step must set cache: false to prevent stale cache"
+        " restoration from prior runs (12-OPS-013)"
     )
