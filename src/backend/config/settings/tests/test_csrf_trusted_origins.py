@@ -14,7 +14,7 @@ import pytest
 
 from config.settings.tests import TEST_SECRET_KEY
 
-pytestmark = [pytest.mark.unit, pytest.mark.settings]
+pytestmark = [pytest.mark.unit, pytest.mark.settings, pytest.mark.no_cover]
 
 # Resolve repository root — same pattern as test_prod_logging.py and
 # test_compose_hardening.py.

@@ -67,7 +67,7 @@ import pytest
 
 from config.settings.base import ALLOWED_ENV_VARS
 
-pytestmark = [pytest.mark.unit, pytest.mark.settings]
+pytestmark = [pytest.mark.integration, pytest.mark.settings, pytest.mark.no_cover]
 
 # Resolve repository root — same _ROOT walk-up used by test_env_allowlist.py,
 # test_prod_logging.py, test_csrf_trusted_origins.py and

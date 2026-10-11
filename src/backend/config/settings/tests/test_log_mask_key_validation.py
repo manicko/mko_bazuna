@@ -25,7 +25,7 @@ from config.settings.tests.test_prod_logging import (
     _run_in_subprocess,
 )
 
-pytestmark = [pytest.mark.unit, pytest.mark.settings]
+pytestmark = [pytest.mark.unit, pytest.mark.settings, pytest.mark.no_cover]
 
 _PROD_MODULE = "config.settings.prod"
 _DEFAULT_LOG_MASK_KEY = "test-log-mask-key-for-testing-only-not-a-secret"

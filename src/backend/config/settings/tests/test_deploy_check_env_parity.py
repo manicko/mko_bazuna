@@ -65,7 +65,7 @@ from ruamel.yaml import YAML
 
 from config.settings.tests.test_prod_logging import _run_in_subprocess
 
-pytestmark = [pytest.mark.unit, pytest.mark.settings]
+pytestmark = [pytest.mark.unit, pytest.mark.settings, pytest.mark.no_cover]
 
 # Resolve the repository root by walking upward to pyproject.toml — the same
 # convention as test_prod_logging.py, test_csrf_trusted_origins.py,

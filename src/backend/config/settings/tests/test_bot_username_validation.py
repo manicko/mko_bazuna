@@ -38,7 +38,7 @@ from config.settings.tests.test_prod_logging import (
     _run_in_subprocess,
 )
 
-pytestmark = [pytest.mark.unit, pytest.mark.settings]
+pytestmark = [pytest.mark.unit, pytest.mark.settings, pytest.mark.no_cover]
 
 _PROD_MODULE = "config.settings.prod"
 _ONESHOT_MODULE = "config.settings.oneshot"

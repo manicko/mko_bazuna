@@ -30,7 +30,7 @@ import pytest
 
 from config.settings.tests.test_prod_logging import TEST_SECRET_KEY, _prod_env_overrides
 
-pytestmark = [pytest.mark.unit, pytest.mark.settings]
+pytestmark = [pytest.mark.integration, pytest.mark.settings, pytest.mark.no_cover]
 
 
 def _run_in_subprocess(env: dict[str, str], import_code: str) -> str:
