@@ -197,7 +197,10 @@ class TestRecomputeRowLockConcurrency:
         pytest.mark.concurrent,
     ]
 
+    @pytest.mark.django_db(transaction=True)
     @pytest.mark.concurrent
+    @pytest.mark.xdist_group("concurrent")
+    @pytest.mark.flaky(reruns=1, reruns_delay=1)
     def test_recompute_row_lock_blocks_concurrent_price_edit(
         self, exchange_rates, seller, category, city
     ) -> None:

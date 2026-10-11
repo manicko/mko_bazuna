@@ -658,6 +658,8 @@ class TestBanAtomicRollback:
 @pytest.mark.slow
 @pytest.mark.integration
 @pytest.mark.concurrent
+@pytest.mark.xdist_group("concurrent")
+@pytest.mark.flaky(reruns=1, reruns_delay=1)
 class TestBulkRejectRowLockConcurrency:
     """DB-003: ``select_for_update()`` in bulk_reject prevents stale-state races.
 

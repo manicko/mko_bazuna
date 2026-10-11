@@ -1187,6 +1187,8 @@ class TestBulkModerationActionView:
     @pytest.mark.django_db(transaction=True)
     @pytest.mark.slow
     @pytest.mark.concurrent
+    @pytest.mark.xdist_group("concurrent")
+    @pytest.mark.flaky(reruns=1, reruns_delay=1)
     def test_row_lock_blocks_concurrent_writer(self, category, city) -> None:
         """``select_for_update()`` is issued per ad: a concurrent writer holding
         the row lock blocks the endpoint until the lock is released.

@@ -178,6 +178,7 @@ markers = [
   "slow: marks tests that take >5 seconds individually (use -m 'not slow' to skip)",
   "real_images: keep the real seed image pipeline for tests that assert on it",
   "xdist_group: marks tests pinned to a single xdist worker",
+  "flaky: marks tests that may transiently fail and should be retried (pytest-rerunfailures)",
 ]
 
 # Coverage.py configuration (used by pytest-cov)

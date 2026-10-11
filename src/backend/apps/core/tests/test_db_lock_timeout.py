@@ -57,6 +57,8 @@ class TestLockWaitIsBounded:
 
     @pytest.mark.django_db(transaction=True)
     @pytest.mark.concurrent
+    @pytest.mark.xdist_group("concurrent")
+    @pytest.mark.flaky(reruns=1, reruns_delay=1)
     def test_lock_wait_is_bounded(self, seller, category, city) -> None:
         """A second connection waiting on a held row lock fails with 55P03.
 

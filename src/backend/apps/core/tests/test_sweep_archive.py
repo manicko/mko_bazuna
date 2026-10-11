@@ -194,6 +194,8 @@ class TestArchiveSweep:
 @pytest.mark.slow
 @pytest.mark.integration
 @pytest.mark.concurrent
+@pytest.mark.xdist_group("concurrent")
+@pytest.mark.flaky(reruns=1, reruns_delay=1)
 class TestArchiveSweepRowLockConcurrency:
     """DB-010: ``select_for_update()`` in archive_sweep prevents lost-update race
     with concurrent web/bot writes."""

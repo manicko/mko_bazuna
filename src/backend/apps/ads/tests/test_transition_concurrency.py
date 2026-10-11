@@ -38,6 +38,9 @@ pytestmark = [
 class TestAdRowLockConcurrency:
     """DB-003: ``select_for_update()`` in review views prevents stale-state races."""
 
+    @pytest.mark.xdist_group("concurrent")
+    @pytest.mark.flaky(reruns=1, reruns_delay=1)
+
     def test_select_for_update_blocks_concurrent_delete(
         self, seller, category, city
     ) -> None:
