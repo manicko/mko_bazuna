@@ -43,6 +43,7 @@ ALLOWED_ENV_VARS = frozenset({
     "RUN_TRANSLATION_BACKFILL",
     "LOCK_TIMEOUT_SECONDS",
     "MEDIA_STAGING_BYTE_BUDGET",
+    "RATE_LIMITING_ENABLED",
     # --- Bootstrap control flags (honoured only from the process environment) ---
     # DJANGO_BUILD: Docker image builder stage only (collectstatic, no .env file).
     # DJANGO_ONESHOT: dev bootstrap one-shots, which run config.settings.oneshot.
@@ -641,6 +642,11 @@ CACHES = {
         },
     }
 }
+
+# Toggle all request-path rate-limit guards (bump_rate_limit_window). Defaults to
+# True in every environment. Only set to false by trusted automation (e.g. the CI
+# load-test job), never in production: per-IP budgets exist to protect real users.
+RATE_LIMITING_ENABLED = env.bool("RATE_LIMITING_ENABLED", default=True)
 
 # ---------------------------------------------------------------------------
 # Email / SMTP configuration (classic Django EMAIL_* settings)

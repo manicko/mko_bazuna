@@ -508,12 +508,17 @@ jobs:
         run: uv run python manage.py seed_load_test_ads --count 120
         working-directory: src/backend
 
-      # Start the web server in the background
+      # Start the web server in the background. Rate limiting is disabled
+      # (RATE_LIMITING_ENABLED=false) because the load test runs from a single
+      # container IP: per-IP budgets (e.g. DEEP_LINK_RENDER 60 req/600 s) would
+      # reject the vast majority of requests as 429. This is test-only; the
+      # setting defaults to true everywhere else.
       - name: Start web server
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+          RATE_LIMITING_ENABLED: false
         run: |
           uv run gunicorn config.wsgi:application \
             --bind 0.0.0.0:8000 --workers 2 --timeout 30 &

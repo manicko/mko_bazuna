@@ -33,6 +33,7 @@ import logging
 from typing import Final, cast
 
 import redis
+from django.conf import settings
 from django.core.cache import cache
 from django_redis.exceptions import ConnectionInterrupted
 
@@ -67,6 +68,12 @@ def bump_rate_limit_window(key: str, limit: int, period: int) -> bool:
     ``telegram_bot.middlewares.update_id_dedup.UpdateIdDedupMiddleware``: a Redis
     outage must not drop legitimate traffic. Never raises into a request path.
 
+    When ``settings.RATE_LIMITING_ENABLED`` is False the guard is bypassed
+    entirely (always allowed). This is intended solely for trusted automation —
+    e.g. the CI load-test job, which exercises the site from a single container IP
+    and must not be tripped by single-IP budgets. Production and all real-user
+    traffic keep rate limiting on (the default).
+
     Args:
         key: The already-derived cache key (the caller owns the key format).
         limit: Maximum number of hits allowed within the window.
@@ -76,6 +83,8 @@ def bump_rate_limit_window(key: str, limit: int, period: int) -> bool:
         ``True`` if the caller may proceed, ``False`` if it is over the limit.
         A cache outage is reported as ``True`` (fail-open).
     """
+    if not settings.RATE_LIMITING_ENABLED:
+        return True
     try:
         if cache.add(key, 1, timeout=period):
             return True

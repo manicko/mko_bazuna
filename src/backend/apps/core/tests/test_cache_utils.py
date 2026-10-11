@@ -18,6 +18,7 @@ It lives in its own module — not appended to
 
 from __future__ import annotations
 
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -112,3 +113,20 @@ class TestCacheOutageFailsOpen:
 
         with patch("apps.core.utils.cache.cache", fake):
             assert bump_rate_limit_window(_KEY, limit=5, period=600) is True
+
+
+class TestRateLimitingDisabled:
+    """When RATE_LIMITING_ENABLED is False the guard is bypassed entirely."""
+
+    def test_disabled_returns_true_without_cache_touch(
+        self, settings: Any
+    ) -> None:
+        """No cache interaction occurs when rate limiting is off."""
+        settings.RATE_LIMITING_ENABLED = False
+        fake = MagicMock()
+        with patch("apps.core.utils.cache.cache", fake):
+            assert bump_rate_limit_window(_KEY, limit=1, period=60) is True
+
+        fake.add.assert_not_called()
+        fake.incr.assert_not_called()
+        fake.set.assert_not_called()
