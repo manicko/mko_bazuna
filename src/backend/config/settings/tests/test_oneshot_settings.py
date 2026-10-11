@@ -18,7 +18,7 @@ from __future__ import annotations
 
 import pytest
 
-from config.settings.tests.test_prod_logging import (
+from config.settings.tests.conftest import (
     _prod_env_overrides,
     _run_in_subprocess,
 )

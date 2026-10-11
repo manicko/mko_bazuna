@@ -144,18 +144,24 @@ uv run pytest ${PYTEST_OPTS:-} ${PYTEST_DEFAULTS} "${PYTEST_MARK_ARGS[@]}"
 ---
 
 ### Block 6 — F2: Shared subprocess-probe fixture
-**Phase:** 2 | **Risk:** Low | **Effort:** 2 | **Agent:** Implementor
+**Phase:** 2 | **Risk:** Low | **Effort:** 2 | **Agent:** Implementor (direct implementation)
 
-**Files:** New `config/settings/tests/conftest.py`, 9 settings test files
+**Files:** `config/settings/tests/conftest.py`, 8 settings test files
 
-**Problem:** 10 duplicated `_run_in_subprocess` helpers across settings test files (70 total subprocess calls).
+**Problem:** 3 duplicated `_run_in_subprocess` definitions across settings test files (in `test_prod_logging.py`, `test_csrf_trusted_origins.py`, and `test_settings_secrets.py` — the last returns `str` instead of `CompletedProcess`). All files imported `_prod_env_overrides` from `test_prod_logging` as the de facto shared module.
 
 **Change:**
-1. Create `config/settings/tests/conftest.py` with shared `_run_in_subprocess` and `_prod_env_overrides` fixtures (moved from `test_prod_logging.py`).
-2. Update the 9 settings test files to import from the shared conftest instead of defining local helpers.
-3. Apply `no_cover` marker (from Block 4) to skip subprocess coverage.
+1. Moved canonical `_run_in_subprocess` (returns `CompletedProcess`) and `_prod_env_overrides` from `test_prod_logging.py` into `config/settings/tests/conftest.py`.
+2. Removed local `_run_in_subprocess` definitions from `test_prod_logging.py` and `test_csrf_trusted_origins.py`.
+3. Updated `test_settings_secrets.py` to import from conftest; changed its local `_run_in_subprocess` (which returned `str`) to use the shared version, appending `.stderr` at 12 call sites.
+4. Updated 5 other files to import from `conftest` instead of `test_prod_logging`:
+   `test_deploy_check_env_parity.py`, `test_oneshot_settings.py`, `test_settings_defaults.py`, `test_bot_username_validation.py`, `test_log_mask_key_validation.py`.
+5. Removed now-unused imports (`subprocess`, `sys`) from `test_csrf_trusted_origins.py`.
+6. Left `_prod_env` in `test_csrf_trusted_origins.py` as a local function — it intentionally starts from `os.environ` excluding `CSRF_TRUSTED_ORIGINS` (different semantics from `_prod_env_overrides`).
 
-**Verification:** All settings tests pass; no behavior change.
+**Verification:** 122/126 settings tests pass. The 4 failures (`test_deploy_check_env_parity.py`) are pre-existing YAML parsing errors (duplicate `runs-on` key in `ci.yml:194`) — confirmed by running the same tests on the unmodified code.
+
+**Status:** ✅ DONE
 
 ---
 
@@ -196,22 +202,21 @@ uv run pytest ${PYTEST_OPTS:-} ${PYTEST_DEFAULTS} "${PYTEST_MARK_ARGS[@]}"
 
 ## Execution Order
 
-**COMPLETED (Blocks 1-5):**
+**COMPLETED (Blocks 1-6):**
 
 | Commit | Block | Change |
 |--------|-------|--------|
+| (pending) | Block 6 (F2) | Shared `_run_in_subprocess` + `_prod_env_overrides` moved to conftest; 3 local defs eliminated, 7 imports updated |
 | `d6e69173` | Block 5 (F1) | Class-scoped `seeded_test_data` fixture; `TestSeedFilterCoverage` runs seed once per class |
 | `d9f153fb` | Block 1 (G3) | `entrypoint-test.sh`: `PYTEST_OPTS` + `${PYTEST_DEFAULTS:-}` merge |
 | `87ccdcf0` | Block 2 (S1+L2+G2) | `ci.yml`: `-m "not (seed or slow or real_images)"`, `--maxprocesses=4`, no `--cov` |
 | `5fb4935d` | Block 3 (P3+P4) | 7 concurrent sites: `xdist_group("concurrent")` + `flaky(reruns=1)` |
 | `4ab67487` | Block 4 (C1+F3) | `no_cover` marker registered + applied to 9 files; 3 tests reclassified to `integration` |
 
-**REMAINING (Blocks 6-8):**
+**REMAINING (Blocks 7-8):**
 
 ```
-Block 6 (F2: subprocess fixture)   Block 7 (G4: nightly)   Block 8 (Full CI + G1)
-    ↓                      ↓
-Block 8 (Full CI + G1)
+Block 7 (G4: nightly)   Block 8 (Full CI + G1)
 ```
 
 **Parallelization opportunities** (max 2 parallel, 1 Implementor):
@@ -219,7 +224,7 @@ Block 8 (Full CI + G1)
 - Block 7 and Block 8 are independent but require sequential Implementors
 
 **Sequential blocks** (1 at a time):
-1. ~~Block 1 → 2 → 3 → 4~~ (done) → ~~Block 5~~ (done) → Block 6 → 7 → 8
+1. ~~Block 1 → 2 → 3 → 4~~ (done) → ~~Block 5~~ (done) → ~~Block 6~~ (done) → Block 7 → 8
 
 ## Acceptance Criteria Per Block
 
@@ -230,7 +235,7 @@ Block 8 (Full CI + G1)
 | P3+P4 | ✅ Done | All 7 concurrent sites have `xdist_group("concurrent")` + `flaky(reruns=1)`; no deadlocks |
 | C1+F3 | ✅ Done | `no_cover` registered + applied to 9 files; 3 tests reclassified to `integration`; parity test passes |
 | F1 | ✅ Done | `TestSeedFilterCoverage` runs seed once per class via `seeded_test_data` fixture; all 8 tests pass in ~53s (down from ~500s) |
-| F2 | ⏳ Pending | Single shared `_run_in_subprocess` + `_prod_env_overrides` in conftest; settings test files import from it |
+| F2 | ✅ Done | Single shared `_run_in_subprocess` + `_prod_env_overrides` in conftest; 3 local defs eliminated, 7 files import from conftest; 122/126 settings tests pass (4 pre-existing ci.yml YAML failures) |
 | G4 | ⏳ Pending | New `ci-nightly.yml` with cron + workflow_dispatch + strict coverage |
 | Full CI+G1 | ⏳ Pending | Full CI job runs non-seed (parallel) + seed (serial); `--cov-fail-under=85` on Full+Nightly |
 
@@ -258,8 +263,8 @@ Block 8 (Full CI + G1)
 | `.github/workflows/ci-nightly.yml` | G4 (7) | New |
 | `src/backend/tests/test_docs_ci_parity.py` | S1/L2/G2 (2) | Modify |
 | `pyproject.toml` | C1/F3/flaky/G1 (3, 8) | Modify |
-| `config/settings/tests/conftest.py` | C1/F2 (4, 6) | New |
-| 9 files in `config/settings/tests/` | C1/F3/F2 (4, 6) | Modify |
+| `config/settings/tests/conftest.py` | C1/F2 (4, 6) | Modified (added helpers to existing conftest) |
+| 8 settings test files in `config/settings/tests/` | C1/F2 (4, 6) | Modify |
 | 7 concurrent test files | P3/P4 (3) | Modify |
 | `apps/seed/tests/conftest.py` | F1 (5) | Modify |
 | `apps/seed/tests/test_seed.py` | F1 (5) | Modify |

@@ -33,7 +33,7 @@ from config.settings.secret_validation import (
     is_placeholder,
     is_valid_bot_username,
 )
-from config.settings.tests.test_prod_logging import (
+from config.settings.tests.conftest import (
     _prod_env_overrides,
     _run_in_subprocess,
 )

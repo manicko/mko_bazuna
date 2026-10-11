@@ -63,7 +63,7 @@ from pathlib import Path
 import pytest
 from ruamel.yaml import YAML
 
-from config.settings.tests.test_prod_logging import _run_in_subprocess
+from config.settings.tests.conftest import _run_in_subprocess
 
 pytestmark = [pytest.mark.unit, pytest.mark.settings, pytest.mark.no_cover]
 

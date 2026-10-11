@@ -6,13 +6,12 @@ test_prod_logging.py).
 """
 
 import os
-import subprocess
-import sys
 from pathlib import Path
 
 import pytest
 
 from config.settings.tests import TEST_SECRET_KEY
+from config.settings.tests.conftest import _run_in_subprocess
 
 pytestmark = [pytest.mark.unit, pytest.mark.settings, pytest.mark.no_cover]
 
@@ -21,22 +20,6 @@ pytestmark = [pytest.mark.unit, pytest.mark.settings, pytest.mark.no_cover]
 _ROOT = Path(__file__).resolve().parent
 while not (_ROOT / "pyproject.toml").exists():
     _ROOT = _ROOT.parent
-
-
-def _run_in_subprocess(
-    env: dict[str, str], import_code: str
-) -> subprocess.CompletedProcess[str]:
-    """Run Python code in a subprocess with the given environment."""
-    env_with_path = {
-        **env,
-        "PYTHONPATH": os.pathsep.join(sys.path),
-    }
-    return subprocess.run(
-        [sys.executable, "-c", import_code],
-        env=env_with_path,
-        capture_output=True,
-        text=True,
-    )
 
 
 def _prod_env(**overrides: str) -> dict[str, str]:

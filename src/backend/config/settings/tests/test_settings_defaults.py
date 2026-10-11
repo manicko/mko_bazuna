@@ -16,7 +16,7 @@ import pytest
 
 from apps.core.enums import LanguageLocale
 from config.settings.tests import TEST_SECRET_KEY
-from config.settings.tests.test_prod_logging import (
+from config.settings.tests.conftest import (
     _prod_env_overrides,
     _run_in_subprocess,
 )

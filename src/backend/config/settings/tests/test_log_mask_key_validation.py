@@ -20,7 +20,7 @@ import pytest
 from django.core.exceptions import ImproperlyConfigured
 
 from config.settings.secret_validation import validate_log_mask_key
-from config.settings.tests.test_prod_logging import (
+from config.settings.tests.conftest import (
     _prod_env_overrides,
     _run_in_subprocess,
 )
