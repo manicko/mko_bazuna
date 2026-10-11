@@ -477,35 +477,35 @@ jobs:
         run: uv run python manage.py bootstrap_reference_data
         working-directory: src/backend
 
-      - name: Seed >100 published ads for load test
+      - name: Load cities
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-        run: |
-          uv run python manage.py shell -c "
-          from apps.ads.models import Ad, AdStatus
-          from apps.categories.models import Category
-          from apps.locations.models import City
-          from django.contrib.auth import get_user_model
-          from decimal import Decimal
-          from django.db import transaction
-          cat = Category.objects.first()
-          city = City.objects.first()
-          User = get_user_model()
-          seller = User.objects.first() or User.objects.create_user('seller', telegram_id=999999, chat_id=999999)
-          with transaction.atomic():
-              for i in range(120):
-                  Ad.objects.create(
-                      title=f'Load test ad {i}',
-                      category=cat,
-                      city=city,
-                      seller=seller,
-                      price=Decimal('100'),
-                      status=AdStatus.PUBLISHED,
-                  )
-          print('Seeded 120 published ads for load test')
-          "
+        run: uv run python manage.py load_cities
+        working-directory: src/backend
+
+      - name: Load catalog (categories)
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run python manage.py load_catalog
+        working-directory: src/backend
+
+      # Seed published ads via the tested seed_load_test_ads command instead of
+      # an inline `shell -c` script. The inline script used the pre-refactor
+      # field names `seller=`/`price=` (Ad was changed: user/price_amount) and
+      # omitted `published_at`/`price_normalized_eur`, which violates
+      # ck_ads_published_at_if_published and leaves the price-sort index empty.
+      # This command sets the constraint-correct fields and is shared by the
+      # query-profile job (ci-seed.yml) for single-source-of-truth seeding.
+      - name: Seed 120 published ads (load test)
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run python manage.py seed_load_test_ads --count 120
         working-directory: src/backend
 
       # Start the web server in the background

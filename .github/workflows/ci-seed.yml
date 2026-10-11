@@ -163,42 +163,14 @@ jobs:
         run: uv run python manage.py load_catalog
         working-directory: src/backend
 
+      # Seed via the tested seed_load_test_ads command (single source of truth
+      # with the ci.yml load-test job) instead of an inline shell script.
       - name: Seed 10k published ads (production-like scale)
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-        run: |
-          uv run python manage.py shell -c "
-          from decimal import Decimal
-          from django.contrib.auth import get_user_model
-          from django.db import transaction
-          from django.utils import timezone
-          from apps.ads.models import Ad, AdStatus
-          from apps.categories.models import Category
-          from apps.locations.models import City
-          cat = Category.objects.filter(is_active=True).first()
-          city = City.objects.first()
-          User = get_user_model()
-          seller = User.objects.first() or User.objects.create_user('profiler-seller', telegram_id=999998, chat_id=999998)
-          rows = [
-              Ad(
-                  title=f'Profiler ad {i}',
-                  category=cat,
-                  city=city,
-                  user=seller,
-                  price_amount=Decimal('100'),
-                  price_currency='EUR',
-                  price_normalized_eur=Decimal('100'),
-                  published_at=timezone.now(),
-                  status=AdStatus.PUBLISHED,
-              )
-              for i in range(10000)
-          ]
-          with transaction.atomic():
-              Ad.objects.bulk_create(rows, batch_size=1000)
-          print('Seeded 10000 published ads for the query profiler')
-          "
+        run: uv run python manage.py seed_load_test_ads --count 10000 --batch-size 1000
         working-directory: src/backend
 
       - name: Run query-plan profiler
