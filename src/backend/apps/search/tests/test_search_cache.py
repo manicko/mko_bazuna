@@ -56,7 +56,7 @@ def _get_backend() -> object:
     conn_proxy = cache  # type: ignore[assignment]
     try:
         backend = conn_proxy._connections[conn_proxy._alias]  # type: ignore[attr-defined]
-    except AttributeError, KeyError:
+    except (AttributeError, KeyError):
         backend = cache
     return backend
 
