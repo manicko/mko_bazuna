@@ -422,6 +422,8 @@ jobs:
   load-test:
     runs-on: ubuntu-latest
     needs: build
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
     services:
       db:
         image: postgres:18-alpine
@@ -512,7 +514,6 @@ jobs:
           DJANGO_SETTINGS_MODULE: config.settings.test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-          PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
         run: |
           uv run gunicorn config.wsgi:application \
             --bind 0.0.0.0:8000 --workers 2 --timeout 30 &
@@ -528,8 +529,6 @@ jobs:
           exit 1
 
       - name: Run Locust load test
-        env:
-          PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
         run: |
           # The p95 gate is the locustfile's `_assert_p95` hook: it raises and
           # sets process_exit_code=1 when the run records no requests or when the
