@@ -4,7 +4,7 @@ CI configuration parity tests (Prevention — guards against D-01/D-02/D-04 / §
 Asserts that live CI configuration matches the documented contract, converting
 doc drift into a CI gate:
 
-1. ci.yml:91 uses `--dist loadgroup` + `-m "not seed"` + `--reuse-db` (not loadscope).
+1. ci.yml uses `--dist loadgroup` + `-m "not (seed or slow or real_images)"` + `--reuse-db` (not loadscope); the PR fast gate runs without --cov.
 2. ci-seed.yml uses `-m "seed"` with NO xdist (serial run), triggered once per push (no nightly cron).
 3. pyproject.toml: no `e2e` marker; `xdist_group` registered; `addopts` has no `--cov`.
 4. entrypoint-test.sh:41 default PYTEST_OPTS includes `--reuse-db` + `--dist loadgroup`.
@@ -90,9 +90,11 @@ def test_ci_uses_loadgroup() -> None:
 
 
 def test_ci_excludes_seed() -> None:
-    """ci.yml:91 must exclude seed tests with -m 'not seed'."""
+    """ci.yml must exclude seed, slow, and real_images tests from the fast gate."""
     text = _CI_YML.read_text()
-    assert '-m "not seed"' in text, "ci.yml:91 must use -m 'not seed'"
+    assert '-m "not (seed or slow or real_images)"' in text, (
+        "ci.yml must use -m 'not (seed or slow or real_images)'"
+    )
 
 
 def test_ci_uses_reuse_db() -> None:
@@ -108,15 +110,20 @@ def test_ci_does_not_use_loadscope() -> None:
 
 
 def test_ci_command_subset() -> None:
-    """ci.yml:91 must contain the full expected command token set."""
+    """ci.yml must contain the full expected command token set for the PR gate.
+
+    Coverage is intentionally absent: the PR fast gate excludes slow/real_images
+    tests, runs without --cov (coverage is collected in ci-seed.yml and the
+    nightly workflow), and caps parallelism with --maxprocesses=4.
+    """
     text = _CI_YML.read_text()
     expected = (
-        '-m "not seed"',
+        '-m "not (seed or slow or real_images)"',
         "-n auto",
+        "--maxprocesses=4",
         "--dist loadgroup",
         "--reuse-db",
-        "--cov",
-        "--cov-report=xml",
+        "--durations=10",
     )
     missing = [token for token in expected if token not in text]
     assert not missing, f"ci.yml missing expected tokens: {missing}"

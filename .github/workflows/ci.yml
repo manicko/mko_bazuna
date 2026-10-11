@@ -169,18 +169,19 @@ jobs:
             --locale ru --locale bs --locale en
         working-directory: src/backend
 
-      - name: Run pytest with coverage
+      - name: Run pytest (fast gate, excludes seed/slow/real_images)
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-        run: uv run pytest -m "not seed" -n auto --dist loadgroup --tb=short --cov --durations=10 --cov-report=term --cov-report=xml --reuse-db
+        run: uv run pytest -m "not (seed or slow or real_images)" -n auto --maxprocesses=4 --dist loadgroup --tb=short --durations=10 --reuse-db
         working-directory: src/backend
 
       # SLO regression gate (13-PERF-001, Block B3): assert the search endpoint
       # stays within the ≤2s SLO at seed volume (≥50 PUBLISHED ads). This dedicated
       # step makes the latency assertion a visible, named gate in every PR —
-      # separate from the coverage run — so regressions cannot be hidden in noise.
+      # separate from the fast-gate run (which excludes seed tests) — so regressions
+      # cannot be hidden in noise.
       - name: Run SLO regression test (≤2s search latency)
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
@@ -189,14 +190,7 @@ jobs:
         run: uv run pytest -k TestSearchResponseSLORegression -n auto --dist loadgroup --tb=short --reuse-db -v
         working-directory: src/backend
 
-      - name: Upload coverage report
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: coverage-report
-          path: src/backend/coverage.xml
-          retention-days: 30
-
-  lint:
+    lint:
     runs-on: ubuntu-latest
     env:
       PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
