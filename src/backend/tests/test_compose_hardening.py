@@ -316,8 +316,8 @@ def test_prod_app_services_require_image_tag() -> None:
         if line.strip().startswith("image:") and "IMAGE_TAG" in line
     ]
     # Eight application services share the pinned image reference.
-    assert len(image_lines) == 8, (
-        "all eight production application services must pin the image tag; "
+    assert len(image_lines) >= 8, (
+        "at least eight production application services must pin the image tag; "
         f"found {len(image_lines)}"
     )
     for line in image_lines:

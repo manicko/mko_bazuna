@@ -38,7 +38,7 @@ from telegram_bot.handlers.contact import (
 )
 from telegram_bot.services.rate_limit import check_contact_start_rate_limit
 
-pytestmark = [pytest.mark.django_db, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.integration]
 
 
 @pytest.fixture(autouse=True)

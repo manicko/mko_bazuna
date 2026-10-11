@@ -185,9 +185,9 @@ def test_deploy_asserts_dispatched_sha_is_a_gated_build() -> None:
     )
     # The assertion must precede the SSH deploy — an ungated SHA must not reach
     # the production host.
-    assertion_idx = text.index("Assert dispatched SHA is on main with a green CI run")
-    ssh_idx = text.index("appleboy/ssh-action")
-    assert assertion_idx < ssh_idx, (
+    assertion_idx = text.find("Assert dispatched SHA is on main with a green CI run")
+    ssh_idx = text.find("appleboy/ssh-action")
+    assert assertion_idx != -1 and ssh_idx != -1 and assertion_idx < ssh_idx, (
         "the deploy-provenance assertion must run before the SSH step (12-OPS-002)"
     )
     # Token scope: the assertion reads workflow runs and commit statuses.
@@ -242,9 +242,9 @@ def test_deploy_captures_previous_image_digest_before_pull() -> None:
     assert "{{index .Image}}" in text, (
         "the capture must read the running image's id via `docker inspect` (12-OPS-008)"
     )
-    digest_idx = text.index("PREVIOUS_IMAGE_DIGEST=")
-    pull_idx = text.index("pull\n")
-    assert digest_idx < pull_idx, (
+    digest_idx = text.find("PREVIOUS_IMAGE_DIGEST=")
+    pull_idx = text.find("pull\n")
+    assert digest_idx != -1 and pull_idx != -1 and digest_idx < pull_idx, (
         "the digest must be captured before the image pull (12-OPS-008)"
     )
 

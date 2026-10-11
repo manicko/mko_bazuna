@@ -9,6 +9,7 @@ trust scores, or UNVERIFIED sellers.
 from __future__ import annotations
 
 import pytest
+from django.contrib.auth.models import AnonymousUser
 from django.template import Context, Template
 
 from apps.core.enums import TrustLevel
@@ -71,7 +72,7 @@ class TestRenderTrustBadge:
 
     def test_no_badge_for_anonymous_user(self) -> None:
         """Anonymous user renders no badge."""
-        html = _render(User(telegram_id=0, chat_id=0, password="x"))
+        html = _render(AnonymousUser())
         assert html == ""
 
     def test_no_badge_for_user_without_trust_score(self) -> None:

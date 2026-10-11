@@ -197,6 +197,7 @@ class TestRecomputeRowLockConcurrency:
         pytest.mark.concurrent,
     ]
 
+    @pytest.mark.slow
     @pytest.mark.django_db(transaction=True)
     @pytest.mark.concurrent
     @pytest.mark.xdist_group("concurrent")

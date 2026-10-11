@@ -25,7 +25,7 @@ from django.conf import settings
 
 pytestmark = [pytest.mark.unit]
 
-_PROJECT_ROOT = settings.BASE_DIR.parent
+_PROJECT_ROOT = settings.BASE_DIR
 _ROLLBACK = _PROJECT_ROOT / "docs" / "ops" / "rollback.md"
 _DOCKER_DEPLOYMENT = _PROJECT_ROOT / "docs" / "ops" / "docker-deployment.md"
 
