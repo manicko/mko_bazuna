@@ -37,10 +37,16 @@ uv sync --frozen --no-install-project --group dev
 # `setup_search_triggers` without `--backfill`, whereas migrate_locked passes
 # it: intentional, because the trigger fires on every insert and a test database
 # has no pre-existing rows whose search vectors would need backfilling.
-# PYTEST_OPTS lets callers (e.g. `make test-recreate`) override ALL pytest flags
-# (single-token flags only; multi-token values like -m "not seed" are fragile here
-# because this expansion is unquoted). For marker-based exclusion use
-# PYTEST_SKIP_MARKERS instead (see below).
+# PYTEST_DEFAULTS holds the fixed pytest flags that are ALWAYS present on every run:
+#   --reuse-db, --tb=short, --durations=10, -n auto, --maxprocesses=4, --dist loadgroup
+# --import-mode=importlib comes from pyproject.toml [tool.pytest.ini_options].addopts,
+# NOT from PYTEST_DEFAULTS.
+# PYTEST_OPTS lets callers ADD flags without losing the fixed defaults: PYTEST_OPTS
+# is expanded BEFORE PYTEST_DEFAULTS on the pytest command line, so callers can add
+# flags (e.g. --create-db) while --reuse-db etc. are always retained. Single-token
+# flags only; multi-token values like -m "not seed" are fragile here because this
+# expansion is unquoted. For marker-based exclusion use PYTEST_SKIP_MARKERS instead
+# (see below).
 # PYTEST_SKIP_MARKERS="seed" appends -m "not (seed)" to pytest, excluding tests by
 # marker. This is how the dev fast-gate (`make test`) skips the ~17-min seed
 # suite while `make test-all` runs everything. Complements PYTEST_OPTS.
@@ -48,6 +54,7 @@ uv sync --frozen --no-install-project --group dev
 # container persists between runs via the named postgres_data volume. Use
 # `make test-recreate` to force a fresh schema (--create-db), e.g. after
 # migration changes or an interrupted (SIGKILL'd) run.
+PYTEST_DEFAULTS="--reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup"
 PYTEST_MARK_ARGS=()
 if [ -n "${PYTEST_SKIP_MARKERS:-}" ]; then
     PYTEST_MARK_ARGS+=(-m "not (${PYTEST_SKIP_MARKERS})")
@@ -56,4 +63,4 @@ echo "Running tests..."
 # xdist parallel execution: matches CI configuration (see .github/workflows/ci.yml:91).
 # -n auto: use all available CPU cores; --dist loadgroup: distribute by xdist_group()
 # markers so bot tests that share FSM state run on the same worker.
-uv run pytest ${PYTEST_OPTS:- --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup} "${PYTEST_MARK_ARGS[@]}"
+uv run pytest ${PYTEST_OPTS:-} ${PYTEST_DEFAULTS} "${PYTEST_MARK_ARGS[@]}"
