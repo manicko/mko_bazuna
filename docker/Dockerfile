@@ -5,7 +5,7 @@
 ################################################################################
 # STAGE 1: Builder — install deps, build Tailwind, collectstatic
 ################################################################################
-FROM python:3.14-slim AS builder
+FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170 AS builder
 
 # Install build dependencies for curl (for Tailwind CLI download in standalone mode)
 # Note: gcc and libpq-dev removed - psycopg[binary] provides pre-compiled PostgreSQL driver
@@ -105,7 +105,7 @@ RUN --mount=type=cache,target=/root/.cache/syft \
 ################################################################################
 # STAGE 2: Production Runtime — non-root user, no build tools
 ################################################################################
-FROM python:3.14-slim AS runtime
+FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170 AS runtime
 
 # Install runtime library for psycopg3, curl (for health checks), and gettext (for compilemessages)
 # apt-get upgrade patches the Debian base image's OS packages to the latest available
@@ -121,12 +121,25 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     && apt-get upgrade -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
-# Remove system-level setuptools (CVE-2025-47273, CVE-2026-59890).
-# python:3.14-slim ships setuptools 70.3.0 in system site-packages;
-# it is not needed at runtime — the venv at /opt/venv is self-contained.
-# Filesystem deletion is used because pip's metadata does not track the
-# base image's system-level installation.
-RUN rm -rf /usr/local/lib/python3.14/site-packages/setuptools*
+# Remove system-level Python packages from the base image that are not needed
+# at runtime (uv owns dependency resolution; /opt/venv is self-contained).
+# python:3.14-slim ships pip (which vendors stale urllib3@2.7.0 and
+# msgpack@1.1.2), setuptools@70.3.0, wheel, and ensurepip bundled wheels.
+# Trivy flags these as HIGH CVEs. The venv at /opt/venv contains the correct
+# versions (urllib3@2.8.0, msgpack@1.2.2 per uv.lock). Combined into one RUN
+# so deletions collapse into a single layer. Filesystem deletion is used
+# because pip's metadata does not track the base image's system-level
+# installation.
+RUN rm -rf /usr/local/lib/python3.14/site-packages/setuptools* \
+           /usr/local/lib/python3.14/site-packages/pip \
+           /usr/local/lib/python3.14/site-packages/pip-*.dist-info \
+           /usr/local/lib/python3.14/site-packages/wheel* \
+           /usr/local/lib/python3.14/ensurepip/_bundled/* \
+           /usr/local/lib/python3.14/site-packages/urllib3 \
+           /usr/local/lib/python3.14/site-packages/urllib3-*.dist-info \
+           /usr/local/lib/python3.14/site-packages/msgpack \
+           /usr/local/lib/python3.14/site-packages/msgpack-*.dist-info \
+    && find /usr/local/bin -maxdepth 1 \( -name 'pip*' -o -name 'wheel*' \) -delete
 
 # Create non-root user with uid 1000 (security baseline)
 RUN groupadd -r -g 1000 app && \
@@ -174,6 +187,7 @@ RUN chmod +x /app/docker/healthcheck-backup.sh
 
 # Activate venv for all subsequent RUN/ENTRYPOINT
 ENV PATH="/opt/venv/bin:${PATH}"
+ENV VIRTUAL_ENV=/opt/venv
 ENV UV_PROJECT_ENVIRONMENT=/opt/venv
 # uv configuration (consistent with builder stage)
 ENV UV_LINK_MODE=copy
