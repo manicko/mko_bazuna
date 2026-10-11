@@ -1909,49 +1909,24 @@ class TestAdGeneratorLeafOnly:
 
 
 @pytest.mark.seed
+@pytest.mark.xdist_group("seed_filter_coverage")
 class TestSeedFilterCoverage:
     """Seed data carries ``listing_purpose`` and ``features`` so the F4/F5
     buyer-facing filters are testable on seed data."""
 
-    @pytest.fixture(autouse=True)
-    def _setup_class(self, db: None) -> None:
-        from apps.categories.catalog.builder import load_catalog
-
-        CATALOG_PATH = (
-            Path(__file__).resolve().parents[2]
-            / "categories"
-            / "catalog"
-            / "categories.yaml"
-        )
-        load_catalog(CATALOG_PATH)
-        City.objects.create(
-            name="Будва", slug="budva", region="Coastal", country_code="ME"
-        )
-        City.objects.create(
-            name="Подгорица", slug="podgorica", region="Central", country_code="ME"
-        )
-
-    def _run_seed(self) -> None:
-        out = StringIO()
-        call_command(
-            "seed",
-            "--users=4",
-            "--ads=40",
-            "--force",
-            "--analytics=False",
-            stdout=out,
-        )
+    @pytest.fixture(autouse=True, scope="class")
+    @classmethod
+    def _setup_class(cls, seeded_test_data: None) -> None:
+        """Delegate to the class-scoped ``seeded_test_data`` fixture."""
 
     def test_seed_populates_listing_purpose(self, db: None) -> None:
         """At least one seeded ad has a listing_purpose (F4)."""
-        self._run_seed()
         assert Ad.objects.filter(
             source=AdSource.SEED, listing_purpose__isnull=False
         ).exists()
 
     def test_seed_populates_features(self, db: None) -> None:
         """At least one seeded ad has one or more features (F5)."""
-        self._run_seed()
         assert (
             Ad.objects.filter(source=AdSource.SEED)
             .filter(features__isnull=False)
@@ -1960,7 +1935,6 @@ class TestSeedFilterCoverage:
 
     def test_seed_filter_by_purpose_returns_results(self, db: None) -> None:
         """A purpose present in seed data narrows /search/ to non-empty results."""
-        self._run_seed()
         purpose = (
             Ad.objects.filter(source=AdSource.SEED, listing_purpose__isnull=False)
             .values_list("listing_purpose__slug", flat=True)
@@ -1974,7 +1948,6 @@ class TestSeedFilterCoverage:
 
     def test_seed_filter_by_feature_returns_results(self, db: None) -> None:
         """A feature present in seed data narrows /search/ to non-empty results."""
-        self._run_seed()
         feature = (
             Ad.objects.filter(source=AdSource.SEED)
             .filter(features__isnull=False)
@@ -1989,7 +1962,6 @@ class TestSeedFilterCoverage:
 
     def test_seed_charity_has_no_features(self, db: None) -> None:
         """A charity-category seeded ad gets no features (empty override)."""
-        self._run_seed()
         charity = Category.objects.filter(slug="charity").first()
         assert charity is not None
         charity_ad = Ad.objects.filter(source=AdSource.SEED, category=charity).first()
@@ -2003,14 +1975,12 @@ class TestSeedFilterCoverage:
         single-select dimension, so at least one conditional-category ad must
         carry ``new`` or ``used``.
         """
-        self._run_seed()
         assert Ad.objects.filter(
             source=AdSource.SEED, listing_condition__isnull=False
         ).exists()
 
     def test_seed_filter_by_condition_returns_results(self, db: None) -> None:
         """A condition present in seed data narrows /search/ to non-empty results."""
-        self._run_seed()
         condition = (
             Ad.objects.filter(source=AdSource.SEED, listing_condition__isnull=False)
             .values_list("listing_condition__slug", flat=True)
@@ -2030,7 +2000,6 @@ class TestSeedFilterCoverage:
         by the seed service. This guards against a regression that re-introduces
         them into the ``listing_feature`` group.
         """
-        self._run_seed()
         assert (
             not Ad.objects.filter(source=AdSource.SEED, features__slug="new")
             .filter(features__slug="used")
