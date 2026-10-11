@@ -493,7 +493,7 @@ jobs:
           cat = Category.objects.first()
           city = City.objects.first()
           User = get_user_model()
-          seller = User.objects.first() or User.objects.create_user('seller', telegram_id=999999)
+          seller = User.objects.first() or User.objects.create_user('seller', telegram_id=999999, chat_id=999999)
           with transaction.atomic():
               for i in range(120):
                   Ad.objects.create(
