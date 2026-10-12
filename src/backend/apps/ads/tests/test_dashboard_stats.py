@@ -11,7 +11,7 @@ from __future__ import annotations
 from datetime import timedelta
 
 import pytest
-from django.test import Client, override_settings
+from django.test import Client
 from django.utils import timezone
 
 from apps.ads.models import Ad
@@ -103,19 +103,6 @@ def dashboard_client(dashboard_seller):
     client = Client()
     client.force_login(dashboard_seller["seller"])
     return client
-
-
-@pytest.fixture(autouse=True)
-def _locmem_cache():
-    """Use in-process locmem cache for deterministic SellerStats behavior."""
-    with override_settings(
-        CACHES={
-            "default": {
-                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-            },
-        },
-    ):
-        yield
 
 
 # ---------------------------------------------------------------------------

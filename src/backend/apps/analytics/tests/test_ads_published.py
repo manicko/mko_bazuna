@@ -9,28 +9,12 @@ rejected, or other non-published statuses. This tests the fix for F4
 from __future__ import annotations
 
 import pytest
-from django.test import override_settings
 
 from apps.analytics.services import SellerStats
 from apps.core.enums import AdStatus
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
-
-# Use locmem cache so SellerStats cache tests are deterministic and isolated.
-
-
-@pytest.fixture(autouse=True)
-def _locmem_cache():
-    """Use in-process locmem cache for deterministic SellerStats behavior."""
-    with override_settings(
-        CACHES={
-            "default": {
-                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-            },
-        },
-    ):
-        yield
 
 
 @pytest.fixture

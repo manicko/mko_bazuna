@@ -13,7 +13,6 @@ from datetime import timedelta
 from unittest.mock import patch
 
 import pytest
-from django.test import override_settings
 from django.utils import timezone
 
 from apps.ads.models import Ad
@@ -25,19 +24,6 @@ from apps.users.models import User
 from conftest import create_test_ad, make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
-
-
-@pytest.fixture(autouse=True)
-def _locmem_cache():
-    """Use in-process locmem cache for deterministic SellerStats behavior."""
-    with override_settings(
-        CACHES={
-            "default": {
-                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
-            },
-        },
-    ):
-        yield
 
 
 # ---------------------------------------------------------------------------

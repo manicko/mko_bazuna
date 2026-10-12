@@ -13,7 +13,7 @@ unchanged: whether the whole sweep should be one transaction is 03-DB-008.
 """
 
 import logging
-from datetime import timedelta
+from datetime import date as _date, timedelta
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
@@ -62,7 +62,7 @@ class Command(BaseCommand):
         )
 
     def add_arguments(self, parser) -> None:
-        """Add dry-run argument to the command."""
+        """Add dry-run and optional target-date arguments to the command."""
         parser.add_argument(
             "--dry-run",
             action="store_true",
@@ -70,14 +70,25 @@ class Command(BaseCommand):
             default=False,
             help="Print aggregation results without saving to database",
         )
+        parser.add_argument(
+            "--date",
+            type=str,
+            default=None,
+            help="Target date (YYYY-MM-DD). Defaults to yesterday.",
+        )
 
     def handle(self, *args, **options) -> None:
         """Execute the daily metrics rollup with advisory lock."""
         dry_run: bool = options["dry_run"]
+        date_str: str | None = options["date"]
 
         with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
             with advisory_lock(AdvisoryLockId.ROLLUP_DAILY_METRICS):
-                yesterday = timezone.now().date() - timedelta(days=1)
+                if date_str:
+                    target_date = _date.fromisoformat(date_str)
+                else:
+                    target_date = timezone.now().date() - timedelta(days=1)
+                yesterday = target_date
 
                 logger.info("Rolling up analytics events for %s", yesterday)
 

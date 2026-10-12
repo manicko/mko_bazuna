@@ -338,7 +338,11 @@ class TestGetModerationStats:
         assert abs(stats["avg_time_to_moderate"] - 4.0) < 0.1
 
     def test_days_parameter_filters_results(self, moderation_stats_data) -> None:
-        """A short time window excludes older events."""
+        """days=1 includes events within the last 24 hours.
+
+        All events in moderation_stats_data are within the last 8 hours, so
+        a 1-day window includes them all rather than excluding any.
+        """
         stats = get_moderation_stats(days=1)
         # All events are within the last 8 hours, so 1 day should include them
         assert stats["approved"] == 1
@@ -426,6 +430,14 @@ class TestGetModeratorPerformance:
         # Approval: created_at = now-6h, published_at = now-2h => 4 hours
         assert b_stats["avg_time_hours"] is not None
         assert abs(b_stats["avg_time_hours"] - 4.0) < 0.1
+
+        mod_a = moderator_performance_data["mod_a"]
+        assert mod_a.id is not None
+        a_stats = next(p for p in perf if p["moderator_id"] == mod_a.id)
+        # A-Approval-1: 10h→5h = 5h, A-Approval-2: 9h→3h = 6h,
+        # A-Rejection: 4h→1h = 3h → avg = (5+6+3)/3 = 4.67h
+        assert a_stats["avg_time_hours"] is not None
+        assert abs(a_stats["avg_time_hours"] - 4.67) < 0.1
 
     def test_no_actions_returns_empty_list(self) -> None:
         """When no moderator actions exist, returns an empty list."""

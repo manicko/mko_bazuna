@@ -36,10 +36,15 @@ def _make_event(
     user=None,
     hours_ago: int = 6,
     source: AdSource | None = None,
+    date: _dt.date | None = None,
 ) -> AnalyticsEvent:
-    """Create an AnalyticsEvent for yesterday (the command's target date)."""
-    yesterday = timezone.now().date() - timedelta(days=1)
-    naive = _dt.datetime.combine(yesterday, _dt.time(hour=12 - hours_ago))
+    """Create an AnalyticsEvent for the target date (yesterday by default).
+
+    ``date`` defaults to yesterday so the fixture and the rollup command
+    compute the same reference date even when the test crosses midnight.
+    """
+    target_date = date or (timezone.now().date() - timedelta(days=1))
+    naive = _dt.datetime.combine(target_date, _dt.time(hour=12 - hours_ago))
     timestamp = timezone.make_aware(naive)
     return AnalyticsEvent.objects.create(
         ad=ad,
@@ -222,6 +227,24 @@ class TestRollupDailyMetricsAggregation:
         ad_ids = {r.ad_id for r in records}
         assert ad_ids == {ad1.id, ad2.id}
 
+    def test_date_parameter_targets_specific_date(self, seller, category, city) -> None:
+        """The --date parameter targets a specific date instead of yesterday.
+
+        Creates events for three days ago and rolls up with ``--date`` to
+        verify the command respects the override rather than defaulting
+        to yesterday.
+        """
+        ad = create_test_ad(
+            seller, category, city, title="Date Param Ad", status=AdStatus.PUBLISHED
+        )
+        target_date = timezone.now().date() - timedelta(days=3)
+        _make_event(ad, AnalyticsEventType.AD_VIEWED, date=target_date)
+
+        call_command("rollup_daily_metrics", f"--date={target_date.isoformat()}")
+
+        metrics = DailyAdMetrics.objects.get(ad=ad, date=target_date)
+        assert metrics.views_count == 1
+
 
 # ---------------------------------------------------------------------------
 # Tests: advisory lock handling
@@ -273,6 +296,28 @@ class TestRollupDailyMetricsLock:
         yesterday = timezone.now().date() - timedelta(days=1)
         metrics = DailyAdMetrics.objects.get(ad=ad1, date=yesterday)
         assert metrics.views_count == 3
+
+
+# ---------------------------------------------------------------------------
+# Tests: empty aggregation early return
+# ---------------------------------------------------------------------------
+
+
+class TestRollupDailyMetricsEmptyAggregation:
+    """Tests for early return when no events exist for the target date."""
+
+    def test_no_events_returns_early_without_metrics(self) -> None:
+        """When no events exist for yesterday, no DailyAdMetrics are created.
+
+        The command logs and returns before reaching the bulk-upsert path,
+        so no records are written.
+        """
+        assert AnalyticsEvent.objects.count() == 0
+
+        call_command("rollup_daily_metrics")
+
+        assert AnalyticsEvent.objects.count() == 0
+        assert DailyAdMetrics.objects.count() == 0
 
 
 # ---------------------------------------------------------------------------

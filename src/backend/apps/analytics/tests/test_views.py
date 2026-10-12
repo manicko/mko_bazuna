@@ -86,8 +86,8 @@ class TestSellerTrustDashboardView:
 
     @pytest.fixture(autouse=True)
     def _setup(self, dashboard_seller) -> Iterator[None]:
-        """Apply locmem cache settings for each test."""
-        self._cache_ctx = override_settings(
+        """Apply locmem cache and staticfiles storage settings for each test."""
+        with override_settings(
             CACHES={
                 "default": {
                     "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
@@ -98,10 +98,8 @@ class TestSellerTrustDashboardView:
                     "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
                 },
             },
-        )
-        self._cache_ctx.__enter__()
-        yield
-        self._cache_ctx.__exit__(None, None, None)
+        ):
+            yield
 
     def test_redirects_anonymous_to_login(self) -> None:
         """Unauthenticated users are redirected to the login page."""
@@ -314,6 +312,22 @@ class TestSellerTrustDashboardView:
         assert response.context["trust_score"] == 100.0
         assert response.context["trust_level"] == TrustLevel.PRO
 
+    def test_html_renders_trust_score_and_summary(self, dashboard_seller) -> None:
+        """HTML response contains the trust score value and summary labels."""
+        from django.test import Client
+
+        seller = dashboard_seller["seller"]
+        client = Client()
+        client.force_login(seller)
+        response = client.get(reverse("analytics:seller_trust_dashboard"))
+        html = response.content.decode()
+        # Trust score: 50 (base) + 10 (1 published ad) = 60.0, VERIFIED band
+        assert "Trust Score" in html
+        assert "60" in html
+        # Summary labels and zero counts
+        assert "Total Views (30d)" in html
+        assert "Total Contacts (30d)" in html
+
 
 # ---------------------------------------------------------------------------
 # Tests: ModerationAnalytics View
@@ -326,17 +340,15 @@ class TestModerationAnalyticsView:
     @pytest.fixture(autouse=True)
     def _setup(self, moderation_context) -> Iterator[None]:
         """Apply storage settings for each test."""
-        self._storage_ctx = override_settings(
+        with override_settings(
             STORAGES={
                 "staticfiles": {
                     "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
                 },
             },
-        )
-        self._storage_ctx.__enter__()
-        self.ctx = moderation_context
-        yield
-        self._storage_ctx.__exit__(None, None, None)
+        ):
+            self.ctx = moderation_context
+            yield
 
     def _patched_stats(self):
         """Return a patcher for get_moderation_stats with sensible defaults."""
@@ -456,8 +468,13 @@ class TestModerationAnalyticsView:
         assert "days" in response.context
         assert response.context["days"] == 30
 
-    def test_stats_reflects_actual_moderation_events(self) -> None:
-        """Stats context reflects the moderation events created in setUp."""
+    def test_stats_context_with_patched_values(self) -> None:
+        """Stats context reflects patched mock values, not real events.
+
+        Uses ``_patched_stats()`` which mocks ``get_moderation_stats``
+        with approved=1, rejected=0, flagged=0. For end-to-end coverage
+        of the real aggregation, see ``test_moderation_dashboard_end_to_end``.
+        """
         from django.test import Client
 
         client = Client()
@@ -502,3 +519,23 @@ class TestModerationAnalyticsView:
 
         assert response.status_code == 200
         assert response.context["stats"]["approved"] == 3
+
+    def test_html_renders_moderation_stats(self) -> None:
+        """HTML response contains the moderation stats counts.
+
+        Uses the patched stats (approved=1, rejected=0, flagged=0) and
+        asserts on the rendered values within their dedicated stat-card
+        elements rather than matching bare numeric literals.
+        """
+        from django.test import Client
+
+        client = Client()
+        client.force_login(self.ctx["staff_user"])
+        with self._patched_stats():
+            response = client.get(self.ctx["url"])
+        html = response.content.decode()
+        assert response.status_code == 200
+        # Patched stats: approved=1, rejected=0, flagged=0
+        assert 'text-2xl font-bold text-green-600">1</p>' in html  # approved
+        assert 'text-2xl font-bold text-red-600">0</p>' in html  # rejected
+        assert 'text-2xl font-bold text-yellow-600">0</p>' in html  # flagged

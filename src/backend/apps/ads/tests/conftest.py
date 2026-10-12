@@ -8,8 +8,31 @@ per-concern test files. Each fixture creates a lookup group with its items.
 from __future__ import annotations
 
 import pytest
+from django.test import override_settings
 
 from apps.lookups.models import LookupGroup, LookupItem
+
+# ---------------------------------------------------------------------------
+# Cache fixtures (was duplicated in test_dashboard_stats.py)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _locmem_cache():
+    """Use in-process locmem cache for deterministic SellerStats behavior."""
+    with override_settings(
+        CACHES={
+            "default": {
+                "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
+            },
+        },
+    ):
+        yield
+
+
+# ---------------------------------------------------------------------------
+# Lookup fixtures (extracted from test_catalog_filters.py)
+# ---------------------------------------------------------------------------
 
 
 def _create_lookup_group(

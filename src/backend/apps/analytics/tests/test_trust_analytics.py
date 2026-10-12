@@ -19,7 +19,7 @@ from apps.analytics.services.trust_analytics import (
     get_trust_level,
     record_trust_event,
 )
-from apps.core.enums import AdStatus, AnalyticsEventType, TrustLevel
+from apps.core.enums import AdSource, AdStatus, AnalyticsEventType, TrustLevel
 from apps.trust.models import SellerVerification
 from conftest import create_test_ad, make_user
 
@@ -267,6 +267,16 @@ class TestRecordTrustEvent:
         assert events[1] is not None
         assert events[0].event_type == AnalyticsEventType.SELLER_VERIFIED
         assert events[1].event_type == AnalyticsEventType.TRUST_LEVEL_UPDATED
+
+    def test_creates_event_with_seed_source(self) -> None:
+        """record_trust_event with source=AdSource.SEED sets the source field."""
+        user = make_user(telegram_id=990010204)
+        record_trust_event(
+            user.id, AnalyticsEventType.SELLER_VERIFIED, source=AdSource.SEED
+        )
+
+        event = AnalyticsEvent.objects.get(user_id=user.id)
+        assert event.source == AdSource.SEED
 
 
 # ---------------------------------------------------------------------------
