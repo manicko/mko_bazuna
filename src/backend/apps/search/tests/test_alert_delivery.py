@@ -105,6 +105,7 @@ class TestImmediateRetryMarksDelivered:
     """
 
     @pytest.mark.django_db(transaction=True)
+    @pytest.mark.concurrent
     def test_retry_success_records_receipt_and_excludes_from_digest(
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:

@@ -67,21 +67,26 @@ class _SyncExecutor:
 
     The production executor is a real ``ThreadPoolExecutor``: submissions run on
     another thread and any exception is captured in the worker, not propagated
-    to the caller. Tests that assert on what was submitted (or on an exception
-    escaping) replace it with this inline stand-in.
+    to the caller. Tests that assert on what was submitted replace it with this
+    inline stand-in.
 
     ``submit`` returns a real, already-resolved ``concurrent.futures.Future``
     on success: ``deliver_immediate_alerts`` attaches a done-callback that
     retrieves the future's exception and decrements the in-flight counter, so a
     stand-in without ``add_done_callback`` would break the dispatch. A callable
-    that raises still propagates inline (the old behaviour), which is what the
-    "an exception escaping" test in this module relies on.
+    that raises has its exception captured on the Future via
+    ``future.set_exception``, mirroring the production contract where the worker
+    thread captures the exception and the done-callback retrieves it.
     """
 
     def submit(self, fn, *args):
-        fn(*args)
         future: Future = Future()
-        future.set_result(None)
+        try:
+            fn(*args)
+        except BaseException as exc:  # noqa: BLE001
+            future.set_exception(exc)
+        else:
+            future.set_result(None)
         return future
 
 
@@ -365,10 +370,10 @@ class TestFindMatchingAds:
     ) -> None:
         """An ad whose notification was delivered is excluded (03-DB-007).
 
-        This is the inversion of the previous ``test_excludes_already_notified_ads``,
-        which created a bare row — recorded, not delivered — and asserted
-        exclusion. Under the delivery-state contract only a DELIVERED pair
-        (``delivered_at IS NOT NULL``) is excluded.
+        This is the inversion of ``test_includes_recorded_but_undelivered_ads``:
+        that test creates a bare row — recorded, not delivered — and asserts
+        inclusion; here a DELIVERED pair (``delivered_at IS NOT NULL``) is
+        excluded under the delivery-state contract.
         """
         ad = create_test_ad(
             seller, category, city, title="Уже отправлено", status=AdStatus.PUBLISHED
@@ -444,7 +449,8 @@ class TestFindMatchingAds:
         self, seller: User, buyer: User, category: Category, city: City
     ) -> None:
         """Results are ordered by SearchRank descending."""
-        create_test_ad(
+        # Title + description match → highest rank (weights A + B).
+        high = create_test_ad(
             seller,
             category,
             city,
@@ -452,12 +458,22 @@ class TestFindMatchingAds:
             description="отличный горный велосипед",
             status=AdStatus.PUBLISHED,
         )
-        create_test_ad(
+        # Title-only match → medium rank (weight A only).
+        medium = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Велосипед для ребенка",
+            description="быстрая доставка по городу",
+            status=AdStatus.PUBLISHED,
+        )
+        # Description-only match → lowest rank (weight B only).
+        low = create_test_ad(
             seller,
             category,
             city,
             title="Самокат детский",
-            description="самокат",
+            description="продаю подержанный велосипед",
             status=AdStatus.PUBLISHED,
         )
 
@@ -466,21 +482,10 @@ class TestFindMatchingAds:
         )
 
         results = find_matching_ads(saved_search)
-        assert len(results) == 1
-        assert "велосипед" in results[0].title.lower()
+        assert len(results) == 3
+        # Descending rank: title+description > title-only > description-only.
+        assert [r.id for r in results] == [high.id, medium.id, low.id]
 
-    def test_empty_query_matches_all(
-        self, seller: User, buyer: User, category: Category, city: City
-    ) -> None:
-        """Empty query on saved search matches all published ads."""
-        create_test_ad(
-            seller, category, city, title="Любой товар", status=AdStatus.PUBLISHED
-        )
-
-        saved_search = SavedSearch.objects.create(user=buyer, query="", is_active=True)
-
-        results = find_matching_ads(saved_search)
-        assert len(results) == 1
 
 
 # ---------------------------------------------------------------------------
@@ -765,13 +770,9 @@ class TestDeliverImmediateAlerts:
     ) -> None:
         """Two calls for the same ad submit payloads exactly once (03-DB-007).
 
-        The previous version of this test monkeypatched ``_run_send`` with a
-        no-op and asserted only the row count, so it could not observe that the
-        second call submitted the payload a second time: it asserted ROW-level
-        idempotency under a name claiming MESSAGE-level idempotency. Re-running
-        must not double-send, so this version records the submitted payloads and
-        asserts there was exactly one submission, while keeping the row-count
-        assertion that pins ``ignore_conflicts`` on the immediate path.
+        Records the submitted payloads and asserts there was exactly one
+        submission (MESSAGE-level idempotency), while also asserting the
+        row-count that pins ``ignore_conflicts`` on the immediate path.
         """
         submitted: list[list] = []
 

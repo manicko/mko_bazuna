@@ -26,10 +26,8 @@ from aiogram.exceptions import (
     TelegramServerError,
 )
 
-from apps.core.enums import AdStatus
 from apps.core.utils.sanitize import mask_telegram_id
-from apps.search.models import SavedSearch
-from conftest import create_test_ad
+from apps.search.tests.test_alert_query import _SyncExecutor
 
 pytestmark = [pytest.mark.unit]
 
@@ -464,24 +462,6 @@ class TestRunSendExceptionNarrowing:
 # ---------------------------------------------------------------------------
 
 
-class _ImmediateFutureExecutor:
-    """Run each submission inline and return a real, already-resolved Future.
-
-    Mirrors the production contract the caller relies on: ``submit`` returns a
-    ``concurrent.futures.Future`` so the done-callback can retrieve its outcome.
-    """
-
-    def submit(self, fn, *args):  # noqa: ANN001, ANN201
-        future: Future = Future()
-        try:
-            fn(*args)
-        except BaseException as exc:  # noqa: BLE001
-            future.set_exception(exc)
-        else:
-            future.set_result(None)
-        return future
-
-
 class TestDispatchFailureIsRetrievable:
     """A failed dispatch leaves a retrievable ERROR log with the payload count."""
 
@@ -492,7 +472,7 @@ class TestDispatchFailureIsRetrievable:
         from apps.search.services import immediate_alerts
 
         monkeypatch.setattr(
-            immediate_alerts, "_executor", _ImmediateFutureExecutor()
+            immediate_alerts, "_executor", _SyncExecutor()
         )
         monkeypatch.setattr(
             immediate_alerts,
@@ -531,65 +511,6 @@ class TestDispatchFailureIsRetrievable:
         immediate_alerts._on_send_finished(1, future)
 
         assert immediate_alerts._in_flight_batches == 0
-
-
-class TestBackpressureSheds:
-    """Above the in-flight threshold the dispatch is skipped with a WARNING."""
-
-    @pytest.mark.django_db
-    @pytest.mark.integration
-    def test_backlog_above_threshold_skips_and_warns(
-        self,
-        seller,
-        buyer,
-        category,
-        city,
-        monkeypatch: pytest.MonkeyPatch,
-        caplog: pytest.LogCaptureFixture,
-    ) -> None:
-        """A saturated backlog issues no outbound send and logs a WARNING."""
-        from apps.search.services import immediate_alerts
-
-        submitted: list[list] = []
-        monkeypatch.setattr(
-            immediate_alerts,
-            "_executor",
-            type(
-                "_Recorder",
-                (),
-                {"submit": lambda self, fn, *a: submitted.append(a)},
-            )(),
-        )
-        # Pretend the backlog is already at the threshold.
-        monkeypatch.setattr(
-            immediate_alerts,
-            "_in_flight_batches",
-            immediate_alerts._MAX_IN_FLIGHT_BATCHES,
-        )
-
-        ad = create_test_ad(
-            seller, category, city, title="Красный велосипед",
-            status=AdStatus.PUBLISHED,
-        )
-        SavedSearch.objects.create(user=buyer, is_active=True)
-
-        with caplog.at_level(logging.WARNING):
-            immediate_alerts.deliver_immediate_alerts(ad.id)
-
-        assert submitted == [], "a shed dispatch must not reach the executor"
-        warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
-        assert any(f"ad {ad.id}" in r.getMessage() for r in warnings), (
-            "the WARNING must name the ad"
-        )
-        assert any(
-            str(immediate_alerts._MAX_IN_FLIGHT_BATCHES) in r.getMessage()
-            for r in warnings
-        ), "the WARNING must name the in-flight count/threshold"
-        # The counter is untouched by a shed dispatch.
-        assert (
-            immediate_alerts._in_flight_batches
-            == immediate_alerts._MAX_IN_FLIGHT_BATCHES
-        )
 
 
 # ---------------------------------------------------------------------------

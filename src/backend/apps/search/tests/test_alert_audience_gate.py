@@ -232,9 +232,13 @@ class TestDeclinedSellerAdDoesNotFanOut:
         # done-callback that would fail on ``None``.
         class _Inline:
             def submit(self, fn, *args):
-                fn(*args)
                 future: Future = Future()
-                future.set_result(None)
+                try:
+                    fn(*args)
+                except BaseException as exc:  # noqa: BLE001
+                    future.set_exception(exc)
+                else:
+                    future.set_result(None)
                 return future
 
         monkeypatch.setattr(
@@ -307,9 +311,13 @@ class TestOneDeclarationDrivesAllSites:
         # ``submit`` returns a resolved Future for the caller's done-callback.
         class _Inline:
             def submit(self, fn, *args):
-                fn(*args)
                 future: Future = Future()
-                future.set_result(None)
+                try:
+                    fn(*args)
+                except BaseException as exc:  # noqa: BLE001
+                    future.set_exception(exc)
+                else:
+                    future.set_result(None)
                 return future
 
         monkeypatch.setattr(
