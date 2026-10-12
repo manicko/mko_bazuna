@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sys
 from typing import Any
 
 import pytest
@@ -211,8 +212,6 @@ class TestRedactingJsonFormatter:
         try:
             raise ValueError("something broke")
         except ValueError:
-            import sys
-
             record = self._make_record(
                 "error occurred",
                 exc_info=sys.exc_info(),  # type: ignore[arg-type]

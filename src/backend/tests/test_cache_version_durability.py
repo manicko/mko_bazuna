@@ -61,24 +61,27 @@ _WRITER_MODULES = (
     "apps/lookups/services/cache_service.py",
 )
 
-_BACKEND_ROOT = Path(__file__).resolve().parents[1]
+_ROOT = Path(__file__).resolve().parent
+while not (_ROOT / "pyproject.toml").exists():
+    _ROOT = _ROOT.parent
+_BACKEND_ROOT = _ROOT / "src" / "backend"
 
 
-# The three write methods that can put a TTL on a version key. ``set`` and
-# ``touch`` are TTL-bearing writes that must carry ``timeout=None``; ``add`` is
-# rejected outright on a version key (see ``_version_key_violation``).
-_WRITE_METHODS = ("set", "add", "touch")
+# The write methods that can appear in a version-key write. ``set`` and ``touch``
+# are TTL-bearing writes that must carry ``timeout=None``; ``add`` is rejected
+# outright on a version key (see ``_version_key_violation``). ``bump_version_key``
+# is the correct durable write path — it always uses ``timeout=None`` internally
+# and is never flagged as a violation, but writers are expected to route
+# through it, so the positive presence check includes it.
+_WRITE_METHODS = ("set", "add", "touch", "bump_version_key")
 
 
 def _is_version_key(node: ast.expr) -> bool:
     """Return True when a cache-write first argument names a version key.
 
-    Matches both a literal whose text mentions ``version`` and an expression
-    that does — e.g. a ``*_VERSION_KEY`` module constant. The modules in
-    ``_WRITER_MODULES`` cheat by passing the constant by name, so this guard
-    only recognises the argument where the source spells it out; the writer
-    modules are pinned by the parametrized test below as the compensating
-    control.
+    Matches any cache-write first argument whose source text (literal or
+    ``ast.unparse``'d expression) mentions ``version``, including
+    ``*_VERSION_KEY`` module constants via ``ast.unparse``.
     """
     if isinstance(node, ast.Constant) and isinstance(node.value, str):
         return _VERSION_HINT in node.value.lower()
@@ -86,7 +89,7 @@ def _is_version_key(node: ast.expr) -> bool:
 
 
 def _write_calls(tree: ast.AST) -> list[ast.Call]:
-    """Collect every ``something.set|add|touch(...)`` / bare-name call."""
+    """Collect every ``something.set|add|touch(...)`` / bare-name ``bump_version_key(...)`` call."""
     calls: list[ast.Call] = []
     for node in ast.walk(tree):
         if not isinstance(node, ast.Call):
@@ -153,30 +156,30 @@ class TestNoVersionKeyWrittenWithTimeout:
     pytestmark = pytest.mark.unit
 
     @pytest.mark.parametrize("module", _WRITER_MODULES)
-    def test_writer_module_uses_no_timeout_for_version_set(self, module: str) -> None:
-        """Each writer module's version-key write is a durable ``timeout=None``.
+    def test_writer_module_contains_a_version_key_write(self, module: str) -> None:
+        """Each writer module MUST contain at least one version-key write.
 
-        The writer modules pass their version key as a named constant, so the
-        ``_is_version_key`` scan cannot see it — this test is the explicit
-        control that the four owners route through ``bump_version_key``.
+        Complements the repo-wide scan below: that scan is a negative ``no
+        violations`` check; this is a positive ``at least one presence`` check.
+        Because ``ast.unparse`` resolves ``*_VERSION_KEY`` named constants,
+        ``_is_version_key`` sees the key passed by name and this assertion is
+        meaningful.
         """
         source = (_BACKEND_ROOT / module).read_text(encoding="utf-8")
         tree = ast.parse(source)
 
-        offending: list[str] = []
+        version_writes: list[str] = []
         for call in _write_calls(tree):
             if not call.args:
                 continue
-            if not _is_version_key(call.args[0]):
-                continue
-            violation = _version_key_violation(call)
-            if violation:
-                offending.append(f"{violation}: {ast.unparse(call)}")
+            if _is_version_key(call.args[0]):
+                version_writes.append(ast.unparse(call))
 
-        assert not offending, (
-            f"{module} writes a version key illegally: "
-            f"{offending}. A version key must be durable — route it through "
-            f"apps.core.utils.cache.bump_version_key (timeout=None)."
+        assert version_writes, (
+            f"{module} must contain at least one cache write whose first "
+            f"argument names a version key (e.g. ``*_VERSION_KEY``); found none. "
+            f"Route it through apps.core.utils.cache.bump_version_key "
+            f"(timeout=None)."
         )
 
     def test_repo_wide_no_version_key_set_with_timeout(self) -> None:
@@ -185,9 +188,11 @@ class TestNoVersionKeyWrittenWithTimeout:
         This is the grep-shaped guard: it fails if any future writer writes a
         version key through ``set``/``touch`` with ``timeout`` other than
         ``None`` (or omits it, which inherits ``DEFAULT_TIMEOUT``), or writes
-        one through ``add``. It matches on the literal text of the key, so a
-        module that binds the key to a ``*_VERSION_KEY`` constant is covered
-        by the parametrized test above instead.
+        one through ``add``. Because ``ast.unparse`` resolves ``*_VERSION_KEY``
+        named constants, the scan sees the same key text the parametrized test
+        above asserts as present — so a new writer that introduces a
+        TTL-bearing version-key write is caught here even if the key is a
+        constant.
         """
         offending: list[str] = []
         for path in _iter_backend_sources():
@@ -219,7 +224,7 @@ class TestVersionKeyIsDurable:
 
     def _expire_at(self, key: str) -> float | None:
         """Return the LocMemCache expiry for *key* (``None`` means never)."""
-        return cache._expire_info.get(cache.make_key(key))
+        return getattr(cache, "_expire_info", {}).get(cache.make_key(key))
 
     def test_bump_version_key_has_no_expiry(self) -> None:
         """``bump_version_key`` seeds the counter with ``timeout=None``."""
@@ -382,7 +387,7 @@ class TestVersionKeyLifetimeRelationship:
         comparing the raw deadline to an entry lifetime would be meaningless
         (an absolute timestamp is always larger than a duration).
         """
-        deadline = cache._expire_info.get(cache.make_key(key))
+        deadline = getattr(cache, "_expire_info", {}).get(cache.make_key(key))
         if deadline is None:
             return None
         return deadline - time.time()

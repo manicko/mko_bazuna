@@ -20,12 +20,16 @@ stays in ``apps/core/tests/test_health_contract.py``, which is unchanged.
 
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 from django.conf import settings
 
 pytestmark = [pytest.mark.unit]
 
-_PROJECT_ROOT = settings.BASE_DIR.parent
+_PROJECT_ROOT = Path(__file__).resolve().parent
+while not (_PROJECT_ROOT / "pyproject.toml").exists():
+    _PROJECT_ROOT = _PROJECT_ROOT.parent
 _ROLLBACK = _PROJECT_ROOT / "docs" / "ops" / "rollback.md"
 _DOCKER_DEPLOYMENT = _PROJECT_ROOT / "docs" / "ops" / "docker-deployment.md"
 

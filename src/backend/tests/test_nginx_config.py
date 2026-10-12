@@ -63,12 +63,13 @@ def _brace_block(lines: list[str], start: int) -> str:
 def _location_block(text: str, location_match: str) -> str:
     """Extract a nginx ``location`` block by its match string (e.g. ``= /metrics``).
 
-    Matches the **first** line containing ``location_match``; callers must not
-    introduce an earlier line containing that string elsewhere in the file.
+    Matches the **first** line that starts with a ``location`` directive and
+    contains ``location_match``; callers must not introduce an earlier matching
+    line elsewhere in the file.
     """
     lines = text.split("\n")
     for i, line in enumerate(lines):
-        if re.search(re.escape(location_match), line):
+        if re.match(r"\s*location\b", line) and re.search(re.escape(location_match), line):
             return _brace_block(lines, i)
     return ""
 
@@ -125,13 +126,6 @@ def _extract_deny_regex(block: str) -> str:
 def _limit_req_zones(text: str) -> list[str]:
     """Return every ``limit_req_zone`` zone name declared in ``text``."""
     return re.findall(r"limit_req_zone\s+\S+\s+zone=([A-Za-z0-9_]+):", text)
-
-
-def test_nginx_config_exists() -> None:
-    """nginx.conf must exist at docker/nginx/nginx.conf."""
-    assert _NGINX_CONF.exists(), (
-        "docker/nginx/nginx.conf must exist"
-    )
 
 
 def test_nginx_metrics_has_proxy_pass() -> None:

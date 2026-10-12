@@ -21,6 +21,7 @@ PyYAML dependency. They do **not** execute any workflow.
 
 from __future__ import annotations
 
+import re
 from pathlib import Path
 
 import pytest
@@ -69,9 +70,15 @@ def test_build_cache_from_and_to_name_the_same_reference() -> None:
     for line in text.splitlines():
         stripped = line.strip()
         if stripped.startswith("cache-from:"):
-            from_ref = stripped.split("ref=", 1)[1].split(",", 1)[0]
+            ref_parts = stripped.split("ref=", 1)
+            if len(ref_parts) < 2:
+                continue  # Line doesn't use ref= syntax
+            from_ref = ref_parts[1].split(",", 1)[0]
         elif stripped.startswith("cache-to:"):
-            to_ref = stripped.split("ref=", 1)[1].split(",", 1)[0]
+            ref_parts = stripped.split("ref=", 1)
+            if len(ref_parts) < 2:
+                continue  # Line doesn't use ref= syntax
+            to_ref = ref_parts[1].split(",", 1)[0]
     assert from_ref, "ci.yml must declare a cache-from registry reference"
     assert to_ref, "ci.yml must declare a cache-to registry reference"
     assert from_ref == to_ref, (
@@ -111,7 +118,10 @@ def test_no_non_canonical_ghcr_coordinate_anywhere() -> None:
             if "ghcr.io/" not in line:
                 continue
             for token in line.split("ghcr.io/")[1:]:
-                repo = token.split(":", 1)[0].split(",", 1)[0].strip().split()[0]
+                parts = token.split(":", 1)[0].split(",", 1)[0].strip()
+                if not parts:
+                    continue
+                repo = parts.split()[0]
                 if repo == "${{":
                     continue  # env.IMAGE_REPOSITORY indirection, asserted above
                 if repo != _CANONICAL_REPOSITORY:
@@ -156,7 +166,7 @@ def _concurrency_block(text: str) -> str:
     """Return the top-level ``concurrency:`` block, or an empty string."""
     lines = text.splitlines()
     for i, line in enumerate(lines):
-        if line == "concurrency:":
+        if re.match(r"concurrency\s*:\s*$", line):
             block = [line]
             for follow in lines[i + 1 :]:
                 if follow and not follow.startswith(" "):

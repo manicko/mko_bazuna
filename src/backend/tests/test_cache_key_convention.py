@@ -24,6 +24,7 @@ import re
 import time
 
 import pytest
+from django.core.cache import cache
 
 from apps.categories.services.lookup_resolution import (
     RESOLVED_CONDITIONS_SEGMENT,
@@ -49,6 +50,10 @@ class TestCacheKeyConvention:
     """Lookup cache keys follow the ``lookup:v1:{version}:...`` convention."""
 
     pytestmark = pytest.mark.unit
+
+    def teardown_method(self) -> None:
+        """Clear cache after each test to prevent LocMemCache state pollution under xdist."""
+        cache.clear()
 
     # --- all_groups key ------------------------------------------------------
 
@@ -141,8 +146,6 @@ class TestCacheKeyConvention:
         """After bumping versions, old cache entries are unreachable under
         the new version key (they persist via TTL but the new key is a miss).
         """
-        from django.core.cache import cache
-
         groups_before = all_groups_key()
         resolve_before = resolved_lookup_key(RESOLVED_PURPOSES_SEGMENT, 1)
 

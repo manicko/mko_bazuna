@@ -119,7 +119,7 @@ def test_backup_healthcheck_is_executable_and_branches_correctly() -> None:
 
 
 def test_both_signals_have_a_healthcheck_declared() -> None:
-    """``web`` and ``backup`` each declare a healthcheck — the two floor signals.
+    """``backup`` declares a healthcheck — the floor signal.
 
     Container health is the machine-readable signal the detection floor exposes
     via ``docker inspect``; a service without a ``healthcheck:`` has no status

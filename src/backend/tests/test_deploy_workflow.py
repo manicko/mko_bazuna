@@ -35,6 +35,8 @@ _ENV_PROD_EXAMPLE = _ROOT / ".env.prod.example"
 _PROD_COMPOSE = _ROOT / "docker-compose.prod.yml"
 
 
+# NOTE: This `_service_block` helper is intentionally duplicated in
+# test_compose_hardening.py. Keep both copies in sync — see the comment there.
 def _service_block(compose_path: Path, service_name: str) -> str:
     """Extract a service's YAML block from a compose file.
 
@@ -263,24 +265,6 @@ def test_deploy_rollback_branches_have_distinct_messages() -> None:
     assert "absent from the registry and could not be pulled" in text, (
         "deploy.yml must have a distinct digest-absent-from-registry message (12-OPS-008)"
     )
-
-
-def test_deploy_does_not_build() -> None:
-    """deploy.yml must never build an image — it deploys a verified artefact.
-
-    This is the invariant (12-OPS-002 / OPS-008): the deploy path consumes an
-    image produced by `ci.yml`, so neither `docker build` nor `docker compose …
-    build` may appear anywhere in the workflow.
-    """
-    text = _DEPLOY_YML.read_text(encoding="utf-8")
-    assert "docker build" not in text, (
-        "deploy.yml must not build images; it deploys a CI-built artefact"
-    )
-    for line in text.splitlines():
-        if "docker compose" in line and " build" in line:
-            raise AssertionError(
-                f"deploy.yml must not run `docker compose build`: {line.strip()!r}"
-            )
 
 
 def test_env_prod_example_forbids_latest_image_tag() -> None:

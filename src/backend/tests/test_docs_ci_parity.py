@@ -162,7 +162,10 @@ def _load_pyproject() -> dict:
 
 
 def _marker_names() -> list[str]:
-    markers: list[str] = _load_pyproject()["tool"]["pytest"]["ini_options"]["markers"]
+    pyproject = _load_pyproject()
+    markers = pyproject.get("tool", {}).get("pytest", {}).get("ini_options", {}).get("markers", [])
+    if not markers:
+        return []
     return [m.split(":")[0] for m in markers]
 
 
@@ -428,6 +431,9 @@ def _manifest_registry_coordinate() -> str:
     return f"{registry_match.group(1)}/{repository_match.group(1)}"
 
 
+# MANUAL MAINTENANCE: This is a static manifest, not a derivation. When a
+# docs/ops file starts/stops documenting a production `docker compose`
+# invocation, add/remove its name here. The guard fails on any disagreement.
 # Files that today document at least one production `docker compose`
 # invocation and therefore MUST keep at least one invocation carrying the
 # required flags. A static manifest — not a derivation — is the deletion guard:
@@ -445,6 +451,9 @@ _DOCS_OPS_FILES_WITH_PRODUCTION_INVOCATIONS = frozenset(
     }
 )
 
+# MANUAL MAINTENANCE: This is a static manifest, not a derivation. When a
+# docs/ops file starts/stops quoting a canonical `ghcr.io` coordinate,
+# add/remove its name here. The guard fails on any disagreement.
 # Files that today quote a canonical `ghcr.io` registry coordinate. Same
 # deletion-guard reasoning as above (12-VAL-003).
 _DOCS_OPS_FILES_WITH_REGISTRY_COORDINATES = frozenset(

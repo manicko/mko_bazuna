@@ -46,6 +46,8 @@ _HARDENING_KEYS = [
 ]
 
 
+# NOTE: This `_service_block` helper is intentionally duplicated in
+# test_deploy_workflow.py. Keep both copies in sync — see the comment there.
 def _service_block(compose_path: Path, service_name: str) -> str:
     """Extract a service's YAML block from a compose file.
 

@@ -46,10 +46,7 @@ def test_restore_test_scheduled_in_ci() -> None:
 
 def test_restore_test_has_migrate_plan() -> None:
     """Makefile restore-test target must reference migrate --plan --check."""
-    text = _MAKEFILE.read_text()
-    target_match = re.search(r"^restore-test:\s*$", text, re.MULTILINE)
-    assert target_match, "Makefile must define a restore-test target"
-    target_block = text[target_match.start():]
+    target_block = _restore_test_target_block()
     assert "migrate --plan --check" in target_block, (
         "Makefile restore-test target must run migrate --plan --check (B5 / 12-OPS-006)"
     )
@@ -83,16 +80,29 @@ def test_restore_test_schedule_is_monthly() -> None:
 # restore fails is a RED demonstration of the target itself, recorded in the
 # commit body — a text guard cannot execute `docker run`.
 
-_MAKEFILE_RESTORE_TARGET_RE = re.compile(r"^restore-test:\s*$", re.MULTILINE)
+_MAKEFILE_RESTORE_TARGET_RE = re.compile(r"^restore-test:\s*", re.MULTILINE)
 _GITHUB_SHA_EXPR = "${{ github.sha }}"
 
 
 def _restore_test_target_block() -> str:
-    """Return the Makefile's ``restore-test`` target body (to end of file)."""
+    """Return the Makefile's ``restore-test`` target body, bounded to the target.
+
+    The block starts at the ``restore-test:`` line and extends until the next
+    column-0 non-comment line (a sibling target), so checks scope only this
+    target rather than everything below it in the Makefile.
+    """
     text = _MAKEFILE.read_text(encoding="utf-8")
     match = _MAKEFILE_RESTORE_TARGET_RE.search(text)
     assert match, "Makefile must define a restore-test target"
-    return text[match.start():]
+    lines = text.split("\n")
+    start_idx = next(i for i, line_text in enumerate(lines) if line_text.startswith("restore-test:"))
+    block: list[str] = []
+    for line in lines[start_idx:]:
+        # Stop at the next column-0 non-comment line (a sibling target header).
+        if block and line and not line.startswith((" ", "\t")) and not line.startswith("#"):
+            break
+        block.append(line)
+    return "\n".join(block)
 
 
 def test_restore_test_pins_a_recorded_app_image() -> None:
