@@ -24,7 +24,7 @@ from apps.users.services.login_token import (
     RAW_TOKEN_ENTROPY_BYTES,
     claim_token,
 )
-from conftest import make_user
+from conftest import establish_login_session, make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -116,11 +116,6 @@ class TestLoginTokenBinding:
         assert issued.status_code == 200
         return issued.context["raw_token"]
 
-    def _claim(self, raw_token: str, telegram_id: int) -> None:
-
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
-
     def test_token_from_another_browser_is_rejected(self) -> None:
         """A raw token issued to browser A cannot be redeemed from browser B.
 
@@ -134,7 +129,7 @@ class TestLoginTokenBinding:
         browser_a = Client()
         raw_token = self._issue(browser_a)
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        self._claim(raw_token, telegram_id)
+        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
 
         # Browser B (no __Host-login_browser_id cookie, or a different one) is
         # refused.
@@ -157,11 +152,7 @@ class TestLoginTokenBinding:
         make_user(telegram_id, username="binding_same")
 
         client = Client()
-        raw_token = self._issue(client)
-        self._claim(raw_token, telegram_id)
-
-        response = client.post("/login/status/", {"token": raw_token})
-        assert response.status_code == 200
+        establish_login_session(client, telegram_id)
         assert "_auth_user_id" in client.session
 
     def test_repeat_issue_does_not_invalidate_the_binding(self) -> None:
@@ -194,7 +185,8 @@ class TestLoginTokenBinding:
 
         # The bot claims only the second (the first is already superseded and
         # cannot be claimed) ...
-        self._claim(second_raw, telegram_id)
+        second_hash = hashlib.sha256(second_raw.encode()).hexdigest()
+        assert claim_token(second_hash, telegram_id, timezone.now()) is not None
         first_hash = hashlib.sha256(first_raw.encode()).hexdigest()
 
         assert claim_token(first_hash, telegram_id, timezone.now()) is None
@@ -230,7 +222,7 @@ class TestLoginTokenBinding:
         client = Client()
         raw_token = self._issue(client)
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-        self._claim(raw_token, telegram_id)
+        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
 
         # Force the legacy/unbound state back with an UPDATE.
         LoginToken.objects.filter(token_hash=token_hash).update(browser_binding=None)
@@ -505,18 +497,6 @@ class TestDeclinedUserRecovery:
     they re-consent.
     """
 
-    @staticmethod
-    def _establish_session(client: Client, telegram_id: int) -> str:
-        """Run issue → bot claim → redeem; return the /login/status/ response body."""
-        issued = client.get("/login/issue/")
-        raw_token = issued.context["raw_token"]
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-
-        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
-        response = client.post("/login/status/", {"token": raw_token})
-        assert response.status_code == 200
-        return raw_token
-
     def test_declined_user_obtains_a_web_session(self) -> None:
         """A declined user completes the handshake and holds a session (was 410)."""
         telegram_id = 700000600
@@ -527,7 +507,7 @@ class TestDeclinedUserRecovery:
         user.save(update_fields=["ads_auto_publish"])
 
         client = Client()
-        self._establish_session(client, telegram_id)
+        establish_login_session(client, telegram_id)
 
         assert client.session.session_key is not None
         assert "_auth_user_id" in client.session
@@ -561,7 +541,7 @@ class TestDeclinedUserRecovery:
         make_user(telegram_id, username="session_gone", is_declined=True)
 
         first_client = Client()
-        self._establish_session(first_client, telegram_id)
+        establish_login_session(first_client, telegram_id)
         assert "_auth_user_id" in first_client.session
 
         # A different browser (session gone from its perspective) redoes the
@@ -569,7 +549,7 @@ class TestDeclinedUserRecovery:
         # handshake — nothing on a fresh client has created one.
         fresh_client = Client()
         assert "sessionid" not in fresh_client.cookies
-        self._establish_session(fresh_client, telegram_id)
+        establish_login_session(fresh_client, telegram_id)
         assert "_auth_user_id" in fresh_client.session
 
 
@@ -668,24 +648,6 @@ def budva_city() -> City:
     )
 
 
-def _claim_login(client: Client, user: User) -> None:
-    """Create a claimed login token for *user* and complete the web login.
-
-    Issues through ``/login/issue/`` so the row is bound to the browser id
-    cookie the ``client`` fixture now holds, then performs the bot's phase-1
-    claim through the service. The three ``TestLoginPreferredCitySync``
-    dependents reach this unchanged.
-    """
-    issued = client.get("/login/issue/")
-    raw_token = issued.context["raw_token"]
-    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-
-    assert claim_token(token_hash, user.telegram_id, timezone.now()) is not None
-
-    response = client.post("/login/status/", {"token": raw_token})
-    assert response.status_code == 200
-
-
 class TestLoginPreferredCitySync:
     """Guest -> account preferred-city migration on login (AC-6 / R-08)."""
 
@@ -701,7 +663,7 @@ class TestLoginPreferredCitySync:
         )
         client.cookies["preferred_city"] = "podgorica"
 
-        _claim_login(client, user)
+        establish_login_session(client, user.telegram_id)
 
         user.refresh_from_db()
         assert user.preferred_city_id == podgorica_city.id
@@ -724,7 +686,7 @@ class TestLoginPreferredCitySync:
         )
         client.cookies["preferred_city"] = "budva"
 
-        _claim_login(client, user)
+        establish_login_session(client, user.telegram_id)
 
         user.refresh_from_db()
         # DB value is Podgorica (not overwritten by the budva cookie).
@@ -741,7 +703,7 @@ class TestLoginPreferredCitySync:
             consent_given_at=timezone.now(),
         )
 
-        _claim_login(client, user)
+        establish_login_session(client, user.telegram_id)
 
         user.refresh_from_db()
         assert user.preferred_city_id is None

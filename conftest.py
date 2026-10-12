@@ -38,7 +38,7 @@ def __getattr__(name: str):
     module is collected), so no Django models are imported at this module's
     load time — preserving the import-safety guarantee stated above.
     """
-    if name in ("create_test_ad", "create_test_ads_bulk", "make_user"):
+    if name in ("create_test_ad", "create_test_ads_bulk", "make_user", "establish_login_session"):
         import backend.conftest as _backend_conftest
 
         _value = getattr(_backend_conftest, name)

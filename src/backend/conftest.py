@@ -14,6 +14,7 @@ satisfying the strict database check constraints (e.g.
 
 from __future__ import annotations
 
+import hashlib
 import tempfile
 from collections.abc import Generator
 from decimal import Decimal
@@ -22,6 +23,7 @@ from typing import Any
 
 import pytest
 from django.core.cache import cache
+from django.test import Client
 from django.utils import timezone, translation
 
 from apps.ads.models import Ad
@@ -30,6 +32,7 @@ from apps.core.enums import AdSource, AdStatus, AdvisoryLockId
 from apps.currencies.enums import CurrencyCode
 from apps.locations.models import City
 from apps.users.models import User
+from apps.users.services.login_token import claim_token
 
 # ---------------------------------------------------------------------------
 # i18n testing standard (Spec 07)
@@ -314,6 +317,27 @@ def make_user(
         user.is_staff = True
         user.save(update_fields=["is_staff"])
     return user
+
+
+def establish_login_session(client: Client, telegram_id: int) -> str:
+    """Run the full two-phase login handshake for a test client.
+
+    GET ``/login/issue/`` → ``claim_token`` (bot phase 1) → POST
+    ``/login/status/`` (web phase 2). Asserts the claim succeeds and the
+    redeem returns 200, then returns the raw token.
+
+    Consolidates the three duplicate claim-and-redeem helpers that
+    previously lived in ``test_login.py`` (``_claim``, ``_establish_session``,
+    ``_claim_login``).
+    """
+    issued = client.get("/login/issue/")
+    raw_token = issued.context["raw_token"]
+    token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
+
+    assert claim_token(token_hash, telegram_id, timezone.now()) is not None
+    response = client.post("/login/status/", {"token": raw_token})
+    assert response.status_code == 200
+    return raw_token
 
 
 # ---------------------------------------------------------------------------
