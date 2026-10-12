@@ -114,11 +114,6 @@ def _locmem_cache():
                 "BACKEND": "django.core.cache.backends.locmem.LocMemCache",
             },
         },
-        STORAGES={
-            "staticfiles": {
-                "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-            },
-        },
     ):
         yield
 
@@ -260,8 +255,11 @@ class TestDashboardHtmlRendering:
         """Dashboard HTML includes the stats summary card."""
         response = dashboard_client.get("/dashboard/")
         html = response.content.decode()
-        assert "3" in html  # total_views
-        assert "2" in html  # total_contacts
+        # Assert on values within their dedicated stats-card elements rather than
+        # matching bare numeric literals ("3", "2") that could appear anywhere
+        # in the page and produce false positives.
+        assert 'text-2xl font-bold text-blue-600">3</p>' in html  # total_views
+        assert 'text-2xl font-bold text-green-600">2</p>' in html  # total_contacts
 
     def test_html_contains_time_range_selector(self, dashboard_client) -> None:
         """Dashboard HTML includes the time range select element."""

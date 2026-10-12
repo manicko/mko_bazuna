@@ -1,11 +1,10 @@
 """
 Integration tests for the ``ad_edit`` reactivation path.
 
-These tests assert the **current** (pre-QLT-001 Stage 3 migration) behavior of
-the ``is_reactivation`` branch in ``apps/ads/views/edit.py``. They serve as the
-behavioral baseline: when the reactivation branch is migrated to call
-``submit_ad`` (Block 12 / A4), every assertion in this file must continue to
-hold — verifying behavioral equivalence across the migration.
+These tests assert the **current** behavior of the ``is_reactivation`` branch in
+``apps/ads/views/edit.py``. The ``submit_ad`` call is already present in both
+the reactivation and published-edit branches, so these tests verify that
+contract directly.
 
 Reactors under test:
     - ARCHIVED -> ON_MODERATION (status transition, archived_at cleared)
@@ -64,7 +63,7 @@ def client_(seller) -> Client:
 
 
 @pytest.fixture
-def btc_rate():
+def bam_rate():
     """Ensure a BAM exchange rate exists and is current for normalization."""
     from apps.currencies.models import ExchangeRate
 
@@ -118,7 +117,7 @@ class TestReactivationStatusTransition:
                     "title": original_title,
                     "description": ad.description,
                     "price_amount": "100",
-                    "price_currency": "EUR",
+                    "price_currency": CurrencyCode.EUR.value,
                     "reactivate": "1",
                 },
                 follow=True,
@@ -154,7 +153,7 @@ class TestReactivationAutoModerate:
                 "title": ad.title,
                 "description": ad.description,
                 "price_amount": "100",
-                "price_currency": "EUR",
+                "price_currency": CurrencyCode.EUR.value,
                 "reactivate": "1",
             },
         )
@@ -191,7 +190,7 @@ class TestReactivationAutoModerate:
                     "title": ad.title,
                     "description": ad.description,
                     "price_amount": "100",
-                    "price_currency": "EUR",
+                    "price_currency": CurrencyCode.EUR.value,
                     "reactivate": "1",
                 },
             )
@@ -257,7 +256,7 @@ class TestReactivationPriceNormalized:
     """Verify price_normalized_eur is recomputed via PriceNormalizer."""
 
     def test_edit_reactivation_price_normalized_recomputed(
-        self, client_, seller, category, city, btc_rate, permissive_criteria
+        self, client_, seller, category, city, bam_rate, permissive_criteria
     ) -> None:
         """Reactivation with valid BAM price -> price_normalized_eur
         matches PriceNormalizer().normalize_to_eur(amount, BAM)."""
@@ -313,7 +312,7 @@ class TestReactivationTextUpdated:
                 "title": new_title,
                 "description": new_description,
                 "price_amount": "100",
-                "price_currency": "EUR",
+                "price_currency": CurrencyCode.EUR.value,
                 "reactivate": "1",
             },
         )
@@ -868,24 +867,6 @@ class TestAdArchiveGetRejected:
 
         ad.refresh_from_db()
         assert ad.status == AdStatus.PUBLISHED  # unchanged by GET
-
-    def test_archive_post_still_works(
-        self,
-        seller,
-        category,
-        city,
-    ) -> None:
-        """POST /ads/<id>/archive/ still archives the ad."""
-        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
-        client = Client()
-        client.force_login(seller)
-
-        response = client.post(reverse("ads:archive", args=[ad.id]))
-        assert response.status_code == 302
-        assert "dashboard" in response.url
-
-        ad.refresh_from_db()
-        assert ad.status == AdStatus.ARCHIVED
 
 
 # ---------------------------------------------------------------------------

@@ -14,15 +14,16 @@ Covers:
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import Any
 
 import pytest
 from django.db import connection
+from django.template.loader import get_template
 from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
+from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.core.services.site_config import get_bot_username
 from conftest import create_test_ad
@@ -172,10 +173,12 @@ class TestAdDetailDeclinedUserVisibility:
 
 def test_detail_template_uses_bot_username_not_settings() -> None:
     """The detail template uses the ``{% telegram_deep_link %}`` tag for the
-    contact button, not a cleartext ``{{ bot_username }}`` href."""
-    content = (
-        Path(__file__).resolve().parents[3] / "templates/ads/detail.html"
-    ).read_text(encoding="utf-8")
+    contact button, not a cleartext ``{{ bot_username }}`` href.
+    """
+    # STRUCTURAL GUARD — verifies the template source does not leak the raw
+    # bot_username variable into a cleartext href. This is a source-level check
+    # because the rendering is already covered by the context tests above.
+    content = get_template("ads/detail.html").template.source
     assert "{% telegram_deep_link" in content
     assert "{{ bot_username }}" not in content  # cleartext no longer in template
     assert "settings.BOT_USERNAME" not in content
@@ -185,31 +188,69 @@ def test_detail_template_uses_bot_username_not_settings() -> None:
 # Breadcrumb ellipsis template (Spec_020 R-05)
 # ---------------------------------------------------------------------------
 
-_BREADCRUMB_CONTENT = (
-    Path(__file__).resolve().parents[3] / "templates/components/breadcrumb.html"
-).read_text(encoding="utf-8")
+_BREADCRUMB_CONTENT = get_template("components/breadcrumb.html").template.source
 
 
 def test_ellipsis_truncation_branch_present() -> None:
-    """The template must gate truncation on the ancestor-chain length."""
+    """The template must gate truncation on the ancestor-chain length.
+
+    STRUCTURAL GUARD — source-level check ensuring the ``{% if ancestors|length > 2 %}``
+    branch exists. Behavioral rendering of the ellipsis is verified by
+    ``test_ellipsis_shown_for_long_ancestor_chain`` below.
+    """
     assert "{% if ancestors|length > 2 %}" in _BREADCRUMB_CONTENT
     assert "{% endwith %}" in _BREADCRUMB_CONTENT
 
 
-def test_ellipsis_literal_present() -> None:
-    """The ``…`` ellipsis literal is rendered for long chains."""
-    assert ">…<" in _BREADCRUMB_CONTENT
+def test_ellipsis_shown_for_long_ancestor_chain(
+    seller,
+    city,
+) -> None:
+    """Behavioral: the ellipsis is rendered when the breadcrumb ancestor
+    chain exceeds 2 links (Spec_020 R-05).
+
+    Creates a 4-level category tree (root -> child -> grandchild -> leaf) so the
+    leaf has 3 ancestors — enough to trigger the ``{% if ancestors|length > 2 %}``
+    truncation branch in ``breadcrumb.html``.
+    """
+    root = Category.objects.create(name="Root", slug="ellipsis-root-001")
+    child = Category.objects.create(
+        name="Child", slug="ellipsis-child-001", parent=root
+    )
+    grandchild = Category.objects.create(
+        name="Grandchild", slug="ellipsis-gc-001", parent=child
+    )
+    leaf = Category.objects.create(
+        name="Leaf", slug="ellipsis-leaf-001", parent=grandchild
+    )
+
+    ad = create_test_ad(seller, leaf, city, status=AdStatus.PUBLISHED)
+    client = Client()
+    response = client.get(reverse("ads:detail", args=[ad.id]))
+
+    assert response.status_code == 200
+    html = response.content.decode()
+    assert "…" in html  # ellipsis rendered for long ancestor chain
 
 
 def test_separator_preserved() -> None:
-    """The ``&rsaquo;`` separator is kept in truncated and full chains."""
+    """The ``&rsaquo;`` separator is kept in truncated and full chains.
+
+    STRUCTURAL GUARD — source-level check ensuring the separator markup exists
+    in both the truncated and non-truncated branches of the template.
+    """
     assert "&rsaquo;" in _BREADCRUMB_CONTENT
 
 
 def test_breadcrumb_with_tag_no_last_ancestor() -> None:
     """The ``{% with %}`` must not bind ``last_ancestor`` via ``|last``
     (which raises on an empty ancestor queryset); the last ancestor is bound
-    safely inside the length-guarded branch (RC-C)."""
+    safely inside the length-guarded branch (RC-C).
+
+    STRUCTURAL SAFETY GUARD — source-level check ensuring ``|last`` is never
+    applied to the ancestor queryset, which would raise a TemplateSyntaxError
+    or produce a DoesNotExist when the queryset is empty.
+    """
     assert "last_ancestor=breadcrumb_category" not in _BREADCRUMB_CONTENT
     assert "get_ancestors|last" not in _BREADCRUMB_CONTENT
     assert (

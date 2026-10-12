@@ -2,8 +2,8 @@
 Structural and concurrency regression tests for DB-003 locking in edit.py.
 
 Mirrors the ``TestModerationReviewLocking`` structural pattern from
-``test_moderation_views.py`` (Block 2) and the concurrency pattern from
-``test_transition_concurrency.py``.
+``test_moderation_views.py`` (Block 2). The concurrency pattern is
+self-contained in ``TestEditViewsRowLockConcurrency`` below.
 
 Tests that the ``select_for_update()`` / ``transaction.atomic()`` pattern in
 ``ads.views.edit`` prevents the stale-state race window between fetching an
@@ -50,6 +50,10 @@ class TestEditViewsLocking:
 
     def test_ad_edit_uses_select_for_update_and_atomic(self) -> None:
         """ad_edit source contains select_for_update inside transaction.atomic."""
+        # IMPLEMENTATION SENTINEL — structural guard, not a behavioral test.
+        # Verifies the source contains select_for_update + transaction.atomic so
+        # that future refactors do not accidentally drop the row lock.
+        # Behavioral coverage of the lock itself: TestEditViewsRowLockConcurrency.
         from apps.ads.views import edit
 
         source = inspect.getsource(edit.ad_edit)
@@ -64,6 +68,10 @@ class TestEditViewsLocking:
         POST block. Exactly ONE ``select_for_update`` should appear in the
         full function source (only in the locked POST re-fetch).
         """
+        # IMPLEMENTATION SENTINEL — structural guard, not a behavioral test.
+        # Verifies that select_for_update appears exactly once (POST path only)
+        # and prefetch_related is used on GET. Behavioral coverage of the lock
+        # itself: TestEditViewsRowLockConcurrency.
         from apps.ads.views import edit
 
         source = inspect.getsource(edit.ad_edit)
@@ -74,6 +82,10 @@ class TestEditViewsLocking:
 
     def test_ad_archive_uses_select_for_update_and_atomic(self) -> None:
         """ad_archive source contains select_for_update inside transaction.atomic."""
+        # IMPLEMENTATION SENTINEL — structural guard, not a behavioral test.
+        # Verifies the source contains select_for_update + transaction.atomic so
+        # that future refactors do not accidentally drop the row lock.
+        # Behavioral coverage of the lock itself: TestEditViewsRowLockConcurrency.
         from apps.ads.views import edit
 
         source = inspect.getsource(edit.ad_archive)
@@ -82,6 +94,10 @@ class TestEditViewsLocking:
 
     def test_ad_reactivate_uses_select_for_update_and_atomic(self) -> None:
         """ad_reactivate source contains select_for_update inside transaction.atomic."""
+        # IMPLEMENTATION SENTINEL — structural guard, not a behavioral test.
+        # Verifies the source contains select_for_update + transaction.atomic so
+        # that future refactors do not accidentally drop the row lock.
+        # Behavioral coverage of the lock itself: TestEditViewsRowLockConcurrency.
         from apps.ads.views import edit
 
         source = inspect.getsource(edit.ad_reactivate)
@@ -90,6 +106,10 @@ class TestEditViewsLocking:
 
     def test_ad_delete_uses_select_for_update_and_atomic(self) -> None:
         """ad_delete source contains select_for_update inside transaction.atomic."""
+        # IMPLEMENTATION SENTINEL — structural guard, not a behavioral test.
+        # Verifies the source contains select_for_update + transaction.atomic so
+        # that future refactors do not accidentally drop the row lock.
+        # Behavioral coverage of the lock itself: TestEditViewsRowLockConcurrency.
         from apps.ads.views import delete
 
         source = inspect.getsource(delete.ad_delete)
@@ -98,6 +118,11 @@ class TestEditViewsLocking:
 
     def test_submit_ad_uses_select_for_update_and_atomic(self) -> None:
         """submit_ad source contains select_for_update inside transaction.atomic."""
+        # IMPLEMENTATION SENTINEL — structural guard, not a behavioral test.
+        # Verifies the source contains select_for_update + transaction.atomic so
+        # that future refactors do not accidentally drop the row lock in the bot
+        # submission path. Behavioral coverage of the lock itself:
+        # TestEditViewsRowLockConcurrency.
         from apps.ads.services.submission import submit_ad
 
         source = inspect.getsource(submit_ad)
@@ -112,6 +137,12 @@ class TestEditViewsLocking:
         top of ``submit_ad`` is gone, and the ``select_for_update`` re-fetch now
         appears inside (after) the ``transaction.atomic()`` block.
         """
+        # IMPLEMENTATION SENTINEL — structural guard, not a behavioral test.
+        # Verifies source-level ordering (fetch inside atomic, no plain unlocked
+        # fetch). Behavioral verification that the lock blocks concurrent deletes
+        # is covered by TestEditViewsRowLockConcurrency for the web views; for
+        # submit_ad the lock contract is exercised via test_ad_constraints.py's
+        # DoesNotExist guard.
         from apps.ads.services.submission import submit_ad
 
         source = inspect.getsource(submit_ad)
@@ -140,31 +171,45 @@ class TestEditViewsLocking:
 @pytest.mark.xdist_group("concurrent")
 @pytest.mark.flaky(reruns=1, reruns_delay=1)
 class TestEditViewsRowLockConcurrency:
-    """DB-003: ``select_for_update()`` in edit views prevents stale-state races."""
+    """DB-003: ``select_for_update()`` in edit views prevents stale-state races.
 
-    def test_select_for_update_blocks_concurrent_delete_during_archive(
-        self, seller, category, city
+    The three view entry points (archive, edit, reactivate) share an identical
+    lock-then-block pattern; they are parametrized by starting ``AdStatus``
+    instead of triplicated as near-copy test bodies.
+    """
+
+    @pytest.mark.parametrize(
+        ("status", "view"),
+        [
+            (AdStatus.PUBLISHED, "archive"),
+            (AdStatus.DRAFT, "edit"),
+            (AdStatus.ARCHIVED, "reactivate"),
+        ],
+    )
+    def test_select_for_update_blocks_concurrent_delete_during(
+        self, seller, category, city, status: AdStatus, view: str
     ) -> None:
         """A row locked with ``select_for_update()`` blocks a concurrent
-        hard-delete until the locking transaction commits.
+        hard-delete during the {view} path until the locking transaction commits.
 
-        This is the core guarantee of DB-003: the archiving view holds the
-        lock from fetch through ``transition_to``, so a concurrent sweep
-        cannot delete the row in the gap between fetch and
-        ``refresh_from_db()``.
+        This is the core guarantee of DB-003: the {view} view holds the lock
+        from fetch through ``transition_to``, so a concurrent sweep cannot
+        delete the row in the gap between fetch and ``refresh_from_db()``.
 
         Uses ``transaction=True`` so the main thread's ``transaction.atomic()``
         is a real transaction (not a savepoint) — in PostgreSQL, row locks are
         released only on transaction commit/rollback, not on savepoint commit.
         The background thread gets its own connection (thread-local) and its
         ``DELETE`` blocks on the row lock until the main thread commits.
-
-        Mirrors ``test_select_for_update_blocks_concurrent_delete`` from
-        ``test_transition_concurrency.py``.
         """
-        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
-        ad_id = ad.id
+        ad = create_test_ad(seller, category, city, status=status)
+        self._assert_row_lock_blocks_concurrent_delete(ad.id)
 
+    def _assert_row_lock_blocks_concurrent_delete(self, ad_id: int) -> None:
+        """Shared helper: acquire a row lock, spawn a concurrent DELETE thread,
+        verify it blocks until the lock is released, then verify the row is
+        hard-deleted by the sweep after commit.
+        """
         started = threading.Event()
         finished = threading.Event()
         errors: list[BaseException] = []
@@ -207,113 +252,6 @@ class TestEditViewsRowLockConcurrency:
 
         # --- Main transaction commits, releasing the row lock ---
         # The background thread's DELETE can now proceed.
-        assert finished.wait(timeout=10), (
-            "DELETE did not complete after lock was released"
-        )
-        thread.join(timeout=10)
-
-        assert not errors, f"Background thread raised: {errors}"
-        assert not Ad.objects.filter(pk=ad_id).exists(), (
-            "Ad should have been hard-deleted by the concurrent sweep "
-            "after the lock was released"
-        )
-
-    def test_select_for_update_blocks_concurrent_delete_during_edit(
-        self, seller, category, city
-    ) -> None:
-        """A row locked with ``select_for_update()`` blocks a concurrent
-        hard-delete during the ad_edit POST path (mirror of archive test).
-
-        The ad_edit view fetches with ``Ad.objects.select_for_update()`` inside
-        ``transaction.atomic()`` before calling ``transition_to()``. This test
-        verifies the lock blocks a concurrent sweep until the transaction commits.
-        """
-        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
-        ad_id = ad.id
-
-        started = threading.Event()
-        finished = threading.Event()
-        errors: list[BaseException] = []
-
-        def concurrent_hard_delete() -> None:
-            started.set()
-            try:
-                with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
-                    Ad.objects.filter(pk=ad_id).delete()
-            except BaseException as exc:  # noqa: BLE001
-                errors.append(exc)
-            finally:
-                finished.set()
-                connection.close()
-
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
-            locked_ad = Ad.objects.select_for_update().get(pk=ad_id)
-            assert locked_ad.id == ad_id
-
-            thread = threading.Thread(target=concurrent_hard_delete)
-            thread.start()
-
-            assert started.wait(timeout=5), "Background thread did not start"
-
-            time.sleep(1.0)
-            assert not finished.is_set(), (
-                "DELETE completed before lock was released — "
-                "select_for_update did not block the concurrent delete"
-            )
-
-        assert finished.wait(timeout=10), (
-            "DELETE did not complete after lock was released"
-        )
-        thread.join(timeout=10)
-
-        assert not errors, f"Background thread raised: {errors}"
-        assert not Ad.objects.filter(pk=ad_id).exists(), (
-            "Ad should have been hard-deleted by the concurrent sweep "
-            "after the lock was released"
-        )
-
-    def test_select_for_update_blocks_concurrent_delete_during_reactivate(
-        self, seller, category, city
-    ) -> None:
-        """A row locked with ``select_for_update()`` blocks a concurrent
-        hard-delete during the ad_reactivate path.
-
-        The ad_reactivate view fetches with ``Ad.objects.select_for_update()``
-        inside ``transaction.atomic()`` before calling ``transition_to()``.
-        """
-        ad = create_test_ad(seller, category, city, status=AdStatus.ARCHIVED)
-        ad_id = ad.id
-
-        started = threading.Event()
-        finished = threading.Event()
-        errors: list[BaseException] = []
-
-        def concurrent_hard_delete() -> None:
-            started.set()
-            try:
-                with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
-                    Ad.objects.filter(pk=ad_id).delete()
-            except BaseException as exc:  # noqa: BLE001
-                errors.append(exc)
-            finally:
-                finished.set()
-                connection.close()
-
-        with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - Django: django-stubs not installed; Atomic.__enter__/__exit__ untyped
-            locked_ad = Ad.objects.select_for_update().get(pk=ad_id)
-            assert locked_ad.id == ad_id
-
-            thread = threading.Thread(target=concurrent_hard_delete)
-            thread.start()
-
-            assert started.wait(timeout=5), "Background thread did not start"
-
-            time.sleep(1.0)
-            assert not finished.is_set(), (
-                "DELETE completed before lock was released — "
-                "select_for_update did not block the concurrent delete"
-            )
-
         assert finished.wait(timeout=10), (
             "DELETE did not complete after lock was released"
         )

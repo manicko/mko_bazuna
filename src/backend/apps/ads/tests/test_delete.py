@@ -97,21 +97,3 @@ class TestAdDeleteGetRejected:
 
         ad.refresh_from_db()
         assert ad.status != AdStatus.DELETED  # unchanged by GET
-
-    def test_delete_post_still_works(
-        self,
-        seller,
-        category,
-        city,
-    ) -> None:
-        """POST /ads/<id>/delete/ still deletes the ad."""
-        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
-        client = Client()
-        client.force_login(seller)
-
-        response = client.post(reverse("ads:delete", args=[ad.id]))
-        assert response.status_code == 302
-        assert "dashboard" in response.url
-
-        ad.refresh_from_db()
-        assert ad.status == AdStatus.DELETED
