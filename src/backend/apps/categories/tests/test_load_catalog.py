@@ -4,6 +4,12 @@ Covers the post-load guard that asserts Category and City rows exist after
 the catalog builder runs, raising CommandError if either dataset is empty.
 Also covers the ENT-037 smoke test: load_catalog populates LookupItem rows
 via builder Phase 1 (lookups).
+
+Note: three tests below each invoke the full real catalog load from
+``categories.yaml`` (advisory lock 104, 4 builder phases). They could share
+a single catalog-load fixture, but ``test_post_load_guard_checks_cities``
+must delete cities first, so automatic deduplication is left as a follow-up
+(B19 audit finding #4).
 """
 
 from __future__ import annotations
@@ -29,7 +35,7 @@ class TestLoadCatalogPostLoadGuard:
         empty_config = tmp_path / "empty.yaml"
         empty_config.write_text("--- {}", encoding="utf-8")
 
-        with pytest.raises(CommandError, match="zero categories"):
+        with pytest.raises(CommandError, match="Catalog loaded zero categories"):
             call_command("load_catalog", "--config", str(empty_config))
 
     def test_load_catalog_succeeds_with_categories_present(self, city: City) -> None:

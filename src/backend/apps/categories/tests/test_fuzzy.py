@@ -38,3 +38,20 @@ class TestSharedCategoryFuzzyLadder:
         result = _fuzzy_match_by_name("electronic", LanguageLocale.ENGLISH)
         assert result is not None
         assert result.id == electronics.id
+
+    def test_name_ladder_accepts_above_cutoff_match_with_case_variance(
+        self, electronics: Category
+    ) -> None:
+        """The name ladder accepts a match above the 0.8 cutoff despite case variance.
+
+        ``get_close_matches`` is case-sensitive, so the slug ladder
+        ("electro" vs "electronics" = 0.778) and the name ladder
+        ("electro" vs "Electronics" = 0.667) diverge at the knife-edge
+        ``electro`` query. This test asserts the name ladder does accept
+        a clearly above-cutoff match ("Electronix" vs "Electronics" = 0.857)
+        so the accept-path of the name ladder is covered beyond the
+        all-lowercase "electronic" sample.
+        """
+        result = _fuzzy_match_by_name("Electronix", LanguageLocale.ENGLISH)
+        assert result is not None
+        assert result.id == electronics.id

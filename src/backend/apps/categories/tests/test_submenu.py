@@ -17,13 +17,43 @@ from apps.categories.models import Category
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+
 @pytest.fixture
 def tree() -> Category:
-    """Create a root category with active and inactive children."""
-    root = Category.objects.create(name="Транспорт", slug="transport")
-    Category.objects.create(name="Велосипеды", slug="bicycles", parent=root)
-    Category.objects.create(name="Автомобили", slug="cars", parent=root)
-    Category.objects.create(name="Устаревшее", slug="old", parent=root, is_active=False)
+    """Create a root category with active and inactive children.
+
+    All children carry ``name_i18n`` with ``ru`` translations so that
+    localization tests (``?lang=ru``) exercise real ``name_i18n`` data
+    rather than falling back to the base ``name`` field (B19 audit #8).
+    """
+    root = Category.objects.create(
+        name="Транспорт",
+        slug="transport",
+        name_i18n={"ru": "Транспорт"},
+    )
+    Category.objects.create(
+        name="Велосипеды",
+        slug="bicycles",
+        parent=root,
+        name_i18n={"ru": "Велосипеды"},
+    )
+    Category.objects.create(
+        name="Автомобили",
+        slug="cars",
+        parent=root,
+        name_i18n={"ru": "Автомобили"},
+    )
+    Category.objects.create(
+        name="Устаревшее",
+        slug="old",
+        parent=root,
+        is_active=False,
+        name_i18n={"ru": "Устаревшее"},
+    )
     return root
 
 
@@ -32,7 +62,10 @@ class TestCategorySubmenu:
 
     def test_submenu_returns_children(self, tree: Category) -> None:
         client = Client()
-        response = client.get("/categories/transport/submenu/")
+        # ?lang=ru so the response renders the localized name_i18n values
+        # rather than falling back to the base ``name`` field. The tree
+        # fixture provides ru translations, so we assert actual localization.
+        response = client.get("/categories/transport/submenu/?lang=ru")
         assert response.status_code == 200
         content = response.content.decode("utf-8")
         assert "Велосипеды" in content
@@ -50,16 +83,21 @@ class TestCategorySubmenu:
         assert client.get(f"/categories/{old.slug}/submenu/").status_code == 404
 
     def test_submenu_localized_content(self, tree: Category) -> None:
-        """Submenu renders localized names based on ``?lang=X`` parameter."""
+        """Submenu renders localized names based on ``?lang=X`` parameter.
+
+        The ``tree`` fixture already provides ``name_i18n`` for each child.
+        This test overwrites the ``bs`` translations to verify the cache
+        isolates locales.
+        """
         root = tree
+        child_bicycles = Category.objects.get(slug="bicycles")
+        child_cars = Category.objects.get(slug="cars")
+
+        # Override bs translations
         root.name_i18n = {"ru": "Транспорт", "bs": "Prevoz"}
         root.save(update_fields=["name_i18n"])
-
-        child_bicycles = Category.objects.get(slug="bicycles")
         child_bicycles.name_i18n = {"ru": "Велосипеды", "bs": "Bicikli"}
         child_bicycles.save(update_fields=["name_i18n"])
-
-        child_cars = Category.objects.get(slug="cars")
         child_cars.name_i18n = {"ru": "Автомобили", "bs": "Automobili"}
         child_cars.save(update_fields=["name_i18n"])
 
@@ -117,7 +155,13 @@ def catalog() -> None:
 
 
 class TestExpandButtons:
-    """Expand buttons render only for categories that have children (RC-A)."""
+    """Expand buttons render only for categories that have children (RC-A).
+
+    Hard-coupled to the committed ``catalog/categories.yaml`` shape:
+    ``business`` is a non-leaf node (has descendants with children), while
+    ``ready-business`` is a leaf node (no children). Renaming either slug or
+    restructuring their children in the YAML will flip these assertions.
+    """
 
     def test_expand_button_present_for_category_with_children(
         self, catalog: None

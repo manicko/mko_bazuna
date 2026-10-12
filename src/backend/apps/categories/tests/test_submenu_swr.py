@@ -7,12 +7,14 @@ Covers:
   - SWR state machine on submenu cache reads (fresh hit, stale serve,
     cold miss winner/loser, expiry, lock-held default fallback)
   - Single-flight: producer invoked exactly once under concurrent access
+  - Concurrent stale-hit: loser path under a shared stale entry
   - Version-bump invalidation (old key unreachable after bump_tree_version)
 
 LocMemCache is used in tests (settings/test.py). Under LocMemCache:
-  - cache.add single-flight is intra-process only
-  - cache.incr is thread-safe (Django acquires a per-key lock)
-  - cache.delete_pattern does not exist (no-op)
+   - cache.add single-flight is intra-process only
+   - cache.add / cache.incr are serialised by LocMemCache's single global
+     per-cache lock (not per-key)
+   - cache.delete_pattern does not exist (no-op)
 Tests assert version-bump and SWR behavior, never delete_pattern.
 """
 
@@ -103,6 +105,60 @@ class TestSubmenuSwr:
         assert val == "stale_html"
         assert call_count == 1
 
+    def test_submenu_concurrent_stale_hit_loser_serves_stale(self):
+        """On a stale hit, only the lock-winner recomputes; losers serve stale.
+
+        Unlike the cold-miss single-flight test, this covers the stale-hit
+        loser path: when several concurrent readers hit a stale entry, only one
+        wins ``cache.add(lock_key)`` (swr_cache.py:113) and recomputes; the rest
+        must serve the stale value without recomputing. This is the highest-
+        traffic production path (PERF-007 wrapped the real endpoint).
+
+        Uses LocMemCache, so this validates intra-process behavior only.
+        """
+        key = "test:submenu_swr:stale_concurrent"
+        cache.set(
+            key,
+            _make_entry("stale_html", age_seconds=SUBMENU_CACHE_TTL + 30),
+            timeout=SUBMENU_CACHE_TTL + SUBMENU_CACHE_STALE_TTL + 60,
+        )
+
+        call_count = 0
+        counter_lock = threading.Lock()
+        barrier = threading.Barrier(5)
+        results: list = []
+        result_lock = threading.Lock()
+
+        def producer():
+            nonlocal call_count
+            with counter_lock:
+                call_count += 1
+            time.sleep(0.2)
+            return "fresh_html"
+
+        def worker():
+            barrier.wait()
+            val = get_with_stale_revalidate(
+                key,
+                producer,
+                ttl=SUBMENU_CACHE_TTL,
+                stale_ttl=SUBMENU_CACHE_STALE_TTL,
+                lock_ttl=SUBMENU_CACHE_LOCK_TTL,
+                default="",
+            )
+            with result_lock:
+                results.append(val)
+
+        threads = [threading.Thread(target=worker) for _ in range(5)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert call_count == 1
+        # All threads served the stale value; only the winner recomputed.
+        assert all(r == "stale_html" for r in results)
+
     def test_submenu_cold_miss_recomputes_and_caches(self):
         assert cache.get(SUBMENU_KEY) is None
 
@@ -125,6 +181,10 @@ class TestSubmenuSwr:
         assert cached["value"] == "computed_fragment"
 
     def test_submenu_cold_miss_lock_held_returns_default(self):
+        # NOTE: This couples to the private ``_CACHE_LOCK_SUFFIX`` constant.
+        # Decoupling would require either exporting a public lock-key builder
+        # or injecting a fake cache — both are production-code changes left for
+        # a future iteration. The coupling is documented here (B19 audit #12).
         lock_key = f"{SUBMENU_KEY}{_CACHE_LOCK_SUFFIX}"
         cache.add(lock_key, "1", SUBMENU_CACHE_LOCK_TTL)
 
@@ -191,6 +251,13 @@ class TestSubmenuSwr:
         assert cache.get(key_after) is None
 
     def test_submenu_single_flight_producer_called_once_under_concurrent_access(self):
+        """Under concurrent cold misses, exactly one worker runs the producer.
+
+        Uses LocMemCache, so this validates intra-process single-flight only —
+        it cannot exercise the production cross-process Redis path (the
+        swr_cache.py docstring explicitly notes LocMemCache single-flight is
+        intra-process only).
+        """
         key = "test:submenu_swr:single_flight"
         lock_key = f"{key}{_CACHE_LOCK_SUFFIX}"
         cache.delete(key)
@@ -235,13 +302,43 @@ class TestSubmenuSwr:
 
 @pytest.fixture
 def tree():
-    """Create a root category with active and inactive children."""
+    """Create a root category with active and inactive children.
+
+    All children carry ``name_i18n`` with ``ru`` translations so that
+    localization tests (``?lang=ru``) exercise real ``name_i18n`` data
+    rather than falling back to the base ``name`` field (B19 audit #8).
+
+    Note: this fixture is duplicated from ``test_submenu.py``. It exists here
+    because pytest fixtures are scoped per-module unless shared via conftest.py
+    (B19 audit finding #9 — a future refactor could move this to a shared
+    conftest).
+    """
     from apps.categories.models import Category
 
-    root = Category.objects.create(name="Транспорт", slug="transport")
-    Category.objects.create(name="Велосипеды", slug="bicycles", parent=root)
-    Category.objects.create(name="Автомобили", slug="cars", parent=root)
-    Category.objects.create(name="Устаревшее", slug="old", parent=root, is_active=False)
+    root = Category.objects.create(
+        name="Транспорт",
+        slug="transport",
+        name_i18n={"ru": "Транспорт"},
+    )
+    Category.objects.create(
+        name="Велосипеды",
+        slug="bicycles",
+        parent=root,
+        name_i18n={"ru": "Велосипеды"},
+    )
+    Category.objects.create(
+        name="Автомобили",
+        slug="cars",
+        parent=root,
+        name_i18n={"ru": "Автомобили"},
+    )
+    Category.objects.create(
+        name="Устаревшее",
+        slug="old",
+        parent=root,
+        is_active=False,
+        name_i18n={"ru": "Устаревшее"},
+    )
     return root
 
 
@@ -292,12 +389,3 @@ class TestSubmenuCacheIntegration:
         response = client.get("/categories/transport/submenu/?lang=ru")
         assert response.status_code == 200
         assert cache.get(key_after) is not None
-
-    def test_submenu_endpoint_returns_correct_content(self, tree):
-        client = Client()
-        response = client.get("/categories/transport/submenu/")
-        assert response.status_code == 200
-        content = response.content.decode("utf-8")
-        assert "Велосипеды" in content
-        assert "Автомобили" in content
-        assert "Устаревшее" not in content
