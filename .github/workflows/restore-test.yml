@@ -93,7 +93,7 @@ jobs:
         # "Off-host real-artifact acquisition — OPEN NAMED TASK" note below.
         run: |
           mkdir -p backups
-          pg_dump --no-sync -h localhost -U postgres -d mko_bazuna -F c > backups/test_backup.dump
+          pg_dump --no-sync "postgres://postgres:postgres@localhost:5432/mko_bazuna" -F c > backups/test_backup.dump
 
       # ---------------------------------------------------------------------
       # Off-host real-artifact acquisition — OPEN NAMED TASK (12-OPS-004)
