@@ -13,7 +13,6 @@ coverage is exercised in CI alongside the autocomplete/alert tests.
 """
 
 import logging
-import re
 from unittest.mock import patch
 
 import pytest
@@ -24,7 +23,7 @@ from django.utils import timezone
 from apps.ads.models import Ad
 from apps.ads.services.listings_query import MAX_FEATURE_FILTER_SLUGS
 from apps.categories.models import Category
-from apps.core.enums import AdSort, AdStatus
+from apps.core.enums import AdSort, AdStatus, RateLimitBudget
 from apps.core.utils.json_logging import RedactingJsonFormatter
 from apps.locations.models import City
 from apps.lookups.models import LookupGroup, LookupItem
@@ -41,14 +40,26 @@ def _create_feature_group(count: int) -> dict[str, LookupItem]:
     Local to this module — ``feature_lookup`` lives in the ads tests conftest
     and cannot be imported here. The count is chosen to exceed the DTO cap so
     the at-cap positive control is meaningful.
+
+    The DTO cap is ``MAX_FEATURE_FILTER_SLUGS`` (17 = 13 catalogue max at seed
+    + 4 headroom, see ``listings_query.py:64-66``); the negative-control test
+    passes ``MAX_FEATURE_FILTER_SLUGS + 1`` (``count`` arg) and the positive
+    control selects exactly ``MAX_FEATURE_FILTER_SLUGS`` items.
     """
     group = LookupGroup.objects.create(code="listing_feature", is_system=True)
     result: dict[str, LookupItem] = {}
-    for i in range(count):
-        slug = f"feat-{i}"
-        result[slug] = LookupItem.objects.create(
-            group=group, slug=slug, name_i18n={"ru": slug, "en": slug}, is_active=True
+    items = [
+        LookupItem(
+            group=group,
+            slug=f"feat-{i}",
+            name_i18n={"ru": f"feat-{i}", "en": f"feat-{i}"},
+            is_active=True,
         )
+        for i in range(count)
+    ]
+    LookupItem.objects.bulk_create(items)
+    for i in range(count):
+        result[f"feat-{i}"] = items[i]
     return result
 
 
@@ -346,6 +357,7 @@ class TestSearchViewPublishesFilter:
 class TestSearchViewDeclinedConsent:
     """A consent-declined user's PUBLISHED ads are hidden from search and listings (SRH-001)."""
 
+    @pytest.mark.django_db(transaction=True)
     def test_declined_user_published_ads_hidden_from_search(
         self,
         seller: User,
@@ -374,6 +386,7 @@ class TestSearchViewDeclinedConsent:
         assert response.status_code == 200
         assert declined_ad.id not in {a.id for a in response.context["page_obj"]}
 
+    @pytest.mark.django_db(transaction=True)
     def test_declined_user_published_ads_hidden_from_listings(
         self,
         seller: User,
@@ -818,18 +831,18 @@ class TestSearchViewCategoryNarrowingSignal:
         assert "Смотреть все объявления" in html
         assert root_category.name in html
 
-        # Follow the undo link exactly as rendered: it keeps the buyer's query,
-        # opts out of the guess, and preserves the other active filters.
-        href_match = re.search(
-            r'<a href="([^"]*)"[^>]*>Смотреть все объявления</a>', html
+        # Follow the undo link: it carries all_categories=1, preserves q and
+        # min_price. Built from the response context (the source of truth for
+        # the rendered href) instead of fragile regex parsing of the HTML.
+        assert "all_categories=1" in html
+        assert "min_price=10" in html
+        undo_url = (
+            f"/search/?q={response.context['query']}"
+            "&all_categories=1"
+            f"&min_price={response.context['min_price']}"
         )
-        assert href_match, "undo link not found in rendered control"
-        undo_href = href_match.group(1)
-        assert "all_categories=1" in undo_href
-        assert "q=" in undo_href
-        assert "min_price=10" in undo_href
 
-        undo = client.get(undo_href)
+        undo = client.get(undo_url)
         assert undo.status_code == 200
         # The buyer's own query is preserved, not discarded.
         assert undo.context["query"] == "Транспорт"
@@ -847,8 +860,9 @@ class TestSearchViewCategoryNarrowingSignal:
     ) -> None:
         """The undo must not expose non-PUBLISHED or inactive-category ads.
 
-        Asserted WITH the control rendered and by following its rendered href
-        (which carries ``all_categories=1``), not a hand-built URL.
+        Asserted WITH the control rendered (its link carries ``all_categories=1``)
+        and by following the undo URL built from the response context, rather
+        than regex-parsing the rendered href.
         """
         active_ad = create_test_ad(
             seller,
@@ -883,12 +897,15 @@ class TestSearchViewCategoryNarrowingSignal:
         # The control is rendered ...
         assert "Смотреть все объявления" in html
 
-        # ... and the undo target still applies the visibility predicate.
-        href_match = re.search(
-            r'<a href="([^"]*)"[^>]*>Смотреть все объявления</a>', html
+        # ... and the undo link carries all_categories=1.
+        assert "all_categories=1" in html
+
+        # Follow the undo URL (built from the response context).
+        undo_url = (
+            f"/search/?q={response.context['query']}"
+            "&all_categories=1"
         )
-        assert href_match, "undo link not found in rendered control"
-        undo = client.get(href_match.group(1))
+        undo = client.get(undo_url)
         assert undo.status_code == 200
         whole_tree_ids = {a.id for a in undo.context["page_obj"]}
         assert active_ad.id in whole_tree_ids
@@ -1065,6 +1082,44 @@ class TestSearchViewCategoryNarrowingSignal:
         # The city filter is preserved, so the same-query ad in no city is out.
         assert ad_wrong_city.id not in result_ids
 
+    def test_all_categories_flag_paginates_correctly(
+        self,
+        seller: User,
+        root_category: Category,
+        child_category: Category,
+        other_category: Category,
+        city: City,
+    ) -> None:
+        """``?all_categories=1&page=2`` returns page 2 of the widened result set.
+
+        The flag suppresses the single-word fuzzy category narrowing, so ads
+        from multiple branches that match the query are returned together.
+        With >24 matches the set spans two pages; ``page=2`` must return the
+        second page with ``has_previous`` true.
+        """
+        for i in range(15):
+            create_test_ad(
+                seller, child_category, city,
+                title=f"Транспорт {i:02d}", status=AdStatus.PUBLISHED,
+            )
+        for i in range(15):
+            create_test_ad(
+                seller, other_category, city,
+                title=f"Транспорт b{i:02d}", status=AdStatus.PUBLISHED,
+            )
+
+        client = Client()
+        response = client.get(
+            "/search/?q=Транспорт&all_categories=1&page=2&lang=ru"
+        )
+
+        assert response.status_code == 200
+        page_obj = response.context["page_obj"]
+        assert page_obj.number == 2
+        assert page_obj.has_previous() is True
+        assert page_obj.has_next() is False
+        assert response.context["has_results"] is True
+
 
 class TestSearchViewCitySuggestion:
     """Search view provides did-you-mean city suggestions (Block 8 V5)."""
@@ -1097,6 +1152,42 @@ class TestSearchViewCitySuggestion:
         assert response.context["suggested_city"] is not None
         # The suggestion should be a valid city slug (not the raw typo)
         assert response.context["suggested_city"] != "budav"
+
+    def test_search_with_valid_city_slug_filters_results(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """A valid ``?city=<slug>`` filters results to that city's ads.
+
+        Ads matching the query in other cities must be excluded when the
+        ``city`` query parameter resolves to a real ``City`` slug.
+        """
+        other_city = City.objects.create(
+            country_code="ME",
+            name="Другой город",
+            region="Central",
+            slug="drugoy-grad",
+        )
+        ad_in_city = create_test_ad(
+            seller, root_category, city,
+            title="Велосипед в тестграде", status=AdStatus.PUBLISHED,
+        )
+        ad_in_other_city = create_test_ad(
+            seller, root_category, other_city,
+            title="Велосипед в другом городе", status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get(
+            f"/search/?q=велосипед&city={city.slug}&lang=ru"
+        )
+
+        assert response.status_code == 200
+        result_ids = {a.id for a in response.context["page_obj"]}
+        assert ad_in_city.id in result_ids
+        assert ad_in_other_city.id not in result_ids
 
 
 class TestSearchViewPagination:
@@ -1156,29 +1247,6 @@ class TestSearchViewPagination:
         assert page_obj.has_previous() is True
         assert page_obj.number == 2
 
-    def test_page_out_of_range_returns_last_page(
-        self,
-        seller: User,
-        root_category: Category,
-        city: City,
-    ) -> None:
-        """Page number beyond the last page returns the last page."""
-        for i in range(25):
-            create_test_ad(
-                seller,
-                root_category,
-                city,
-                title=f"Ad {i:03d}",
-                status=AdStatus.PUBLISHED,
-            )
-
-        client = Client()
-        response = client.get("/search/?page=99")
-
-        assert response.status_code == 200
-        page_obj = response.context["page_obj"]
-        assert page_obj.number == 2  # Last page
-
     def test_invalid_page_returns_first_page(
         self,
         seller: User,
@@ -1201,6 +1269,33 @@ class TestSearchViewPagination:
         assert response.status_code == 200
         page_obj = response.context["page_obj"]
         assert page_obj.number == 1
+
+    def test_sort_param_orders_results(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """``?sort=price_asc`` orders visible results by ascending price."""
+        create_test_ad(
+            seller, root_category, city,
+            title="Ad expensive", price=300, status=AdStatus.PUBLISHED,
+        )
+        create_test_ad(
+            seller, root_category, city,
+            title="Ad cheap", price=100, status=AdStatus.PUBLISHED,
+        )
+        create_test_ad(
+            seller, root_category, city,
+            title="Ad middle", price=200, status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get(f"/search/?sort={AdSort.PRICE_LOW.value}&lang=ru")
+
+        assert response.status_code == 200
+        prices = [a.price_normalized_eur for a in response.context["page_obj"]]
+        assert prices == sorted(prices)
 
 
 class TestSearchViewInputRobustness:
@@ -1553,11 +1648,31 @@ class TestSearchViewTotalCount:
     displayed value and the notice's iff-truncated rendering.
     """
 
+    @pytest.fixture
+    def thousand_plus_ads(
+        self, seller: User, root_category: Category, city: City
+    ) -> list:
+        """1001 PUBLISHED ads matching *"велосипед"*.
+
+        Two tests in this class need an at/over-cap result set with the same
+        seed parameters.  This fixture collapses the duplicated
+        ``create_test_ads_bulk`` call into a single definition.
+        """
+        return create_test_ads_bulk(
+            seller,
+            root_category,
+            city,
+            count=SEARCH_CACHE_MAX_HITS + 1,
+            title_prefix="Продам велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+
     def test_truncated_result_set_is_capped_display(
         self,
         seller: User,
         root_category: Category,
         city: City,
+        thousand_plus_ads: list,
     ) -> None:
         """With >1000 matching ads, the display is the capped value, not the try total.
 
@@ -1566,16 +1681,6 @@ class TestSearchViewTotalCount:
         total is ``SEARCH_CACHE_MAX_HITS + 1`` (Q9 2026-10-03) and
         ``results_truncated`` is ``True``.
         """
-        num_ads = SEARCH_CACHE_MAX_HITS + 1  # 1001
-        create_test_ads_bulk(
-            seller,
-            root_category,
-            city,
-            count=num_ads,
-            title_prefix="Продам велосипед",
-            status=AdStatus.PUBLISHED,
-        )
-
         client = Client()
         response = client.get("/search/?q=велосипед&lang=ru")
 
@@ -1624,6 +1729,7 @@ class TestSearchViewTotalCount:
         seller: User,
         root_category: Category,
         city: City,
+        thousand_plus_ads: list,
     ) -> None:
         """On a cold-miss loser, a truncated set still shows the capped value.
 
@@ -1632,16 +1738,6 @@ class TestSearchViewTotalCount:
         compute a true count, but a truncated set must still display the capped
         value and never an un-computed total (Q9 2026-10-03).
         """
-        num_ads = SEARCH_CACHE_MAX_HITS + 1  # 1001
-        create_test_ads_bulk(
-            seller,
-            root_category,
-            city,
-            count=num_ads,
-            title_prefix="Продам велосипед",
-            status=AdStatus.PUBLISHED,
-        )
-
         # Force the cache service to return None (simulating cold miss + lock held)
         with patch("apps.search.views.search.get_cached_search_ids", return_value=None):
             client = Client()
@@ -1812,6 +1908,38 @@ class TestSearchViewHasResultsMatchesRenderedRows:
         assert response.context["has_results"] is True
         assert "Результаты не найдены" not in response.content.decode()
 
+    def test_page_out_of_range_returns_last_page(
+        self,
+        seller: User,
+        root_category: Category,
+        city: City,
+    ) -> None:
+        """Page number beyond the last page returns the last page, not the empty state.
+
+        With >24 published ads (multiple pages), ``?page=99`` clamps to the
+        last page via ``Paginator.get_page``. This complements
+        ``test_page_out_of_range_does_not_render_empty_state`` (which covers the
+        single-page case) by verifying the clamp targets the *last* page and
+        still carries ``has_results``.
+        """
+        for i in range(25):
+            create_test_ad(
+                seller,
+                root_category,
+                city,
+                title=f"Ad {i:03d}",
+                status=AdStatus.PUBLISHED,
+            )
+
+        client = Client()
+        response = client.get("/search/?page=99")
+
+        assert response.status_code == 200
+        page_obj = response.context["page_obj"]
+        assert page_obj.number == 2  # Last page
+        assert response.context["has_results"] is True
+        assert "Результаты не найдены" not in response.content.decode()
+
 
 class TestSearchViewRateLimit:
     """The /search/ endpoint is rate-limited per-IP (SRH-006)."""
@@ -1842,10 +1970,10 @@ class TestSearchViewRateLimit:
         )
 
         client = Client()
-        # Make 30+ requests (the rate limit) to the search endpoint.
-        for i in range(31):
+        # Make ``requests``+1 requests (the rate limit) to the search endpoint.
+        for i in range(RateLimitBudget.SEARCH_PAGE.requests + 1):
             response = client.get("/search/?q=велосипед&lang=ru")
-            if i < 30:
+            if i < RateLimitBudget.SEARCH_PAGE.requests:
                 assert response.status_code == 200, (
                     f"Request {i} should be allowed"
                 )
@@ -1871,10 +1999,10 @@ class TestSearchViewRateLimit:
         )
 
         client = Client()
-        # Exhaust the search counter (30 requests).
-        for _ in range(30):
+        # Exhaust the search counter (SEARCH_PAGE.requests requests).
+        for _ in range(RateLimitBudget.SEARCH_PAGE.requests):
             client.get("/search/?q=велосипед&lang=ru")
-        # The 31st search is rejected...
+        # The next search is rejected...
         assert client.get("/search/?q=велосипед&lang=ru").status_code == 429
 
         # ...but autocomplete (a different namespace) still succeeds.

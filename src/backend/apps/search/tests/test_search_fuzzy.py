@@ -98,6 +98,14 @@ class TestFuzzyEquivalence:
         assert result is not None
         assert result.id == expected.id
 
+    def test_fuzzy_category_match_returns_none_for_random_query(self) -> None:
+        """A random query with no close category match returns ``None``.
+
+        Neither the slug-exact tier nor the fuzzy-name tier (``cutoff=0.8``)
+        should match ``xyzqwerty`` against any seeded category.
+        """
+        assert _fuzzy_category_match("xyzqwerty", LanguageLocale.RUSSIAN) is None
+
 
 class TestFuzzyInvalidation:
     """Category changes invalidate the cached name list via tree version."""

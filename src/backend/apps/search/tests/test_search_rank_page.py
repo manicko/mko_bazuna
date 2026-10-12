@@ -117,8 +117,16 @@ class TestCacheHitPageRankPreservesRenderedOrder:
         )
 
 
+@pytest.mark.unit
+@pytest.mark.django_db(transaction=True)
 class TestCacheHitRankStatementScalesWithPage:
-    """The page-scoped rank statement scales with ``per_page`` (static, no DB)."""
+    """The page-scoped rank statement scales with ``per_page`` (static, no DB).
+
+    These tests compile SQL strings without executing them — they are pure unit
+    tests measuring statement size and bind count. The class-level markers
+    override the module-level ``pytestmark`` (``django_db + integration``) to
+    signal this intent.
+    """
 
     def test_statement_arms_scale_with_page_not_cache_cap(self) -> None:
         """Built over a 1000-id list, page 1 carries ~``per_page`` arms only.

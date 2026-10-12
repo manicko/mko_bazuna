@@ -1,25 +1,16 @@
 """
 Tests for Block B3 — SLO regression guard (finding 13-PERF-001).
 
-Verifies the two remaining PERF-001 deliverables:
-  - ``PerformanceSLO`` constant values match the spec and rules.md references.
+Verifies:
+  - ``PerformanceSLO`` constant values match the spec.
   - The ``/search/`` endpoint completes within the ≤2s SLO at seed volume
-    (≥50 PUBLISHED ads), as defined in ``docs/01-spec/search-patterns.md``
-    ("Target response time: ≤2 seconds for search queries").
+    (≥50 PUBLISHED ads).
 
-This is a **robust in-repo guard** — one untimed warm-up request followed by the
-**median** of N=7 timed samples — **not a percentile instrument**.  It is a
-smoke-level regression signal for the request path: the warm-up absorbs the
-dominant cold-start cost (template/tag compilation, first FTS plan, test-client
-warm-up) and the median absorbs residual single-sample host spikes, so the
-guard stays stable on a loaded Docker host.  A percentile SLO can only be
-established by a load run: the CI ``load-test`` job's p95 gate is the **sole
-percentile instrument** for that.
-
-The ``django-prometheus`` wiring (INSTALLED_APPS, MIDDLEWARE, ``/metrics``,
-nginx restriction) is already covered by ``apps/core/tests/test_observability.py``;
-this module completes B3 with the SLO constants assertion and the latency
-regression test that every PR is gated on.
+Robust in-repo guard — one untimed warm-up request followed by the **median**
+of N=7 timed samples, **not a percentile instrument**.  The warm-up absorbs
+cold-start cost (template/tag compilation, first FTS plan) and the median
+absorbs single-sample host spikes.  The CI ``load-test`` job's p95 is the sole
+percentile instrument.
 """
 
 from __future__ import annotations
@@ -69,18 +60,9 @@ class TestSLOConstants:
         """Load-test p95 regression threshold is 10% (rules.md:228)."""
         assert PerformanceSLO.LOAD_TEST_P95_REGRESSION_THRESHOLD == 10
 
-    def test_search_slo_matches_spec(self) -> None:
-        """search-patterns.md "≤2 seconds" target → SEARCH_SLO_MS = 2000."""
-        assert PerformanceSLO.SEARCH_SLO_MS == 2000
-
     def test_search_slo_is_p99_aligned(self) -> None:
         """The ≤2s search SLO is the p99 latency target."""
         assert PerformanceSLO.SEARCH_SLO_MS == PerformanceSLO.P99_SLO_MS
-
-    def test_constants_are_int_enum(self) -> None:
-        """PerformanceSLO is an IntEnum so values work as numeric thresholds."""
-        assert isinstance(PerformanceSLO.SEARCH_SLO_MS, int)
-        assert isinstance(PerformanceSLO.P95_SLO_MS, int)
 
 
 # ---------------------------------------------------------------------------

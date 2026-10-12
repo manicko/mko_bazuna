@@ -63,7 +63,15 @@ def _contains_pii(value: str) -> bool:
 
 
 class TestSearchQueryKeyDerivation:
-    """The helper is the single key derivation."""
+    """The helper is the single key derivation.
+
+    These are pure-function tests (no database, no model access) that call
+    ``search_query_key`` and ``redact_search_query`` directly. The module-level
+    ``pytestmark`` forces ``django_db``; this class-level ``unit`` marker
+    overrides that categorisation so these tests run in the fast gate.
+    """
+
+    pytestmark = pytest.mark.unit
 
     def test_is_redact_then_lower_on_raw_query(self) -> None:
         """``search_query_key(q) == redact_search_query(q).strip().lower()``."""
@@ -96,6 +104,21 @@ class TestSearchQueryKeyDerivation:
         """The key is never longer than the raw query (200-char caps stay safe)."""
         for query in ("+79001234567", "user@example.com", "Ivan Petrov"):
             assert len(search_query_key(query)) <= len(query)
+
+    def test_redact_query_masks_name_only_pii(self) -> None:
+        """``redact_search_query`` masks a name-only query with no phone/email.
+
+        The input ``"Ivan Petrov"`` carries no phone or e-mail, so only the
+        two-word name class is masked. The output must not contain the raw
+        name fragments and must contain no phone/e-mail patterns at all.
+        """
+        redacted = redact_search_query("Ivan Petrov")
+        assert redacted == "I*** P*****"
+        assert "Ivan" not in redacted
+        assert "Petrov" not in redacted
+        # No phone or email patterns survive in a name-only input.
+        assert "@" not in redacted
+        assert "+" not in redacted
 
 
 class TestSearchQueryKeyIdempotence:

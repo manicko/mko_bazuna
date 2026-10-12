@@ -19,9 +19,9 @@ import pytest
 import redis
 from django.core.cache import cache
 from django.test import Client
-from django.utils import timezone
 from django_redis.exceptions import ConnectionInterrupted
 
+from apps.ads.models import Ad
 from apps.ads.services.listings_query import ListingsQueryParams
 from apps.core.enums import AdSort, AdStatus, LanguageLocale
 from apps.core.utils.swr_cache import (
@@ -35,7 +35,6 @@ from apps.search.services.cache import (
     bump_search_version,
     get_cached_search_ids,
     get_search_version,
-    invalidate_search_cache,
 )
 from apps.users.models import User
 
@@ -652,9 +651,34 @@ class TestSearchCacheVersionBump:
         bump_search_cache_version()
         assert get_search_version() == 1
 
-    def test_invalidate_search_cache_alias_bumps_version(self):
-        invalidate_search_cache()
-        assert get_search_version() == 1
+
+# ---------------------------------------------------------------------------
+# Shared fixture for integration cache tests
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def published_ad_for_cache_test(seller: User, category, city) -> Ad:
+    """A published ad titled *"Продам красный велосипед"* for cache tests.
+
+    Shared by the five cache-integration test classes that all seed the same
+    published ad and search for ``"велосипед"``::
+
+        TestSearchViewCaching
+        TestSearchCacheInvalidationOnPublish
+        TestSearchCacheInvalidationOnWithdrawal
+        TestSearchCacheInvalidationOnAccountState
+        TestCacheOutageDoesNotAbortUserSave
+    """
+    from conftest import create_test_ad
+
+    return create_test_ad(
+        seller,
+        category,
+        city,
+        title="Продам красный велосипед",
+        status=AdStatus.PUBLISHED,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -825,6 +849,43 @@ class TestSearchViewCaching:
         ads = list(response.context["page_obj"])
         assert len(ads) == 1
 
+    def test_large_result_exceeds_max_entry_bytes_not_cached(
+        self, seller, category, city, monkeypatch
+    ):
+        """A result whose pickled size exceeds ``SEARCH_CACHE_MAX_ENTRY_BYTES``
+        is returned to the caller but not persisted in the cache.
+
+        ``swr_cache._store`` drops entries whose pickled size exceeds
+        ``max_size_bytes`` — the value is still returned (the caller never blocks)
+        but no ``search:v1:`` key is written.  We shrink the limit to 1 byte so
+        even a single-id result is over the ceiling.
+        """
+        from conftest import create_test_ad
+
+        monkeypatch.setattr(
+            "apps.search.services.cache.SEARCH_CACHE_MAX_ENTRY_BYTES", 1
+        )
+
+        create_test_ad(
+            seller,
+            category,
+            city,
+            title="Продам красный велосипед",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get("/search/?q=велосипед&lang=ru")
+
+        # The producer still ran and returned results — the guard drops the
+        # cache write, not the response.
+        assert response.status_code == 200
+        assert len(list(response.context["page_obj"])) == 1
+
+        # ...but nothing was cached.
+        search_keys = _get_cache_keys("search:v1")
+        assert len(search_keys) == 0
+
 
 # ---------------------------------------------------------------------------
 # Cache invalidation integration tests (with database)
@@ -925,7 +986,7 @@ class TestSearchCacheInvalidationOnPublish:
         version_after = get_search_version()
         assert version_after == version_before
 
-    def test_archive_invalates_cache(self, seller, category, city):
+    def test_archive_invalidates_cache(self, seller, category, city):
         """Transitioning an ad to ARCHIVED bumps the content version."""
         from conftest import create_test_ad
 
@@ -961,7 +1022,9 @@ class TestSearchCacheInvalidationOnPublish:
 class TestSearchCacheInvalidationOnWithdrawal:
     """Cache invalidation via version bump when a user withdraws consent (08-SRH-001)."""
 
-    def test_withdrawal_bumps_cache_version(self, seller, category, city):
+    def test_withdrawal_bumps_cache_version(
+        self, seller: User, published_ad_for_cache_test: Ad
+    ):
         """withdraw_consent bumps the search content version (08-SRH-001).
 
         soft_delete_user_ads routes each ad through transition_to(DELETED),
@@ -969,16 +1032,6 @@ class TestSearchCacheInvalidationOnWithdrawal:
         bumping the cache version (AD-001).
         """
         from apps.users.services.deletion import withdraw_consent
-        from conftest import create_test_ad
-
-        # Publish an ad so there is a buyer-visible result to invalidate
-        create_test_ad(
-            seller,
-            category,
-            city,
-            title="Продам красный велосипед",
-            status=AdStatus.PUBLISHED,
-        )
 
         version_before = get_search_version()
         withdraw_consent(seller)
@@ -986,19 +1039,11 @@ class TestSearchCacheInvalidationOnWithdrawal:
 
         assert version_after > version_before
 
-    def test_withdrawal_hides_ads_and_bumps_version(self, seller, category, city):
+    def test_withdrawal_hides_ads_and_bumps_version(
+        self, seller: User, published_ad_for_cache_test: Ad
+    ):
         """After withdrawal, the ad is hidden from search AND the cache version is bumped."""
         from apps.users.services.deletion import withdraw_consent
-        from conftest import create_test_ad
-
-        create_test_ad(
-            seller,
-            category,
-            city,
-            title="Продам красный велосипед",
-            status=AdStatus.PUBLISHED,
-            published_at=timezone.now(),
-        )
 
         client = Client()
         resp1 = client.get("/search/?q=велосипед&lang=ru")
@@ -1029,7 +1074,9 @@ class TestSearchCacheInvalidationOnWithdrawal:
 class TestSearchCacheInvalidationOnAccountState:
     """A user's ``is_declined`` change invalidates the search cache (08-SRCH-005)."""
 
-    def test_give_consent_service_call_bumps_cache_version(self, seller, category, city):
+    def test_give_consent_service_call_bumps_cache_version(
+        self, seller: User, published_ad_for_cache_test: Ad
+    ):
         """``give_consent`` increases the search content version.
 
         This pins the **service call site**, not the receiver: ``give_consent``
@@ -1040,15 +1087,7 @@ class TestSearchCacheInvalidationOnAccountState:
         ``test_raw_is_declined_save_bumps_cache_version`` below.
         """
         from apps.users.services.deletion import give_consent
-        from conftest import create_test_ad
 
-        create_test_ad(
-            seller,
-            category,
-            city,
-            title="Продам красный велосипед",
-            status=AdStatus.PUBLISHED,
-        )
         seller.is_declined = True
         seller.save(update_fields=["is_declined"])
 
