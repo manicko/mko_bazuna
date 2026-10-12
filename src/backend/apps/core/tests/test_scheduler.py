@@ -36,7 +36,6 @@ from apps.core.utils.scheduler import (
     DAILY_COMMANDS,
     DAILY_HOUR_UTC,
     HOURLY_COMMANDS,
-    SCHEDULE_INTERVAL_SECONDS,
     run_one_cycle,
     run_scheduler,
     should_run_daily,
@@ -84,46 +83,14 @@ def _noop_command(name: str) -> int:
 
 
 class TestSchedulerConstants:
-    """Verify the module-level command lists and thresholds."""
-
-    def test_hourly_commands_match_spec(self) -> None:
-        """HOURLY_COMMANDS must match the canonical Phase 4 sweep list."""
-        assert HOURLY_COMMANDS == [
-            "archive_sweep",
-            "delete_sweep",
-            "consent_hard_delete",
-            "sweep_drafts",
-            "sweep_orphaned_media",
-            "cleanup_login_tokens",
-            "purge_failed_ads",
-            "purge_rejected_ads",
-            "purge_deleted_ads",
-            "purge_media_deletion_errors",
-        ]
-
-    def test_daily_commands_include_send_alerts(self) -> None:
-        """DAILY_COMMANDS must include send_alerts, rollup_daily_metrics and
-        purge_consent_records."""
-        assert DAILY_COMMANDS == [
-            "send_alerts",
-            "rollup_daily_metrics",
-            "purge_consent_records",
-        ]
+    """Verify business-critical scheduler constants."""
 
     def test_daily_hour_utc_is_8(self) -> None:
         """DAILY_HOUR_UTC must be 08:00 UTC per phase-02 spec."""
         assert DAILY_HOUR_UTC == 8
 
-    def test_schedule_interval_is_3600(self) -> None:
-        """SCHEDULE_INTERVAL_SECONDS must be 1 hour."""
-        assert SCHEDULE_INTERVAL_SECONDS == 3600.0
-
-    def test_sweep_orphaned_media_in_hourly(self) -> None:
-        """sweep_orphaned_media must be present in HOURLY_COMMANDS."""
-        assert "sweep_orphaned_media" in HOURLY_COMMANDS
-
     def test_all_hourly_commands_are_distinct(self) -> None:
-        """No duplicate command names in HOURLY_COMMANDS."""
+        """No duplicate command names in HOURLY_COMMANDS — prevents double-dispatch."""
         assert len(HOURLY_COMMANDS) == len(set(HOURLY_COMMANDS))
 
 

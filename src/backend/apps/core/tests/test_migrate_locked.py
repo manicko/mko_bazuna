@@ -13,8 +13,8 @@ these are fast unit tests with no database or subprocess involvement.
 from __future__ import annotations
 
 import importlib
-import inspect
 import logging
+import os
 import subprocess
 from contextlib import nullcontext
 from unittest.mock import patch
@@ -149,27 +149,37 @@ class TestMainTimeout:
 
 
 class TestDefaultSettings:
-    """Verify migrate_locked.main() defaults to the prod settings module."""
+    """Verify migrate_locked.main() and manage.py default to prod settings."""
 
-    def test_main_defaults_to_prod_settings(self) -> None:
+    def test_main_defaults_to_prod_settings(self, monkeypatch: pytest.MonkeyPatch) -> None:
         """``os.environ.setdefault`` in ``main()`` targets ``config.settings.prod``."""
-        source = inspect.getsource(migrate_locked.main)
-        assert 'os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.prod")' in source
+        monkeypatch.delenv("DJANGO_SETTINGS_MODULE", raising=False)
+        monkeypatch.setattr(django, "setup", lambda: None)
+        monkeypatch.setattr(
+            "apps.core.utils.advisory_lock.advisory_lock",
+            lambda *args, **kwargs: nullcontext(),
+        )
+        monkeypatch.setattr(migrate_locked, "_build_steps", lambda: ())
+        monkeypatch.delenv("RUN_TRANSLATION_BACKFILL", raising=False)
 
-    def test_main_does_not_default_to_dev_settings(self) -> None:
-        """The default is ``config.settings.prod``, never ``config.settings.dev``."""
-        source = inspect.getsource(migrate_locked.main)
-        assert 'os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.dev")' not in source
+        rc = migrate_locked.main()
 
-    def test_manage_defaults_to_prod_settings(self) -> None:
+        assert rc == 0
+        assert os.environ["DJANGO_SETTINGS_MODULE"] == "config.settings.prod"
+
+    def test_manage_defaults_to_prod_settings(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
         """``manage.py``'s ``os.environ.setdefault`` targets ``config.settings.prod``."""
-        source = inspect.getsource(importlib.import_module("manage").main)
-        assert 'os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.prod")' in source
+        manage_mod = importlib.import_module("manage")
+        monkeypatch.delenv("DJANGO_SETTINGS_MODULE", raising=False)
+        monkeypatch.setattr(
+            "django.core.management.execute_from_command_line",
+            lambda argv: None,
+        )
+        manage_mod.main()
 
-    def test_manage_does_not_default_to_dev_settings(self) -> None:
-        """``manage.py``'s default is ``config.settings.prod``, never ``config.settings.dev``."""
-        source = inspect.getsource(importlib.import_module("manage").main)
-        assert 'os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.dev")' not in source
+        assert os.environ["DJANGO_SETTINGS_MODULE"] == "config.settings.prod"
 
 
 class TestSessionLockAcquisitionLog:

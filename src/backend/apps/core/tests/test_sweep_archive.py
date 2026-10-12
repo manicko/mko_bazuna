@@ -7,6 +7,7 @@ guarded by an advisory lock (lock id 1).
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from datetime import timedelta
@@ -29,8 +30,7 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 class TestArchiveSweep:
     """Tests for archive_sweep command (advisory lock 1, 60-day window)."""
 
-    def test_dry_run_does_not_mutate(self, seller, category, city):
-
+    def test_dry_run_does_not_mutate(self, seller, category, city, caplog: pytest.LogCaptureFixture) -> None:
         stale = create_test_ad(
             seller,
             category,
@@ -38,7 +38,12 @@ class TestArchiveSweep:
             status=AdStatus.PUBLISHED,
             published_at=timezone.now() - timedelta(days=90),
         )
-        call_command("archive_sweep", "--dry-run")
+        with caplog.at_level(
+            logging.INFO,
+            logger="apps.core.management.commands.archive_sweep",
+        ):
+            call_command("archive_sweep", "--dry-run")
+        assert "DRY RUN: Would archive 1 ads older than 60 days" in caplog.text
         stale.refresh_from_db()
         assert stale.status == AdStatus.PUBLISHED
 

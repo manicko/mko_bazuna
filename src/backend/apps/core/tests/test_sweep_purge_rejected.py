@@ -7,6 +7,7 @@ guarded by an advisory lock (lock id 7).
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
 import pytest
@@ -24,8 +25,7 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 class TestPurgeRejectedAds:
     """Tests for purge_rejected_ads command (advisory lock 7, 90-day window)."""
 
-    def test_dry_run_does_not_delete(self, seller, category, city):
-
+    def test_dry_run_does_not_delete(self, seller, category, city, caplog: pytest.LogCaptureFixture) -> None:
         old = create_test_ad(
             seller,
             category,
@@ -33,7 +33,12 @@ class TestPurgeRejectedAds:
             status=AdStatus.REJECTED,
             rejected_at=timezone.now() - timedelta(days=120),
         )
-        call_command("purge_rejected_ads", "--dry-run")
+        with caplog.at_level(
+            logging.INFO,
+            logger="apps.core.management.commands.purge_rejected_ads",
+        ):
+            call_command("purge_rejected_ads", "--dry-run")
+        assert "DRY RUN: Would delete 1 ads with REJECTED status older than 90 days" in caplog.text
         assert Ad.objects.filter(pk=old.pk).exists()
 
     def test_purges_rejected_ads_older_than_90_days(self, seller, category, city):

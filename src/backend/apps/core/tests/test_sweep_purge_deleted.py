@@ -7,6 +7,7 @@ guarded by an advisory lock (lock id 11).
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
 import pytest
@@ -62,8 +63,7 @@ class TestPurgeDeletedAds:
     def test_purge_deleted_ads_advisory_lock(self):
         assert AdvisoryLockId.PURGE_DELETED_ADS == 11
 
-    def test_purge_deleted_ads_dry_run(self, seller, category, city):
-
+    def test_purge_deleted_ads_dry_run(self, seller, category, city, caplog: pytest.LogCaptureFixture) -> None:
         old = create_test_ad(
             seller,
             category,
@@ -71,35 +71,13 @@ class TestPurgeDeletedAds:
             status=AdStatus.DELETED,
             deleted_at=timezone.now() - timedelta(days=200),
         )
-        call_command("purge_deleted_ads", "--dry-run")
+        with caplog.at_level(
+            logging.INFO,
+            logger="apps.core.management.commands.purge_deleted_ads",
+        ):
+            call_command("purge_deleted_ads", "--dry-run")
+        assert "DRY RUN: Would delete 1 ads with DELETED status older than 120 days" in caplog.text
         assert Ad.objects.filter(pk=old.pk).exists()
-
-    @pytest.mark.django_db(transaction=True)
-    def test_purge_deleted_ads_media_cleanup(self, seller, category, city, monkeypatch):
-
-        old = create_test_ad(
-            seller,
-            category,
-            city,
-            status=AdStatus.DELETED,
-            deleted_at=timezone.now() - timedelta(days=200),
-        )
-        AdImage.objects.create(ad=old, image="test-uuid-deleted.jpg")
-
-        deleted_keys: list[str] = []
-
-        def _record(storage_key: str) -> None:
-            deleted_keys.append(storage_key)
-
-        monkeypatch.setattr(
-            "apps.media.signals.delete_photo",
-            _record,
-        )
-
-        call_command("purge_deleted_ads")
-
-        assert "test-uuid-deleted.jpg" in deleted_keys
-        assert not Ad.objects.filter(pk=old.pk).exists()
 
     @pytest.mark.django_db(transaction=True)
     def test_collects_thumbnail_keys_for_media_cleanup(

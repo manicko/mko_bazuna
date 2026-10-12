@@ -8,6 +8,7 @@ guarded by an advisory lock (lock id 3).
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
 import pytest
@@ -33,11 +34,15 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 class TestConsentHardDelete:
     """Tests for consent_hard_delete command (advisory lock 3, 30-day window)."""
 
-    def test_dry_run_does_not_delete(self, seller):
-
+    def test_dry_run_does_not_delete(self, seller, caplog: pytest.LogCaptureFixture) -> None:
         seller.consent_revoked_at = timezone.now() - timedelta(days=60)
         seller.save()
-        call_command("consent_hard_delete", "--dry-run")
+        with caplog.at_level(
+            logging.INFO,
+            logger="apps.core.management.commands.consent_hard_delete",
+        ):
+            call_command("consent_hard_delete", "--dry-run")
+        assert "DRY RUN: Would hard-delete 1 users with consent revoked over 30 days ago" in caplog.text
         assert User.objects.filter(pk=seller.pk).exists()
 
     def test_hard_deletes_users_past_grace_period(self, seller):
@@ -126,8 +131,19 @@ class TestConsentHardDelete:
     def test_lock_id_is_consent_hard_delete(self):
         assert AdvisoryLockId.CONSENT_HARD_DELETE == 3
 
-    def test_crash_between_updates_and_delete_rolls_back(self, seller, monkeypatch):
-        """Crash during mutation rolls back atomically - user and history preserved."""
+    @pytest.mark.django_db(transaction=True)
+    def test_crash_between_updates_and_delete_rolls_back(self, seller) -> None:
+        """Crash during user deletion rolls back atomically - user and history preserved.
+
+        Uses a real ``pre_delete`` signal handler on ``User`` (instead of a
+        monkey-patched fake queryset) so the production ``queryset.delete()``
+        code path runs in full -- the Collector, the ``pre_delete`` dispatch, and
+        the savepoint rollback -- exercising the exact guarantee being tested:
+        a crash between the null-UPDATE phase and the user DELETE rolls back
+        everything inside ``handle()``'s ``transaction.atomic()``.
+        """
+        from django.db.models.signals import pre_delete
+
         seller.consent_revoked_at = timezone.now() - timedelta(days=60)
         seller.save()
         event = AnalyticsEvent.objects.create(
@@ -145,45 +161,24 @@ class TestConsentHardDelete:
             text="rollback ticket",
         )
 
-        # Patch User.objects.filter to return a mock that crashes on delete
-        # but allows count() and values_list()
-        class _CrashOnDeleteQuerySet:
-            def __init__(self, target_pk):
-                self._target_pk = target_pk
+        def _raise_on_user_delete(sender, instance, **kwargs):
+            if instance.pk == seller.pk:
+                raise RuntimeError("Simulated crash during user delete")
 
-            def count(self):
-                return 1
+        pre_delete.connect(_raise_on_user_delete, sender=User)
+        try:
+            with pytest.raises(RuntimeError, match="Simulated crash during user delete"):
+                call_command("consent_hard_delete")
 
-            def values_list(self, *args, **kwargs):
-                return [self._target_pk]
-
-            def delete(self):
-                raise RuntimeError("Simulated crash during delete")
-
-            def exists(self):
-                return True
-
-        original_filter = User.objects.filter
-        monkeypatch.setattr(
-            User.objects,
-            "filter",
-            lambda *args, **kwargs: _CrashOnDeleteQuerySet(seller.pk),
-        )
-
-        with pytest.raises(RuntimeError, match="Simulated crash during delete"):
-            call_command("consent_hard_delete")
-
-        # Restore original filter so post-crash assertions use real DB
-        monkeypatch.setattr(User.objects, "filter", original_filter)
-
-        # Verify atomicity: user still exists, history not nulled, ticket restored
-        assert User.objects.filter(pk=seller.pk).exists()
-        event.refresh_from_db()
-        assert event.user_id == seller.pk
-        log.refresh_from_db()
-        assert log.user_id == seller.pk
-        # The ticket sweep is inside the same atomic() and rolls back too.
-        assert SupportTicket.objects.filter(pk=ticket.pk).exists()
+            # Verify atomicity: all mutations inside handle()'s atomic() rolled back
+            assert User.objects.filter(pk=seller.pk).exists()
+            event.refresh_from_db()
+            assert event.user_id == seller.pk
+            log.refresh_from_db()
+            assert log.user_id == seller.pk
+            assert SupportTicket.objects.filter(pk=ticket.pk).exists()
+        finally:
+            pre_delete.disconnect(_raise_on_user_delete, sender=User)
 
     def test_hard_delete_cascades_support_tickets_and_spares_others(self, seller):
         """A hard-deleted user's ticket goes with them; another user's survives."""

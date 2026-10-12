@@ -24,18 +24,15 @@ spy replaces ``advisory_lock`` and each command is driven through
 
 from __future__ import annotations
 
-from datetime import timedelta
 from unittest.mock import DEFAULT, AsyncMock, MagicMock
 
 import pytest
 from django.conf import settings
 from django.core.management import call_command
 from django.db import transaction
-from django.utils import timezone
 
-from apps.core.enums import AdStatus, AdvisoryLockId
+from apps.core.enums import AdvisoryLockId
 from apps.search.management.commands import send_alerts
-from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -222,25 +219,3 @@ class TestSweepLockOrdering:
                 f"{command_name}: production sweep must use a transaction-scoped "
                 "(non-session) lock"
             )
-
-
-class TestArchiveSweepPositivePath:
-    """Behavioural positive-path test for archive_sweep's retention window."""
-
-    @pytest.mark.parametrize("age_days", [61, 90, 180])
-    def test_archives_published_ad_older_than_retention(
-        self, seller, category, city, age_days: int
-    ) -> None:
-        """A PUBLISHED ad whose published_at is older than the 60-day cutoff is
-        transitioned to ARCHIVED by archive_sweep."""
-        stale = create_test_ad(
-            seller,
-            category,
-            city,
-            status=AdStatus.PUBLISHED,
-            published_at=timezone.now() - timedelta(days=age_days),
-        )
-        call_command("archive_sweep")
-        stale.refresh_from_db()
-        assert stale.status == AdStatus.ARCHIVED
-        assert stale.archived_at is not None

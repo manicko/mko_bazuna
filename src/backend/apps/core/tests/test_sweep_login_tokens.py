@@ -7,6 +7,7 @@ guarded by an advisory lock (lock id 5).
 
 from __future__ import annotations
 
+import logging
 from datetime import timedelta
 
 import pytest
@@ -26,15 +27,19 @@ class TestCleanupLoginTokens:
         defaults = {
             "token_hash": f"hash_{LoginToken.objects.count()}_{id(kwargs)}",
             "telegram_id": 900000002,
-            "expires_at": timezone.now() - timezone.timedelta(hours=1),
+            "expires_at": timezone.now() - timedelta(hours=1),
         }
         defaults.update(kwargs)
         return LoginToken.objects.create(**defaults)
 
-    def test_dry_run_does_not_delete(self):
-
+    def test_dry_run_does_not_delete(self, caplog: pytest.LogCaptureFixture) -> None:
         expired = self._make_token(expires_at=timezone.now() - timedelta(hours=1))
-        call_command("cleanup_login_tokens", "--dry-run")
+        with caplog.at_level(
+            logging.INFO,
+            logger="apps.core.management.commands.cleanup_login_tokens",
+        ):
+            call_command("cleanup_login_tokens", "--dry-run")
+        assert "DRY RUN: Would delete 1 expired or old consumed login tokens" in caplog.text
         assert LoginToken.objects.filter(pk=expired.pk).exists()
 
     def test_deletes_expired_tokens(self):
