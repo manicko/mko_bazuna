@@ -131,9 +131,10 @@ def test_get_support_contacts_reads_from_cache() -> None:
     # Second call should NOT access the DB (cache hit).  If filter() were
     # called the side_effect would raise, the except block would return [],
     # and the assertion below would fail.
-    with patch.object(SupportContact.objects, "filter", side_effect=RuntimeError):
+    with patch.object(SupportContact.objects, "filter", side_effect=RuntimeError) as mock_filter:
         result = get_support_contacts()
     assert len(result) == 1
+    mock_filter.assert_not_called()
 
 
 # ---------------------------------------------------------------------------

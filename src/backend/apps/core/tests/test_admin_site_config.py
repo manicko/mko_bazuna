@@ -52,4 +52,4 @@ def test_bot_username_field_max_length() -> None:
 def test_bot_username_field_has_help_text() -> None:
     """The ``bot_username`` field ``help_text`` mentions "without @ prefix"."""
     field = SiteConfig._meta.get_field("bot_username")
-    assert "without @ prefix" in str(field.help_text)
+    assert "without @ prefix" in field.help_text

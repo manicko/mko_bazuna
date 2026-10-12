@@ -33,14 +33,6 @@ def _clear_cache():
     cache.clear()
     yield
     cache.clear()
-
-
-@pytest.fixture
-def site_config() -> SiteConfig:
-    """Return the singleton SiteConfig instance (creating if needed)."""
-    return SiteConfig.get_singleton()
-
-
 # ---------------------------------------------------------------------------
 # Singleton model tests
 # ---------------------------------------------------------------------------

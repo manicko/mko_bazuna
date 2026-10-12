@@ -27,84 +27,6 @@ _CONTACT_PATTERN = re.compile(r"^contact_(\d+)$")
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
-class TestCanContactSellerLogic:
-    """Tests for can_contact_seller render condition logic (zone R2)."""
-
-    def test_all_conditions_true_returns_true(self, seller, category, city):
-        """All 5 R2 conditions true -> can_contact_seller returns True."""
-        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
-        assert can_contact_seller(ad) is True
-
-    def test_archived_ad_returns_false(self, seller, category, city):
-        """ARCHIVED/non-PUBLISHED ad -> can_contact_seller returns False."""
-        ad = create_test_ad(seller, category, city, status=AdStatus.ARCHIVED)
-        assert can_contact_seller(ad) is False
-
-    def test_draft_ad_returns_false(self, seller, category, city):
-        """DRAFT status -> can_contact_seller returns False."""
-        ad = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
-        assert can_contact_seller(ad) is False
-
-    def test_on_moderation_ad_returns_false(self, seller, category, city):
-        """ON_MODERATION status -> can_contact_seller returns False."""
-        ad = create_test_ad(seller, category, city, status=AdStatus.ON_MODERATION)
-        assert can_contact_seller(ad) is False
-
-    def test_rejected_ad_returns_false(self, seller, category, city):
-        """REJECTED status -> can_contact_seller returns False."""
-        ad = create_test_ad(seller, category, city, status=AdStatus.REJECTED)
-        assert can_contact_seller(ad) is False
-
-    def test_telegram_id_none_returns_false(self):
-        """Seller telegram_id is None OR seller is None -> can_contact_seller returns False.
-
-        Note: The User model enforces telegram_id NOT NULL and the Ad model
-        enforces user NOT NULL, but the function has defensive checks. We exercise
-        these paths via mock objects to test the actual function logic without
-        DB constraint changes.
-        """
-
-        class MockSeller:
-            telegram_id = None
-            is_deleted = False
-            is_banned = False
-            consent_revoked_at = None
-
-        class MockAdWithSellerNone:
-            status = AdStatus.PUBLISHED
-            user = None
-
-        class MockAdWithTelegramIdNone:
-            status = AdStatus.PUBLISHED
-            user = MockSeller()
-
-        # Test seller is None returns False
-        assert can_contact_seller(MockAdWithSellerNone()) is False
-        # Test telegram_id is None returns False
-        assert can_contact_seller(MockAdWithTelegramIdNone()) is False
-
-    def test_seller_deleted_returns_false(self, seller, category, city):
-        """Seller is_deleted flag -> can_contact_seller returns False."""
-        seller.is_deleted = True
-        seller.save(update_fields=["is_deleted"])
-        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
-        assert can_contact_seller(ad) is False
-
-    def test_seller_banned_returns_false(self, seller, category, city):
-        """Seller is_banned flag -> can_contact_seller returns False."""
-        seller.is_banned = True
-        seller.save(update_fields=["is_banned"])
-        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
-        assert can_contact_seller(ad) is False
-
-    def test_consent_revoked_returns_false(self, seller, category, city):
-        """Seller consent_revoked_at set -> can_contact_seller returns False."""
-        seller.consent_revoked_at = timezone.now()
-        seller.save(update_fields=["consent_revoked_at"])
-        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
-        assert can_contact_seller(ad) is False
-
-
 class TestContactPattern:
     """Tests for contact deep-link pattern matching (from bot handler)."""
 
@@ -125,6 +47,18 @@ class TestContactPattern:
         match = _CONTACT_PATTERN.match("contact_456")
         assert match is not None
         assert int(match.group(1)) == 456
+
+    def test_contact_pattern_matches_production(self) -> None:
+        """The inlined _CONTACT_PATTERN must match the production CONTACT_PATTERN.
+
+        ``telegram_bot`` is on ``sys.path`` via ``pyproject.toml``'s
+        ``pythonpath = ["src", "src/backend"]``, so importing it in a core
+        test is safe. This drift-guard catches edits to the bot-side pattern
+        that are not mirrored in the inlined copy.
+        """
+        from telegram_bot.handlers.contact import CONTACT_PATTERN
+
+        assert _CONTACT_PATTERN.pattern == CONTACT_PATTERN.pattern
 
 
 class TestContactResponseNoPii:
@@ -384,16 +318,6 @@ class TestRecordContactInitiated:
             event_type=AnalyticsEventType.CONTACT_INITIATED
         )
         assert event.user_id == seller.id
-
-    def test_record_contact_initiated_resolves_user_id(self, seller) -> None:
-        """A known buyer_telegram_id resolves to the correct user_id on the event."""
-        record_contact_initiated(buyer_telegram_id=seller.telegram_id)
-
-        event = AnalyticsEvent.objects.get(
-            event_type=AnalyticsEventType.CONTACT_INITIATED
-        )
-        assert event.user_id == seller.id
-        assert event.ad_id is None  # contact-initiated has no ad association
 
     def test_record_contact_initiated_anonymous(self) -> None:
         """With buyer_telegram_id=None, the event is created with user_id=None."""

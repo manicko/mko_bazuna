@@ -94,12 +94,6 @@ class TestDeepLinkRenderRateLimit:
     def test_rate_limit_check_handles_cache_incr_value_error(self) -> None:
         """ValueError from cache.incr (race: key expired between add/incr) →
         counter reset to 1, returns True (graceful degradation)."""
-        from unittest.mock import patch
-
-        from apps.core.services.contact_rate_limit import (
-            check_deep_link_render_rate_limit,
-        )
-
         cache.clear()
         request = _make_request()
 
@@ -153,5 +147,5 @@ class TestDeepLinkRenderRateLimitView:
     def test_login_issue_returns_429_when_rate_limited(self) -> None:
         """A pre-exhausted IP budget makes /login/issue/ return 429."""
         cache.set("telegram_dl_rl:127.0.0.1", 60, timeout=600)
-        response = Client().get("/login/issue/")
+        response = Client().post("/login/issue/")
         assert response.status_code == 429

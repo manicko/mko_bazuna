@@ -82,7 +82,8 @@ def test_home_page_survives_cache_read_fault(seller, category, city) -> None:
     config.bot_username = "fault_bot"
     config.save()
 
-    with _patch_cache_reads()[0], _patch_cache_reads()[1]:
+    _p_site, _p_bot = _patch_cache_reads()
+    with _p_site, _p_bot:
         response = Client().get("/")
 
     assert response.status_code == 200
@@ -92,7 +93,8 @@ def test_ad_detail_survives_cache_read_fault(seller, category, city) -> None:
     """An ad detail page returns 200 when every site-config cache read raises."""
     ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
 
-    with _patch_cache_reads()[0], _patch_cache_reads()[1]:
+    _p_site, _p_bot = _patch_cache_reads()
+    with _p_site, _p_bot:
         response = Client().get(reverse("ads:detail", args=[ad.id]))
 
     assert response.status_code == 200
@@ -104,7 +106,8 @@ def test_login_issue_survives_cache_read_fault() -> None:
     config.bot_username = "fault_bot"
     config.save()
 
-    with _patch_cache_reads()[0], _patch_cache_reads()[1]:
+    _p_site, _p_bot = _patch_cache_reads()
+    with _p_site, _p_bot:
         response = Client().post("/login/issue/")
 
     assert response.status_code == 200
@@ -139,13 +142,15 @@ def test_health_probe_still_reports_cache_failure() -> None:
 
 def test_site_name_falls_back_under_cache_fault() -> None:
     """get_site_name() returns 'Bazuna' when the cache read raises."""
-    with _patch_cache_reads()[0], _patch_cache_reads()[1]:
+    _p_site, _p_bot = _patch_cache_reads()
+    with _p_site, _p_bot:
         assert get_site_name() == "Bazuna"
 
 
 def test_bot_username_falls_back_under_cache_fault() -> None:
     """get_bot_username() returns 'bazuna_bot' when the cache read raises."""
-    with _patch_cache_reads()[0], _patch_cache_reads()[1]:
+    _p_site, _p_bot = _patch_cache_reads()
+    with _p_site, _p_bot:
         assert get_bot_username() == "bazuna_bot"
 
 
