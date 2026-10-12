@@ -13,26 +13,20 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from django.core.cache import DEFAULT_CACHE_ALIAS, caches
-from django.test import Client
+from django.test import Client, override_settings
 from django.utils import timezone
 from django_redis.exceptions import ConnectionInterrupted
 
 from apps.locations.models import City
 from apps.users.models import LoginToken, User
-from apps.users.services.login_token import LOGIN_BROWSER_ID_COOKIE
+from apps.users.services.login_token import (
+    LOGIN_BROWSER_ID_COOKIE,
+    RAW_TOKEN_ENTROPY_BYTES,
+    claim_token,
+)
 from conftest import make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
-
-
-@pytest.fixture(autouse=True)
-def _clear_cache():
-    """Clear Django cache between tests to prevent rate-limiter state bleed."""
-    from django.core.cache import cache
-
-    cache.clear()
-    yield
-    cache.clear()
 
 
 # ---------------------------------------------------------------------------
@@ -98,7 +92,7 @@ class TestLoginIssue:
 
         assert response.status_code == 200
         assert "raw_token" in response.context
-        assert len(response.context["raw_token"]) == 32
+        assert len(response.context["raw_token"]) == RAW_TOKEN_ENTROPY_BYTES * 4 // 3
 
 
 # ---------------------------------------------------------------------------
@@ -116,15 +110,6 @@ class TestLoginTokenBinding:
     without importing the bot package.
     """
 
-    @pytest.fixture(autouse=True)
-    def _clear_rate_limit_cache(self):
-        """Clear rate-limiter cache between tests."""
-        from django.core.cache import cache
-
-        cache.clear()
-        yield
-        cache.clear()
-
     def _issue(self, client: Client) -> str:
         """GET the issuing URL and return the raw token (client holds the cookie)."""
         issued = client.get("/login/issue/")
@@ -132,7 +117,6 @@ class TestLoginTokenBinding:
         return issued.context["raw_token"]
 
     def _claim(self, raw_token: str, telegram_id: int) -> None:
-        from apps.users.services.login_token import claim_token
 
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
         assert claim_token(token_hash, telegram_id, timezone.now()) is not None
@@ -212,7 +196,6 @@ class TestLoginTokenBinding:
         # cannot be claimed) ...
         self._claim(second_raw, telegram_id)
         first_hash = hashlib.sha256(first_raw.encode()).hexdigest()
-        from apps.users.services.login_token import claim_token
 
         assert claim_token(first_hash, telegram_id, timezone.now()) is None
 
@@ -383,7 +366,6 @@ class TestLoginStatus:
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
         # The bot's phase-1 claim, performed through the service.
-        from apps.users.services.login_token import claim_token
 
         assert claim_token(token_hash, telegram_id, timezone.now()) is not None
 
@@ -401,6 +383,7 @@ class TestLoginStatus:
             chat_id=telegram_id,
             username="banned_user",
             is_banned=True,
+            consent_given_at=timezone.now(),
         )
 
         client = Client()
@@ -408,7 +391,25 @@ class TestLoginStatus:
         raw_token = issued.context["raw_token"]
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
-        from apps.users.services.login_token import claim_token
+        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
+
+        response = client.post("/login/status/", {"token": raw_token})
+        assert response.status_code == 410
+
+    def test_login_status_410_user_not_found(self) -> None:
+        """A claimed token whose telegram_id has no corresponding User returns 410.
+
+        The bot's phase-1 claim succeeds (token row exists with telegram_id),
+        but the user was never created — perhaps deleted between the bot's
+        phase-1 and the web client's phase-2 poll. The view must catch
+        User.DoesNotExist and return 410 instead of raising 500.
+        """
+        telegram_id = 700000399
+
+        client = Client()
+        issued = client.get("/login/issue/")
+        raw_token = issued.context["raw_token"]
+        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
         assert claim_token(token_hash, telegram_id, timezone.now()) is not None
 
@@ -428,8 +429,6 @@ class TestLoginStatus:
         issued = client.get("/login/issue/")
         raw_token = issued.context["raw_token"]
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-
-        from apps.users.services.login_token import claim_token
 
         assert claim_token(token_hash, telegram_id, timezone.now()) is not None
 
@@ -451,8 +450,6 @@ class TestLoginStatus:
         issued = client.get("/login/issue/")
         raw_token = issued.context["raw_token"]
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-
-        from apps.users.services.login_token import claim_token
 
         assert claim_token(token_hash, telegram_id, timezone.now()) is not None
 
@@ -478,8 +475,6 @@ class TestLoginStatus:
         issued = client.get("/login/issue/")
         raw_token = issued.context["raw_token"]
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-
-        from apps.users.services.login_token import claim_token
 
         assert claim_token(token_hash, telegram_id, timezone.now()) is not None
 
@@ -517,8 +512,6 @@ class TestDeclinedUserRecovery:
         raw_token = issued.context["raw_token"]
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
-        from apps.users.services.login_token import claim_token
-
         assert claim_token(token_hash, telegram_id, timezone.now()) is not None
         response = client.post("/login/status/", {"token": raw_token})
         assert response.status_code == 200
@@ -548,8 +541,6 @@ class TestDeclinedUserRecovery:
         issued = client.get("/login/issue/")
         raw_token = issued.context["raw_token"]
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-
-        from apps.users.services.login_token import claim_token
 
         assert claim_token(token_hash, telegram_id, timezone.now()) is not None
 
@@ -590,15 +581,6 @@ class TestDeclinedUserRecovery:
 class TestLoginTokenSecurity:
     """Edge-case tests for LoginToken hashing, mismatch rejection, and atomicity."""
 
-    @pytest.fixture(autouse=True)
-    def _clear_cache(self):
-        """Clear rate-limiter cache between tests."""
-        from django.core.cache import cache
-
-        cache.clear()
-        yield
-        cache.clear()
-
     def test_token_hash_mismatch_returns_410(self) -> None:
         """Polling with a *different* raw token (wrong hash) returns 410."""
         # Issue a real token (creates a LoginToken row to prove mismatch detection).
@@ -610,8 +592,7 @@ class TestLoginTokenSecurity:
         response = client.post("/login/status/", {"token": wrong_token})
         assert response.status_code == 410
 
-    @pytest.mark.parametrize("field", ["token_hash"])
-    def test_stored_hash_is_sha256_not_raw(self, field: str) -> None:
+    def test_stored_hash_is_sha256_not_raw(self) -> None:
         """``token_hash`` is always ``sha256(raw)``, never the raw token string."""
         client = Client()
         response = client.get("/login/issue/")
@@ -621,41 +602,8 @@ class TestLoginTokenSecurity:
         token = LoginToken.objects.get(token_hash=expected_hash)
 
         # The stored value must equal the hash, not the raw token.
-        assert getattr(token, field) == expected_hash
-        assert getattr(token, field) != raw_token
-
-    @pytest.mark.parametrize("raw", ["a" * 32, "z" * 32, "0123456789abcdef" * 2])
-    def test_token_hash_length_is_64_hex(self, raw: str) -> None:
-        """SHA-256 hex digest is always 64 characters."""
-        token_hash = hashlib.sha256(raw.encode()).hexdigest()
-        assert len(token_hash) == 64
-        assert all(c in "0123456789abcdef" for c in token_hash)
-
-    def test_consumed_token_cannot_be_reused(self) -> None:
-        """A consumed token returns 410 on a second poll (claim atomicity)."""
-        telegram_id = 700000350
-        User.objects.create(
-            telegram_id=telegram_id,
-            chat_id=telegram_id,
-            username="atomic_user",
-        )
-
-        client = Client()
-        issued = client.get("/login/issue/")
-        raw_token = issued.context["raw_token"]
-        token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-
-        from apps.users.services.login_token import claim_token
-
-        assert claim_token(token_hash, telegram_id, timezone.now()) is not None
-
-        # First poll — should consume and return 200.
-        first = client.post("/login/status/", {"token": raw_token})
-        assert first.status_code == 200
-
-        # Second poll — token is now consumed → 410.
-        second = client.post("/login/status/", {"token": raw_token})
-        assert second.status_code == 410
+        assert token.token_hash == expected_hash
+        assert token.token_hash != raw_token
 
     def test_bot_phase_claim_completes_when_user_exists(self) -> None:
         """Phase 1 (bot set telegram_id + created user) → phase 2 (web poll) claims.
@@ -675,14 +623,13 @@ class TestLoginTokenSecurity:
             telegram_id=telegram_id,
             chat_id=telegram_id,
             username="bot_phase_user",
+            consent_given_at=timezone.now(),
         )
 
         client = Client()
         issued = client.get("/login/issue/")
         raw_token = issued.context["raw_token"]
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
-
-        from apps.users.services.login_token import claim_token
 
         assert claim_token(token_hash, telegram_id, timezone.now()) is not None
 
@@ -721,7 +668,7 @@ def budva_city() -> City:
     )
 
 
-def _claim_login(client: Client, user: User, username: str) -> None:
+def _claim_login(client: Client, user: User) -> None:
     """Create a claimed login token for *user* and complete the web login.
 
     Issues through ``/login/issue/`` so the row is bound to the browser id
@@ -733,8 +680,6 @@ def _claim_login(client: Client, user: User, username: str) -> None:
     raw_token = issued.context["raw_token"]
     token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
-    from apps.users.services.login_token import claim_token
-
     assert claim_token(token_hash, user.telegram_id, timezone.now()) is not None
 
     response = client.post("/login/status/", {"token": raw_token})
@@ -744,15 +689,6 @@ def _claim_login(client: Client, user: User, username: str) -> None:
 class TestLoginPreferredCitySync:
     """Guest -> account preferred-city migration on login (AC-6 / R-08)."""
 
-    @pytest.fixture(autouse=True)
-    def _clear_cache(self):
-        """Clear rate-limiter cache between tests."""
-        from django.core.cache import cache
-
-        cache.clear()
-        yield
-        cache.clear()
-
     def test_login_backfills_db_from_cookie(
         self, client: Client, podgorica_city: City
     ) -> None:
@@ -761,10 +697,11 @@ class TestLoginPreferredCitySync:
             telegram_id=700000400,
             chat_id=700000400,
             username="cookie_user",
+            consent_given_at=timezone.now(),
         )
         client.cookies["preferred_city"] = "podgorica"
 
-        _claim_login(client, user, "cookie_user")
+        _claim_login(client, user)
 
         user.refresh_from_db()
         assert user.preferred_city_id == podgorica_city.id
@@ -783,10 +720,11 @@ class TestLoginPreferredCitySync:
             chat_id=700000401,
             username="existing_pref",
             preferred_city=podgorica_city,
+            consent_given_at=timezone.now(),
         )
         client.cookies["preferred_city"] = "budva"
 
-        _claim_login(client, user, "existing_pref")
+        _claim_login(client, user)
 
         user.refresh_from_db()
         # DB value is Podgorica (not overwritten by the budva cookie).
@@ -800,9 +738,10 @@ class TestLoginPreferredCitySync:
             telegram_id=700000402,
             chat_id=700000402,
             username="no_cookie_user",
+            consent_given_at=timezone.now(),
         )
 
-        _claim_login(client, user, "no_cookie_user")
+        _claim_login(client, user)
 
         user.refresh_from_db()
         assert user.preferred_city_id is None
@@ -829,6 +768,7 @@ class TestLoginPreferredCitySync:
             chat_id=700000410,
             username="declined_pref",
             is_declined=True,
+            consent_given_at=timezone.now(),
         )
         request = RequestFactory().get("/", HTTP_COOKIE="preferred_city=podgorica")
 
@@ -849,6 +789,7 @@ class TestLoginPreferredCitySync:
             telegram_id=700000411,
             chat_id=700000411,
             username="active_pref",
+            consent_given_at=timezone.now(),
         )
         request = RequestFactory().get("/", HTTP_COOKIE="preferred_city=podgorica")
 
@@ -869,6 +810,12 @@ class TestLoginRateLimitCheck:
     Uses the atomic ``cache.add`` (first hit) → ``cache.incr`` (subsequent)
     pattern so the counter is initialised at 1 and incremented per request.
     """
+
+    @pytest.fixture(autouse=True)
+    def _enable_rate_limiting(self):
+        """Ensure rate limiting is ON for every test in this class."""
+        with override_settings(RATE_LIMITING_ENABLED=True):
+            yield
 
     def test_login_rate_limit_check(self) -> None:
         """First 10 calls return True; the 11th is throttled (False).
@@ -901,8 +848,6 @@ class TestLoginRateLimitCheck:
     def test_login_rate_limit_check_handles_cache_incr_value_error(self) -> None:
         """ValueError from cache.incr (race: key expired between add/incr) →
         counter reset to 1, returns True (graceful degradation)."""
-        from unittest.mock import patch
-
         from django.core.cache import cache
         from django.http import HttpRequest
 

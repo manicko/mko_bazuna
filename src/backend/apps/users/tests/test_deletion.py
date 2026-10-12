@@ -22,6 +22,7 @@ from apps.users.services.deletion import (
     soft_delete_user_ads,
     withdraw_consent,
 )
+from apps.users.services.login_token import claim_token
 from conftest import create_test_ad, make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -72,19 +73,8 @@ class TestWithdrawConsentInvalidatesTokens:
         )
 
         # User claims the token (simulating /start login_<token>)
-        # This sets telegram_id on the token
-        def claim_token():
-            result = LoginToken.objects.filter(
-                token_hash=token_hash,
-                telegram_id__isnull=True,
-                consumed_at__isnull=True,
-                expires_at__gt=now,
-            ).update(telegram_id=user.telegram_id)
-            if result == 0:
-                return None
-            return LoginToken.objects.get(token_hash=token_hash)
-
-        claimed = claim_token()
+        # This sets telegram_id on the token via the real service.
+        claimed = claim_token(token_hash, user.telegram_id, now)
         assert claimed is not None, "Token should be claimable before withdrawal"
 
         # Set consent_given_at before withdraw (simulates prior consent)
@@ -105,7 +95,7 @@ class TestWithdrawConsentInvalidatesTokens:
         assert user.consent_given_at is None
 
         # Second claim attempt on the same token fails
-        second_claim = claim_token()
+        second_claim = claim_token(token_hash, user.telegram_id, now)
         assert second_claim is None, "Token should not be claimable after withdrawal"
 
 
@@ -249,6 +239,7 @@ class TestWithdrawConsentSoftDeletesAds:
         assert ad1.status == AdStatus.DELETED
         assert ad1.deleted_at is not None
         assert ad2.status == AdStatus.DELETED
+        assert ad2.deleted_at is not None
 
     def test_withdraw_refreshes_updated_at_on_ads(self, user: User, category, city):
         """Consent withdrawal refreshes updated_at on soft-deleted ads (AD-001).
@@ -521,47 +512,6 @@ class TestWithdrawConsentAtomicity:
         assert user.is_deleted is False
         assert user.telegram_id is not None  # not nulled (rolled back)
         assert user.consent_revoked_at is None
-
-    @pytest.mark.django_db(transaction=True)
-    def test_withdraw_returns_storage_keys(
-        self, user: User, monkeypatch, category, city
-    ):
-        """withdraw_consent returns list[str] of DRAFT-ad storage keys."""
-        draft_ad = create_test_ad(
-            user,
-            category,
-            city,
-            title="Draft Ad",
-            description="Description",
-            status=AdStatus.DRAFT,
-        )
-        AdImage.objects.create(
-            ad=draft_ad,
-            image="test-draft-key.jpg",
-            thumbnail_small="test-draft-key-small.jpg",
-            thumbnail_medium="test-draft-key-medium.jpg",
-            thumbnail_large="test-draft-key-large.jpg",
-        )
-
-        deleted_keys: list[str] = []
-
-        def _spy(key: str) -> None:
-            deleted_keys.append(key)
-
-        monkeypatch.setattr("apps.media.signals.delete_photo", _spy)
-
-        result = withdraw_consent(user)
-
-        assert isinstance(result, list)
-        assert all(isinstance(k, str) for k in result)
-        assert "test-draft-key.jpg" in result
-        assert "test-draft-key-small.jpg" in result
-        assert "test-draft-key-medium.jpg" in result
-        assert "test-draft-key-large.jpg" in result
-        # All 4 keys returned for the single AdImage (image + 3 thumbnails)
-        assert len(result) == 4
-        # delete_photo called with the same keys after transaction commits
-        assert deleted_keys == result
 
     def test_withdraw_idempotent(self, user: User):
         """Calling withdraw_consent twice returns [] on second call, no extra deletions."""

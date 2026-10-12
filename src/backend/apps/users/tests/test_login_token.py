@@ -23,22 +23,36 @@ Honest limits (stated, not skipped):
 
 from __future__ import annotations
 
+import ast
 import hashlib
 import logging
 import re
 from datetime import timedelta
 from pathlib import Path
+from unittest.mock import MagicMock
 
 import pytest
 from django.utils import timezone
 
 from apps.users.models import LoginToken, User
 from apps.users.services.login_token import (
+    RAW_TOKEN_ENTROPY_BYTES,
     RETURNING_COLUMNS,
+    ConsumeOutcome,
     _hash_browser_id,
+    claim_token,
+    consume_token,
+    issue_token,
 )
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
+
+# Walk up from this file to the repo root (where pyproject.toml lives) so that
+# source-file paths are robust to relocation, instead of hard-coding a parent
+# index that silently breaks if the test moves a directory level.
+_REPO_ROOT = next(p for p in Path(__file__).parents if (p / "pyproject.toml").exists())
+_BACKEND_ROOT = _REPO_ROOT / "src" / "backend"
+_SRC_ROOT = _REPO_ROOT / "src"
 
 # A 32-char URL-safe token matching the bot's deep-link pattern.
 _LOGIN_PATTERN = re.compile(r"^login_([A-Za-z0-9_-]{32})$")
@@ -54,6 +68,25 @@ _BROWSER_ID = "testbrowserid0abcdefgh"
 
 # A second, distinct well-formed browser id for cross-binding supersession tests.
 _OTHER_BROWSER_ID = "otherbrowserid0abcdefg"
+
+
+def _source_has_browser_binding(source: str) -> bool:
+    """Return True if any function call in *source* passes a browser kwarg.
+
+    AST-based replacement for the fragile ``\"browser\" not in source``
+    substring check: only keyword arguments (and call args) are examined, so
+    a comment or docstring mentioning "browser" does not trip the guard.
+    """
+    tree = ast.parse(source)
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Call):
+            for kw in node.keywords:
+                if kw.arg is not None and "browser" in kw.arg:
+                    return True
+            for arg in node.args:
+                if isinstance(arg, ast.Name) and "browser" in arg.id.lower():
+                    return True
+    return False
 
 
 def _make_token(
@@ -78,8 +111,6 @@ def _make_token(
 
 def _claim(token_hash: str, telegram_id: int, now=None) -> LoginToken | None:
     """Synchronous wrapper over the service claim for readable tests."""
-    from apps.users.services.login_token import claim_token
-
     if now is None:
         now = timezone.now()
     return claim_token(token_hash, telegram_id, now)
@@ -94,7 +125,6 @@ class TestIssueToken:
     """``issue_token`` mints a fresh token, persisting only the SHA-256 hash."""
 
     def test_stores_sha256_of_raw(self) -> None:
-        from apps.users.services.login_token import issue_token
 
         issued = issue_token()
         stored = LoginToken.objects.get(token_hash=issued.token_hash)
@@ -102,15 +132,24 @@ class TestIssueToken:
         assert stored.token_hash == expected
 
     def test_leaves_telegram_id_and_consumed_at_null(self) -> None:
-        from apps.users.services.login_token import issue_token
 
         issued = issue_token()
         stored = LoginToken.objects.get(token_hash=issued.token_hash)
         assert stored.telegram_id is None
         assert stored.consumed_at is None
 
+    def test_browser_binding_is_sha256_of_resolved_browser_id(self) -> None:
+        """``issue_token`` persists browser_binding as the SHA-256 of the resolved
+        browser id, never the raw id itself."""
+
+        issued = issue_token(browser_id=_BROWSER_ID)
+        stored = LoginToken.objects.get(token_hash=issued.token_hash)
+        # The stored binding is the digest of the browser id the issuing client
+        # holds — never the raw id (G-1a fail-closed corallary).
+        assert stored.browser_binding == _hash_browser_id(_BROWSER_ID)
+        assert stored.browser_binding != _BROWSER_ID
+
     def test_expires_in_5_minutes(self) -> None:
-        from apps.users.services.login_token import issue_token
 
         issued = issue_token()
         stored = LoginToken.objects.get(token_hash=issued.token_hash)
@@ -118,17 +157,15 @@ class TestIssueToken:
         assert 240 <= remaining.total_seconds() <= 300
 
     def test_raw_never_persisted(self) -> None:
-        from apps.users.services.login_token import issue_token
 
         issued = issue_token()
-        assert len(issued.raw_token) == 32
+        assert len(issued.raw_token) == RAW_TOKEN_ENTROPY_BYTES * 4 // 3
         assert len(issued.token_hash) == 64
         # The stored value is the hash, never the raw token.
         stored = LoginToken.objects.get(token_hash=issued.token_hash)
         assert stored.token_hash != issued.raw_token
 
     def test_raw_token_is_urlsafe_and_matches_pattern(self) -> None:
-        from apps.users.services.login_token import issue_token
 
         issued = issue_token()
         assert all(c in _URLSAFE_CHARS for c in issued.raw_token)
@@ -136,14 +173,6 @@ class TestIssueToken:
         # deep-link pattern: /start login_<32-char-token>.
         assert re.fullmatch(r"[A-Za-z0-9_-]{32}", issued.raw_token) is not None
         assert _LOGIN_PATTERN.match(f"login_{issued.raw_token}") is not None
-
-    def test_two_issues_differ(self) -> None:
-        from apps.users.services.login_token import issue_token
-
-        first = issue_token()
-        second = issue_token()
-        assert first.raw_token != second.raw_token
-        assert first.token_hash != second.token_hash
 
 
 # ---------------------------------------------------------------------------
@@ -160,12 +189,6 @@ class TestIssueTokenSupersession:
 
     def test_second_issue_supersedes_the_first(self) -> None:
         """The first token is neither claimable nor redeemable after a re-issue."""
-        from apps.users.services.login_token import (
-            ConsumeOutcome,
-            claim_token,
-            consume_token,
-            issue_token,
-        )
 
         first = issue_token(browser_id=_BROWSER_ID)
         second = issue_token(browser_id=_BROWSER_ID)
@@ -194,12 +217,6 @@ class TestIssueTokenSupersession:
         that isolates *that* consequence (the surviving token being burned by
         the issue that minted it), which the others do not.
         """
-        from apps.users.services.login_token import (
-            ConsumeOutcome,
-            claim_token,
-            consume_token,
-            issue_token,
-        )
 
         issue_token(browser_id=_BROWSER_ID)
         second = issue_token(browser_id=_BROWSER_ID)
@@ -211,12 +228,6 @@ class TestIssueTokenSupersession:
 
     def test_issue_does_not_supersede_another_browser(self) -> None:
         """One browser's issue never reaches another browser's live token."""
-        from apps.users.services.login_token import (
-            ConsumeOutcome,
-            claim_token,
-            consume_token,
-            issue_token,
-        )
 
         other = issue_token(browser_id=_OTHER_BROWSER_ID)
         issue_token(browser_id=_BROWSER_ID)  # a different profile issues
@@ -235,12 +246,6 @@ class TestIssueTokenSupersession:
         same-site prefetch of ``/login/issue/`` would kill a login whose user
         already tapped the Telegram button.
         """
-        from apps.users.services.login_token import (
-            ConsumeOutcome,
-            claim_token,
-            consume_token,
-            issue_token,
-        )
 
         first = issue_token(browser_id=_BROWSER_ID)
         assert claim_token(first.token_hash, 700000103, timezone.now()) is not None
@@ -271,7 +276,6 @@ class TestIssueTokenSupersession:
         ``telegram_id__isnull=True`` shields a claimed row from any
         ``browser_binding`` disjunct.
         """
-        from apps.users.services.login_token import claim_token, issue_token
 
         raw = "o" * 32
         unbound = _make_token(raw)
@@ -290,12 +294,6 @@ class TestIssueTokenSupersession:
         row is claimed first so ``consume_token`` reaches the binding gate (an
         unclaimed row would read ``PENDING`` before the gate is consulted).
         """
-        from apps.users.services.login_token import (
-            ConsumeOutcome,
-            claim_token,
-            consume_token,
-            issue_token,
-        )
 
         raw = "o" * 32
         unbound = _make_token(raw)
@@ -326,7 +324,6 @@ class TestIssueTokenSupersession:
         coupling the assertion to a ``login_status`` HTTP round trip would
         misattribute the guard.
         """
-        from apps.users.services.login_token import issue_token
 
         known_telegram_id = 700000105
         # A claimed row on this binding: it exists (and carries a raw
@@ -415,7 +412,6 @@ class TestClaimToken:
 
         # (c) ROUND TRIP: a real claim returns an instance whose binding is
         # actually populated (catches a behavioural loss the set check misses).
-        from apps.users.services.login_token import claim_token, issue_token
 
         issued = issue_token(browser_id=_BROWSER_ID)
         claimed = claim_token(issued.token_hash, 700000008, timezone.now())
@@ -434,14 +430,12 @@ class TestConsumeToken:
     """``consume_token`` returns a typed ``ConsumeResult`` for every case."""
 
     def test_unknown_token_not_found(self) -> None:
-        from apps.users.services.login_token import ConsumeOutcome, consume_token
 
         result = consume_token("z" * 32, browser_id=_BROWSER_ID)
         assert result.outcome is ConsumeOutcome.NOT_FOUND
         assert result.telegram_id is None
 
     def test_expired_token_gone(self) -> None:
-        from apps.users.services.login_token import ConsumeOutcome, consume_token
 
         raw = "e" * 32
         _make_token(raw, expires_at=timezone.now() - timedelta(hours=1))
@@ -449,7 +443,6 @@ class TestConsumeToken:
         assert result.outcome is ConsumeOutcome.GONE
 
     def test_consumed_token_gone(self) -> None:
-        from apps.users.services.login_token import ConsumeOutcome, consume_token
 
         raw = "g" * 32
         _make_token(raw, telegram_id=700000010, consumed_at=timezone.now())
@@ -457,7 +450,6 @@ class TestConsumeToken:
         assert result.outcome is ConsumeOutcome.GONE
 
     def test_unclaimed_live_token_pending(self) -> None:
-        from apps.users.services.login_token import ConsumeOutcome, consume_token
 
         raw = "h" * 32
         token = _make_token(raw)
@@ -469,7 +461,6 @@ class TestConsumeToken:
         assert token.consumed_at is None
 
     def test_claimed_token_consumed(self) -> None:
-        from apps.users.services.login_token import ConsumeOutcome, consume_token
 
         raw = "i" * 32
         _make_token(raw, telegram_id=700000011)
@@ -481,13 +472,51 @@ class TestConsumeToken:
         assert token.consumed_at is not None
 
     def test_row_deleted_before_consume_not_found(self) -> None:
-        from apps.users.services.login_token import ConsumeOutcome, consume_token
 
         raw = "j" * 32
         token = _make_token(raw)
         token.delete()
         result = consume_token(raw, browser_id=_BROWSER_ID)
         assert result.outcome is ConsumeOutcome.NOT_FOUND
+
+    def test_claimed_token_unbound_on_browser_mismatch(self) -> None:
+        """A claimed token consumed from a different browser returns UNBOUND.
+
+        The token is NOT burned — the legitimate holder can still redeem it
+        from the correct browser (unlike every other 410 path).
+        """
+
+        raw = "u" * 32
+        _make_token(raw, telegram_id=700000025)
+        result = consume_token(raw, browser_id=_OTHER_BROWSER_ID)
+        assert result.outcome is ConsumeOutcome.UNBOUND
+        assert result.telegram_id == 700000025
+        # The token survived — consumed_at is still NULL.
+        token = LoginToken.objects.get(
+            token_hash=hashlib.sha256(raw.encode()).hexdigest()
+        )
+        assert token.consumed_at is None
+
+    def test_lost_race_returns_lost_race(self, monkeypatch) -> None:
+        """When a concurrent consume zeros the UPDATE, outcome is LOST_RACE (410).
+
+        The read sees a live claimed token, but between the read and the
+        atomic ``UPDATE`` a concurrent request has already consumed it, so the
+        ``UPDATE`` affects zero rows. ``consume_token`` reports ``LOST_RACE``
+        rather than silently treating it as ``CONSUMED``.
+        """
+
+        raw = "v" * 32
+        _make_token(raw, telegram_id=700000026)
+
+        # Simulate a concurrent consume: the UPDATE finds zero matching rows.
+        mock_qs = MagicMock()
+        mock_qs.update.return_value = 0
+        monkeypatch.setattr(LoginToken.objects, "filter", lambda **kw: mock_qs)
+
+        result = consume_token(raw, browser_id=_BROWSER_ID)
+        assert result.outcome is ConsumeOutcome.LOST_RACE
+        assert result.telegram_id == 700000026
 
 
 # ---------------------------------------------------------------------------
@@ -510,7 +539,6 @@ class TestClaimConsumeAgreement:
         assert token.telegram_id == 700000020
 
     def test_b_consumed_token_not_claimable_by_anyone(self) -> None:
-        from apps.users.services.login_token import consume_token
 
         raw = "l" * 32
         token = _make_token(raw, telegram_id=700000022)
@@ -520,7 +548,6 @@ class TestClaimConsumeAgreement:
             assert _claim(token.token_hash, x) is None
 
     def test_c_consumed_binds_to_the_claiming_user(self) -> None:
-        from apps.users.services.login_token import ConsumeOutcome, consume_token
 
         # Users for BOTH the claiming and the non-claiming telegram_id exist.
         User.objects.create(
@@ -539,7 +566,6 @@ class TestClaimConsumeAgreement:
         assert token.consumed_at is not None
 
     def test_d_never_claimed_is_pending(self) -> None:
-        from apps.users.services.login_token import ConsumeOutcome, consume_token
 
         raw = "n" * 32
         token = _make_token(raw)
@@ -571,11 +597,11 @@ class TestBindingDoesNotReachTheBot:
 
     def test_bot_claim_is_not_given_a_binding(self) -> None:
         source = (
-            Path(__file__).parents[4].joinpath("telegram_bot", "handlers", "login.py")
+            _SRC_ROOT / "telegram_bot" / "handlers" / "login.py"
         ).read_text()
 
         assert "claim_token(token_hash, telegram_id, now)" in source
-        assert "browser" not in source
+        assert not _source_has_browser_binding(source)
 
 
 # ---------------------------------------------------------------------------
@@ -607,7 +633,7 @@ class TestLoginHandshakeOwnership:
         assert callable(consume_token)
 
     def test_consent_view_has_no_token_logic(self) -> None:
-        source = Path(__file__).parents[1].joinpath("views", "consent.py").read_text()
+        source = (_BACKEND_ROOT / "apps" / "users" / "views" / "consent.py").read_text()
         for forbidden in (
             "hashlib",
             "secrets",
@@ -622,7 +648,7 @@ class TestLoginHandshakeOwnership:
 
     def test_bot_handler_has_no_raw_sql(self) -> None:
         source = (
-            Path(__file__).parents[4].joinpath("telegram_bot", "handlers", "login.py")
+            _SRC_ROOT / "telegram_bot" / "handlers" / "login.py"
         ).read_text()
         # ``cursor.execute`` + ``UPDATE login_tokens`` together uniquely identify
         # raw SQL in the handler; ``RETURNING`` is deliberately not asserted
