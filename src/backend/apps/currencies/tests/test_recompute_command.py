@@ -8,6 +8,7 @@ correctly-computed ``price_normalized_eur`` with a stale value (lost update).
 
 from __future__ import annotations
 
+import logging
 import threading
 import time
 from decimal import Decimal
@@ -21,18 +22,15 @@ from django.db.models.query import QuerySet
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
+from apps.currencies.models import ExchangeRate
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
-@pytest.fixture(autouse=True)
-def _clear_rate_cache():
-    from django.core.cache import cache
-
-    cache.clear()
-    yield
-    cache.clear()
+# Cache isolation between tests is provided by the root conftest's autouse
+# ``_clear_cache_between_tests`` fixture (src/backend/conftest.py, lines 90-103),
+# which clears the LocMem cache before and after every backend test.
 
 
 class TestRecomputeNormalizedPrices:
@@ -60,7 +58,7 @@ class TestRecomputeNormalizedPrices:
         assert ad.price_normalized_eur == Decimal("51.2000")
 
     def test_dry_run_does_not_write(
-        self, exchange_rates, seller, category, city
+        self, exchange_rates, seller, category, city, caplog
     ) -> None:
         """``--dry-run`` reports without persisting any change."""
         ad = create_test_ad(
@@ -73,10 +71,13 @@ class TestRecomputeNormalizedPrices:
             price_normalized_eur=999,
         )
 
-        call_command("recompute_normalized_prices", dry_run=True)
+        with caplog.at_level(logging.INFO):
+            call_command("recompute_normalized_prices", dry_run=True)
 
         ad.refresh_from_db()
         assert ad.price_normalized_eur == Decimal("999")
+        # The dry-run summary reports the count of stale-value ads to update.
+        assert "DRY RUN: Would recompute 1 of 1 checked ads" in caplog.text
 
     def test_draft_ads_are_skipped(
         self, exchange_rates, seller, category, city
@@ -177,6 +178,138 @@ class TestRecomputeNormalizedPrices:
         assert updated_pks == batch_one_pks, (
             "batch 1 must be committed when a later batch fails — the per-batch "
             "commit is not taking effect (03-DB-008)"
+        )
+
+    def test_unknown_currency_is_skipped_and_logged(
+        self, exchange_rates, seller, category, city, caplog
+    ) -> None:
+        """An ad with an unknown ``price_currency`` is skipped per-row.
+
+        ``CurrencyCode(ad.price_currency)`` raises ``ValueError`` for a currency
+        code no longer in the StrEnum (e.g. a deprecated value persisted in the
+        DB). ``_apply_batch`` catches it, logs a warning, and ``continue``s —
+        other ads in the same batch are still recomputed.
+        """
+        good_ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.PUBLISHED,
+            price=100,
+            price_currency=CurrencyCode.BAM,
+            price_normalized_eur=999,
+        )
+        bad_ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.PUBLISHED,
+            price=100,
+            price_currency=CurrencyCode.BAM,
+            price_normalized_eur=999,
+        )
+        # Simulate a deprecated currency code no longer in the CurrencyCode enum
+        Ad.objects.filter(pk=bad_ad.pk).update(price_currency="XXX")
+
+        with caplog.at_level(logging.WARNING):
+            call_command("recompute_normalized_prices")
+
+        good_ad.refresh_from_db()
+        assert good_ad.price_normalized_eur == Decimal("51.2000")
+        bad_ad.refresh_from_db()
+        assert bad_ad.price_normalized_eur == Decimal("999")
+        assert any(
+            "Skipping ad" in record.message and "XXX" in record.message
+            for record in caplog.records
+        )
+
+    def test_missing_exchange_rate_is_skipped_and_logged(
+        self, exchange_rates, seller, category, city, caplog
+    ) -> None:
+        """An ad whose currency has no current rate is skipped per-row.
+
+        ``PriceNormalizer.normalize_to_eur`` raises ``ExchangeRateNotFoundError``
+        when no ``is_current=True`` rate row exists; ``_apply_batch`` catches it,
+        logs a warning, and ``continue``s — other ads in the same batch are
+        still recomputed.
+        """
+        good_ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.PUBLISHED,
+            price=100,
+            price_currency=CurrencyCode.EUR,
+            price_normalized_eur=999,
+        )
+        stale_ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.PUBLISHED,
+            price=100,
+            price_currency=CurrencyCode.BAM,
+            price_normalized_eur=999,
+        )
+        # Remove the current BAM rate so normalize_to_eur raises
+        ExchangeRate.objects.filter(
+            currency=CurrencyCode.BAM.value
+        ).update(is_current=False)
+
+        with caplog.at_level(logging.WARNING):
+            call_command("recompute_normalized_prices")
+
+        good_ad.refresh_from_db()
+        assert good_ad.price_normalized_eur == Decimal("100.0000")
+        stale_ad.refresh_from_db()
+        assert stale_ad.price_normalized_eur == Decimal("999")
+        assert any(
+            "Skipping ad" in record.message and "BAM" in record.message
+            for record in caplog.records
+        )
+
+    def test_null_price_currency_is_excluded(
+        self, exchange_rates, seller, category, city, caplog
+    ) -> None:
+        """A null ``price_currency`` is excluded by ``_RECOMPUTE_PREDICATE``.
+
+        The predicate filters ``Q(price_currency__isnull=False)``, so an ad with
+        a null currency is never loaded into a batch or seen by ``_apply_batch``.
+        A sibling ad with a valid currency is still recomputed normally.
+        """
+        good_ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.PUBLISHED,
+            price=100,
+            price_currency=CurrencyCode.EUR,
+            price_normalized_eur=999,
+        )
+        null_ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.PUBLISHED,
+            price=100,
+            price_currency=CurrencyCode.EUR,
+            price_normalized_eur=999,
+        )
+        # Clear price_currency (allowed by the model: null=True, blank=True)
+        Ad.objects.filter(pk=null_ad.pk).update(price_currency=None)
+
+        with caplog.at_level(logging.WARNING):
+            call_command("recompute_normalized_prices")
+
+        good_ad.refresh_from_db()
+        assert good_ad.price_normalized_eur == Decimal("100.0000")
+        null_ad.refresh_from_db()
+        assert null_ad.price_currency is None
+        assert null_ad.price_normalized_eur == Decimal("999")
+        # The null-currency ad is excluded by the predicate — it never reaches
+        # _apply_batch, so no "Skipping ad" warning references it.
+        assert not any(
+            str(null_ad.pk) in record.message for record in caplog.records
         )
 
 

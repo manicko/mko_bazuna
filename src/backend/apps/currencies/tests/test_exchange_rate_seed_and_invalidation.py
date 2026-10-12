@@ -38,12 +38,9 @@ from apps.currencies.services.price_normalizer import (
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
-@pytest.fixture(autouse=True)
-def _clear_rate_cache():
-    """Clear the shared cache so rate lookups hit the DB in each test."""
-    cache.clear()
-    yield
-    cache.clear()
+# Cache isolation between tests is provided by the root conftest's autouse
+# ``_clear_cache_between_tests`` fixture (src/backend/conftest.py, lines 90-103),
+# which clears the LocMem cache before and after every backend test.
 
 
 def _rate_cache_key(currency: CurrencyCode) -> str:
