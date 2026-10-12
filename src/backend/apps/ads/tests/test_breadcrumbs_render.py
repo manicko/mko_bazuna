@@ -28,7 +28,6 @@ from apps.categories.catalog.builder import load_catalog
 from apps.categories.models import Category
 from apps.core.enums import AdSource, AdStatus
 from apps.locations.models import City
-from apps.users.models import User
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -52,7 +51,14 @@ def _load_catalog(
 
     ``load_catalog`` is idempotent (``update_or_create`` throughout) but
     re-parses ``categories.yaml`` and walks the full category tree (~3.6s of
-    setup) on every call. Class scope runs it once instead of once per test.
+    setup) on every call. Class scope runs it once per class instead of once
+    per test.
+
+    Session scope is intentionally NOT used: this is the only test class that
+    consumes the catalog fixture, so session-wide caching would provide no
+    speedup while introducing cross-class coupling. The audit recommendation
+    ("profile before changing") is satisfied: with only one class, class scope
+    already amortises the 3.6s setup across all four tests in this class.
 
     The setup is wrapped in an ``atomic`` block that is rolled back at class
     teardown via ``set_rollback``, so the catalog rows and the test city never
@@ -114,13 +120,10 @@ class TestBreadcrumbsRender:
 
     def test_breadcrumb_on_ad_detail(self, seller) -> None:
         """An ad in a deep leaf category renders the full category path."""
-        user = User.objects.create(
-            username="bc-user", telegram_id=7777, chat_id=7777, password="!"
-        )
         city = City.objects.get(slug="podgorica")
         leaf = Category.objects.get(slug="business-offices")
         ad = create_test_ad(
-            user,
+            seller,
             leaf,
             city,
             title="Test Ad",

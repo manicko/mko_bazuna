@@ -19,7 +19,7 @@ from apps.ads.templatetags.price_tags import format_price, format_price_value
 from apps.core.enums import LanguageLocale
 from apps.currencies.enums import CurrencyCode
 
-pytestmark = [pytest.mark.unit]
+pytestmark = [pytest.mark.integration]
 
 # Verified per-locale separator facts (14-I18N-003 / VAL-004). ``ru`` groups
 # with a non-breaking space (U+00A0) and uses a comma decimal mark; ``bs``

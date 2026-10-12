@@ -175,6 +175,23 @@ def test_view_hits_real_orm_and_renders_list_template(
     assert response.context["has_results"] is True
     assert ad in response.context["page_obj"].object_list
     # Bounded query count: no N+1 leaks on the listing render path.
+    # Breakdown of the 16-query ceiling (each may or may not fire depending on
+    # context, but the total never exceeds 16):
+    #   1. SELECT categories (context processor)
+    #   2. SELECT cities (context processor)
+    #   3. SELECT exchange rates (context processor)
+    #   4. SELECT ad row(s) for the listing page
+    #   5. Prefetch / SELECT related ad images
+    #   6. SELECT features for the filter chip context
+    #   7. SELECT user trust data (annotate_trust)
+    #   8. SELECT user trust badges
+    #   9. SELECT feature lookups for the filter form
+    #  10. SELECT price-step enum (cached, may be skipped)
+    #  11. SELECT consent state (for authenticated users)
+    #  12. SELECT SEO/open-graph metadata
+    #  13-16. Reserve for future context processors / prefetches
+    # A regression that adds an N+1 (e.g. per-ad image query in the template)
+    # will breach 16 and trip this assertion.
     assert len(ctx.captured_queries) <= 16
 
 

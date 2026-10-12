@@ -14,7 +14,10 @@ satisfying the strict database check constraints (e.g.
 
 from __future__ import annotations
 
+import tempfile
+from collections.abc import Generator
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 
 import pytest
@@ -48,6 +51,24 @@ from apps.users.models import User
 # translation.deactivate() in teardown, eliminating all thread-local translation
 # state leakage between tests. Do NOT add per-file deactivate() calls.
 # ---------------------------------------------------------------------------
+
+# ---------------------------------------------------------------------------
+# Shared test fixtures available across all backend test modules
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def isolated_media_root() -> Generator[Path]:
+    """Create a temporary MEDIA_ROOT isolated from the real media volume.
+
+    Shared at the root conftest level so that test modules under ``apps/*/``
+    no longer need to redefine this identical fixture (DRY — was previously
+    duplicated in 5 sibling files, each with ``tempfile.TemporaryDirectory()``
+    + ``Path(tmpdir)``). Modules that need a different implementation (e.g.
+    pytest's ``tmp_path``) shadow this fixture locally and are unaffected.
+    """
+    with tempfile.TemporaryDirectory() as tmpdir:
+        yield Path(tmpdir)
 
 
 @pytest.fixture(autouse=True)

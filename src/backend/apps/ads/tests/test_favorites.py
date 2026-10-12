@@ -14,6 +14,7 @@ Covers:
 
 import pytest
 from django.test import Client
+from django.urls import reverse
 from django.utils import timezone
 
 from apps.ads.models import Ad, AdFavorite
@@ -66,7 +67,9 @@ class TestFavoriteToggle:
 
         # NO redirect (302) — a guest must get a fragment htmx can swap.
         assert resp.status_code == 200
-        assert "Войти для сохранения" in resp.content.decode()
+        # Structural assertion: the login prompt links to the Telegram login
+        # flow (not a hard-coded translated string).
+        assert reverse("consent:login_issue") in resp.content.decode()
         # Nothing persisted, and the ad detail/login url is referenced.
         assert not AdFavorite.objects.filter(ad=ad).exists()
 
@@ -204,7 +207,7 @@ class TestFavoritesList:
 
     def test_requires_login(self) -> None:
         resp = Client().get("/cabinet/favorites/")
-        assert resp.status_code in (301, 302)  # redirect to login
+        assert resp.status_code == 302  # redirect to login
 
     def test_lists_favorited_ads(
         self, buyer: User, seller: User, category: Category, city: City

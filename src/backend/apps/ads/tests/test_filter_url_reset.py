@@ -33,41 +33,83 @@ class TestFilterUrlReset:
     """
 
     # ------------------------------------------------------------------ #
-    # Static template-source assertions (no DB needed)
+    # Rendered assertions (via Django test Client — not template source)
     # ------------------------------------------------------------------ #
 
-    def test_form_uses_request_path_not_empty(self) -> None:
-        """``filter_form.html`` must use ``hx-get="{{ request.path }}"``, not ``hx-get=""``."""
-        path = (
-            Path(__file__).resolve().parents[3]
-            / "templates/ads/partials/filter_form.html"
+    def test_form_uses_request_path_not_empty(
+        self, seller, category, city
+    ) -> None:
+        """The ``filter_form`` renders ``hx-get="/"`` (the request path), never an
+        empty ``hx-get=""``."""
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        response = client.get(
+            "/",
+            headers={"HX-Request": "true", "Accept-Language": "en"},
         )
-        content = path.read_text(encoding="utf-8")
-        assert 'hx-get="{{ request.path }}' in content
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert 'hx-get="/"' in content
         assert 'hx-get=""' not in content
 
-    def test_all_htmx_links_have_push_url(self) -> None:
-        """Every ``hx-get`` link in ``ad_list.html`` must also carry ``hx-push-url="true"``."""
-        path = (
-            Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
-        )
-        content = path.read_text(encoding="utf-8")
-        # 10 links: price chip, purpose chip, condition chip, feature chip,
-        # clear-all, and 5 pagination links (««, «, page, », »»).
-        assert content.count("hx-get=") == 10
-        assert content.count('hx-push-url="true"') == 10
+    def test_all_htmx_links_have_push_url(
+        self, seller, category, city
+    ) -> None:
+        """Every ``hx-get`` link in the rendered ``ad_list.html`` also carries
+        ``hx-push-url="true"`` (no link may navigate without pushing history).
 
-    def test_lang_param_in_all_htmx_urls(self) -> None:
-        """Every ``hx-get`` URL in ``ad_list.html`` preserves ``LANGUAGE_CODE``."""
-        path = (
-            Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
+        Asserts parity (``count(hx-get) == count(hx-push-url)``) rather than a
+        brittle hard-coded number: the count is driven by the number of filter
+        chips, clear-all, and pagination links, which can grow with the design.
+        """
+        create_test_ads_bulk(
+            seller,
+            category,
+            city,
+            count=25,
+            status=AdStatus.PUBLISHED,
         )
-        content = path.read_text(encoding="utf-8")
+        client = Client()
+        response = client.get(
+            "/",
+            headers={"HX-Request": "true", "Accept-Language": "en"},
+        )
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        hx_get_count = content.count("hx-get=")
+        push_url_count = content.count('hx-push-url="true"')
+        assert hx_get_count > 0, "no hx-get links found in rendered output"
+        assert hx_get_count == push_url_count, (
+            f"{hx_get_count} hx-get links but only {push_url_count} carry "
+            'hx-push-url="true"'
+        )
+
+    def test_lang_param_in_all_htmx_urls(
+        self, seller, category, city
+    ) -> None:
+        """Every ``hx-get`` URL in the rendered ``ad_list.html`` preserves the
+        ``lang`` query parameter (OQ3)."""
+        create_test_ads_bulk(
+            seller,
+            category,
+            city,
+            count=25,
+            status=AdStatus.PUBLISHED,
+        )
+        client = Client()
+        response = client.get(
+            "/?lang=en",
+            headers={"HX-Request": "true"},
+        )
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
         hx_get_values = re.findall(r'hx-get="([^"]*)"', content)
-        assert len(hx_get_values) > 0
-        missing = [v for v in hx_get_values if "LANGUAGE_CODE" not in v]
+        assert len(hx_get_values) > 0, "no hx-get links found in rendered output"
+        # Only links that carry a query string need to preserve lang= — the
+        # filter-form ``hx-get="/"`` is path-only (no params to preserve).
+        missing = [v for v in hx_get_values if "?" in v and "lang=en" not in v]
         assert not missing, (
-            f"{len(missing)} hx-get values are missing LANGUAGE_CODE preservation"
+            f"{len(missing)} hx-get values are missing lang=en preservation: {missing}"
         )
 
     def test_clear_all_filters_static_guard(self) -> None:
@@ -119,14 +161,27 @@ class TestFilterUrlReset:
             f"clear-all link is NOT inside the chips-block if (depth={depth})"
         )
 
-    def test_sort_dropdown_is_not_gated_on_query(self) -> None:
-        """The sort ``<select>`` must always render, even on search results (PO-2)."""
-        path = (
-            Path(__file__).resolve().parents[3]
-            / "templates/ads/partials/filter_form.html"
+    def test_sort_dropdown_is_not_gated_on_query(
+        self, seller, category, city
+    ) -> None:
+        """The sort ``<select>`` renders on the search page even when ``?q=`` is
+        present (PO-2) — the sort control is always visible, never hidden by an
+        ``{% if not query %}`` guard."""
+        create_test_ads_bulk(
+            seller,
+            category,
+            city,
+            count=2,
+            status=AdStatus.PUBLISHED,
         )
-        content = path.read_text(encoding="utf-8")
-        assert "{% if not query %}" not in content
+        client = Client()
+        response = client.get(
+            "/search/?q=boat",
+            headers={"HX-Request": "true", "Accept-Language": "en"},
+        )
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert "<select name=\"sort\"" in content
 
     def test_sort_block_is_right_pinned(self) -> None:
         """The Sort block is pinned to the right edge of the filter row while
@@ -159,27 +214,39 @@ class TestFilterUrlReset:
             f"of the flex row, got: {wrapper!r}"
         )
 
-    def test_price_inputs_use_default_filter(self) -> None:
-        """Min/max price inputs use ``|default:''`` so ``None`` renders as empty, not ``"None"``."""
-        path = (
-            Path(__file__).resolve().parents[3]
-            / "templates/ads/partials/filter_form.html"
+    def test_price_inputs_use_default_filter(
+        self, seller, category, city
+    ) -> None:
+        """Min/max price inputs render empty (not ``"None"``) when no price
+        filter is active."""
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        response = client.get(
+            "/",
+            headers={"HX-Request": "true", "Accept-Language": "en"},
         )
-        content = path.read_text(encoding="utf-8")
-        assert "value=\"{{ min_price|default:'' }}\"" in content
-        assert "value=\"{{ max_price|default:'' }}\"" in content
-        # The raw "{{ min_price }}" / "{{ max_price }}" without the filter must not appear.
-        assert 'value="{{ min_price }}"' not in content
-        assert 'value="{{ max_price }}"' not in content
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        # The price inputs must exist and have empty values, never the literal
+        # string "None" which the |default filter prevents.
+        assert "min_price" in content
+        assert "max_price" in content
+        assert 'value="None"' not in content
 
-    def test_price_inputs_step_uses_price_step_enum(self) -> None:
-        """Price range inputs render ``step="{{ price_step.value }}"`` (currently 1), not a hardcoded 0.01."""
-        path = (
-            Path(__file__).resolve().parents[3]
-            / "templates/ads/partials/filter_form.html"
+    def test_price_inputs_step_uses_price_step_enum(
+        self, seller, category, city
+    ) -> None:
+        """Price range inputs render ``step="1"`` (from the PriceStep enum's
+        ``DEFAULT`` value), not a hard-coded ``0.01``."""
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        response = client.get(
+            "/",
+            headers={"HX-Request": "true", "Accept-Language": "en"},
         )
-        content = path.read_text(encoding="utf-8")
-        assert 'step="{{ price_step.value }}"' in content
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+        assert 'step="1"' in content
         assert 'step="0.01"' not in content
 
     def test_price_inputs_step_renders_as_one(self, seller, category, city) -> None:

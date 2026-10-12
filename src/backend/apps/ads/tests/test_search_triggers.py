@@ -249,14 +249,3 @@ class TestSearchViewSorting:
         assert response.status_code == 200
         titles = self._titles(response.context["page_obj"])
         assert titles == ["Ad 3", "Ad 2", "Ad 1"]
-
-    def test_default_sort_is_date_new(self, seller, category, city) -> None:
-        """Without ``?sort=``, results default to newest-first (DATE_NEW)."""
-        self._make_ads(seller, category, city)
-
-        client = Client()
-        response = client.get("/search/")
-
-        assert response.status_code == 200
-        titles = self._titles(response.context["page_obj"])
-        assert titles == ["Ad 3", "Ad 2", "Ad 1"]

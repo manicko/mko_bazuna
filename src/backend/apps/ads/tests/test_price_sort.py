@@ -23,6 +23,14 @@ class TestPriceSort:
             price=100,
             status=AdStatus.PUBLISHED,
         )
+        mid = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Mid",
+            price=150,
+            status=AdStatus.PUBLISHED,
+        )
         expensive = create_test_ad(
             seller,
             category,
@@ -37,8 +45,8 @@ class TestPriceSort:
 
         assert response.status_code == 200
         ids = list(a.id for a in response.context["page_obj"])
-        assert cheap.id in ids and expensive.id in ids
-        assert ids.index(cheap.id) < ids.index(expensive.id)
+        assert cheap.id in ids and mid.id in ids and expensive.id in ids
+        assert ids.index(cheap.id) < ids.index(mid.id) < ids.index(expensive.id)
 
     def test_price_desc_orders_by_value(self, seller, category, city) -> None:
         cheap = create_test_ad(
@@ -47,6 +55,14 @@ class TestPriceSort:
             city,
             title="Cheap",
             price=100,
+            status=AdStatus.PUBLISHED,
+        )
+        mid = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Mid",
+            price=150,
             status=AdStatus.PUBLISHED,
         )
         expensive = create_test_ad(
@@ -63,5 +79,5 @@ class TestPriceSort:
 
         assert response.status_code == 200
         ids = list(a.id for a in response.context["page_obj"])
-        assert cheap.id in ids and expensive.id in ids
-        assert ids.index(expensive.id) < ids.index(cheap.id)
+        assert cheap.id in ids and mid.id in ids and expensive.id in ids
+        assert ids.index(expensive.id) < ids.index(mid.id) < ids.index(cheap.id)

@@ -58,16 +58,9 @@ class TestListingsSortOrder:
         response = client.get(f"/?sort={AdSort.DATE_OLD}")
 
         assert response.status_code == 200
-        html = response.content.decode()
-
-        # Alpha has the oldest published_at → should appear first.
-        pos_alpha = html.find("Alpha Ad")
-        pos_beta = html.find("Beta Ad")
-        pos_gamma = html.find("Gamma Ad")
-        assert pos_alpha != -1
-        assert pos_beta != -1
-        assert pos_gamma != -1
-        assert pos_alpha < pos_beta < pos_gamma
+        # Assert on the queryset order, not on HTML string positions.
+        ids = [a.id for a in response.context["page_obj"]]
+        assert ids == [a.id for a in sorted(published_ads, key=lambda a: a.published_at)]
 
     def test_date_new_orders_newest_first(self, published_ads) -> None:
         """``?sort=date_desc`` (DATE_NEW, default) renders ads newest-first."""
@@ -75,13 +68,8 @@ class TestListingsSortOrder:
         response = client.get(f"/?sort={AdSort.DATE_NEW}")
 
         assert response.status_code == 200
-        html = response.content.decode()
-
-        # Gamma has the newest published_at → should appear first.
-        pos_alpha = html.find("Alpha Ad")
-        pos_beta = html.find("Beta Ad")
-        pos_gamma = html.find("Gamma Ad")
-        assert pos_gamma < pos_beta < pos_alpha
+        ids = [a.id for a in response.context["page_obj"]]
+        assert ids == [a.id for a in sorted(published_ads, key=lambda a: a.published_at, reverse=True)]
 
     def test_default_sort_is_date_new(self, published_ads) -> None:
         """No ``sort`` param defaults to ``date_desc`` (newest first)."""
@@ -89,20 +77,5 @@ class TestListingsSortOrder:
         response = client.get("/")
 
         assert response.status_code == 200
-        html = response.content.decode()
-
-        pos_alpha = html.find("Alpha Ad")
-        pos_gamma = html.find("Gamma Ad")
-        assert pos_gamma < pos_alpha
-
-    def test_date_asc_and_desc_are_reversed(self, published_ads) -> None:
-        """Ascending and descending produce opposite orderings (sanity reversal)."""
-        client = Client()
-
-        asc = client.get(f"/?sort={AdSort.DATE_OLD}")
-        asc_html = asc.content.decode()
-        desc = client.get(f"/?sort={AdSort.DATE_NEW}")
-        desc_html = desc.content.decode()
-
-        assert asc_html.find("Alpha Ad") < asc_html.find("Gamma Ad")
-        assert desc_html.find("Gamma Ad") < desc_html.find("Alpha Ad")
+        ids = [a.id for a in response.context["page_obj"]]
+        assert ids == [a.id for a in sorted(published_ads, key=lambda a: a.published_at, reverse=True)]

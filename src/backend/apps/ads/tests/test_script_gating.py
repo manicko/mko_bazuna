@@ -9,8 +9,7 @@ accepts analytics consent.
 from __future__ import annotations
 
 import pytest
-from django.conf import settings
-from django.test import Client
+from django.test import Client, override_settings
 from django.urls import reverse
 
 from apps.ads.models import Ad, AdImage
@@ -69,8 +68,21 @@ class TestScriptGating:
         client.cookies["consent_given"] = "accepted"
         client.cookies["consent_analytics"] = "true"
         client.cookies["consent_preferences"] = "true"
-        content = _get_detail(client, ad).content.decode()
-        if settings.PLAUSIBLE_HOST:
-            assert "plausible.io" in content
+        with override_settings(PLAUSIBLE_HOST="plausible.io"):
+            content = _get_detail(client, ad).content.decode()
+        assert "plausible.io" in content
         assert "glightbox.min.js" in content
         assert "GLightbox({" in content
+
+    def test_scripts_absent_when_analytics_declined(self, ad: Ad) -> None:
+        """When ``consent_analytics=false``, both Plausible and GLightbox JS are
+        absent — even with ``PLAUSIBLE_HOST`` configured and preferences granted."""
+        client = Client()
+        client.cookies["consent_given"] = "accepted"
+        client.cookies["consent_analytics"] = "false"
+        client.cookies["consent_preferences"] = "true"
+        with override_settings(PLAUSIBLE_HOST="plausible.io"):
+            content = _get_detail(client, ad).content.decode()
+        assert "plausible.io" not in content
+        assert "glightbox.min.js" not in content
+        assert "GLightbox({" not in content

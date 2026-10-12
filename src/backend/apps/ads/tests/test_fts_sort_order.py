@@ -124,7 +124,14 @@ class TestFtsSortOrder:
         # Price 0 (Free) sorts before positive prices in ascending order.
         assert ids.index(ad_free.id) < ids.index(ad_priced.id)
 
-    def test_fts_default_sort_is_relevance(self, seller, category, city) -> None:
+    def test_default_tiebreaks_by_published_at_desc(
+        self, seller, category, city
+    ) -> None:
+        """Default (no ``?sort=``) sorts by relevance rank, then by ``-published_at``.
+
+        Two ads with the same title (``"Велосипед"``) have equal FTS rank, so
+        the secondary ``-published_at`` tiebreaker surfaces the newer ad first.
+        """
         now = timezone.now()
         ad_older = create_test_ad(
             seller,
@@ -153,6 +160,45 @@ class TestFtsSortOrder:
         ids = list(a.id for a in response.context["page_obj"])
         assert ad_newer.id in ids
         assert ad_older.id in ids
-        # Relevance-first default: equal rank breaks by -published_at, so the
-        # newer ad appears before the older one (unchanged behavior).
+        # Equal rank → secondary -published_at tiebreaker: newer first.
         assert ids.index(ad_newer.id) < ids.index(ad_older.id)
+
+    def test_title_match_ranks_above_description_only(
+        self, seller, category, city
+    ) -> None:
+        """A title match outranks a description-only match (true relevance).
+
+        Both ads match the search query, but one has the term in its title
+        (highest weight) and the other only in its description (lower weight),
+        so the title-match ad must appear first in the default relevance
+        ordering.
+        """
+        ad_title = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Велосипед",
+            description="Продается товар",
+            status=AdStatus.PUBLISHED,
+        )
+        ad_desc = create_test_ad(
+            seller,
+            category,
+            city,
+            title="Самокат",
+            description="Продается велосипед в хорошем состоянии",
+            status=AdStatus.PUBLISHED,
+        )
+
+        client = Client()
+        response = client.get(
+            "/search/?q=велосипед&lang=ru",
+            headers={"HX-Request": "true"},
+        )
+
+        assert response.status_code == 200
+        ids = list(a.id for a in response.context["page_obj"])
+        assert ad_title.id in ids
+        assert ad_desc.id in ids
+        # Title match (highest weight) ranks above description-only match.
+        assert ids.index(ad_title.id) < ids.index(ad_desc.id)
