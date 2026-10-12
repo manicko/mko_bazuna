@@ -80,12 +80,18 @@ def test_scheduler_health_stale_seconds_allowlisted() -> None:
 
 
 def test_unknown_env_var_logs_warning(caplog: pytest.LogCaptureFixture) -> None:
-    """Unknown keys trigger a WARNING mentioning each key."""
+    """Unknown keys trigger a WARNING mentioning each key.
+
+    The fixture names are clearly fictional (``BOT_T0KEN`` with a zero, and
+    ``DJANGO_FAKE_VAR``) so they cannot be mistaken for a real misspelling of a
+    production secret such as ``DJANGO_SECRET_KEY`` — the whole point of the
+    allowlist scan is to surface typos, not to resemble one.
+    """
     with caplog.at_level("WARNING", logger="config.settings.base"):
-        _warn_unknown_env_vars({"BOT_T0KEN", "DJANGO_SECRETKEY"})
+        _warn_unknown_env_vars({"BOT_T0KEN", "DJANGO_FAKE_VAR"})
     warnings = [r.message for r in caplog.records if r.levelname == "WARNING"]
     assert any("BOT_T0KEN" in w for w in warnings)
-    assert any("DJANGO_SECRETKEY" in w for w in warnings)
+    assert any("DJANGO_FAKE_VAR" in w for w in warnings)
 
 
 def test_known_env_vars_no_warning(caplog: pytest.LogCaptureFixture) -> None:

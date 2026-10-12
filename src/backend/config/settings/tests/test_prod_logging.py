@@ -8,9 +8,6 @@ These tests use subprocess isolation with controlled os.environ.
 from __future__ import annotations
 
 import importlib.util
-import os
-import subprocess
-import sys
 import tomllib
 from pathlib import Path
 from types import ModuleType
@@ -22,7 +19,7 @@ from config.settings.tests.conftest import (
     _run_in_subprocess,
 )
 
-pytestmark = [pytest.mark.integration, pytest.mark.settings, pytest.mark.no_cover]
+pytestmark = [pytest.mark.unit, pytest.mark.settings, pytest.mark.no_cover]
 
 # Resolve repository root — same pattern as test_compose_hardening.py.
 _ROOT = Path(__file__).resolve().parent
@@ -34,7 +31,6 @@ while not (_ROOT / "pyproject.toml").exists():
 def test_sentry_initialized_when_dsn_configured() -> None:
     """prod settings with SENTRY_DSN set and DEBUG=False initializes sentry_sdk."""
     env = _prod_env_overrides(SENTRY_DSN="https://test@example.com/42")
-    env["PYTHONPATH"] = os.pathsep.join(sys.path)
     import_code = (
         "import django; django.setup(); "
         "import sentry_sdk; "
@@ -49,7 +45,6 @@ def test_sentry_initialized_when_dsn_configured() -> None:
 def test_sentry_not_initialized_without_dsn() -> None:
     """prod settings without SENTRY_DSN does not initialize sentry_sdk and does not crash."""
     env = _prod_env_overrides(SENTRY_DSN="")
-    env["PYTHONPATH"] = os.pathsep.join(sys.path)
     import_code = (
         "import django; django.setup(); "
         "import sentry_sdk; "
@@ -72,7 +67,6 @@ def test_sentry_malformed_dsn_degrades_without_crashing() -> None:
     sentry-sdk 2.69.2 and would assert nothing.
     """
     env = _prod_env_overrides(SENTRY_DSN="not-a-valid-dsn")
-    env["PYTHONPATH"] = os.pathsep.join(sys.path)
     import_code = (
         "import django; django.setup(); "
         "import sentry_sdk; "
@@ -92,25 +86,16 @@ def test_sentry_malformed_dsn_degrades_without_crashing() -> None:
 def test_prod_logging_uses_json_formatter() -> None:
     """prod settings LOGGING dict configures RedactingJsonFormatter."""
     env = _prod_env_overrides()
-    env["PYTHONPATH"] = os.pathsep.join(sys.path)
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            (
-                "import django; django.setup(); "
-                "from django.conf import settings; "
-                "fmt_class = settings.LOGGING['formatters']['json'].get('()', ''); "
-                "handler_fmt = settings.LOGGING['handlers']['console'].get('formatter', ''); "
-                "print(f'formatter_class={fmt_class}'); "
-                "print(f'handler_formatter={handler_fmt}'); "
-                "print(f'root_level={settings.LOGGING[\"root\"][\"level\"]}')"
-            ),
-        ],
-        env=env,
-        capture_output=True,
-        text=True,
+    import_code = (
+        "import django; django.setup(); "
+        "from django.conf import settings; "
+        "fmt_class = settings.LOGGING['formatters']['json'].get('()', ''); "
+        "handler_fmt = settings.LOGGING['handlers']['console'].get('formatter', ''); "
+        "print(f'formatter_class={fmt_class}'); "
+        "print(f'handler_formatter={handler_fmt}'); "
+        "print(f'root_level={settings.LOGGING[\"root\"][\"level\"]}')"
     )
+    result = _run_in_subprocess(env, import_code)
     assert result.returncode == 0, result.stderr
     assert "RedactingJsonFormatter" in result.stdout
     assert "handler_formatter=json" in result.stdout
@@ -147,30 +132,26 @@ def test_sentry_sdk_in_pyproject_dependencies() -> None:
 
 
 def test_prod_settings_email_accessible() -> None:
-    """prod settings import successfully and expose EMAIL_* settings."""
+    """prod settings import successfully and expose EMAIL_* settings.
+
+    EMAIL_HOST, EMAIL_PORT and DEFAULT_FROM_EMAIL carry the unique host/port/
+    sender shape asserted here. EMAIL_BACKEND is deliberately not re-asserted:
+    its prod pin is owned by
+    test_settings_defaults.test_prod_email_backend_env_override_is_ignored, so
+    asserting it again would be redundant (F13).
+    """
     env = _prod_env_overrides()
-    env["PYTHONPATH"] = os.pathsep.join(sys.path)
-    result = subprocess.run(
-        [
-            sys.executable,
-            "-c",
-            (
-                "import django; django.setup(); "
-                "from django.conf import settings; "
-                "print(f'email_host={settings.EMAIL_HOST}'); "
-                "print(f'email_port={settings.EMAIL_PORT}'); "
-                "print(f'email_backend={settings.EMAIL_BACKEND}'); "
-                "print(f'default_from_email={settings.DEFAULT_FROM_EMAIL}')"
-            ),
-        ],
-        env=env,
-        capture_output=True,
-        text=True,
+    import_code = (
+        "import django; django.setup(); "
+        "from django.conf import settings; "
+        "print(f'email_host={settings.EMAIL_HOST}'); "
+        "print(f'email_port={settings.EMAIL_PORT}'); "
+        "print(f'default_from_email={settings.DEFAULT_FROM_EMAIL}')"
     )
+    result = _run_in_subprocess(env, import_code)
     assert result.returncode == 0, result.stderr
     assert "email_host=smtp.example.com" in result.stdout
     assert "email_port=587" in result.stdout
-    assert "email_backend=django.core.mail.backends.smtp.EmailBackend" in result.stdout
     assert "default_from_email=noreply@example.com" in result.stdout
 
 

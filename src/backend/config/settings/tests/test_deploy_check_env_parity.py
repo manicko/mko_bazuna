@@ -25,8 +25,8 @@ clean, and it relies on ``prod.py``'s exception messages staying value-free — 
 future change that starts echoing values into an ``ImproperlyConfigured`` message
 would break that contract, and this docstring is the reviewer's pointer to it.
 
-Two negative-control rows are shipped, one per masking channel, each chosen to be
-valid in **both** environments this suite runs in:
+Three negative-control rows are shipped, each chosen to be valid in **both**
+environments this suite runs in:
 
 ``REDIS_URL``, present-but-empty
     In the Docker test container ``./.env.test`` is bind-mounted as ``src/.env``
@@ -38,6 +38,18 @@ valid in **both** environments this suite runs in:
     ``test`` runner there is no ``src/.env`` at all, so both forms are simply the
     process environment.
 
+``ALLOWED_HOSTS``, present-but-empty
+    ``.env.test`` *does* define this key (``localhost,127.0.0.1``), so a
+    *deleted* ALLOWED_HOSTS is silently restored by the same back-fill channel
+    and the prod import would succeed — the control would be a false green (a
+    harness that cannot fail, the exact defect these rows exist to prevent). The
+    portable probe is therefore present-but-empty (the same channel as
+    ``REDIS_URL``): ``base.py``'s ``env.list("ALLOWED_HOSTS", default=[])``
+    resolves an empty value to ``[]``, so ``prod.py``'s ``if not ALLOWED_HOSTS``
+    guard raises the bare ``ValueError`` this row asserts. It shares the
+    ``ValueError`` surface with ``CSRF_TRUSTED_ORIGINS`` — both ``ValueError``
+    guards the module documents are now negative-controlled.
+
 ``CSRF_TRUSTED_ORIGINS``, absent
     ``.env.test`` does not define this key, so there is nothing for the back-fill
     channel to restore and deletion is portable to both environments.
@@ -47,7 +59,7 @@ is no ``src/.env``, so emptying it takes ``base.py``'s missing-file branch and
 ``sys.exit(1)``s with a red-herring ".env file not found" message rather than
 exercising ``prod.py``.
 
-The two rows also assert different exception types on purpose: the prod import
+The rows also assert different exception types on purpose: the prod import
 has no single failure surface. Seven guards raise ``ImproperlyConfigured``, two
 (``ALLOWED_HOSTS``, ``CSRF_TRUSTED_ORIGINS``) raise a bare ``ValueError``, and an
 unset ``DJANGO_SECRET_KEY`` fails from ``base.py`` with a different message
@@ -188,6 +200,10 @@ def test_deploy_check_env_block_declares_no_bypass_flag() -> None:
     ("name", "form", "expected_error"),
     [
         ("REDIS_URL", "empty", "ImproperlyConfigured"),
+        # ALLOWED_HOSTS is present-but-empty (not absent): .env.test defines it,
+        # so deletion is silently back-filled by read_env(overwrite=False) and the
+        # import would succeed. Empty resolves to env.list -> [] -> ValueError.
+        ("ALLOWED_HOSTS", "empty", "ValueError"),
         ("CSRF_TRUSTED_ORIGINS", "absent", "ValueError"),
     ],
 )

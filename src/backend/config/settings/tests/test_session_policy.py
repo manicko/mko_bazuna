@@ -26,10 +26,12 @@ settings module change).
 
 from __future__ import annotations
 
+import ast
 from datetime import timedelta
 from pathlib import Path
 
 import pytest
+from django.conf import settings
 from django.contrib.auth import SESSION_KEY
 from django.contrib.sessions.models import Session
 from django.test import Client, override_settings
@@ -38,7 +40,7 @@ from django.utils import timezone
 from config.settings import base
 from conftest import make_user
 
-pytestmark = [pytest.mark.django_db, pytest.mark.integration]
+pytestmark = [pytest.mark.django_db, pytest.mark.integration, pytest.mark.settings]
 
 # Resolve the repository root with the same walk-up used across the settings
 # tests (test_env_allowlist_reverse.py, test_prod_logging.py). Do not invent a
@@ -49,14 +51,51 @@ while not (_ROOT / "pyproject.toml").exists():
 
 _SRC_ROOT = _ROOT / "src"
 
-# The name of a production call that sets a per-session expiry would make the
-# declared window meaningless (it would let a view override the module policy).
-_PER_SESSION_EXPIRY_CALL = "set_expiry("
+# The session-receiver attribute that overrides the declared window per session.
+# A production call ``session.set_expiry(...)`` (or ``request.session.set_expiry(...)``)
+# would let a view defeat the module-level ``SESSION_COOKIE_AGE`` policy.
+_PER_SESSION_EXPIRY_ATTR = "set_expiry"
 
 # A search query that reaches ``record_search_history``. It must be non-empty:
 # the service early-returns on an empty/whitespace query, which would make the
 # anonymous-refresh test vacuous.
 _SEARCH_QUERY = "session-policy-probe"
+
+
+class _SessionExpiryVisitor(ast.NodeVisitor):
+    """Collect ``*.set_expiry(...)`` calls on a ``session`` receiver.
+
+    Replaces the previous substring scan for ``"set_expiry("``. A substring
+    match cannot tell a real call from a mention in a comment or docstring, and
+    would also fire on an unrelated ``set_expiry`` attribute on a different
+    object. The visitor inspects actual ``ast.Call`` nodes whose ``func`` is an
+    ``ast.Attribute`` named ``set_expiry`` and whose receiver is ``session`` —
+    either the bare name (``session.set_expiry(...)``) or an attribute chain
+    reaching ``session`` (``request.session.set_expiry(...)``).
+    """
+
+    def __init__(self, filename: str) -> None:
+        self._filename = filename
+        self.offenders: list[str] = []
+
+    def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
+        func = node.func
+        if (
+            isinstance(func, ast.Attribute)
+            and func.attr == _PER_SESSION_EXPIRY_ATTR
+            and _receiver_is_session(func.value)
+        ):
+            self.offenders.append(f"{self._filename}:{node.lineno}")
+        self.generic_visit(node)
+
+
+def _receiver_is_session(value: ast.AST) -> bool:
+    """True for ``session`` or an attribute chain that reaches ``session``."""
+    if isinstance(value, ast.Name):
+        return value.id == "session"
+    if isinstance(value, ast.Attribute):
+        return value.attr == "session" or _receiver_is_session(value.value)
+    return False
 
 
 def _persisted_expiry(session_key: str) -> object:
@@ -237,17 +276,21 @@ def test_anonymous_session_is_refreshed_by_each_recorded_search() -> None:
 def test_no_per_session_expiry_override_exists() -> None:
     """No production code overrides the declared window per session.
 
-    Two independent guards: a source scan for ``set_expiry(`` across non-test
-    ``src/**/*.py``, and the absence of a ``_session_expiry`` key in a real
-    session after a request cycle (the internal field Django uses when a view
-    *does* override the window).
+    Two independent guards: an AST source scan for ``*.set_expiry(...)`` calls on
+    a ``session`` receiver across non-test ``src/**/*.py``, and a runtime check
+    that a real session's expiry age equals the configured default — i.e. no view
+    applied a per-session ``_session_expiry`` override, which is the internal
+    field Django consults when a view *does* override the window.
     """
     offenders: list[str] = []
     for path in sorted(_SRC_ROOT.rglob("*.py")):
         if "tests" in path.relative_to(_SRC_ROOT).parts:
             continue
-        if _PER_SESSION_EXPIRY_CALL in path.read_text(encoding="utf-8"):
-            offenders.append(path.relative_to(_ROOT).as_posix())
+        visitor = _SessionExpiryVisitor(path.relative_to(_ROOT).as_posix())
+        visitor.visit(
+            ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+        )
+        offenders.extend(visitor.offenders)
     assert not offenders, (
         "production code overrides the session expiry per session, which would "
         f"defeat the declared policy: {offenders}. Remove the call, or fix the "
@@ -257,4 +300,10 @@ def test_no_per_session_expiry_override_exists() -> None:
     client = Client()
     response = client.get("/")
     assert response.status_code == 200
-    assert "_session_expiry" not in client.session
+    # A ``_session_expiry`` key in the session is the internal signal Django
+    # consults when a view overrides the window; ``get_expiry_age()`` resolves
+    # to ``SESSION_COOKIE_AGE`` only when that override is absent. Asserting the
+    # resolved age against the setting (not a session-key membership test, which
+    # ``"_session_expiry" not in client.session`` was — a no-op over a dict-like
+    # SessionStore) pins the runtime policy to the declaration.
+    assert client.session.get_expiry_age() == settings.SESSION_COOKIE_AGE

@@ -190,7 +190,7 @@ jobs:
         run: uv run pytest -k TestSearchResponseSLORegression -n auto --dist loadgroup --tb=short --reuse-db -v
         working-directory: src/backend
 
-    lint:
+  lint:
     runs-on: ubuntu-latest
     env:
       PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend

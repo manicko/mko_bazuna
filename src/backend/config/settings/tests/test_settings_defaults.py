@@ -21,7 +21,7 @@ from config.settings.tests.conftest import (
     _run_in_subprocess,
 )
 
-pytestmark = [pytest.mark.unit, pytest.mark.settings]
+pytestmark = [pytest.mark.unit, pytest.mark.settings, pytest.mark.no_cover]
 
 _ROOT = Path(__file__).resolve().parent
 while not (_ROOT / "pyproject.toml").exists():
