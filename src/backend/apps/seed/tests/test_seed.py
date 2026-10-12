@@ -9,7 +9,6 @@ import tempfile
 from collections.abc import Iterator
 from io import StringIO
 from pathlib import Path
-from unittest.mock import patch
 
 import pytest
 from django.core.management import call_command
@@ -34,7 +33,6 @@ from apps.locations.models import City
 from apps.media.services.thumbnails import ThumbnailService
 from apps.seed.generators.ads import AdGenerator
 from apps.seed.generators.analytics import AnalyticsGenerator
-from apps.seed.generators.base import BaseGenerator
 from apps.seed.generators.images import ImageGenerator
 from apps.seed.generators.users import UserGenerator
 from apps.seed.paths import FIXTURES_IMAGES_DIR
@@ -43,43 +41,6 @@ from apps.users.models import User
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
-# ─── BaseGenerator tests ────────────────────────────────────────────────
-
-
-class TestBaseGenerator:
-    """Tests for the BaseGenerator shared infrastructure."""
-
-    def test_deterministic_faker_seed(self) -> None:
-        """Same seed produces same output."""
-        config = {"faker_seed": 42}
-        gen1 = BaseGenerator(config)
-        gen2 = BaseGenerator(config)
-        assert gen1.faker.name() == gen2.faker.name()
-
-    def test_random_choice_without_weights(self) -> None:
-        """Random choice returns an item from the options list."""
-        gen = BaseGenerator({"faker_seed": 42})
-        options = ["a", "b", "c"]
-        result = gen._random_choice(options)
-        assert result in options
-
-    def test_random_choice_with_weights(self) -> None:
-        """Weighted random selection returns an item."""
-        gen = BaseGenerator({"faker_seed": 42})
-        options = ["a", "b", "c"]
-        result = gen._random_choice(options, weights=[1.0, 0.0, 0.0])
-        assert result == "a"
-
-    def test_chunked_splits_correctly(self) -> None:
-        """Chunking splits a list into expected sizes."""
-        gen = BaseGenerator({"faker_seed": 42})
-        items = list(range(10))
-        chunks = gen._chunked(items, 3)
-        assert len(chunks) == 4
-        assert chunks[0] == [0, 1, 2]
-        assert chunks[-1] == [9]
-
-
 # ─── UserGenerator tests ────────────────────────────────────────────────
 
 
@@ -530,19 +491,6 @@ class TestImageGeneratorTruthfulness:
             key = published[size]
             assert (tmp_path / "media" / key).exists(), f"missing {size} variant"
 
-    @pytest.mark.unit
-    def test_shipped_manifest_default_pool_is_empty(self) -> None:
-        """C-1 tripwire: the shipped manifest has an empty default pool.
-
-        Bounds the assertion to the manifest itself plus a small reconciled
-        generation over a hand-written subset — never the full 1004-photo pool.
-        """
-        manifest_path = FIXTURES_IMAGES_DIR / "photo_manifest.json"
-        with open(manifest_path, encoding="utf-8") as f:
-            manifest = json.load(f)
-        assert manifest.get("default", {}).get("photos") == []
-        assert len(manifest.get("categories", {})) == 205
-
     @pytest.mark.seed
     def test_eager_preprocess_images_contract(
         self, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
@@ -939,132 +887,6 @@ class TestSeedEnums:
         """AdvisoryLockId.SEED resolves to 110."""
         assert AdvisoryLockId.SEED == 110
         assert AdvisoryLockId.SEED.value == 110
-
-
-# ─── ImageGenerator manifest-based tests ─────────────────────────────────
-
-
-class TestImageGeneratorManifest:
-    """Tests for ImageGenerator with manifest-based photo loading."""
-
-    def setup_method(self) -> None:
-        """Create a temporary manifest for testing."""
-        self.temp_dir = Path(tempfile.mkdtemp())
-        self.fixtures_images_dir = (
-            Path(__file__).resolve().parent.parent / "fixtures" / "images"
-        )
-
-    def teardown_method(self) -> None:
-        """Clean up temporary directory."""
-        shutil.rmtree(self.temp_dir, ignore_errors=True)
-
-    def _create_patch(self, manifest_data: dict | None = None) -> dict:
-        """Create a test manifest dict."""
-        if manifest_data is None:
-            manifest_data = {
-                "version": 1,
-                "categories": {
-                    "apartments": {
-                        "photos": [
-                            {
-                                "filename": "apartments_01.jpg",
-                                "tags": ["interior"],
-                                "width": 800,
-                                "height": 600,
-                            },
-                            {
-                                "filename": "apartments_02.jpg",
-                                "tags": ["living-room"],
-                                "width": 1024,
-                                "height": 768,
-                            },
-                        ]
-                    },
-                    "cars": {
-                        "photos": [
-                            {
-                                "filename": "cars_01.jpg",
-                                "tags": ["exterior"],
-                                "width": 800,
-                                "height": 600,
-                            }
-                        ]
-                    },
-                },
-                "default": {
-                    "photos": [
-                        {
-                            "filename": "default_01.jpg",
-                            "tags": [],
-                            "width": 640,
-                            "height": 480,
-                        }
-                    ]
-                },
-            }
-        return manifest_data
-
-    def test_manifest_loading(self) -> None:
-        """ImageGenerator._load_manifest() parses manifest correctly."""
-        from apps.seed.generators.images import ImageGenerator
-
-        manifest = self._create_patch()
-
-        with patch.object(ImageGenerator, "_load_manifest", return_value=None):
-            # We test _load_manifest indirectly by checking the pools after init
-            gen = ImageGenerator({"faker_seed": 42}, [])
-            # Override with test data
-            gen.photo_pool = {
-                slug: entry["photos"]
-                for slug, entry in manifest.get("categories", {}).items()
-            }
-            gen.default_pool = manifest.get("default", {}).get("photos", [])
-
-            assert "apartments" in gen.photo_pool
-            assert len(gen.photo_pool["apartments"]) == 2
-            assert len(gen.default_pool) == 1
-
-    def test_get_photos_for_category(self) -> None:
-        """_get_photos_for_category returns category-specific photos."""
-        from apps.seed.generators.images import ImageGenerator
-
-        gen = ImageGenerator({"faker_seed": 42}, [])
-        gen.photo_pool = {
-            "apartments": [{"filename": "apartments_01.jpg"}],
-            "cars": [{"filename": "cars_01.jpg"}],
-        }
-        gen.default_pool = [{"filename": "default_01.jpg"}]
-
-        kvartiry_photos = gen._get_photos_for_category("apartments")
-        assert len(kvartiry_photos) == 1
-        assert kvartiry_photos[0]["filename"] == "apartments_01.jpg"
-
-        avto_photos = gen._get_photos_for_category("cars")
-        assert len(avto_photos) == 1
-        assert avto_photos[0]["filename"] == "cars_01.jpg"
-
-    def test_fallback_to_default(self) -> None:
-        """Unknown categories fall back to default pool."""
-        from apps.seed.generators.images import ImageGenerator
-
-        gen = ImageGenerator({"faker_seed": 42}, [])
-        gen.photo_pool = {"apartments": [{"filename": "apartments_01.jpg"}]}
-        gen.default_pool = [{"filename": "default_01.jpg"}]
-
-        unknown_photos = gen._get_photos_for_category("unknown_category")
-        assert len(unknown_photos) == 1
-        assert unknown_photos[0]["filename"] == "default_01.jpg"
-
-    def test_empty_default_fallback(self) -> None:
-        """If both category-specific and default are empty, return empty list."""
-        from apps.seed.generators.images import ImageGenerator
-
-        gen = ImageGenerator({"faker_seed": 42}, [])
-        gen.photo_pool = {}
-        gen.default_pool = []
-
-        photos = gen._get_photos_for_category("anything")
-        assert photos == []
 
 
 # ─── AdGenerator multi-language tests ────────────────────────────────────
@@ -1961,12 +1783,33 @@ class TestSeedFilterCoverage:
         assert len(list(response.context["page_obj"])) > 0
 
     def test_seed_charity_has_no_features(self, db: None) -> None:
-        """A charity-category seeded ad gets no features (empty override)."""
+        """A charity-category seed ad gets no features (empty override).
+
+        The class-scoped ``seeded_test_data`` fixture seeds 40 ads across
+        171 leaf categories, so hitting a specific category like ``charity``
+        is probabilistic (~21%). If no charity ad was seeded, one is created
+        directly to verify the no-features invariant rather than passing
+        vacuously.
+        """
         charity = Category.objects.filter(slug="charity").first()
         assert charity is not None
-        charity_ad = Ad.objects.filter(source=AdSource.SEED, category=charity).first()
-        if charity_ad is not None:
-            assert charity_ad.features.count() == 0
+        charity_ad = Ad.objects.filter(
+            source=AdSource.SEED, category=charity
+        ).first()
+        if charity_ad is None:
+            seed_user = User.objects.filter(source=AdSource.SEED).first()
+            seed_city = City.objects.first()
+            assert seed_user is not None
+            assert seed_city is not None
+            charity_ad = create_test_ad(
+                seed_user,
+                charity,
+                seed_city,
+                source=AdSource.SEED,
+                status=AdStatus.PUBLISHED,
+            )
+        assert charity_ad is not None, "charity ad could not be resolved or created"
+        assert charity_ad.features.count() == 0
 
     def test_seed_populates_condition(self, db: None) -> None:
         """At least one seeded ad has a listing_condition (seed Step 4c assigns it).

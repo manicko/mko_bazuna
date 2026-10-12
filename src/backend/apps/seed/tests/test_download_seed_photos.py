@@ -336,8 +336,13 @@ class TestProcessCategoryResilience:
         assert n == 0
         assert client.exhausted
 
-    def test_process_category_succeeds_when_source_recovers(self, config, sleep_mock):
-        """If the source 429s then recovers, process_category still gets its photos."""
+    def test_429_marks_source_exhausted_and_process_category_returns_zero(self, config, sleep_mock):
+        """A 429 marks the source permanently exhausted; process_category returns 0.
+
+        After exhaustion, the exhausted guard returns [] without calling
+        requests.get, so process_category cannot proceed. This confirms
+        that a 429 correctly stops further attempts for that source.
+        """
         client = UnsplashClient("test-key", config)
 
         # First few calls: 429 (source gets exhausted).
