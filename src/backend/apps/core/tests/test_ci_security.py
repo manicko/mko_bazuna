@@ -16,7 +16,7 @@ from pathlib import Path
 import pytest
 from django.conf import settings
 
-pytestmark = [pytest.mark.unit]
+# BASE_DIR in settings points to src/ ; its parent is the repository root.
 _PROJECT_ROOT = settings.BASE_DIR.parent
 
 
@@ -25,6 +25,59 @@ def _read(*parts: str) -> str:
     return (_PROJECT_ROOT / Path(*parts)).read_text(encoding="utf-8")
 
 
+def _ci_document() -> dict:
+    """Parse ``ci.yml`` as YAML and return the document mapping.
+
+    Uses ``yaml.safe_load`` (PyYAML) rather than ``ruamel.yaml`` because
+    ci.yml legitimately repeats ``runs-on: ubuntu-latest`` across job
+    mappings; ruamel 0.19 ``typ="safe"`` rejects duplicate keys, while
+    PyYAML silently lets the last value win (acceptable here — we only
+    read specific keys, never the repeated ones).
+    """
+    import yaml
+
+    document = yaml.safe_load(_read(".github", "workflows", "ci.yml"))
+    assert isinstance(document, dict), "ci.yml must parse to a mapping"
+    return document
+
+
+def _job_steps(job_name: str) -> list:
+    """Return the parsed ``steps`` list for ``jobs.<job_name>`` from ci.yml.
+
+    Raises ``AssertionError`` if the job or its steps are missing or
+    malformed, surfacing config drift as a test failure rather than a
+    silent KeyError later.
+    """
+    document = _ci_document()
+    jobs = document.get("jobs")
+    assert isinstance(jobs, dict), "ci.yml 'jobs' must be a mapping"
+    job = jobs.get(job_name)
+    assert isinstance(job, dict), f"ci.yml has no '{job_name}' job"
+    steps = job.get("steps")
+    assert isinstance(steps, list), f"ci.yml '{job_name}.steps' must be a list"
+    return steps
+
+
+def _job_by_name(job_name: str) -> dict:
+    """Return the parsed ``jobs.<job_name>`` mapping from ci.yml."""
+    document = _ci_document()
+    jobs = document.get("jobs")
+    assert isinstance(jobs, dict), "ci.yml 'jobs' must be a mapping"
+    job = jobs.get(job_name)
+    assert isinstance(job, dict), f"ci.yml has no '{job_name}' job"
+    return job
+
+
+def _build_step(step_name: str) -> dict:
+    """Return a parsed step by its display name from the ``build`` job."""
+    steps = _job_steps("build")
+    for step in steps:
+        if isinstance(step, dict) and step.get("name") == step_name:
+            return step
+    raise AssertionError(f"ci.yml build job has no step named {step_name!r}")
+
+
+@pytest.mark.unit
 def test_ci_yml_has_security_scan_tools() -> None:
     """ci.yml references pip-audit, trivy, and gitleaks (>= 3 tools)."""
     content = _read(".github", "workflows", "ci.yml")
@@ -33,20 +86,29 @@ def test_ci_yml_has_security_scan_tools() -> None:
     assert found >= 3, f"Only found {found}/3 security scanning tools in ci.yml"
 
 
+@pytest.mark.unit
 def test_ci_yml_has_security_job() -> None:
     """ci.yml defines a 'security' job."""
     content = _read(".github", "workflows", "ci.yml")
     assert "  security:" in content
 
 
+@pytest.mark.unit
 def test_security_steps_are_blocking() -> None:
     """Security scan steps in ci.yml are blocking (no continue-on-error; Trivy/gitleaks use exit-code: 1)."""
     content = _read(".github", "workflows", "ci.yml")
-    assert "continue-on-error: true" not in content
+    steps = _job_steps("security")
+    for step in steps:
+        if isinstance(step, dict):
+            assert step.get("continue-on-error") is not True, (
+                f"security step {step.get('name', '<unnamed>')} must not set "
+                "continue-on-error: true (12-OPS-001)"
+            )
     assert "exit-code: 1" in content
     assert "--exit-code 1" in content
 
 
+@pytest.mark.unit
 def test_dependabot_config_exists() -> None:
     """.github/dependabot.yml exists with github-actions and uv ecosystems."""
     dependabot_path = _PROJECT_ROOT / ".github" / "dependabot.yml"
@@ -97,6 +159,7 @@ def _find_dependabot_entry(ecosystem: str, group_name: str | None = None) -> dic
     return None
 
 
+@pytest.mark.unit
 def test_dependabot_uv_restricted_to_semver_minor_patch() -> None:
     """The uv ecosystem only allows semver-minor and semver-patch updates.
 
@@ -120,6 +183,7 @@ def test_dependabot_uv_restricted_to_semver_minor_patch() -> None:
     )
 
 
+@pytest.mark.unit
 def test_dependabot_django_prometheus_prerelease_ignored() -> None:
     """The uv ecosystem ignores pre-release updates for django-prometheus.
 
@@ -143,6 +207,7 @@ def test_dependabot_django_prometheus_prerelease_ignored() -> None:
     )
 
 
+@pytest.mark.unit
 def test_dependabot_build_actions_restricted_to_minor_patch() -> None:
     """The build-actions entry only allows semver-minor and semver-patch.
 
@@ -163,6 +228,7 @@ def test_dependabot_build_actions_restricted_to_minor_patch() -> None:
     assert "version-update:semver-patch" in update_types
 
 
+@pytest.mark.unit
 def test_dependabot_security_actions_allows_all_types() -> None:
     """The security-actions entry allows all update types (incl. majors).
 
@@ -179,6 +245,7 @@ def test_dependabot_security_actions_allows_all_types() -> None:
         )
 
 
+@pytest.mark.unit
 def test_dockerfile_has_sbom_generation() -> None:
     """Dockerfile builder stage generates a CycloneDX SBOM (via syft)."""
     content = _read("docker", "Dockerfile")
@@ -186,12 +253,14 @@ def test_dockerfile_has_sbom_generation() -> None:
     assert "syft" in content.lower() or "cyclonedx" in content.lower()
 
 
+@pytest.mark.unit
 def test_dockerfile_copies_sbom_to_runtime() -> None:
     """Builder-stage SBOM is copied into the runtime image."""
     content = _read("docker", "Dockerfile")
     assert "sbom.cyclonedx.json" in content
 
 
+@pytest.mark.unit
 def test_build_job_has_trivy_image_scan() -> None:
     """Build job scans the Docker image with Trivy."""
     content = _read(".github", "workflows", "ci.yml")
@@ -199,6 +268,7 @@ def test_build_job_has_trivy_image_scan() -> None:
     assert "trivy" in content.lower()
 
 
+@pytest.mark.unit
 def test_build_job_targets_runtime_stage() -> None:
     """Build job must build the production ``runtime`` stage, not test-runtime.
 
@@ -221,6 +291,7 @@ def test_build_job_targets_runtime_stage() -> None:
     )
 
 
+@pytest.mark.unit
 def test_trivy_image_scan_ignores_unfixed() -> None:
     """The Trivy image scan must set ignore-unfixed: true.
 
@@ -228,18 +299,15 @@ def test_trivy_image_scan_ignores_unfixed() -> None:
     has ``ignore-unfixed: true``). Only vulnerabilities with known fixes are
     reported; CVEs without an upstream fix do not block CI.
     """
-    content = _read(".github", "workflows", "ci.yml")
-    # The image scan section starts at the "Scan Docker image" step header and
-    # extends until the next step ("Upload Trivy SARIF artifact").
-    start = content.index("Scan Docker image for vulnerabilities")
-    end = content.index("Upload Trivy SARIF", start)
-    image_scan_section = content[start:end]
-    assert "ignore-unfixed: true" in image_scan_section, (
+    step = _build_step("Scan Docker image for vulnerabilities")
+    config = step.get("with", {})
+    assert config.get("ignore-unfixed") is True, (
         "the Trivy image scan in the build job must set ignore-unfixed: true "
         "to match the fs-mode scan policy (12-OPS-013)"
     )
 
 
+@pytest.mark.unit
 def test_dockerfile_runtime_upgrades_os_packages() -> None:
     """The runtime stage runs apt-get upgrade to patch OS-level CVEs.
 
@@ -253,6 +321,7 @@ def test_dockerfile_runtime_upgrades_os_packages() -> None:
     )
 
 
+@pytest.mark.unit
 def test_dockerfile_removes_system_setuptools() -> None:
     """The runtime stage removes system-level setuptools via filesystem deletion.
 
@@ -280,6 +349,7 @@ def test_dockerfile_removes_system_setuptools() -> None:
     )
 
 
+@pytest.mark.unit
 def test_dockerfile_has_no_dead_cache_bust_arg() -> None:
     """The builder stage has no dead CACHEBUST ARG.
 
@@ -296,6 +366,7 @@ def test_dockerfile_has_no_dead_cache_bust_arg() -> None:
     )
 
 
+@pytest.mark.unit
 def test_gitleaks_config_exists() -> None:
     """.gitleaks.toml exists for allowlist configuration."""
     gitleaks_path = _PROJECT_ROOT / ".gitleaks.toml"
@@ -304,6 +375,7 @@ def test_gitleaks_config_exists() -> None:
     assert "allowlists" in content
 
 
+@pytest.mark.unit
 def test_pip_audit_in_dev_deps() -> None:
     """pip-audit is listed in pyproject.toml dev dependencies."""
     content = _read("pyproject.toml")
@@ -320,46 +392,68 @@ def test_pip_audit_in_dev_deps() -> None:
 # production env vars set to valid placeholders.
 
 
-def _deploy_check_section() -> str:
-    """Return the YAML block of the dedicated ``deploy-check`` CI job.
+def _deploy_check_job() -> dict:
+    """Return the parsed ``deploy-check`` job mapping from ci.yml.
 
-    The job is the last definition in ``ci.yml``, so slicing from its header to
-    end-of-file isolates exactly its contents.
+    Replaces the previous ``content.index`` slicing that assumed the job was
+    the last definition in the file — a fragile assumption on text ordering.
+    Structural parsing instead navigates ``jobs.deploy-check`` directly.
     """
-    content = _read(".github", "workflows", "ci.yml")
-    marker = "  deploy-check:"
-    idx = content.index(marker)
-    return content[idx:]
+    return _job_by_name("deploy-check")
 
 
+@pytest.mark.unit
 def test_ci_deploy_check_uses_prod_settings() -> None:
     """The deploy-check job runs check --deploy against config.settings.prod (not test)."""
-    section = _deploy_check_section()
-    assert "config.settings.prod" in section
-    assert "config.settings.test" not in section
+    job = _deploy_check_job()
+    env = job.get("env", {})
+    assert isinstance(env, dict), "deploy-check job must declare an env block"
+    settings_module = env.get("DJANGO_SETTINGS_MODULE")
+    assert settings_module == "config.settings.prod", (
+        f"deploy-check job must set DJANGO_SETTINGS_MODULE to "
+        f"config.settings.prod, got {settings_module!r} (12-OPS-001)"
+    )
+    assert settings_module != "config.settings.test", (
+        "deploy-check job must not use config.settings.test (12-OPS-001)"
+    )
 
 
+@pytest.mark.unit
 def test_ci_deploy_check_fails_on_warnings() -> None:
     """The deploy-check step uses --fail-level WARNING and is not continue-on-error."""
-    section = _deploy_check_section()
-    assert "check --deploy --fail-level WARNING" in section
-    assert "continue-on-error" not in section
+    job = _deploy_check_job()
+    steps = job.get("steps", [])
+    assert isinstance(steps, list), "deploy-check job must declare steps"
+    for step in steps:
+        if isinstance(step, dict):
+            assert step.get("continue-on-error") is not True, (
+                f"deploy-check step {step.get('name', '<unnamed>')} must not set "
+                "continue-on-error: true (12-OPS-001)"
+            )
+    deploy_check_run = next(
+        (
+            step.get("run", "")
+            for step in steps
+            if isinstance(step, dict)
+            and "check --deploy" in str(step.get("run", ""))
+        ),
+        None,
+    )
+    assert deploy_check_run is not None, (
+        "deploy-check job must have a step running check --deploy"
+    )
+    assert "--fail-level WARNING" in deploy_check_run, (
+        "deploy-check step must use --fail-level WARNING"
+    )
 
 
+@pytest.mark.unit
 def test_ci_deploy_check_sets_valid_secret_key() -> None:
     """The deploy-check job sets DJANGO_SECRET_KEY to a 50+ char non-secret literal."""
-    section = _deploy_check_section()
-    secret_key_value: str | None = None
-    for line in section.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("DJANGO_SECRET_KEY:"):
-            raw = stripped.split(":", 1)[1].strip()
-            if (raw.startswith('"') and raw.endswith('"')) or (
-                raw.startswith("'") and raw.endswith("'")
-            ):
-                raw = raw[1:-1]
-            secret_key_value = raw
-            break
+    job = _deploy_check_job()
+    env = job.get("env", {})
+    assert isinstance(env, dict), "deploy-check job must declare an env block"
+    secret_key_value = env.get("DJANGO_SECRET_KEY")
     assert secret_key_value is not None, "DJANGO_SECRET_KEY not set in deploy-check job"
     assert len(secret_key_value) >= 50, (
         f"DJANGO_SECRET_KEY is {len(secret_key_value)} chars; deploy-check requires >=50"
@@ -390,18 +484,7 @@ _MIN_SCANNED_FILES = 250
 
 def _sast_step() -> dict:
     """Return the parsed SAST step mapping from ci.yml, proving it was found."""
-    from ruamel.yaml import YAML
-
-    content = _read(".github", "workflows", "ci.yml")
-    document = YAML(typ="safe").load(content)
-    assert isinstance(document, dict), "ci.yml must parse to a mapping"
-    jobs = document.get("jobs")
-    assert isinstance(jobs, dict), "ci.yml 'jobs' must be a mapping"
-    security = jobs.get("security")
-    assert isinstance(security, dict), "ci.yml has no 'security' job"
-    steps = security.get("steps")
-    assert isinstance(steps, list), "ci.yml 'security.steps' must be a list"
-    for step in steps:
+    for step in _job_steps("security"):
         if isinstance(step, dict) and step.get("name") == _SAST_STEP_NAME:
             return step
     raise AssertionError(f"ci.yml security job has no step named {_SAST_STEP_NAME!r}")
@@ -419,6 +502,7 @@ def _scan_roots_and_config(run: str) -> tuple[list[str], str]:
     return roots, config
 
 
+@pytest.mark.unit
 def test_ci_yml_has_sast_job() -> None:
     """ci.yml defines a bandit SAST step with resolvable roots and config.
 
@@ -449,6 +533,7 @@ def test_ci_yml_has_sast_job() -> None:
         )
 
 
+@pytest.mark.integration
 def test_sast_step_actually_scans_files() -> None:
     """Run bandit as configured and assert a non-zero scanned-file count.
 
@@ -510,12 +595,14 @@ def test_sast_step_actually_scans_files() -> None:
     )
 
 
+@pytest.mark.unit
 def test_bandit_in_dev_deps() -> None:
     """pyproject.toml lists a SAST tool (bandit or semgrep) in dev dependencies."""
     content = _read("pyproject.toml")
     assert "bandit" in content or "semgrep" in content
 
 
+@pytest.mark.unit
 def test_bandit_has_config_section() -> None:
     """pyproject.toml contains a [tool.bandit] configuration section."""
     content = _read("pyproject.toml")
@@ -566,6 +653,7 @@ def _unpinned_uses_refs(text: str) -> list[str]:
     return offenders
 
 
+@pytest.mark.unit
 def test_every_workflow_action_is_pinned_to_a_commit_sha() -> None:
     """Every third-party `uses:` in every workflow is a pinned commit SHA.
 
@@ -590,6 +678,7 @@ def test_every_workflow_action_is_pinned_to_a_commit_sha() -> None:
     )
 
 
+@pytest.mark.unit
 def test_unpinned_uses_guard_detects_a_mutable_tag() -> None:
     """The pin guard fails on a mutable tag and on a blank version comment.
 
@@ -611,6 +700,7 @@ def test_unpinned_uses_guard_detects_a_mutable_tag() -> None:
     assert not _unpinned_uses_refs("      - uses: docker://alpine:3.20\n")
 
 
+@pytest.mark.unit
 def test_dockerfile_downloads_are_pinned() -> None:
     """The image build's toolchain downloads are pinned, not fetched from `latest`.
 
@@ -637,6 +727,7 @@ def test_dockerfile_downloads_are_pinned() -> None:
     )
 
 
+@pytest.mark.unit
 def test_build_job_has_security_events_permission() -> None:
     """The build job grants security-events: write for upload-sarif.
 
@@ -646,20 +737,21 @@ def test_build_job_has_security_events_permission() -> None:
     with a 403 Forbidden. ``actions: read`` is also required for
     actions/upload-artifact and workflow run metadata.
     """
-    content = _read(".github", "workflows", "ci.yml")
-    # Extract the build job's permissions block (lines between "  build:"
-    # and the next top-level key like "  env:" that has steps).
-    build_start = content.index("  build:")
-    # The permissions block is between "  build:" and "    env:".
-    build_section = content[build_start:content.index("    env:", build_start)]
-    assert "security-events: write" in build_section, (
+    build = _job_by_name("build")
+    permissions = build.get("permissions", {})
+    assert isinstance(permissions, dict), (
+        "build job must declare a permissions block (12-OPS-013)"
+    )
+    assert permissions.get("security-events") == "write", (
         "build job must grant security-events: write for upload-sarif (12-OPS-013)"
     )
-    assert "actions: read" in build_section, (
-        "build job must grant actions: read (required by upload-artifact and workflow metadata)"
+    assert permissions.get("actions") == "read", (
+        "build job must grant actions: read (required by upload-artifact and "
+        "workflow metadata)"
     )
 
 
+@pytest.mark.unit
 def test_build_job_trivy_action_disables_cache() -> None:
     """The Trivy image scan step sets cache: false.
 
@@ -669,13 +761,9 @@ def test_build_job_trivy_action_disables_cache() -> None:
     of scanning the freshly-built image. Setting ``cache: false`` forces a fresh
     scan on every run.
     """
-    content = _read(".github", "workflows", "ci.yml")
-    # The image scan section starts at "Scan Docker image" and extends until
-    # the next step ("Upload Trivy SARIF artifact").
-    start = content.index("Scan Docker image for vulnerabilities")
-    end = content.index("Upload Trivy SARIF artifact", start)
-    image_scan_section = content[start:end]
-    assert "cache: false" in image_scan_section, (
+    step = _build_step("Scan Docker image for vulnerabilities")
+    config = step.get("with", {})
+    assert config.get("cache") is False, (
         "the Trivy image scan step must set cache: false to prevent stale cache"
         " restoration from prior runs (12-OPS-013)"
     )

@@ -17,9 +17,15 @@ These tests guard against:
 Follows the pattern established in ``test_sweep_commands.py`` and
 ``test_seed.py`` for advisory lock verification.
 
-The specific integer *values* (e.g. 104, 111) are no longer asserted
-directly — they are an implementation detail that can evolve.  Instead we
-verify member existence, value type, and reference validity.
+Most integer *values* (e.g. 104, 111) are an implementation detail and are
+checked only for type and existence. A few, however, ARE asserted by value
+where another block depends on them — lock 15 (media-deletion-error
+retention purge), lock 103 (``SWEEP_ORPHANED_MEDIA``), and lock 3
+(``CONSENT_HARD_DELETE``) — so a silent renumbering breaks the test
+(``test_existing_lock_ids_are_not_renumbered``,
+``test_purge_media_deletion_errors_lock_is_not_a_reuse``). Every other
+member is covered by existence, type, and reference-validity checks, leaving
+the rest free to evolve.
 """
 
 from __future__ import annotations

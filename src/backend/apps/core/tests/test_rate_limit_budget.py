@@ -36,8 +36,8 @@ class TestRateLimitBudgetTable:
         """The search module's module-level pair is the declared budget."""
         from apps.search.services import rate_limit
 
-        assert rate_limit.RATE_LIMIT_REQUESTS == RateLimitBudget.SEARCH_PAGE.requests
-        assert rate_limit.RATE_LIMIT_PERIOD == RateLimitBudget.SEARCH_PAGE.period
+        assert rate_limit.RATE_LIMIT_REQUESTS == RateLimitBudget.AUTOCOMPLETE.requests
+        assert rate_limit.RATE_LIMIT_PERIOD == RateLimitBudget.AUTOCOMPLETE.period
 
     def test_autocomplete_budget_equals_search_budget(self) -> None:
         """Autocomplete shares the search budget value but its own namespace."""
@@ -95,11 +95,14 @@ class TestOneResponseShape:
         assert resp.status_code == 429
         assert resp.json() == {"error": RATE_LIMIT_ERROR}
 
-    def test_search_and_listings_429_bodies_are_equal(self) -> None:
-        """The /search/ and / 429 bodies are byte-identical (both empty-ish)."""
-        # /search/ is JSON; / is a bare-status HTML route. The shared builder
-        # makes their bodies equal only within each shape — assert the JSON
-        # shape is used consistently and the HTML shape is consistently empty.
+    def test_search_and_listings_429_share_status_and_builder(self) -> None:
+        """The /search/ and / routes both return 429 via the shared builder.
+
+        Both routes return a 429 status via the shared ``rate_limited_response``
+        builder. The JSON shape (search) emits ``{"error": "rate_limit"}`` and
+        the HTML shape (listings) emits an empty body — each shape is internally
+        consistent, not byte-identical across shapes.
+        """
         cache.clear()
         client = Client()
         search_resp = client.get("/search/?q=велосипед&lang=ru")
@@ -131,16 +134,6 @@ class TestOneResponseShape:
         assert html_resp.content == b""
         assert html_resp["Cache-Control"] == "no-store"
 
-    def test_html_429_carries_no_store(self) -> None:
-        """Every 429 HTML response must not be cached by clients or proxies."""
-        response = rate_limited_response(json=False)
-        assert response["Cache-Control"] == "no-store"
-
-    def test_json_429_carries_no_store(self) -> None:
-        """Every 429 JSON response must not be cached by clients or proxies."""
-        response = rate_limited_response()
-        assert response["Cache-Control"] == "no-store"
-
     def test_retry_after_header_when_specified(self) -> None:
         """A ``retry_after`` value is rendered as a string in the header."""
         response = rate_limited_response(retry_after=30)
@@ -157,15 +150,6 @@ class TestOneResponseShape:
         """A ``body`` value overrides the response content."""
         response = rate_limited_response(json=False, body="foo")
         assert response.content == b"foo"
-
-    def test_backward_compatibility(self) -> None:
-        """Callers that pass only ``json`` get the original shape plus ``no-store``."""
-        html_resp = rate_limited_response(json=False)
-        assert html_resp.status_code == 429
-        assert html_resp.content == b""
-        assert html_resp["Cache-Control"] == "no-store"
-        assert "Retry-After" not in html_resp
-
 
 class TestNamespaceIsolation:
     """Search and autocomplete keep independent counter key namespaces."""

@@ -19,8 +19,6 @@ import pytest
 from django.conf import settings
 from django.test import Client
 
-pytestmark = [pytest.mark.unit]
-
 _PROJECT_ROOT = settings.BASE_DIR.parent
 
 

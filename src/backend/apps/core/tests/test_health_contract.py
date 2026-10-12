@@ -32,7 +32,6 @@ from django.test import Client, override_settings
 from django.urls import reverse
 from ruamel.yaml import YAML
 
-pytestmark = [pytest.mark.unit]
 # BASE_DIR in settings points to src/ ; its parent is the repository root.
 _PROJECT_ROOT = settings.BASE_DIR.parent
 

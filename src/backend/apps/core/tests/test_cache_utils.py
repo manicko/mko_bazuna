@@ -114,6 +114,34 @@ class TestCacheOutageFailsOpen:
         with patch("apps.core.utils.cache.cache", fake):
             assert bump_rate_limit_window(_KEY, limit=5, period=600) is True
 
+    def test_incr_connection_interrupted_fails_open(self) -> None:
+        """``ConnectionInterrupted`` from ``cache.incr`` reports "allowed".
+
+        Covers the path where ``cache.add`` returns ``False`` (key already
+        exists) and the subsequent ``cache.incr`` raises — the rate limiter
+        must still fail open, not raise into the request path.
+        """
+        fake = MagicMock()
+        fake.add.return_value = False
+        fake.incr.side_effect = ConnectionInterrupted(None)
+
+        with patch("apps.core.utils.cache.cache", fake):
+            assert bump_rate_limit_window(_KEY, limit=5, period=600) is True
+
+    def test_incr_redis_error_fails_open(self) -> None:
+        """A bare ``redis.RedisError`` from ``cache.incr`` reports "allowed".
+
+        Mirrors ``test_incr_connection_interrupted_fails_open`` but with a
+        ``redis.RedisError`` instead, exercising the second arm of the
+        ``except (ConnectionInterrupted, redis.RedisError)`` tuple.
+        """
+        fake = MagicMock()
+        fake.add.return_value = False
+        fake.incr.side_effect = redis.RedisError("redis down")
+
+        with patch("apps.core.utils.cache.cache", fake):
+            assert bump_rate_limit_window(_KEY, limit=5, period=600) is True
+
 
 class TestRateLimitingDisabled:
     """When RATE_LIMITING_ENABLED is False the guard is bypassed entirely."""
