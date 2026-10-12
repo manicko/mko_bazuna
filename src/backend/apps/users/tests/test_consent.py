@@ -45,7 +45,8 @@ class TestConsentAcceptView:
         assert response.status_code == 302
         assert response.url == "/"
 
-        # No DB write for anonymous consent (security gate D-3).
+        # Anonymous consent creates a ConsentRecord with user_id=NULL, not an
+        # authenticated-user record (security gate D-3).
         assert (
             ConsentRecord.objects.filter(
                 user__isnull=False, choice=ConsentChoice.ACCEPTED
@@ -67,7 +68,7 @@ class TestConsentAcceptView:
 
         assert response.status_code == 302
         # Check redirect target
-        assert response.url == "/dashboard/"  # noqa: S105
+        assert response.url == "/dashboard/"
 
         # Verify user state
         user.refresh_from_db()
@@ -102,8 +103,8 @@ class TestConsentAcceptView:
         for name in ("consent_given", "consent_analytics", "consent_preferences"):
             assert response.cookies[name]["secure"] is True, name
 
-    def test_anonymous_accept_sets_cookie_no_db_write(self) -> None:
-        """Anonymous accept sets cookies without creating a DB record."""
+    def test_anonymous_accept_sets_cookie_creates_null_user_record(self) -> None:
+        """Anonymous accept sets cookies and creates a ConsentRecord with user_id=NULL."""
         client = Client()
         before = ConsentRecord.objects.count()
         response = client.post("/consent/accept/")
@@ -351,7 +352,7 @@ class TestConsentDeclineSessionKnownGap:
 
         decline_response = client.post("/consent/decline/")
         assert decline_response.status_code == 302
-        assert decline_response.url == "/dashboard/"  # noqa: S105
+        assert decline_response.url == "/dashboard/"
 
         user.refresh_from_db()
         assert user.is_declined is True

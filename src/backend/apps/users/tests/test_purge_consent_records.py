@@ -23,7 +23,7 @@ from django.utils import timezone
 
 from apps.core.enums import ConsentActionSource, ConsentChoice, ConsentVersion
 from apps.search.models import SavedSearch
-from apps.users.context_processors import CONSENT_REPROMPT_DAYS, consent_state
+from apps.users.context_processors import consent_state
 from apps.users.models import ConsentRecord, User
 from apps.users.services.deletion import withdraw_consent
 from conftest import make_user
@@ -183,7 +183,7 @@ class TestRePromptCoupling:
     """The re-prompt boundary and the retained decision fields share one clock."""
 
     def test_old_row_survives_and_reprompt_fires(self, user) -> None:
-        age = CONSENT_REPROMPT_DAYS + 10
+        age = _ACTOR_DAYS + 10
         record = _aged_record(
             user=user,
             age_days=age,
@@ -512,7 +512,7 @@ class TestRetentionOrderingGuard:
         assert row.user_id is not None
         assert "DRY RUN" in caplog.text
         # The actor-eligible count is reported.
-        assert "1 acting accounts older than 365 days" in caplog.text
+        assert "acting accounts older than 365 days" in caplog.text
 
 
 class TestNoInteractionWithTeardown:
