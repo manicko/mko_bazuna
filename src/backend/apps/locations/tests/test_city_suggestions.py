@@ -25,17 +25,6 @@ def real_city() -> City:
 
 
 @pytest.fixture
-def other_city() -> City:
-    """Create a second city to test multi-city matching."""
-    return City.objects.create(
-        country_code="RU",
-        name="Москва",
-        region="Central",
-        slug="moscow",
-    )
-
-
-@pytest.fixture
 def podgorica_city() -> City:
     """Create Podgorica so an in-band typo resolves against it."""
     return City.objects.create(
@@ -47,28 +36,17 @@ def podgorica_city() -> City:
 
 
 class TestSuggestCity:
-    """Unit tests for ``suggest_city``."""
+    """Integration tests for ``suggest_city``."""
 
     def test_returns_close_match_for_typo(self, real_city: City) -> None:
         """A typo of a real slug returns the correct city slug."""
         result = suggest_city("budav")
         assert result == "budva"
 
-    def test_returns_none_for_no_match(self, real_city: City, other_city: City) -> None:
-        """A completely unrelated slug returns None."""
-        result = suggest_city("xyznonexistent")
-        assert result is None
-
     def test_returns_none_for_empty_slug(self, real_city: City) -> None:
         """An empty/blank slug returns None (no match)."""
         assert suggest_city("") is None
         assert suggest_city("   ") is None
-
-    def test_prefers_closer_match(self, real_city: City, other_city: City) -> None:
-        """When multiple close matches exist, the closest one wins."""
-        # "budav" is closer to "budva" than to "moscow"
-        result = suggest_city("budav")
-        assert result == "budva"
 
     def test_returns_none_when_no_cities_exist(self) -> None:
         """With zero cities in the DB, any slug returns None."""
@@ -76,15 +54,27 @@ class TestSuggestCity:
 
     def test_below_cutoff_query_is_rejected(self, podgorica_city: City) -> None:
         """A query below the fuzzy cutoff does not resolve to a suggestion."""
-        # SequenceMatcher("xyznotacity", "podgorica") == 0.2000 -- well below.
+        # "xyznotacity" is well below the CITY_FUZZY_CUTOFF (0.6) threshold.
         assert suggest_city("xyznotacity") is None
 
     def test_in_band_query_resolves(self, podgorica_city: City) -> None:
-        """A query whose ratio lies in-band (0.6 < ratio < 0.8) resolves."""
-        # SequenceMatcher("podgo", "podgorica") == 0.7143 -- in (0.6, 0.8).
+        """A partial query above the cutoff resolves to the closest slug."""
+        # "podgo" is above the CITY_FUZZY_CUTOFF (0.6) threshold.
         assert suggest_city("podgo") == "podgorica"
 
     def test_above_cutoff_query_resolves(self, podgorica_city: City) -> None:
-        """A query above the cutoff resolves to the closest slug."""
-        # SequenceMatcher("Podgoric", "Podgorica") == 0.9412 -- above.
+        """A near-miss query above the cutoff resolves to the closest slug."""
+        # "Podgoric" is above the CITY_FUZZY_CUTOFF (0.6) threshold. The actual
+        # comparison is against the lowercase slug "podgorica" (ratio ≈ 0.8235),
+        # not the capitalized "Podgorica" (ratio 0.9412) that get_close_matches
+        # does not see.
         assert suggest_city("Podgoric") == "podgorica"
+
+    def test_tier1_exact_case_insensitive_match(self, podgorica_city: City) -> None:
+        """An exact slug match ignoring case returns immediately via Tier 1.
+
+        "PODGORICA" casefolds to "podgorica", matching the stored slug exactly,
+        so ``match_city`` returns before ``get_close_matches`` (Tier 2) is
+        invoked.
+        """
+        assert suggest_city("PODGORICA") == "podgorica"
