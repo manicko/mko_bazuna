@@ -1714,10 +1714,17 @@ def _extract_python_msgids(root: Path) -> set[str]:
     constant. An alias such as ``_lazy`` is not in that set — mirroring
     xgettext — so aliased call sites would not be extracted; plan 27 BLOCK B-07
     removed the last such alias, so every in-scope call site is extracted.
+
+    Files under any ``tests`` directory are skipped (mirroring the
+    ``_collect_bot_source_files`` exclusion via ``is_relative_to``), so test-only
+    ``_("<string>")`` calls do not produce false-green orphans in the reverse
+    gate. ``__pycache__`` modules are likewise skipped.
     """
     msgids: set[str] = set()
     for py_file in root.rglob("*.py"):
         if "__pycache__" in py_file.parts:
+            continue
+        if "tests" in py_file.parts:
             continue
         tree = ast.parse(py_file.read_text(encoding="utf-8"), filename=str(py_file))
         for node in ast.walk(tree):

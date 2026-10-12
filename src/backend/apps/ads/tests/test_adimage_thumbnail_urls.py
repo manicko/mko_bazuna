@@ -106,3 +106,40 @@ def test_all_thumbnail_urls_return_none_when_all_empty() -> None:
     assert img.thumbnail_small_url is None
     assert img.thumbnail_medium_url is None
     assert img.thumbnail_large_url is None
+
+
+# ── image_url (no null guard) ─────────────────────────────────────────
+
+
+def test_image_url_returns_joined_url_when_set() -> None:
+    """``image_url`` returns MEDIA_URL + key when ``image`` is set.
+
+    Unlike the thumbnail URL properties (which return ``None`` for empty/null
+    fields), ``image_url`` has no guard — it always returns the joined string.
+    """
+    img = AdImage.__new__(AdImage)
+    img.image = "test.jpg"
+    assert img.image_url == "/media/test.jpg"
+
+
+def test_image_url_returns_media_root_only_when_empty() -> None:
+    """``image_url`` with an empty ``image`` yields just MEDIA_URL.
+
+    No null guard exists: ``f"{MEDIA_URL}{self.image}"`` with ``image=""``
+    produces ``"/media/"`` (the MEDIA_URL alone).
+    """
+    img = AdImage.__new__(AdImage)
+    img.image = ""
+    assert img.image_url == "/media/"
+
+
+def test_image_url_stringifies_none_as_literal() -> None:
+    """``image_url`` with ``image=None`` embeds the literal ``"None"``.
+
+    Because the f-string coerces ``None`` via ``str()``, ``image_url`` returns
+    ``"/media/None"`` — NOT ``None`` and NOT ``" /media/"``. This documents the
+    no-guard contract: callers must not rely on a None-sentinel.
+    """
+    img = AdImage.__new__(AdImage)
+    img.image = None
+    assert img.image_url == "/media/None"

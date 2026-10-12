@@ -20,6 +20,7 @@ import pytest
 from django.test import override_settings
 
 from apps.core.enums import AdStatus
+from apps.users.models import User
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -38,10 +39,8 @@ def isolated_media_root() -> Generator[Path]:
 
 
 @pytest.fixture
-def seller2() -> object:
+def seller2() -> User:
     """Create a second seller user."""
-    from apps.users.models import User
-
     return User.objects.create(
         telegram_id=900000031,
         chat_id=900000031,

@@ -206,14 +206,17 @@ class TestNonCanonicalCookieLocale:
         # uses, then assert the accessors return that locale's value.
         active = translation.get_language()
         assert active in {code for code, _ in settings.LANGUAGES}
+        # translation.get_language() returns a bare str; the accessors are
+        # typed to accept LanguageLocale, so normalise through from_code.
+        locale = LanguageLocale.from_code(active)
 
         localized_category.refresh_from_db()
         localized_city.refresh_from_db()
         ad.refresh_from_db()
         assert active == "en"
-        assert localized_category.get_name(active) == "Transport"
-        assert localized_city.get_name(active) == "Testgrad"
-        assert ad.get_title(active) == "Non-canonical cookie ad"
+        assert localized_category.get_name(locale) == "Transport"
+        assert localized_city.get_name(locale) == "Testgrad"
+        assert ad.get_title(locale) == "Non-canonical cookie ad"
 
     def test_unsupported_cookie_falls_back_for_accessors(
         self,
@@ -221,7 +224,17 @@ class TestNonCanonicalCookieLocale:
         localized_category: Category,
         localized_city: City,
     ) -> None:
-        """An unsupported cookie resolves to the BOSNIAN accessor values."""
+        """An unsupported cookie resolves to the BOSNIAN accessor values.
+
+        The middleware path uses ``LanguageLocale.from_code(code)`` with its
+        default fallback of BOSNIAN — *not* the context processor's
+        ``language`` which falls back to RUSSIAN (``fallback=LanguageLocale.
+        RUSSIAN``). This test exercises the middleware path, so the resolved
+        locale is BOSNIAN. (The ``header_context`` context processor at
+        L90-94 passes a raw str to ``get_name`` without conversion — a
+        production inconsistency noted in VAL-003 but deliberately left unfixed
+        here per audit scope.)
+        """
         ad = create_test_ad(
             seller,
             localized_category,
@@ -235,12 +248,13 @@ class TestNonCanonicalCookieLocale:
         assert response.status_code == 200
 
         active = translation.get_language()
+        locale = LanguageLocale.from_code(active)
         assert active in {code for code, _ in settings.LANGUAGES}
         assert active == "bs"
         localized_category.refresh_from_db()
         localized_city.refresh_from_db()
-        assert localized_category.get_name(active) == "Prevoz"
-        assert localized_city.get_name(active) == "Testgrad"
+        assert localized_category.get_name(locale) == "Prevoz"
+        assert localized_city.get_name(locale) == "Testgrad"
 
 
 @pytest.fixture

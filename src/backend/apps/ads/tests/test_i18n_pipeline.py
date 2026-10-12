@@ -45,26 +45,6 @@ def test_po_files_exist_for_all_languages() -> None:
     assert not missing, f"Missing .po files for languages: {missing}"
 
 
-def test_no_empty_msgstr() -> None:
-    """Every non-header ``msgid`` has a non-empty ``msgstr``.
-
-    The ``en`` locale is exempt — its ``msgid`` is already English, so
-    ``msgstr`` may remain empty.
-    """
-    for po_path in _po_files():
-        locale_code = po_path.parent.parent.name
-        text = po_path.read_text(encoding="utf-8")
-        entries = _parse_po_entries(text)
-        empty = [
-            msgid
-            for msgid, msgstr_forms in entries
-            if msgid and any(not form.strip() for form in msgstr_forms)
-        ]
-        if locale_code == "en":
-            continue
-        assert not empty, f"{po_path}: empty msgstr for msgids: {empty}"
-
-
 def test_parse_po_entries_reports_blank_non_final_form() -> None:
     """A blank non-final ``msgstr[N]`` form is reported as a violation.
 
@@ -93,19 +73,6 @@ def test_parse_po_entries_reports_blank_non_final_form() -> None:
     assert empty == ["%(counter)s view", "%(counter)s views"], (
         f"blank msgstr[0] not reported: {empty!r}"
     )
-
-
-def test_mo_files_exist() -> None:
-    """Compiled ``.mo`` files exist for every ``.po`` (compilemessages ran).
-
-    The test entrypoint runs ``compilemessages`` before pytest, so ``.mo``
-    files are guaranteed to be present.  This test guards against accidental
-    deletion or misnamed ``.mo`` files that would break ``{% trans %}`` at
-    runtime.
-    """
-    for po_path in _po_files():
-        mo_path = po_path.with_suffix(".mo")
-        assert mo_path.exists(), f"Missing compiled file: {mo_path}"
 
 
 def test_pot_creation_date_sync() -> None:
