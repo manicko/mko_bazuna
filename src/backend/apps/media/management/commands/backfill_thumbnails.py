@@ -33,7 +33,7 @@ from django.db.models import Q
 from apps.ads.models import AdImage
 from apps.core.enums import AdvisoryLockId, ThumbnailSizeStrEnum, WriteMode
 from apps.core.utils.advisory_lock import advisory_lock
-from apps.media.services.thumbnails import ThumbnailService
+from apps.media.services.thumbnails import ThumbnailService, thumbnail_key_for
 
 logger = logging.getLogger(__name__)
 
@@ -260,7 +260,7 @@ class Command(BaseCommand):
         for size_enum in ThumbnailSizeStrEnum:
             if getattr(ad_image, _SIZE_COLUMNS[size_enum]) is not None:
                 continue
-            if (storage_dir / f"{stem}-{size_enum.value}.jpg").exists():
+            if (storage_dir / thumbnail_key_for(stem, size_enum)).exists():
                 logger.info(
                     "AdImage %d: repairing stale-leftover %s thumbnail",
                     ad_image.id,

@@ -18,7 +18,11 @@ import pytest
 from PIL import Image
 
 from apps.core.enums import ThumbnailSizeStrEnum, WriteMode
-from apps.media.services.thumbnails import TEMP_SUFFIX, ThumbnailService
+from apps.media.services.thumbnails import (
+    TEMP_SUFFIX,
+    ThumbnailService,
+    thumbnail_key_for,
+)
 
 
 def _make_test_image(width: int, height: int) -> bytes:
@@ -41,7 +45,7 @@ def _make_test_image(width: int, height: int) -> bytes:
 def _thumbnail_names(tmp_path: Path, original_key: str) -> set[str]:
     """Return the expected final filenames for ``original_key``."""
     stem = os.path.splitext(original_key)[0]
-    return {f"{stem}-{size.value}.jpg" for size in ThumbnailSizeStrEnum}
+    return {thumbnail_key_for(stem, size) for size in ThumbnailSizeStrEnum}
 
 
 def _temp_files(directory: Path) -> list[Path]:

@@ -36,12 +36,8 @@ from PIL import Image
 from apps.ads.models import Ad
 from apps.ads.services.images import AdImageService
 from apps.core.enums import AdStatus, ThumbnailSizeStrEnum
-from apps.media.services.filesystem import (
-    STAGING_PREFIX,
-    generate_storage_key,
-    strip_photo_exif,
-)
-from apps.media.services.thumbnails import ThumbnailService
+from apps.media.services.thumbnails import ThumbnailService, thumbnail_key_for
+from apps.media.tests.test_helpers import save_and_read_back_staging
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -68,19 +64,17 @@ def _save_and_thumbnail(media_root, photo_bytes):
     """Drive the full ``strip_photo_exif`` -> disk -> ``generate_thumbnails`` chain.
 
     Strips EXIF from *photo_bytes*, writes the result to the ``staging/``
-    subdir of *media_root*, then runs it through ``ThumbnailService``.
+    subdir of *media_root* (via :func:`save_and_read_back_staging`), then runs
+    the on-disk bytes through ``ThumbnailService``.
 
     Returns ``(storage_key, on_disk_bytes, thumbnail_keys)``.
     """
-    storage_key = f"{STAGING_PREFIX}{generate_storage_key()}"
-    stripped = strip_photo_exif(photo_bytes)
-    staging_path = media_root / storage_key
-    staging_path.parent.mkdir(parents=True, exist_ok=True)
-    staging_path.write_bytes(stripped)
-
-    on_disk_bytes = staging_path.read_bytes()
+    storage_key, on_disk_bytes = save_and_read_back_staging(media_root, photo_bytes)
 
     service = ThumbnailService(str(media_root))
+    # generate_thumbnails expects the stem (no staging prefix), but the
+    # storage_key carries "staging/" — the original code passed the full
+    # staging key, and the thumbnail keys are derived from its stem.
     thumbnail_keys = service.generate_thumbnails(on_disk_bytes, storage_key)
 
     return storage_key, on_disk_bytes, thumbnail_keys
@@ -123,10 +117,11 @@ class TestSavePhotoThumbnailIntegration:
             assert size in thumbnail_keys, f"missing thumbnail for {size}"
 
         # 3. Each thumbnail follows the '<stem>-<size>.jpg' pattern and exists on disk.
-        stem = storage_key.rsplit(".", 1)[0]
         for size in ThumbnailSizeStrEnum:
             key = thumbnail_keys[size]
-            assert key == f"{stem}-{size.value}.jpg", (
+            expected_stem = storage_key.rsplit(".", 1)[0]
+            expected_key = thumbnail_key_for(expected_stem, size)
+            assert key == expected_key, (
                 f"unexpected key for {size}: {key}"
             )
             thumb_path = media_root / key

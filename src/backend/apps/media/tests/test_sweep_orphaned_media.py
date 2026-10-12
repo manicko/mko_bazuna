@@ -29,7 +29,7 @@ from django.test import override_settings
 
 from apps.ads.models import AdImage
 from apps.core.enums import AdStatus
-from apps.media.services.filesystem import STAGING_SUBDIR
+from apps.media.services.filesystem import STAGING_SUBDIR, delete_photo
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
@@ -180,9 +180,13 @@ class TestSweepOrphanedMedia:
         assert staging_file.read_bytes() == b"in-flight"
 
     def test_stale_staging_file_reclaimed(
-        self, seller, category, city, isolated_media_root
+        self, seller, category, city, isolated_media_root, monkeypatch
     ):
-        """Staging files older than the 2-hour TTL are reclaimed by the sweep."""
+        """Staging files older than the 2-hour TTL are reclaimed via delete_photo.
+
+        Verifies that reclamation routes through ``delete_photo`` (the sole
+        byte-freeing entry point, ME-001) rather than raw ``os.remove``.
+        """
         staging_dir = isolated_media_root / STAGING_SUBDIR
         staging_dir.mkdir()
         stale_file = staging_dir / "stale.jpg"
@@ -192,9 +196,26 @@ class TestSweepOrphanedMedia:
         stale_mtime = os.path.getmtime(stale_file) - (3 * 60 * 60)
         os.utime(stale_file, (stale_mtime, stale_mtime))
 
+        delete_calls: list[str] = []
+        real_delete_photo = delete_photo
+
+        def spy_delete_photo(key: str) -> None:
+            delete_calls.append(key)
+            real_delete_photo(key)
+
+        monkeypatch.setattr(
+            "apps.media.management.commands.sweep_orphaned_media.delete_photo",
+            spy_delete_photo,
+        )
+
         with override_settings(MEDIA_ROOT=str(isolated_media_root)):
             call_command("sweep_orphaned_media")
 
+        # delete_photo was called with the staging-relative key (not os.remove)
+        assert any("stale.jpg" in call for call in delete_calls), (
+            f"delete_photo was not called for the stale staging file; "
+            f"calls: {delete_calls}"
+        )
         # Stale staging file IS deleted (beyond TTL)
         assert not stale_file.exists(), "stale staging file was not reclaimed"
 

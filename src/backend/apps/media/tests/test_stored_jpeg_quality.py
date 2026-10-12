@@ -17,9 +17,12 @@ from __future__ import annotations
 
 import io
 
+import pytest
 from PIL import Image
 
 from apps.media.services.filesystem import STORED_JPEG_QUALITY, strip_photo_exif
+
+pytestmark = [pytest.mark.unit]
 
 
 def _jpeg_bytes() -> bytes:

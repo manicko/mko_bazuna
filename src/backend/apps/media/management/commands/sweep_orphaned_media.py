@@ -180,6 +180,11 @@ def _reclaim_stale_staging(media_root: str, ttl_seconds: int) -> int:
     dangling reference permanent (accepted risk).  A rolled-back submission
     likewise leaves its staged file here for this TTL to reclaim.
 
+    Deletion is routed through :func:`delete_photo` (not raw ``os.remove``)
+    so that path-traversal containment (assert_storage_key_contained) and the
+    ME-003 secondary deletion-failure event are consistently applied
+    (ME-001, finding 08.1.5).
+
     Args:
         media_root: Absolute path to ``MEDIA_ROOT``.
         ttl_seconds: Files older than this are deleted.
@@ -197,12 +202,20 @@ def _reclaim_stale_staging(media_root: str, ttl_seconds: int) -> int:
             path = os.path.join(dirpath, name)
             try:
                 if now - os.path.getmtime(path) >= ttl_seconds:
-                    os.remove(path)
-                    logger.info(
-                        "Reclaimed stale staging file: %s",
-                        os.path.relpath(path, media_root),
-                    )
-                    reclaimed += 1
+                    # Derive the storage key relative to MEDIA_ROOT and route the
+                    # deletion through ``delete_photo`` — the same receiver that
+                    # ``apps.media.signals._cleanup`` calls, so delete_photo
+                    # remains the sole byte-freeing entry point (ME-001).  delete_photo
+                    # handles FileNotFoundError as terminal and always logs; it never
+                    # raises, so a post-call existence probe is the truthful signal.
+                    key = os.path.relpath(path, media_root)
+                    delete_photo(key)
+                    if not os.path.exists(path):
+                        logger.info(
+                            "Reclaimed stale staging file: %s",
+                            key,
+                        )
+                        reclaimed += 1
             except OSError:
                 logger.exception("Failed to reclaim staging file: %s", path)
     return reclaimed

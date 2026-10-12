@@ -45,6 +45,22 @@ TEMP_SUFFIX: Final[str] = ".tmp"
 TEMP_FILE_MODE: Final[int] = 0o666
 
 
+def thumbnail_key_for(stem: str, size: ThumbnailSizeStrEnum) -> str:
+    """Format a thumbnail storage key from a stem and size enum.
+
+    Centralizes the ``"<stem>-<size>.jpg"`` construction so every call site
+    (service, backfill command, tests) formats keys identically.
+
+    Args:
+        stem: The original key stem (without extension).
+        size: A :class:`ThumbnailSizeStrEnum` member.
+
+    Returns:
+        The thumbnail storage key, e.g. ``"<uuid>-small.jpg"``.
+    """
+    return f"{stem}-{size.value}.jpg"
+
+
 class ThumbnailService:
     """Service for generating thumbnail image variants from uploaded photos."""
 
@@ -112,7 +128,7 @@ class ThumbnailService:
         thumbnails: dict[ThumbnailSizeStrEnum, str] = {}
 
         for size_enum, dimensions in self.SIZES.items():
-            key = f"{stem}-{size_enum.value}.jpg"
+            key = thumbnail_key_for(stem, size_enum)
             thumbnails[size_enum] = key
             target_path = os.path.join(self.storage_dir, key)
 

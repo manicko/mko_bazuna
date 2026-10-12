@@ -9,29 +9,16 @@ EXIF-bearing JPEG bytes go in, and the bytes on disk must be stripped.
 from __future__ import annotations
 
 import io
-from pathlib import Path
 
 import pytest
 from django.test import override_settings
 from PIL import Image
 from PIL.ExifTags import Base as ExifBase
 
-from apps.media.services.filesystem import STAGING_PREFIX, strip_photo_exif
+from apps.media.services.filesystem import STAGING_PREFIX
+from apps.media.tests.test_helpers import save_to_staging
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
-
-
-def _save_to_staging(media_root: Path, filename: str, photo_bytes: bytes) -> str:
-    """Replicate the bot's ``save_photo`` inline: strip EXIF, write to staging/.
-
-    Returns the staging storage key (``staging/<filename>``).
-    """
-    stripped = strip_photo_exif(photo_bytes)
-    storage_key = f"{STAGING_PREFIX}{filename}"
-    staging_path = media_root / storage_key
-    staging_path.parent.mkdir(parents=True, exist_ok=True)
-    staging_path.write_bytes(stripped)
-    return storage_key
 
 
 @pytest.fixture
@@ -58,7 +45,7 @@ class TestSavePhotoExifStripping:
         media_root = tmp_path / "media"
         media_root.mkdir()
         with override_settings(MEDIA_ROOT=media_root):
-            storage_key = _save_to_staging(media_root, "exif-test.jpg", jpeg_with_exif)
+            storage_key = save_to_staging(media_root, "exif-test.jpg", jpeg_with_exif)
 
         written_path = media_root / storage_key
         assert written_path.exists(), "file was not written to disk"
@@ -87,7 +74,7 @@ class TestSavePhotoExifStripping:
         media_root = tmp_path / "media"
         media_root.mkdir()
         with override_settings(MEDIA_ROOT=str(media_root)):
-            storage_key = _save_to_staging(media_root, "test-stg.jpg", jpeg_with_exif)
+            storage_key = save_to_staging(media_root, "test-stg.jpg", jpeg_with_exif)
 
         # Returned key carries the staging prefix
         assert storage_key == f"{STAGING_PREFIX}test-stg.jpg"
