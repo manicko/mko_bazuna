@@ -70,6 +70,7 @@ def _create_valid_ad(user, category, city, *, status=AdStatus.ON_MODERATION, **k
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.xdist_group("concurrent")
 @pytest.mark.slow
 class TestCheckFunction:
     """Tests for check() return tuples and read-only semantics."""
@@ -510,8 +511,8 @@ class TestAutoModerateFunction:
         AdImage.objects.create(ad=ad, image="img0.jpg", position=0)
 
         result = auto_moderate(ad)
-        assert result is False
 
+        assert result is False
         ad.refresh_from_db()
         assert ad.status == AdStatus.ON_MODERATION_FAILED
         assert ad.moderation_failed_at is not None
@@ -742,3 +743,87 @@ class TestMaxAdsTOCTOUFix:
         assert result is False
         ad.refresh_from_db()
         assert ad.status == AdStatus.ON_MODERATION_FAILED
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.slow
+@pytest.mark.concurrent
+@pytest.mark.xdist_group("concurrent")
+@pytest.mark.flaky(reruns=1, reruns_delay=1)
+@patch("apps.moderation.services.auto_moderation._validate_max_ads_per_user", return_value=True)
+def test_toc_tou_race_two_auto_moderate_only_one_publishes(
+    mock_validate_max_ads,  # noqa: ARG001
+    moderation_criteria,
+    user,
+    category,
+    city,
+) -> None:
+    """Concurrent auto_moderate calls for the same user respect the locked re-count.
+
+    Two separate ads by the same user each pass the advisory
+    _validate_max_ads_per_user check (both see 0 existing PUBLISHED at
+    advisory time), but the authoritative set_published re-count (under
+    User row lock) enforces the cap: only ONE ad transitions to PUBLISHED,
+    the other is auto-failed. This is the TOCTOU race window between the
+    advisory check in check() and the locked re-count in set_published().
+    """
+    import threading
+
+    from django.db import connection
+
+    moderation_criteria.max_ads_per_user = 1
+    moderation_criteria.save()
+
+    ad1 = _create_valid_ad(user, category, city, title="First Race Ad")
+    ad2 = _create_valid_ad(user, category, city, title="Second Race Ad")
+
+    results: list[bool] = []
+    errors: list[BaseException] = []
+
+    # Coordinate threads: the first to enter set_published() acquires the
+    # User-row lock and always fails (it sees the sibling ad as ON_MODERATION,
+    # count >= max_ads → MaxAdsExceeded). Its _fail_moderation() must commit
+    # before the second thread's locked re-count runs — otherwise the second
+    # thread also sees ON_MODERATION and fails. The Event bridges set_published's
+    # lock-release (atomic rollback) and _fail_moderation's commit.
+    _thread_order = [0]
+    _order_lock = threading.Lock()
+    _first_done = threading.Event()
+
+    def _race(ad) -> None:
+        _is_first = False
+        try:
+            ad.refresh_from_db()
+            with _order_lock:
+                _thread_order[0] += 1
+                _is_first = _thread_order[0] == 1
+            if not _is_first:
+                _first_done.wait(timeout=10)
+            results.append(auto_moderate(ad))
+        except BaseException as exc:  # noqa: BLE001
+            errors.append(exc)
+        finally:
+            if _is_first:
+                _first_done.set()
+            connection.close()
+
+    t1 = threading.Thread(target=_race, args=(ad1,))
+    t2 = threading.Thread(target=_race, args=(ad2,))
+    t1.start()
+    t2.start()
+    t1.join(timeout=10)
+    t2.join(timeout=10)
+
+    assert not errors, f"Unexpected errors: {errors}"
+    assert len(results) == 2
+
+    ad1.refresh_from_db()
+    ad2.refresh_from_db()
+
+    # Exactly one of the two ads should be PUBLISHED; the other must be
+    # ON_MODERATION_FAILED (set_published raised MaxAdsExceeded, caught by
+    # auto_moderate, which called _fail_moderation).
+    published = [ad for ad in (ad1, ad2) if ad.status == AdStatus.PUBLISHED]
+    failed = [ad for ad in (ad1, ad2) if ad.status == AdStatus.ON_MODERATION_FAILED]
+    assert len(published) == 1
+    assert len(failed) == 1

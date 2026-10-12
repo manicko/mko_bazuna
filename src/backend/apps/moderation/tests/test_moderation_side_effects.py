@@ -15,6 +15,7 @@ atomic status-transition + audit-log write chain (DB-002).
 from __future__ import annotations
 
 import pytest
+from django.core.cache import cache
 
 from apps.ads.models import AdImage
 from apps.core.enums import AdStatus, ModeratorActionType
@@ -154,3 +155,29 @@ class TestApproveAdPriority:
         priority = AdModerationPriority.objects.filter(ad=ad).first()
         assert priority is not None
         assert priority.ad_id == ad.id
+
+
+class TestCriteriaCacheInvalidation:
+    """Verify the post_save signal clears the moderation_criteria cache."""
+
+    def test_saving_criteria_invalidates_cache(
+        self, moderation_criteria, category, city
+    ) -> None:
+        """Saving ModerationCriteria clears the moderation_criteria:v1 cache key.
+
+        The invalidate_criteria_cache_on_save signal (signals.py) calls
+        _invalidate_criteria_cache -> invalidate_criteria_cache -> cache.delete
+        so stale criteria are not served after admin edits.
+        """
+        from apps.core.utils.cache import CRITERIA_CACHE_KEY, set_cached_criteria
+
+        # Populate the cache with a sentinel value.
+        set_cached_criteria({"sentinel": True})
+        assert cache.get(CRITERIA_CACHE_KEY) is not None
+
+        # Saving the singleton triggers the post_save signal.
+        moderation_criteria.title_min_length = 7
+        moderation_criteria.save()
+
+        # The signal must have cleared the cache key.
+        assert cache.get(CRITERIA_CACHE_KEY) is None
