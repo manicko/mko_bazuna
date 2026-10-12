@@ -11,7 +11,11 @@ Covers:
 
 import pytest
 
-from apps.core.utils.sanitize import redact_search_query, search_query_key
+from apps.core.utils.sanitize import (
+    _MAX_QUERY_LENGTH,
+    redact_search_query,
+    search_query_key,
+)
 from apps.search.models import PopularSearch, SearchHistory
 from apps.search.services.popular_search import (
     get_popular_suggestions,
@@ -75,7 +79,7 @@ class TestRedactSearchQuery:
     def test_truncates_long_query(self) -> None:
         """Queries are truncated to a safe length."""
         long = "x" * 500
-        assert len(redact_search_query(long)) == 100
+        assert len(redact_search_query(long)) == _MAX_QUERY_LENGTH
 
     def test_never_lengthens_query(self) -> None:
         """Redaction never lengthens a query (200-char column cap stays safe)."""

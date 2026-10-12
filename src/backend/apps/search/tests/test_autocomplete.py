@@ -19,7 +19,12 @@ from django_redis.exceptions import ConnectionInterrupted
 
 from apps.analytics.models import AnalyticsEvent
 from apps.categories.models import Category
-from apps.core.enums import AdStatus, AnalyticsEventType, SearchSuggestionSource
+from apps.core.enums import (
+    AdStatus,
+    AnalyticsEventType,
+    RateLimitBudget,
+    SearchSuggestionSource,
+)
 from apps.locations.models import City
 from apps.search.models import PopularSearch, SearchHistory
 from apps.search.services.entity_suggestions import get_entity_suggestions
@@ -157,10 +162,10 @@ class TestAutocompleteEndpoint:
         cache.clear()
 
         client = Client()
-        # Make 30+ requests (the rate limit) to the autocomplete endpoint
-        for i in range(31):
+        # Exhaust the autocomplete rate limit (budget + 1 = the over-budget request).
+        for i in range(RateLimitBudget.AUTOCOMPLETE.requests + 1):
             response = client.get("/api/search/autocomplete", {"q": "тест"})
-            if i < 30:
+            if i < RateLimitBudget.SEARCH_PAGE.requests:
                 assert response.status_code == 200, f"Request {i} should be allowed"
             else:
                 assert response.status_code == 429, (

@@ -24,26 +24,6 @@ from conftest import create_test_ad
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
-@pytest.fixture
-def budva() -> City:
-    return City.objects.create(
-        country_code="ME",
-        name="Будва",
-        region="Coastal",
-        slug="budva",
-    )
-
-
-@pytest.fixture
-def podgorica() -> City:
-    return City.objects.create(
-        country_code="ME",
-        name="Подгорица",
-        region="Central",
-        slug="podgorica",
-    )
-
-
 class TestPreferredCityView:
     """Preferred-city view contract."""
 

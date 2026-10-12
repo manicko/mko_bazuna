@@ -84,7 +84,7 @@ def test_valid_post_stores_int_prices_and_matches_the_same_ads(
     accepted.  The stored values must be ``int`` (not ``str``/``Decimal``), and
     a search built from the posted filters must select the same ads as before.
     """
-    cheap = create_test_ad(
+    create_test_ad(
         seller, category, city, title="Дешевый велосипед", price=50,
         status=AdStatus.PUBLISHED,
     )
@@ -110,7 +110,6 @@ def test_valid_post_stores_int_prices_and_matches_the_same_ads(
     # An empty query matches by price only, so the result is locale-independent.
     matched = find_matching_ads(ss)
     assert [ad.id for ad in matched] == []
-    assert cheap.id not in {ad.id for ad in matched}
 
 
 def test_valid_post_with_blank_prices_stores_none(
@@ -204,6 +203,8 @@ def test_cabinet_edit_accepts_valid_filters(
 # ---------------------------------------------------------------------------
 
 
+@pytest.mark.unit
+@pytest.mark.django_db(False)
 def test_saved_search_input_rejects_unknown_key() -> None:
     """An undeclared key raises ``ValidationError`` (``extra="forbid"``).
 

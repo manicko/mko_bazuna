@@ -14,6 +14,7 @@ Covers:
 
 import pytest
 from django.db import DataError, transaction
+from django.template.loader import get_template
 from django.test import Client
 from django.urls import resolve, reverse
 
@@ -69,16 +70,7 @@ def test_requires_login(client: Client) -> None:
 
 def test_modal_has_no_dangling_search_list_ref():
     """The save-search modal no longer references the removed search:list route."""
-    from pathlib import Path
-
-    modal_path = (
-        Path(__file__).resolve().parents[3]
-        / "templates"
-        / "search"
-        / "partials"
-        / "save_search_modal.html"
-    )
-    content = modal_path.read_text(encoding="utf-8")
+    content = get_template("search/partials/save_search_modal.html").template.source
     # No functional URL reference to the removed route remains.
     assert "url 'search:list'" not in content
     assert 'url "search:list"' not in content

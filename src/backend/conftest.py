@@ -282,6 +282,34 @@ def city() -> City:
     return city
 
 
+@pytest.fixture
+def budva() -> City:
+    """Create the Budva city fixture (shared by preferred-city tests)."""
+    budva, _ = City.objects.get_or_create(
+        slug="budva",
+        defaults={
+            "country_code": "ME",
+            "name": "Будва",
+            "region": "Coastal",
+        },
+    )
+    return budva
+
+
+@pytest.fixture
+def podgorica() -> City:
+    """Create the Podgorica city fixture (shared by preferred-city tests)."""
+    podgorica, _ = City.objects.get_or_create(
+        slug="podgorica",
+        defaults={
+            "country_code": "ME",
+            "name": "Подгорица",
+            "region": "Central",
+        },
+    )
+    return podgorica
+
+
 # ---------------------------------------------------------------------------
 # User creation helper — factory for tests needing distinct telegram_ids
 # ---------------------------------------------------------------------------

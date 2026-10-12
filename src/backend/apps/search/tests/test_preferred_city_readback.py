@@ -30,26 +30,6 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 @pytest.fixture
-def podgorica() -> City:
-    return City.objects.create(
-        country_code="ME",
-        name="Подгорица",
-        region="Central",
-        slug="podgorica",
-    )
-
-
-@pytest.fixture
-def budva() -> City:
-    return City.objects.create(
-        country_code="ME",
-        name="Будва",
-        region="Coastal",
-        slug="budva",
-    )
-
-
-@pytest.fixture
 def podgorica_ad(seller: User, category: Category, podgorica: City) -> Ad:
     return create_test_ad(
         seller, category, podgorica, status=AdStatus.PUBLISHED, title="Велосипед"
