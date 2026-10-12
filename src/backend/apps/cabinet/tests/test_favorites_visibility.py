@@ -26,12 +26,6 @@ from conftest import create_test_ad
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
-def _login(buyer: User) -> Client:
-    client = Client()
-    client.force_login(buyer)
-    return client
-
-
 def _ban(user: User) -> None:
     """Ban *user* through a plain save (the moderation action's effect)."""
     user.is_banned = True
@@ -42,7 +36,12 @@ class TestBannedSellerHiddenFromFavorites:
     """A banned seller's favourited PUBLISHED ad is absent from the list."""
 
     def test_banned_seller_ad_absent_from_favorites(
-        self, buyer: User, seller: User, category: Category, city: City
+        self,
+        buyer: User,
+        buyer_client: Client,
+        seller: User,
+        category: Category,
+        city: City,
     ) -> None:
         ad = create_test_ad(
             seller,
@@ -53,14 +52,14 @@ class TestBannedSellerHiddenFromFavorites:
         )
         AdFavorite.objects.create(user=buyer, ad=ad)
 
-        client = _login(buyer)
-
         # Positive control: visible while the seller is active.
-        assert ad.id in {a.id for a in client.get("/cabinet/favorites/").context["page_obj"]}
+        assert ad.id in {
+            a.id for a in buyer_client.get("/cabinet/favorites/").context["page_obj"]
+        }
 
         _ban(seller)
 
-        response = client.get("/cabinet/favorites/")
+        response = buyer_client.get("/cabinet/favorites/")
         assert response.status_code == 200
         assert ad.id not in {a.id for a in response.context["page_obj"]}
 
@@ -69,7 +68,12 @@ class TestFavoritesVisibilityUnchanged:
     """Positive and preservation controls — no over-correction."""
 
     def test_active_seller_favourite_unchanged(
-        self, buyer: User, seller: User, category: Category, city: City
+        self,
+        buyer: User,
+        buyer_client: Client,
+        seller: User,
+        category: Category,
+        city: City,
     ) -> None:
         """An active, non-declined seller's favourited ad is visible."""
         ad = create_test_ad(
@@ -81,13 +85,18 @@ class TestFavoritesVisibilityUnchanged:
         )
         AdFavorite.objects.create(user=buyer, ad=ad)
 
-        response = _login(buyer).get("/cabinet/favorites/")
+        response = buyer_client.get("/cabinet/favorites/")
 
         assert response.status_code == 200
         assert ad.id in {a.id for a in response.context["page_obj"]}
 
     def test_non_published_favourite_is_not_rendered(
-        self, buyer: User, seller: User, category: Category, city: City
+        self,
+        buyer: User,
+        buyer_client: Client,
+        seller: User,
+        category: Category,
+        city: City,
     ) -> None:
         """A DRAFT favourite is not shown as a live ad card."""
         ad = create_test_ad(
@@ -99,13 +108,18 @@ class TestFavoritesVisibilityUnchanged:
         )
         AdFavorite.objects.create(user=buyer, ad=ad)
 
-        response = _login(buyer).get("/cabinet/favorites/")
+        response = buyer_client.get("/cabinet/favorites/")
 
         assert response.status_code == 200
         assert ad.id not in {a.id for a in response.context["page_obj"]}
 
     def test_declined_only_favourite_is_hidden(
-        self, buyer: User, seller: User, category: Category, city: City
+        self,
+        buyer: User,
+        buyer_client: Client,
+        seller: User,
+        category: Category,
+        city: City,
     ) -> None:
         """``is_declined`` keeps its semantics: a declined seller's ad is hidden."""
         ad = create_test_ad(
@@ -120,7 +134,7 @@ class TestFavoritesVisibilityUnchanged:
         seller.is_declined = True
         seller.save(update_fields=["is_declined"])
 
-        response = _login(buyer).get("/cabinet/favorites/")
+        response = buyer_client.get("/cabinet/favorites/")
 
         assert response.status_code == 200
         assert ad.id not in {a.id for a in response.context["page_obj"]}

@@ -259,6 +259,19 @@ def buyer() -> User:
 
 
 @pytest.fixture
+def buyer_client(buyer: User) -> Client:
+    """Authenticated test client for the ``buyer`` fixture.
+
+    Wraps ``Client``.``force_login`` so every cabinet test that needs an
+    authenticated buyer can request ``buyer_client`` instead of repeating the
+    two-line login boilerplate (``client = Client(); client.force_login(buyer)``).
+    """
+    client = Client()
+    client.force_login(buyer)
+    return client
+
+
+@pytest.fixture
 def category() -> Category:
     """Create a generic root category."""
     category, _ = Category.objects.get_or_create(

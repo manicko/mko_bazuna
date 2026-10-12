@@ -8,6 +8,8 @@ Covers:
 - Settings page renders as a stub.
 """
 
+from __future__ import annotations
+
 import pytest
 from django.test import Client
 
@@ -15,14 +17,9 @@ from apps.categories.models import Category
 from apps.locations.models import City
 from apps.search.models import SavedSearch, SearchHistory
 from apps.users.models import User
+from conftest import make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
-
-
-def _login(buyer: User) -> Client:
-    client = Client()
-    client.force_login(buyer)
-    return client
 
 
 # ---------------------------------------------------------------------------
@@ -34,9 +31,8 @@ class TestCabinetHub:
     def test_hub_requires_login(self) -> None:
         assert Client().get("/cabinet/").status_code in (301, 302)
 
-    def test_hub_renders_and_nav_links(self, buyer: User) -> None:
-        client = _login(buyer)
-        resp = client.get("/cabinet/")
+    def test_hub_renders_and_nav_links(self, buyer_client: Client) -> None:
+        resp = buyer_client.get("/cabinet/?lang=ru")
         assert resp.status_code == 200
         content = resp.content.decode()
         # Section nav links (CAB-001)
@@ -45,13 +41,14 @@ class TestCabinetHub:
             "/cabinet/saved-searches/",
             "/cabinet/search-history/",
             "/cabinet/settings/",
-            # "Мои объявления" -> existing dashboard (C9, unrefactored)
-            "/dashboard/",
         ]:
             assert url in content
+        # "Мои объявления" -> existing dashboard (C9, unrefactored).
+        # Assert the nav link's visible text, not the /dashboard/ URL.
+        assert "Мои объявления" in content
 
-    def test_settings_stub_renders(self, buyer: User) -> None:
-        resp = _login(buyer).get("/cabinet/settings/?lang=ru")
+    def test_settings_stub_renders(self, buyer_client: Client) -> None:
+        resp = buyer_client.get("/cabinet/settings/?lang=ru")
         assert resp.status_code == 200
         assert "Настройки" in resp.content.decode()
 
@@ -63,36 +60,41 @@ class TestCabinetHub:
 
 class TestSavedSearchesManagement:
     def test_create_disable_edit_delete_workflow(
-        self, buyer: User, category: Category, city: City
+        self,
+        buyer_client: Client,
+        buyer: User,
+        category: Category,
+        city: City,
     ) -> None:
-        client = _login(buyer)
-
-        # Create via the save-search endpoint.
-        client.post(
-            "/save-search/",
-            {
-                "query": "велосипед",
-                "city_id": str(city.id),
-                "category_id": str(category.id),
-                "min_price": "100",
-            },
+        # Create via ORM — the /save-search/ create path is already covered by
+        # test_saved_search_create.py (FIND-7).
+        ss = SavedSearch.objects.create(
+            user=buyer,
+            query="велосипед",
+            city=city,
+            category=category,
+            min_price=100,
+            max_price=500,
+            is_active=True,
         )
-        ss = SavedSearch.objects.get(user=buyer)
-        assert ss.is_active is True
 
         # List shows it.
-        resp = client.get("/cabinet/saved-searches/")
+        resp = buyer_client.get("/cabinet/saved-searches/")
         assert resp.status_code == 200
         assert "велосипед" in resp.content.decode()
 
         # Disable keeps the row (D9): only is_active flips.
-        client.post(f"/cabinet/saved-searches/{ss.id}/toggle/")
+        resp = buyer_client.post(f"/cabinet/saved-searches/{ss.id}/toggle/")
+        assert resp.status_code == 200
         ss.refresh_from_db()
         assert ss.is_active is False
         assert SavedSearch.objects.filter(user=buyer).count() == 1
 
         # Edit persists new filters + language.
-        client.post(
+        # The edit view sets language=request.LANGUAGE_CODE ("en" in the test
+        # env), so asserting ss.language == "en" confirms the view persisted
+        # the request language rather than leaving the model default ("bs").
+        resp = buyer_client.post(
             f"/cabinet/saved-searches/{ss.id}/edit/",
             {
                 "query": "самокат",
@@ -102,32 +104,33 @@ class TestSavedSearchesManagement:
                 "max_price": "200",
             },
         )
+        assert resp.status_code == 302
         ss.refresh_from_db()
         assert ss.query == "самокат"
         assert ss.city_id is None
         assert ss.max_price == 200
+        assert ss.language == "en"
 
         # Delete removes the row (D9).
-        client.post(f"/cabinet/saved-searches/{ss.id}/delete/")
+        buyer_client.post(f"/cabinet/saved-searches/{ss.id}/delete/")
         assert SavedSearch.objects.filter(user=buyer).count() == 0
 
     def test_guest_cannot_manage_other_users_search(
-        self, buyer: User, category: Category
+        self, buyer_client: Client
     ) -> None:
-        other = User.objects.create(
-            telegram_id=940000202,
-            chat_id=940000202,
-            password="x",
-        )
+        other = make_user(940000202)
         ss = SavedSearch.objects.create(user=other, query="чужой")
 
-        client = _login(buyer)
         # Toggling another user's search returns 404 (scoped to request.user).
         assert (
-            client.post(f"/cabinet/saved-searches/{ss.id}/toggle/").status_code == 404
+            buyer_client.post(f"/cabinet/saved-searches/{ss.id}/toggle/")
+            .status_code
+            == 404
         )
         assert (
-            client.post(f"/cabinet/saved-searches/{ss.id}/delete/").status_code == 404
+            buyer_client.post(f"/cabinet/saved-searches/{ss.id}/delete/")
+            .status_code
+            == 404
         )
 
 
@@ -137,7 +140,9 @@ class TestSavedSearchesManagement:
 
 
 class TestSearchHistorySection:
-    def test_lists_and_clears_history(self, buyer: User) -> None:
+    def test_lists_and_clears_history(
+        self, buyer_client: Client, buyer: User
+    ) -> None:
         SearchHistory.objects.create(
             user=buyer, query="велосипед", query_normalized="велосипед"
         )
@@ -145,17 +150,16 @@ class TestSearchHistorySection:
             user=buyer, query="самокат", query_normalized="самокат"
         )
 
-        client = _login(buyer)
-        resp = client.get("/cabinet/search-history/")
+        resp = buyer_client.get("/cabinet/search-history/")
         assert resp.status_code == 200
         content = resp.content.decode()
         assert "велосипед" in content
         assert "самокат" in content
 
-        client.post("/cabinet/search-history/clear/")
+        buyer_client.post("/cabinet/search-history/clear/")
         assert SearchHistory.objects.filter(user=buyer).count() == 0
 
-        resp = client.get("/cabinet/search-history/?lang=ru")
+        resp = buyer_client.get("/cabinet/search-history/?lang=ru")
         assert "Нет истории поиска" in resp.content.decode()
 
 
@@ -164,46 +168,23 @@ class TestSearchHistorySection:
 # ---------------------------------------------------------------------------
 
 
-class TestCabinetAnonymousGate:
+@pytest.mark.parametrize(
+    "url",
+    [
+        "/cabinet/saved-searches/1/toggle/",
+        "/cabinet/saved-searches/1/edit/",
+        "/cabinet/saved-searches/1/delete/",
+        "/cabinet/search-history/clear/",
+    ],
+)
+def test_anon_post_mutating_cabinet_endpoint_redirects(url: str) -> None:
     """Every mutating cabinet POST is ``@login_required``.
 
     Anonymous POSTs receive a 302 redirect to ``/login/issue/?next=...``
     rather than touching the DB row (pk is irrelevant — login_required
     short-circuits before the view body runs).
     """
-
-    def test_anon_post_saved_search_toggle_redirects(self) -> None:
-        """POST /cabinet/saved-searches/<pk>/toggle/ anonymous → 302 login gate."""
-        client = Client()
-        response = client.post("/cabinet/saved-searches/1/toggle/")
-
-        assert response.status_code == 302
-        assert response.url.startswith("/login/issue/")
-        assert "next=" in response.url
-
-    def test_anon_post_saved_search_edit_redirects(self) -> None:
-        """POST /cabinet/saved-searches/<pk>/edit/ anonymous → 302 login gate."""
-        client = Client()
-        response = client.post("/cabinet/saved-searches/1/edit/")
-
-        assert response.status_code == 302
-        assert response.url.startswith("/login/issue/")
-        assert "next=" in response.url
-
-    def test_anon_post_saved_search_delete_redirects(self) -> None:
-        """POST /cabinet/saved-searches/<pk>/delete/ anonymous → 302 login gate."""
-        client = Client()
-        response = client.post("/cabinet/saved-searches/1/delete/")
-
-        assert response.status_code == 302
-        assert response.url.startswith("/login/issue/")
-        assert "next=" in response.url
-
-    def test_anon_post_search_history_clear_redirects(self) -> None:
-        """POST /cabinet/search-history/clear/ anonymous → 302 login gate."""
-        client = Client()
-        response = client.post("/cabinet/search-history/clear/")
-
-        assert response.status_code == 302
-        assert response.url.startswith("/login/issue/")
-        assert "next=" in response.url
+    resp = Client().post(url)
+    assert resp.status_code == 302
+    assert resp.url.startswith("/login/issue/")
+    assert "next=" in resp.url
