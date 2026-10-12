@@ -8,11 +8,13 @@ asserts anything about nginx.
 
 from __future__ import annotations
 
+import ipaddress
+
 import pytest
 from django.http import HttpRequest
 from django.test import override_settings
 
-from apps.core.utils.client_ip import get_client_ip
+from apps.core.utils.client_ip import _is_trusted_peer, get_client_ip
 
 # `override_settings(TRUSTED_PROXY_NETWORKS=...)` below is why most of these are
 # django_db-free: they touch only request metadata and cache. The one exception
@@ -25,6 +27,8 @@ _UNTRUSTED_PEER = "1.2.3.4"
 _SPOOF_A = "8.8.8.8"
 _SPOOF_B = "9.9.9.9"
 _TRUSTED_NETWORK = ("10.0.0.0/8",)
+
+pytestmark = [pytest.mark.unit]
 
 
 class _SessionStub:
@@ -150,6 +154,128 @@ class TestKeyStability:
         expanded = get_client_ip(_request({"REMOTE_ADDR": "2001:0db8:0000:0000:0000:0000:0000:0001"}))
         compressed = get_client_ip(_request({"REMOTE_ADDR": "2001:db8::1"}))
         assert expanded == compressed
+
+
+class TestIsTrustedPeer:
+    """Direct unit tests for the peer-trust gate (``_is_trusted_peer``).
+
+    These exercise the private decision function in isolation — no request
+    metadata, no forwarded-header parsing — so the trust boundary itself is
+    pinned independently of ``get_client_ip``'s precedence rules.
+    """
+
+    def test_ipv6_loopback_is_trusted(self) -> None:
+        """IPv6 loopback (``::1``) is always trusted via ``is_loopback``."""
+        assert _is_trusted_peer(ipaddress.ip_address("::1")) is True
+
+    def test_ipv4_mapped_ipv6_loopback_is_trusted(self) -> None:
+        """IPv4-mapped IPv6 of a loopback address (``::ffff:127.0.0.1``) is trusted."""
+        peer = ipaddress.ip_address("::ffff:127.0.0.1")
+        assert peer.is_loopback is True
+        assert _is_trusted_peer(peer) is True
+
+    def test_public_address_without_listed_network_is_untrusted(self) -> None:
+        """A public address outside every listed network is untrusted."""
+        assert _is_trusted_peer(ipaddress.ip_address(_UNTRUSTED_PEER)) is False
+
+    @override_settings(TRUSTED_PROXY_NETWORKS=(_TRUSTED_NETWORK,))
+    def test_network_boundary_inclusive(self) -> None:
+        """The exact last address of a listed network is still contained."""
+        # 10.255.255.255 is the broadcast edge of 10.0.0.0/8 — within strict=False.
+        assert (
+            _is_trusted_peer(ipaddress.ip_address("10.255.255.255")) is True
+        )
+
+    @override_settings(TRUSTED_PROXY_NETWORKS=(_TRUSTED_NETWORK,))
+    def test_just_outside_network_is_untrusted(self) -> None:
+        """The first address outside a listed network is not contained."""
+        # 11.0.0.0 is the first address outside 10.0.0.0/8.
+        assert (
+            _is_trusted_peer(ipaddress.ip_address("11.0.0.0")) is False
+        )
+
+    @override_settings(TRUSTED_PROXY_NETWORKS=(_TRUSTED_NETWORK,))
+    def test_malformed_network_entry_is_skipped(self) -> None:
+        """A non-network string in TRUSTED_PROXY_NETWORKS is skipped, not fatal.
+
+        A typo in the operator setting must not raise and must not broaden trust
+        beyond the valid networks alongside it.
+        """
+        with override_settings(
+            TRUSTED_PROXY_NETWORKS=("not-a-network", *_TRUSTED_NETWORK)
+        ):
+            # Inside the valid network — still trusted.
+            assert (
+                _is_trusted_peer(ipaddress.ip_address("10.1.2.3")) is True
+            )
+            # Public and not in any valid network — untrusted.
+            assert (
+                _is_trusted_peer(ipaddress.ip_address(_UNTRUSTED_PEER))
+                is False
+            )
+
+
+class TestIPv6PeerTrust:
+    """IPv6 peers are handled correctly by the trust gate and header resolution.
+
+    Covers the ``is_loopback`` / ``is_private`` fast-path for IPv6 and the
+    ``TRUSTED_PROXY_NETWORKS`` listing path for a public IPv6 address that is
+    not privately routed (Gap 4: no prior test exercised a real IPv6 peer).
+    """
+
+    def test_ipv6_loopback_peer_honours_x_real_ip(self) -> None:
+        """IPv6 loopback (``::1``) opens the gate; ``X-Real-IP`` is honoured."""
+        result = get_client_ip(
+            _request(
+                {
+                    "REMOTE_ADDR": "::1",
+                    "HTTP_X_REAL_IP": "2001:db8::42",
+                }
+            )
+        )
+        assert result == "2001:db8::42"
+
+    @override_settings(TRUSTED_PROXY_NETWORKS=("fd00::/8",))
+    def test_ipv6_ula_peer_from_listed_network(self) -> None:
+        """A ULA address from a listed IPv6 network opens the gate.
+
+        ``fd00::/8`` is a unique-local address; listing it explicitly exercises
+        the ``TRUSTED_PROXY_NETWORKS`` read loop with an IPv6 network object.
+        """
+        result = get_client_ip(
+            _request(
+                {
+                    "REMOTE_ADDR": "fd00::1",
+                    "HTTP_X_REAL_IP": "2001:db8::42",
+                }
+            )
+        )
+        assert result == "2001:db8::42"
+
+    @override_settings(TRUSTED_PROXY_NETWORKS=("2606:4700::/32",))
+    def test_public_ipv6_peer_from_listed_network(self) -> None:
+        """A public (non-private) IPv6 peer in a listed network is trusted.
+
+        ``2606:4700:4700::1111`` is a real, publicly-routed address — it is
+        neither loopback nor private, so it can only open the gate through the
+        ``TRUSTED_PROXY_NETWORKS`` listing. This pins the IPv6 branch of the
+        network-containment loop, which the IPv4 coverage cannot.
+        """
+        peer = "2606:4700:4700::1111"
+        # Sanity: confirm this address is genuinely public (not private/loopback).
+        addr = ipaddress.ip_address(peer)
+        assert addr.is_private is False
+        assert addr.is_loopback is False
+
+        result = get_client_ip(
+            _request(
+                {
+                    "REMOTE_ADDR": peer,
+                    "HTTP_X_REAL_IP": "2001:db8::42",
+                }
+            )
+        )
+        assert result == "2001:db8::42"
 
 
 class TestConsumerAgreement:

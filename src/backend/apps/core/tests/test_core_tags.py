@@ -216,6 +216,68 @@ class TestGetTitleFilter:
         assert result == "English"
 
 
+@pytest.mark.django_db
+@pytest.mark.integration
+class TestGetTitleFilterDB:
+    """Integration tests for ``get_title`` with a DB-persisted Ad.
+
+    Gap 5: the in-memory ``_make_ad`` helper bypasses the ORM, so the
+    template filter was never exercised against a row whose locale column is
+    actually NULL in the database. These tests persist a real ``Ad`` via the
+    shared ``create_test_ad`` helper and render through the template engine.
+    """
+
+    def test_get_title_falls_back_to_base_when_title_en_is_null(
+        self, seller, category, city
+    ) -> None:
+        """A persisted Ad with title set but title_en=NULL falls back to Russian.
+
+        The fallback chain is ``title_en`` → ``title``: when the English column
+        is NULL (the common partial-localisation case), the Russian base
+        ``title`` must be returned, proving the template filter reads the real
+        DB row and not a pre-populated in-memory stub.
+        """
+        from conftest import create_test_ad
+
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.PUBLISHED,
+            title="Трактор для поля",
+        )
+        # title_en is not set by create_test_ad defaults → NULL in the DB.
+        assert ad.title_en in (None, "")
+
+        template = Template(
+            "{% load localized_content %}{{ ad|get_title:'en' }}"
+        )
+        result = template.render(Context({"ad": ad}))
+        assert result == "Трактор для поля"
+
+
+    def test_get_title_returns_english_when_title_en_populated(
+        self, seller, category, city
+    ) -> None:
+        """A persisted Ad with title_en populated returns the English title."""
+        from conftest import create_test_ad
+
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.PUBLISHED,
+            title="Трактор для поля",
+            title_en="Tractor for the field",
+        )
+
+        template = Template(
+            "{% load localized_content %}{{ ad|get_title:'en' }}"
+        )
+        result = template.render(Context({"ad": ad}))
+        assert result == "Tractor for the field"
+
+
 # ---------------------------------------------------------------------------
 # get_description filter (unit — in-memory Ad, no DB)
 # ---------------------------------------------------------------------------

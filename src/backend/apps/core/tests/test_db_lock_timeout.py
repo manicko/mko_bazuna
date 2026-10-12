@@ -28,6 +28,7 @@ import pytest
 from django.db import OperationalError, connection, transaction
 
 from apps.core.enums import AdStatus
+from config.settings.base import LOCK_TIMEOUT_SECONDS
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.integration]
@@ -35,8 +36,10 @@ pytestmark = [pytest.mark.integration]
 
 # The bound the production ``OPTIONS`` is expected to render. Asserted as the
 # rendered string (not the int) because a bare PostgreSQL GUC number is
-# MILLISECONDS — the explicit ``s`` suffix is the 1000x guard.
-_EXPECTED_RENDERED_OPTION = "-c lock_timeout=10s"
+# MILLISECONDS — the explicit ``s`` suffix is the 1000x guard. The value is
+# derived from ``settings.LOCK_TIMEOUT_SECONDS`` so the assertion cannot drift
+# from the production helper that renders it.
+_EXPECTED_RENDERED_OPTION = f"-c lock_timeout={LOCK_TIMEOUT_SECONDS}s"
 
 # How long the holding transaction keeps its row lock. The production bound is
 # 10 s, so ~1 s leaves ample headroom for the waiter to acquire the lock *if*

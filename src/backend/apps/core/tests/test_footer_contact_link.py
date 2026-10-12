@@ -7,8 +7,13 @@ CR-11 anti-scrape flow:
   never in the static HTML; the bot username is base64-encoded and assembled in
   the browser by an inline IIFE).
 - The link is visible to *all* visitors regardless of consent/JS state — it is
-  NOT wrapped in a ``{% if js_verified %}`` gate. When JS is not yet verified the
-  tag degrades to an inert anchor (no ``data-*`` attributes, no script).
+  NOT wrapped in a ``{% if js_verified %}`` gate. The ``js_verified`` flag no
+  longer gates the link itself: the tag always emits the full interactive link
+  (``data-*`` attributes, click-handler IIFE, working deep-link assembly). The
+  obfuscation layer (base64-encoded username, click-time URL assembly, no
+  cleartext URL in the static HTML) provides scrape resistance. The flag only
+  controls the cookie-setting script in the footer, which proves JS execution
+  for subsequent requests.
 - A one-line inline ``<script>`` sets a ``js=true`` session cookie proving the
   browser executed JS. Non-JS clients never send it, so they never receive the
   full deep-link.

@@ -64,8 +64,18 @@ def test_invalidate_does_not_affect_other_users() -> None:
 
 
 def test_entry_expires_after_ttl() -> None:
-    """A cached language expires after the configured TTL elapses."""
+    """A cached language expires after the configured TTL (deterministic, no sleep).
+
+    The test backend is ``LocMemCache``, whose ``_has_expired`` compares the
+    stored expiry timestamp against ``time.time()``. Rather than block the
+    process for a real second, we push the entry's expiry into the past via the
+    backend's internal ``_expire_info`` map and assert the next ``get`` evicts
+    it — exercising the real TTL eviction path without a real-time sleep.
+    """
     set_cached_anon_language(123456, "ru", ttl=1)
     assert get_cached_anon_language(123456) == "ru"
-    time.sleep(1.1)
+    # Advance the stored expiry into the past so LocMemCache considers the
+    # entry stale on the next read.
+    cache_key = cache.make_key("bot_anon_lang:123456")
+    cache._expire_info[cache_key] = time.time() - 1  # pyright: ignore[reportAttributeAccessIssue]
     assert get_cached_anon_language(123456) is None

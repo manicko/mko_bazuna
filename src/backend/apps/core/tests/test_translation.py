@@ -114,6 +114,62 @@ class TestTranslationCircuitBreaker:
 
 
 # ---------------------------------------------------------------------------
+# translate_text() half-open retry (circuit breaker cooldown path)
+# ---------------------------------------------------------------------------
+
+
+class TestHalfOpenRetry:
+    """Half-open retry path: open circuit -> cooldown -> upstream succeeds -> closes.
+
+    Gap 2: there was no test verifying that an *open* circuit transitions to
+    half-open (and lets the upstream call through) once the cooldown elapses,
+    and that a successful half-open call closes the circuit. The existing
+    ``test_circuit_breaker_half_open_after_cooldown`` only asserts ``is_open``
+    flips on a bare ``TranslationCircuitBreaker`` — it never calls
+    ``translate_text`` through the open->half-open boundary.
+    """
+
+    def test_half_open_call_goes_through_and_closes_circuit(self) -> None:
+        """An open circuit that has passed its cooldown lets the call through.
+
+        Sequence:
+        1. Record enough failures to open the module-level ``_CIRCUIT_BREAKER``.
+        2. Advance the monotonic clock past ``cooldown_seconds`` so ``is_open``
+           reports half-open (``False``) — no real-time sleep.
+        3. ``translate_text`` proceeds to the upstream call.
+        4. A successful upstream result closes the circuit (``record_success``).
+        """
+        # Step 1 — open the module-level breaker.
+        for _ in range(_CIRCUIT_BREAKER.failure_threshold):
+            _CIRCUIT_BREAKER.record_failure()
+        assert _CIRCUIT_BREAKER.is_open is True
+
+        # Step 2 — simulate cooldown elapsed via the monotonic clock the breaker
+        # consults in ``is_open``.
+        advanced = (
+            _CIRCUIT_BREAKER._last_failure_time
+            + _CIRCUIT_BREAKER.cooldown_seconds
+            + 1
+        )
+
+        with patch(
+            "apps.core.services.translation.time.monotonic",
+            return_value=advanced,
+        ), patch(
+            "apps.core.services.translation._translate_via_api",
+            return_value="Переведено",
+        ):
+            # Half-open: is_open is False, so translate_text proceeds upstream.
+            assert _CIRCUIT_BREAKER.is_open is False
+            result = translate_text("Hello", "en", "ru")
+
+        # Step 4 — success closes the circuit.
+        assert result == "Переведено"
+        assert _CIRCUIT_BREAKER.is_open is False
+        assert _CIRCUIT_BREAKER._failure_count == 0
+
+
+# ---------------------------------------------------------------------------
 # translate_text() integration with circuit breaker
 # ---------------------------------------------------------------------------
 
@@ -160,10 +216,6 @@ class TestTranslateTextFallback:
         (or exception type) rather than str(e), and RedactingJsonFormatter must
         redact any surviving key=VALUE pattern.
         """
-        from django.core.management import (
-            call_command,  # noqa: F401  (ensures settings configured)
-        )
-
         from apps.core.utils.json_logging import RedactingJsonFormatter
 
         secret = "yaGOOGLE_TRANSLATE_API_KEY-secret-1234567890abcdef"
