@@ -133,6 +133,12 @@ class TestLookupCacheServiceSwr:
         # Winner recombined once
         assert call_count == 1
 
+        # Cache must have been refreshed with the fresh value after the winner
+        # recompute completed (stale-hit path calls the producer synchronously).
+        cached = cache.get(key)
+        assert cached is not None
+        assert cached["value"] == ["fresh_data"]
+
     def test_cold_miss_recomputes_and_caches(self):
         """A cold miss (no cache entry) triggers a single recompute."""
         key = all_groups_key()  # version 0 by default
@@ -223,6 +229,11 @@ class TestLookupVersionBump:
         assert get_lookup_version() == 0
 
     def test_bump_lookup_version_increments(self):
+        # NOTE: The absolute 0/1/2 values rely on the autouse
+        # ``_clear_cache_between_tests`` fixture (root conftest.py) which calls
+        # cache.clear() before/after every test, resetting the version counter
+        # to 0. Without it, versions would accumulate across tests and these
+        # assertions would fail.
         assert get_lookup_version() == 0
         bump_lookup_version()
         assert get_lookup_version() == 1
@@ -382,6 +393,11 @@ class TestLookupResolveVersionBump:
         assert get_lookup_resolve_version() == 0
 
     def test_bump_lookup_resolve_version_increments(self):
+        # NOTE: The absolute 0/1/2 values rely on the autouse
+        # ``_clear_cache_between_tests`` fixture (root conftest.py) which calls
+        # cache.clear() before/after every test, resetting the version counter
+        # to 0. Without it, versions would accumulate across tests and these
+        # assertions would fail.
         assert get_lookup_resolve_version() == 0
         bump_lookup_resolve_version()
         assert get_lookup_resolve_version() == 1
@@ -412,7 +428,7 @@ class TestLookupCacheIntegration:
     """Integration: cache priming, version-bump invalidation, and recomputation."""
 
     def test_get_all_groups_primes_cache_then_version_bump_misses(
-        self, category
+        self,
     ) -> None:
         """After priming and version-bump, the next read is a cold miss."""
         LookupGroup.objects.create(
@@ -449,7 +465,7 @@ class TestLookupCacheIntegration:
         assert len(result2) == 1
         assert result2[0].code == LookupGroupCode.LISTING_PURPOSE
 
-    def test_get_active_items_primes_and_invalidates(self, category) -> None:
+    def test_get_active_items_primes_and_invalidates(self) -> None:
         """Active items cache is primed then invalidated via version bump."""
         group = LookupGroup.objects.create(
             code=LookupGroupCode.LISTING_PURPOSE,
@@ -606,6 +622,11 @@ class TestLookupCacheSWR:
         Five threads hit a cold cache simultaneously (via a ``Barrier``).
         Only the lock-winner runs the producer; the other four losers
         receive the ``default`` fallback without invoking the producer.
+
+        Timing sensitivity: relies on ``time.sleep(0.2)`` to force thread
+        overlap before the lock TTL releases. Under heavy CI load a loser
+        could resume after the winner releases the lock and re-acquire it,
+        risking a flaky ``call_count > 1``. The 0.2s margin keeps this LOW.
         """
         key = "test:swr:single_flight"
         lock_key = f"{key}{_CACHE_LOCK_SUFFIX}"
@@ -653,6 +674,10 @@ class TestLookupCacheSWR:
     def test_stale_serve_serves_stale_to_all_concurrent_callers(self):
         """Stale entries are served to all concurrent callers while the winner
         recomputes in the background — no caller blocks on the recompute.
+
+        Timing sensitivity: relies on ``time.sleep(0.2)`` to force thread
+        overlap before the lock TTL releases; see the single-flight test
+        above for the flakiness caveat (LOW risk under the existing margin).
         """
         key = "test:swr:stale_concurrent"
         lock_key = f"{key}{_CACHE_LOCK_SUFFIX}"
@@ -699,6 +724,12 @@ class TestLookupCacheSWR:
 
         assert all(list(r) == ["stale_data"] for r in results)
         assert call_count == 1
+
+        # Cache must have been refreshed with the fresh value once the winner's
+        # recompute completed (the winner runs the producer synchronously).
+        cached = cache.get(key)
+        assert cached is not None
+        assert cached["value"] == ["fresh_data"]
 
     # --- Version-bump (PERF-006) ----------------------------------------------
 

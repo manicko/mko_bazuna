@@ -154,9 +154,6 @@ class TestLookupItemCacheInvalidation:
         """
         category, item = purpose_binding
 
-        # Prime the cache so the version key exists.
-        CategoryLookupResolver.get_resolved_purposes(category)
-
         failing_incr = Mock(
             side_effect=ConnectionInterrupted("Simulated Redis outage")
         )
