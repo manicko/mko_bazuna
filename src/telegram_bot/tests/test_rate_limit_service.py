@@ -67,6 +67,47 @@ class TestContactStartRateLimit:
         assert await check_contact_start_rate_limit(111, limit=3, period=600) is False
 
 
+class TestUploadRateLimit:
+    """End-to-end tests for ``check_upload_rate_limit`` (B26 GAP-2).
+
+    Previously only ``iscoroutinefunction`` was asserted; these tests exercise
+    the allow/block/window/per-user/isolation semantics of the upload limiter.
+    """
+
+    @pytest.mark.asyncio
+    async def test_allows_under_limit(self) -> None:
+        """First 10 uploads within the window are allowed."""
+        for _ in range(10):
+            assert await check_upload_rate_limit(123) is True
+
+    @pytest.mark.asyncio
+    async def test_blocks_after_threshold(self) -> None:
+        """11th upload within the 60-second window is rate-limited."""
+        for _ in range(10):
+            assert await check_upload_rate_limit(456) is True
+        assert await check_upload_rate_limit(456) is False
+
+    @pytest.mark.asyncio
+    async def test_independent_per_user(self) -> None:
+        """Upload counters are isolated per seller user_id."""
+        for _ in range(10):
+            assert await check_upload_rate_limit(789) is True
+        # User 999 is unaffected by user 789's exhausted window.
+        assert await check_upload_rate_limit(999) is True
+
+    @pytest.mark.asyncio
+    async def test_key_pattern_is_bot_upload_rl(self) -> None:
+        """The cache key uses the bot_upload_rl namespace."""
+        with patch(
+            "telegram_bot.services.rate_limit.bump_rate_limit_window"
+        ) as mock_bump:
+            await check_upload_rate_limit(12345)
+
+        mock_bump.assert_called_once()
+        key = mock_bump.call_args.args[0]
+        assert key == "bot_upload_rl:12345"
+
+
 class TestSupportMessageRateLimit:
     """Tests for ``check_support_message_rate_limit``."""
 
