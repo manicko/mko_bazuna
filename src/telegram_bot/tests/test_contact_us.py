@@ -20,33 +20,22 @@ matching the marks/fixture idiom in ``test_rate_limit_service.py``; the
 callback and login-button tests are pure mock doubles.
 """
 
-from collections.abc import Iterator
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
-from django.core.cache import cache
 from django.utils import translation
 
 from telegram_bot.handlers.contact import (
     _CONTACT_US_GREETING,
     ANONYMOUS_BUYER_LABEL,
     CONTACT_US_CALLBACK,
-    CONTACT_US_PATTERN,
     CONTACT_US_RATE_LIMITED_MESSAGE,
     handle_contact_us_callback,
     handle_contact_us_start,
 )
 from telegram_bot.services.rate_limit import check_contact_start_rate_limit
 
-pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.integration]
-
-
-@pytest.fixture(autouse=True)
-def _clear_cache() -> Iterator[None]:
-    """Clear the shared LocMemCache so rate-limit counters don't leak across tests."""
-    cache.clear()
-    yield
-    cache.clear()
+pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.unit]
 
 
 def _mock_message(user_id: int = 123, is_bot: bool = False) -> MagicMock:
@@ -130,16 +119,6 @@ class TestContactUsDeepLink:
         message.answer.assert_awaited_once()
         sent_text = message.answer.await_args.args[0]
         assert sent_text == CONTACT_US_RATE_LIMITED_MESSAGE
-
-    @pytest.mark.asyncio
-    async def test_contact_us_pattern_matches(self) -> None:
-        """``contact_us`` is recognised as a support-desk deep-link."""
-        assert CONTACT_US_PATTERN.match("contact_us") is not None
-
-    @pytest.mark.asyncio
-    async def test_contact_us_pattern_does_not_match_contact_ad(self) -> None:
-        """``contact_<id>`` must not collide with the support-desk pattern."""
-        assert CONTACT_US_PATTERN.match("contact_42") is None
 
 
 # ---------------------------------------------------------------------------

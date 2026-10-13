@@ -152,14 +152,23 @@ class TestSupportMessageRateLimit:
 
 
 def test_rate_limit_functions_are_async_callable() -> None:
-    """Both rate-limit functions are async (awaitable coroutine functions).
+    """Rate-limit functions are async (awaitable coroutine functions).
 
-    Guards against regression: a future change must not accidentally make either
-    function synchronous again, which would block the bot event loop on cache I/O.
+    Guards against regression: a future change must not accidentally make any
+    function synchronous, which would block the bot event loop on cache I/O.
     """
+    from telegram_bot.services.rate_limit import (
+        check_contact_deep_link_buyer_rate_limit,
+        check_contact_seller_rate_limit,
+        check_login_rate_limit,
+    )
+
     assert inspect.iscoroutinefunction(check_upload_rate_limit)
     assert inspect.iscoroutinefunction(check_contact_start_rate_limit)
     assert inspect.iscoroutinefunction(check_support_message_rate_limit)
+    assert inspect.iscoroutinefunction(check_login_rate_limit)
+    assert inspect.iscoroutinefunction(check_contact_deep_link_buyer_rate_limit)
+    assert inspect.iscoroutinefunction(check_contact_seller_rate_limit)
 
 
 class TestBotGuardsFailOpenOnCacheOutage:

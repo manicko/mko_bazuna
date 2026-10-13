@@ -14,7 +14,6 @@ Covers:
   with the consent notice and **no ticket** is created.
 """
 
-from collections.abc import Iterator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -23,7 +22,6 @@ from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.base import StorageKey
 from aiogram.fsm.storage.memory import MemoryStorage
 from asgiref.sync import sync_to_async
-from django.core.cache import cache
 from django.utils import timezone
 from django.utils.functional import Promise
 
@@ -44,14 +42,6 @@ pytestmark = [
     pytest.mark.django_db(transaction=True),
     pytest.mark.integration,
 ]
-
-
-@pytest.fixture(autouse=True)
-def _clear_cache() -> Iterator[None]:
-    """Clear the shared LocMemCache so rate-limit counters don't leak across tests."""
-    cache.clear()
-    yield
-    cache.clear()
 
 
 @pytest.fixture
@@ -205,7 +195,7 @@ class TestSupportMessage:
     """``handle_support_message``: validation -> persist -> deliver -> confirm."""
 
     @pytest.mark.asyncio
-    async def test_persists_and_delivers(self, fsm_context: FSMContext) -> None:
+    async def test_unregistered_sender_refused(self, fsm_context: FSMContext) -> None:
         """An unregistered sender is refused: no ticket, one consent notice.
 
         This **inverts the test's original purpose.** Under the storage-consent
@@ -247,45 +237,6 @@ class TestSupportMessage:
         assert await fsm_context.get_state() == ContactUsState.IDLE
 
     @pytest.mark.asyncio
-    async def test_unregistered_sender_is_refused_no_ticket(
-        self, fsm_context: FSMContext
-    ) -> None:
-        """An unregistered sender (no consent) is refused with the notice.
-
-        Renamed from ``test_anonymous_user_has_null_user_fk``: under the
-        storage-consent gate (06-PII-101) the bot never creates an unattributed
-        ticket, so "null user FK" is no longer reachable at the bot boundary.
-        The model can still store one
-        (``test_support_models.py::TestSupportTicketAnonymous``); the *bot*
-        refuses.
-        """
-        await fsm_context.set_state(ContactUsState.AWAITING_MESSAGE)
-        message = _mock_message(text="Hi", user_id=305)
-        bot = _mock_bot()
-
-        with (
-            patch(
-                "telegram_bot.handlers.support.send_support_notification_email",
-                new=AsyncMock(),
-            ),
-            patch(
-                "telegram_bot.handlers.support.send_support_notification_telegram",
-                new=AsyncMock(),
-            ),
-            patch(
-                "telegram_bot.handlers.support.get_support_contacts_async",
-                new=AsyncMock(return_value=[]),
-            ),
-        ):
-            await handle_support_message(message, bot, fsm_context)
-
-        assert await _count_tickets() == 0
-        message.answer.assert_awaited_once()
-        sent_text = message.answer.await_args.args[0]
-        assert str(sent_text) == str(SUPPORT_CONSENT_REQUIRED_MESSAGE)
-        assert await fsm_context.get_state() == ContactUsState.IDLE
-
-    @pytest.mark.asyncio
     async def test_registered_user_is_attributed(self, fsm_context: FSMContext) -> None:
         """A consenting registered user is attributed and completes the ticket.
 
@@ -316,11 +267,11 @@ class TestSupportMessage:
             patch(
                 "telegram_bot.handlers.support.send_support_notification_telegram",
                 new=AsyncMock(),
-            ),
+            ) as mock_telegram,
             patch(
                 "telegram_bot.handlers.support.get_support_contacts_async",
-                new=AsyncMock(return_value=[]),
-            ),
+                new=AsyncMock(return_value=[])
+            ) as mock_contacts,
         ):
             await handle_support_message(message, bot, fsm_context)
 
@@ -331,6 +282,8 @@ class TestSupportMessage:
         assert ticket.telegram_id == 900000100
         assert ticket.text == "I am registered"
         mock_email.assert_awaited_once()
+        mock_telegram.assert_awaited_once()
+        mock_contacts.assert_awaited_once()
 
     @pytest.mark.asyncio
     async def test_registered_user_without_consent_is_refused(
@@ -502,7 +455,6 @@ class TestSupportMessage:
 class TestSupportMessageLocalization:
     """The support message constants must not bake the import-time locale."""
 
-    @pytest.mark.django_db(transaction=True)
     def test_message_constants_are_lazy_proxies(self) -> None:
         """All three support message constants are lazy, not eager ``_()`` strings.
 
@@ -520,12 +472,7 @@ class TestSupportMessageLocalization:
             assert isinstance(const, Promise), (
                 f"{const!r} must be a lazy gettext proxy, not an eager string"
             )
-            # Under the default ``en`` test locale the proxy resolves to the
-            # English msgid source text.
-            assert str(const) == str(const)
-            assert isinstance(str(const), str)
 
-    @pytest.mark.django_db(transaction=True)
     def test_prompt_resolves_to_english_under_en_locale(self) -> None:
         """Under an active ``en`` locale the prompt resolves to the English msgid.
 
