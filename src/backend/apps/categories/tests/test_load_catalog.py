@@ -4,12 +4,6 @@ Covers the post-load guard that asserts Category and City rows exist after
 the catalog builder runs, raising CommandError if either dataset is empty.
 Also covers the ENT-037 smoke test: load_catalog populates LookupItem rows
 via builder Phase 1 (lookups).
-
-Note: three tests below each invoke the full real catalog load from
-``categories.yaml`` (advisory lock 104, 4 builder phases). They could share
-a single catalog-load fixture, but ``test_post_load_guard_checks_cities``
-must delete cities first, so automatic deduplication is left as a follow-up
-(B19 audit finding #4).
 """
 
 from __future__ import annotations
@@ -27,6 +21,25 @@ from apps.lookups.models import LookupItem
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
+@pytest.fixture
+def loaded_catalog(request, city: City) -> None:
+    """Load the full category catalog from categories.yaml once per test.
+
+    The *city* fixture guarantees ``City.objects.exists()`` is True so the
+    post-load city guard passes. ``--no-rewrite`` prevents the builder from
+    mutating the committed ``categories.yaml`` on disk.
+
+    Indirectly parametrize with ``"no_cities"`` to delete all cities before
+    loading — this exercises the post-load city guard (B19 audit finding #4).
+    """
+    if getattr(request, "param", None) == "no_cities":
+        City.objects.all().delete()
+        with pytest.raises(CommandError, match="zero cities"):
+            call_command("load_catalog", "--no-rewrite")
+    else:
+        call_command("load_catalog", "--no-rewrite")
+
+
 class TestLoadCatalogPostLoadGuard:
     """Tests for the post-load guard in load_catalog (ENT-040)."""
 
@@ -38,43 +51,34 @@ class TestLoadCatalogPostLoadGuard:
         with pytest.raises(CommandError, match="Catalog loaded zero categories"):
             call_command("load_catalog", "--config", str(empty_config))
 
-    def test_load_catalog_succeeds_with_categories_present(self, city: City) -> None:
+    def test_load_catalog_succeeds_with_categories_present(
+        self, loaded_catalog: None
+    ) -> None:
         """Running load_catalog with a valid config populates categories and passes the guard.
 
-        The *city* fixture guarantees `City.objects.exists()` is True so the
-        city guard does not fire; `--no-rewrite` prevents the builder from
-        mutating the committed `categories.yaml` on disk.
+        The *loaded_catalog* fixture invokes ``load_catalog`` with the *city*
+        fixture satisfying the command's city guard.
         """
-        assert Category.objects.count() == 0
-
-        call_command("load_catalog", "--no-rewrite")
-
         assert Category.objects.exists()
 
-    def test_post_load_guard_checks_cities(self) -> None:
+    @pytest.mark.parametrize("loaded_catalog", ["no_cities"], indirect=True)
+    def test_post_load_guard_checks_cities(self, loaded_catalog: None) -> None:
         """When cities table is empty, the guard raises CommandError for cities.
 
-        Categories are loaded normally (real config), but no cities exist, so
-        the city guard should fire.
+        The *loaded_catalog* fixture (parametrized with ``"no_cities"``) deletes
+        all cities before calling ``load_catalog`` and asserts the command
+        raises ``CommandError`` with the city-guard message. ``load_catalog``
+        itself does not seed cities (ENT-031), so the table stays empty.
         """
-        City.objects.all().delete()
-        assert City.objects.count() == 0
+        assert not City.objects.exists()
 
-        with pytest.raises(CommandError, match="zero cities"):
-            call_command("load_catalog", "--no-rewrite")
-
-    def test_load_catalog_populates_lookup_items(self, city: City) -> None:
+    def test_load_catalog_populates_lookup_items(self, loaded_catalog: None) -> None:
         """The real management command populates LookupItem rows (ENT-037).
 
         ``load_catalog`` invokes ``builder.load_catalog``, whose Phase 1
         (``_load_lookups``) creates ``LookupItem`` rows via
-        ``update_or_create``. The *city* fixture satisfies the command's
-        post-load ``City.objects.exists()`` guard — ``load_catalog`` itself
-        does not seed cities (ENT-031).
+        ``update_or_create``. The *loaded_catalog* fixture satisfies the
+        command's post-load ``City.objects.exists()`` guard.
         """
-        assert LookupItem.objects.count() == 0
-
-        call_command("load_catalog", "--no-rewrite")
-
         assert LookupItem.objects.exists()
         assert LookupItem.objects.count() > 0

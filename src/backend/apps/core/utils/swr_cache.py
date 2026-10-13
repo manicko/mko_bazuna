@@ -43,6 +43,16 @@ logger = logging.getLogger(__name__)
 _CACHE_LOCK_SUFFIX: Final[str] = ":lock"
 
 
+def lock_key_for(key: str) -> str:
+    """Return the single-flight lock key for *key*.
+
+    Centralises the ``f"{key}{_CACHE_LOCK_SUFFIX}"`` construction so callers
+    (including tests) do not couple to the private ``_CACHE_LOCK_SUFFIX``
+    constant (B19 audit finding: implementation-detail coupling).
+    """
+    return f"{key}{_CACHE_LOCK_SUFFIX}"
+
+
 class _CacheEntry:
     """Cache entry carrying the value and its storage timestamp.
 
@@ -96,7 +106,7 @@ def get_with_stale_revalidate(
         The cached value (fresh or stale), the recomputed value, or *default*
         if the lock is held and no stale value exists.
     """
-    lock_key = f"{key}{_CACHE_LOCK_SUFFIX}"
+    lock_key = lock_key_for(key)
     entry_data = cache.get(key)
 
     if entry_data is not None:
@@ -167,7 +177,7 @@ def _recompute_and_store(
     SYNCHRONOUSLY (blocking its own response) and overwrites the cache entry.
     Any exception is caught so the lock is still released.
     """
-    lock_key = f"{key}{_CACHE_LOCK_SUFFIX}"
+    lock_key = lock_key_for(key)
     try:
         value = producer()
         _store(key, value, ttl, stale_ttl, max_size_bytes)

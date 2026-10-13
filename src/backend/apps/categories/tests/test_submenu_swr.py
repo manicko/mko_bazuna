@@ -35,8 +35,8 @@ from apps.categories.cache import (
     get_tree_version,
 )
 from apps.core.utils.swr_cache import (
-    _CACHE_LOCK_SUFFIX,
     get_with_stale_revalidate,
+    lock_key_for,
 )
 
 
@@ -181,11 +181,7 @@ class TestSubmenuSwr:
         assert cached["value"] == "computed_fragment"
 
     def test_submenu_cold_miss_lock_held_returns_default(self):
-        # NOTE: This couples to the private ``_CACHE_LOCK_SUFFIX`` constant.
-        # Decoupling would require either exporting a public lock-key builder
-        # or injecting a fake cache — both are production-code changes left for
-        # a future iteration. The coupling is documented here (B19 audit #12).
-        lock_key = f"{SUBMENU_KEY}{_CACHE_LOCK_SUFFIX}"
+        lock_key = lock_key_for(SUBMENU_KEY)
         cache.add(lock_key, "1", SUBMENU_CACHE_LOCK_TTL)
 
         call_count = 0
@@ -259,7 +255,7 @@ class TestSubmenuSwr:
         intra-process only).
         """
         key = "test:submenu_swr:single_flight"
-        lock_key = f"{key}{_CACHE_LOCK_SUFFIX}"
+        lock_key = lock_key_for(key)
         cache.delete(key)
         cache.delete(lock_key)
 
@@ -300,46 +296,9 @@ class TestSubmenuSwr:
         assert results.count("") >= 1
 
 
-@pytest.fixture
-def tree():
-    """Create a root category with active and inactive children.
-
-    All children carry ``name_i18n`` with ``ru`` translations so that
-    localization tests (``?lang=ru``) exercise real ``name_i18n`` data
-    rather than falling back to the base ``name`` field (B19 audit #8).
-
-    Note: this fixture is duplicated from ``test_submenu.py``. It exists here
-    because pytest fixtures are scoped per-module unless shared via conftest.py
-    (B19 audit finding #9 — a future refactor could move this to a shared
-    conftest).
-    """
-    from apps.categories.models import Category
-
-    root = Category.objects.create(
-        name="Транспорт",
-        slug="transport",
-        name_i18n={"ru": "Транспорт"},
-    )
-    Category.objects.create(
-        name="Велосипеды",
-        slug="bicycles",
-        parent=root,
-        name_i18n={"ru": "Велосипеды"},
-    )
-    Category.objects.create(
-        name="Автомобили",
-        slug="cars",
-        parent=root,
-        name_i18n={"ru": "Автомобили"},
-    )
-    Category.objects.create(
-        name="Устаревшее",
-        slug="old",
-        parent=root,
-        is_active=False,
-        name_i18n={"ru": "Устаревшее"},
-    )
-    return root
+# The ``tree`` fixture is now shared via ``apps/categories/tests/conftest.py``
+# (B19 audit finding #9 — deduplication of the byte-identical fixture that
+# previously existed in both test_submenu.py and test_submenu_swr.py).
 
 
 @pytest.mark.django_db
@@ -351,7 +310,7 @@ class TestSubmenuCacheIntegration:
         version = get_tree_version()
         cache_key = f"category:submenu:{version}:transport:ru"
         cache.delete(cache_key)
-        cache.delete(f"{cache_key}:lock")
+        cache.delete(lock_key_for(cache_key))
 
         client = Client()
         # Language is driven via ?lang=ru so the cache key locale segment matches

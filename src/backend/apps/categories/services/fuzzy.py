@@ -41,5 +41,10 @@ def match_category(query: str, candidates: list[str]) -> str | None:
     for candidate in candidates:
         if candidate.casefold() == target:
             return candidate
-    matches = get_close_matches(query, candidates, n=1, cutoff=CATEGORY_FUZZY_CUTOFF)
-    return matches[0] if matches else None
+    casefolded = [c.casefold() for c in candidates]
+    matches = get_close_matches(target, casefolded, n=1, cutoff=CATEGORY_FUZZY_CUTOFF)
+    if not matches:
+        return None
+    matched = matches[0]
+    matched_idx = casefolded.index(matched)
+    return candidates[matched_idx]

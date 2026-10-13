@@ -6,55 +6,15 @@ Covers the HTMX partial used by the header's "All Categories" dropdown:
 - excludes inactive children
 - returns 404 for unknown or inactive categories
 - fragment cache invalidates on structural Category changes
+- expand buttons render only for non-leaf children
 """
 
 import pytest
 from django.test import Client
 
-from apps.categories.catalog.builder import load_catalog
 from apps.categories.models import Category
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
-
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
-
-@pytest.fixture
-def tree() -> Category:
-    """Create a root category with active and inactive children.
-
-    All children carry ``name_i18n`` with ``ru`` translations so that
-    localization tests (``?lang=ru``) exercise real ``name_i18n`` data
-    rather than falling back to the base ``name`` field (B19 audit #8).
-    """
-    root = Category.objects.create(
-        name="Транспорт",
-        slug="transport",
-        name_i18n={"ru": "Транспорт"},
-    )
-    Category.objects.create(
-        name="Велосипеды",
-        slug="bicycles",
-        parent=root,
-        name_i18n={"ru": "Велосипеды"},
-    )
-    Category.objects.create(
-        name="Автомобили",
-        slug="cars",
-        parent=root,
-        name_i18n={"ru": "Автомобили"},
-    )
-    Category.objects.create(
-        name="Устаревшее",
-        slug="old",
-        parent=root,
-        is_active=False,
-        name_i18n={"ru": "Устаревшее"},
-    )
-    return root
 
 
 class TestCategorySubmenu:
@@ -141,43 +101,59 @@ class TestCategorySubmenu:
 
 
 @pytest.fixture
-def catalog() -> None:
-    """Load the full category catalog from categories.yaml."""
-    from pathlib import Path
+def expand_tree() -> None:
+    """Create a deterministic category tree for expand-button assertions.
 
-    catalog_path = (
-        Path(__file__).resolve().parents[2]
-        / "categories"
-        / "catalog"
-        / "categories.yaml"
+    - ``business`` (non-leaf): one child has a grandchild, so the submenu
+      renders ``data-category-expand`` on that child.
+    - ``ready-business`` (leaf): no children, so the submenu is empty and
+      no expand buttons appear.
+    """
+    business = Category.objects.create(
+        name="Business",
+        slug="business",
+        name_i18n={"ru": "Бизнес"},
     )
-    load_catalog(catalog_path)
+    child = Category.objects.create(
+        name="Equipment",
+        slug="business-equipment",
+        parent=business,
+        name_i18n={"ru": "Оборудование"},
+    )
+    Category.objects.create(
+        name="Tractor",
+        slug="equipment-tractor",
+        parent=child,
+    )
+    Category.objects.create(
+        name="Ready Business",
+        slug="ready-business",
+        name_i18n={"ru": "Готовый бизнес"},
+    )
 
 
 class TestExpandButtons:
-    """Expand buttons render only for categories that have children (RC-A).
+    """Expand buttons render only for children that have children of their own.
 
-    Hard-coupled to the committed ``catalog/categories.yaml`` shape:
-    ``business`` is a non-leaf node (has descendants with children), while
-    ``ready-business`` is a leaf node (no children). Renaming either slug or
-    restructuring their children in the YAML will flip these assertions.
+    Constructs a deterministic category tree inline rather than relying on
+    the committed ``catalog/categories.yaml`` shape (B19 audit finding: hard
+    coupling to catalog contents).
     """
 
     def test_expand_button_present_for_category_with_children(
-        self, catalog: None
+        self, expand_tree: None
     ) -> None:
         client = Client()
         response = client.get("/categories/business/submenu/")
         assert response.status_code == 200
         content = response.content.decode("utf-8")
-        # business has children with children of their own (e.g.
-        # business-commercial-real-estate) -> expand buttons must render.
+        # business-equipment has a child (equipment-tractor) -> expand button.
         assert "data-category-expand" in content
 
-    def test_expand_button_absent_for_leaf_category(self, catalog: None) -> None:
+    def test_expand_button_absent_for_leaf_category(self, expand_tree: None) -> None:
         client = Client()
         response = client.get("/categories/ready-business/submenu/")
         assert response.status_code == 200
         content = response.content.decode("utf-8")
-        # ready-business is a leaf node (no children) -> no expand buttons.
+        # ready-business is a leaf (no children) -> submenu empty, no expand.
         assert "data-category-expand" not in content
