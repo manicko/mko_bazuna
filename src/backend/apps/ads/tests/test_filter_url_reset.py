@@ -112,54 +112,44 @@ class TestFilterUrlReset:
             f"{len(missing)} hx-get values are missing lang=en preservation: {missing}"
         )
 
-    def test_clear_all_filters_static_guard(self) -> None:
-        """The "Clear all filters" link carries ``hx-push-url="true"`` and is
-        nested inside the chips-block ``{% if %}`` conditional so it only
-        renders when at least one filter chip is active (R-FR-01)."""
-        path = (
-            Path(__file__).resolve().parents[3] / "templates/ads/partials/ad_list.html"
+    def test_clear_all_filters_rendered_guard(
+        self, seller, category, city
+    ) -> None:
+        """The "Clear all filters" button carries ``hx-push-url="true"`` and only
+        renders when at least one filter chip is active (R-FR-01).
+
+        Converted from a static template-source read to a rendered-output
+        assertion: with an active price filter (``/?min_price=100``) the button
+        is present and push-url-enabled; with no filters active it is absent.
+        """
+        create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+
+        # With an active price filter: clear-all is present and push-url enabled.
+        response = client.get(
+            "/?min_price=100",
+            headers={"HX-Request": "true", "Accept-Language": "en"},
         )
-        content = path.read_text(encoding="utf-8")
-        lines = content.splitlines()
-
-        # Locate the chips-block {% if %} — the gate wrapping all chips + clear-all.
-        chips_if_idx = None
-        for i, line in enumerate(lines):
-            if "current_listing_purpose or current_features" in line:
-                chips_if_idx = i
-                break
-        assert chips_if_idx is not None, "chips-block {% if %} not found"
-
-        # Locate the clear-all link via its translatable text marker.
-        # Search for the template tag ``{% trans "Clear all filters" %}`` to
-        # avoid matching the prose mention in the header comment (line 7).
-        clear_idx = None
-        for i, line in enumerate(lines):
-            if '{% trans "Clear all filters" %}' in line:
-                clear_idx = i
-                break
-        assert clear_idx is not None, "Clear all filters trans tag not found"
-        assert clear_idx > chips_if_idx, "clear-all appears before chips-block if"
-
-        # The <a> tag and its hx-push-url="true" must be on the lines preceding
-        # the translatable text.
-        link_block = "\n".join(lines[clear_idx - 6 : clear_idx + 1])
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
         assert "Clear all filters" in content
-        assert 'hx-push-url="true"' in link_block
-
-        # Nesting-depth tracker: every {% if %}/{% for %} between the chips-block
-        # opening tag and the clear-all link must be balanced, leaving depth > 0
-        # so the clear-all stays inside the chips-block conditional.
-        depth = 1  # already inside the chips-block {% if %}
-        for i in range(chips_if_idx + 1, clear_idx):
-            line = lines[i]
-            depth += line.count("{% if ")
-            depth += line.count("{% for ")
-            depth -= line.count("{% endif %}")
-            depth -= line.count("{% endfor %}")
-        assert depth > 0, (
-            f"clear-all link is NOT inside the chips-block if (depth={depth})"
+        # The clear-all <button> is the last <button before the translatable
+        # text; verify its opening tag carries hx-push-url="true".
+        clear_idx = content.index("Clear all filters")
+        button_start = content.rfind("<button", 0, clear_idx)
+        button_segment = content[button_start:clear_idx]
+        assert 'hx-push-url="true"' in button_segment, (
+            'Clear all filters button must carry hx-push-url="true" in its '
+            f"opening tag, got: {button_segment!r}"
         )
+
+        # With no filters active: the chips-block conditional is False, so
+        # clear-all does not render at all.
+        response_empty = client.get(
+            "/", headers={"HX-Request": "true", "Accept-Language": "en"}
+        )
+        assert response_empty.status_code == 200
+        assert "Clear all filters" not in response_empty.content.decode("utf-8")
 
     def test_sort_dropdown_is_not_gated_on_query(
         self, seller, category, city
@@ -183,35 +173,47 @@ class TestFilterUrlReset:
         content = response.content.decode("utf-8")
         assert "<select name=\"sort\"" in content
 
-    def test_sort_block_is_right_pinned(self) -> None:
-        """The Sort block is pinned to the right edge of the filter row while
-        the filter controls remain left-aligned (same row, free space between).
+    def test_sort_block_is_right_pinned(
+        self, seller, category, city
+    ) -> None:
+        """The Sort block is pinned to the right via ``ml-auto`` on its wrapper div.
+
+        Converted from a static template-source read to a rendered-output
+        assertion: render the listings page (≥25 ads so pagination also renders)
+        and verify the sort ``<select>``'s enclosing ``<div>`` carries
+        ``ml-auto``.
 
         Guards the ``ml-auto`` utility on the Sort wrapper ``<div>``: the form
         row is a flex row (``flex flex-wrap ... items-end``), so ``ml-auto``
         consumes the free main-axis space and pushes the Sort block to the right
         edge; the label/select inside stay left-aligned.
         """
-        path = (
-            Path(__file__).resolve().parents[3]
-            / "templates/ads/partials/filter_form.html"
+        create_test_ads_bulk(
+            seller,
+            category,
+            city,
+            count=25,
+            status=AdStatus.PUBLISHED,
         )
-        content = path.read_text(encoding="utf-8")
+        client = Client()
+        response = client.get(
+            "/", headers={"HX-Request": "true", "Accept-Language": "en"}
+        )
+        assert response.status_code == 200
+        content = response.content.decode("utf-8")
+
         # The container holding the filters + sort must be a flex row so that
         # ``ml-auto`` pinning and ``items-end`` alignment apply.
         assert "flex flex-wrap gap-4 items-end" in content
+
         # Walk back from the Sort <select> to its enclosing <div> wrapper and
         # confirm it carries ``ml-auto`` (right-edge pinning).
-        lines = content.splitlines()
-        select_idx = next(
-            i for i, line in enumerate(lines) if "<select name=\"sort\"" in line
-        )
-        wrapper = next(
-            line for line in reversed(lines[:select_idx]) if "<div" in line
-        )
-        assert "ml-auto" in wrapper, (
+        select_idx = content.index('name="sort"')
+        div_start = content.rfind("<div", 0, select_idx)
+        wrapper_segment = content[div_start:select_idx]
+        assert "ml-auto" in wrapper_segment, (
             "Sort block wrapper must carry ml-auto to pin it to the right edge "
-            f"of the flex row, got: {wrapper!r}"
+            f"of the flex row, got: {wrapper_segment!r}"
         )
 
     def test_price_inputs_use_default_filter(
@@ -264,6 +266,18 @@ class TestFilterUrlReset:
 
     # ------------------------------------------------------------------ #
     # applyCityFilter URL navigation (Q2=A: city always as ?city= query param)
+    #
+    # ACCEPTED STRUCTURAL GUARDS — these tests read header_catalog.html source
+    # to assert on embedded client-side JS (applyCityFilter, autocomplete
+    # URL builder, htmx:configRequest / afterSwap hooks). The JS is rendered
+    # verbatim in every response, but the assertions target the *JS logic
+    # itself* (function bodies, URLSearchParams API calls), which has no
+    # Django-rendered-state equivalent — there is no server-side context to
+    # assert on. These are kept as static-source guards because:
+    #   - Converting to rendered output would assert the same JS strings in
+    #     the rendered <script> block — equally brittle with no behavioral gain.
+    #   - The *behavioral* outcome (city as ?city= param, lang preserved)
+    #     is already covered by the rendered tests below (lines onward).
     # ------------------------------------------------------------------ #
 
     @staticmethod
@@ -536,6 +550,28 @@ class TestFilterUrlReset:
     # ------------------------------------------------------------------ #
     # URL-state preservation (spec §2: CR-1 through CR-8)                  #
     # Static template-source assertions (no DB needed)                     #
+    #                                                                      #
+    # ACCEPTED STRUCTURAL GUARDS — these tests read template source to      #
+    # assert on Django template-tag syntax (query_replace, url, if query)   #
+    # and embedded JS (URL API, htmx hooks). They are NOT converted to      #
+    # rendered-output assertions because:                                   #
+    #   1. Template-tag syntax (e.g. ``?{% query_replace ... %}``) has no    #
+    #      rendered-state equivalent — the rendered output is a URL string, #
+    #      and the behavioral correctness of that URL is already covered by  #
+    #      the rendered tests below (test_category_links_render_with_state,  #
+    #      test_search_page_category_links_preserve_q, etc.).                #
+    #   2. Embedded JS function bodies (applyCityFilter, recomputeCategory-  #
+    #      Links, htmx hooks) are rendered verbatim; asserting the JS code   #
+    #      in rendered output is equally brittle with no gain.             #
+    # Each test below is classified:                                        #
+    #   test_category_links_preserve_lang_and_city     — GUARD (template syntax, behavioral equiv. in rendered tests)
+    #   test_no_bare_category_path_in_dropdown          — GUARD (template syntax lint)
+    #   test_breadcrumb_links_preserve_lang_and_city      — GUARD (same as above, breadcrumb.html)
+    #   test_did_you_mean_category_uses_query_replace     — GUARD (template syntax, rendered by test_category_with_city_and_lang)
+    #   test_autocomplete_category_preserves_url_params   — GUARD (JS URL API logic, no rendered-state equiv.)
+    #   test_config_request_hook_injects_lang             — GUARD (JS htmx hook, no rendered-state equiv.)
+    #   test_after_swap_recomputes_category_links         — GUARD (JS htmx hook, no rendered-state equiv.)
+    #   test_search_page_routes_category_links_to_search  — GUARD (template syntax lint across 3 files)
     # ------------------------------------------------------------------ #
 
     def test_category_links_preserve_lang_and_city(self) -> None:

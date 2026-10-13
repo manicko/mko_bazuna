@@ -261,3 +261,21 @@ class TestGalleryMarkup:
         ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
         content = _gallery_html(ad)
         assert 'src="/media/key-0-large.jpg"' in content
+
+    def test_detail_glightbox_js_absent_without_consent(
+        self, seller: User, category: Category, city: City
+    ) -> None:
+        """GLightbox JS is absent from the detail page without analytics consent.
+
+        ``consent_analytics`` gates the entire GLightbox script block in
+        ``detail.html`` (D7 / T-06b). Without consent cookies the external
+        ``glightbox.min.js`` and the inline ``GLightbox({`` init must both be
+        absent, while the gallery markup (images, anchors) remains server-rendered.
+        """
+        ad = _create_published_ad(seller, category, city, image_positions=[0, 1])
+        client = Client()  # no consent cookies — anonymous visitor
+        response = client.get(reverse("ads:detail", args=[ad.id]))
+        assert response.status_code == 200
+        content = response.content.decode()
+        assert "glightbox.min.js" not in content
+        assert "GLightbox({" not in content
