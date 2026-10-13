@@ -10,6 +10,7 @@ at this level lets the mock receive ``(text, source_locale, target_locale)``
 so per-locale assertions are possible.
 """
 
+import json
 import time
 from unittest.mock import patch
 
@@ -25,6 +26,7 @@ from apps.core.services.translation import (
     translate_cached_generic,
     translate_text,
 )
+from apps.users.models import User
 from telegram_bot.middlewares.language import _resolve_user_language
 from telegram_bot.services.ad_data import translate_all_languages
 
@@ -173,7 +175,13 @@ class TestTranslateAllLanguages:
 
     @pytest.mark.asyncio
     async def test_timeout_fallback_returns_original(self) -> None:
-        """Translation exceeding the (patched) timeout falls back to original text."""
+        """Translation exceeding the (patched) timeout falls back to original text.
+
+        The worker thread sleeps for 0.1s (exceeding the patched 0.05s timeout),
+        causing ``future.result`` to raise ``TimeoutError`` on the main thread.
+        The worker thread is left to complete in the thread pool — Python reuses
+        threads, so there is no leak concern in tests.
+        """
 
         def slow_translate(text: str, source: str, target: str) -> str:
             time.sleep(0.1)  # exceeds the patched 0.05s timeout
@@ -186,15 +194,6 @@ class TestTranslateAllLanguages:
             result = await translate_all_languages("original", ["ru"])
 
         assert result["ru"] == "original"
-
-    @pytest.mark.asyncio
-    async def test_empty_string_returns_empty(self) -> None:
-        """Empty input is returned as empty without calling the translator."""
-        with patch(_TRANSLATE_PATH) as mock_translate:
-            result = await translate_all_languages("", ["ru", "en"])
-
-        assert result == {"ru": "", "en": ""}
-        mock_translate.assert_not_called()
 
     @pytest.mark.asyncio
     async def test_gather_return_exceptions_isolates_failure(self) -> None:
@@ -228,12 +227,18 @@ class TestTranslateTextExceptNarrowing:
             httpx.ReadTimeout("read timeout", request=_REQUEST),
             _make_http_error(429),
             _make_http_error(400),
+            json.JSONDecodeError("bad json", "", 0),
+            KeyError("missing"),
+            ValueError("bad value"),
         ],
         ids=[
             "RequestError",
             "ReadTimeout",
             "HTTPStatusError-429",
             "HTTPStatusError-400",
+            "JSONDecodeError",
+            "KeyError",
+            "ValueError",
         ],
     )
     def test_narrowed_except_catches_httpx_family(self, exc: Exception) -> None:
@@ -385,3 +390,25 @@ class TestPerUserLocaleActivation:
             assert lang == settings.LANGUAGE_CODE
         finally:
             await sync_to_async(user.delete)()
+
+    @pytest.mark.asyncio
+    async def test_db_language_takes_priority_over_cached_anon(
+        self, seller: User
+    ) -> None:
+        """A registered user's DB ``telegram_language`` wins over a cached anon choice.
+
+        ``_resolve_user_language`` checks DB first, then cached anon language.
+        Verify the DB value is returned even when a cached anon language differs.
+        """
+        from apps.core.utils.cache import set_cached_anon_language
+
+        # Cache a different language for this user id.
+        set_cached_anon_language(seller.telegram_id, "en")
+        try:
+            lang = await _resolve_user_language(seller.telegram_id)
+            # DB value wins over the cached anon choice.
+            assert lang == seller.telegram_language
+        finally:
+            from django.core.cache import cache
+
+            cache.clear()

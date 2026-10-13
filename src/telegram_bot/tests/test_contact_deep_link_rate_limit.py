@@ -20,22 +20,22 @@ asserts a limiter's return value in isolation would pass vacuously against the
 unrated code path.
 
 Idiom mirrors ``test_contact_us.py``: a ``MagicMock`` message double with an
-``AsyncMock`` ``answer``, the real ``LocMemCache`` limiter, and an autouse
-``cache.clear()`` fixture. Bot tests cannot import the backend conftest, so the
-async ``seller`` / ``category`` / ``city`` fixtures from
-``src/telegram_bot/tests/conftest.py`` are used, plus the shared
-``create_test_ad`` (imported from the backend conftest via ``pythonpath``).
+``AsyncMock`` ``answer``, the real ``LocMemCache`` limiter (cache isolation
+provided by the bot conftest's autouse ``_clear_cache_between_tests`` fixture).
+Bot tests cannot import the backend conftest, so the async ``seller`` /
+``category`` / ``city`` fixtures from ``src/telegram_bot/tests/conftest.py`` are
+used, plus the shared ``create_test_ad`` (imported from the backend conftest via
+``pythonpath``).
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterator
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from asgiref.sync import sync_to_async
-from django.core.cache import DEFAULT_CACHE_ALIAS, cache, caches
+from django.core.cache import DEFAULT_CACHE_ALIAS, caches
 from django_redis.exceptions import ConnectionInterrupted
 
 from apps.ads.models import Ad
@@ -62,14 +62,6 @@ pytestmark = [
     pytest.mark.concurrent,
 ]
 pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
-
-
-@pytest.fixture(autouse=True)
-def _clear_cache() -> Iterator[None]:
-    """Clear the shared LocMemCache so rate-limit counters don't leak across tests."""
-    cache.clear()
-    yield
-    cache.clear()
 
 
 # ---------------------------------------------------------------------------

@@ -22,9 +22,7 @@ from telegram_bot.lifecycle import _BOT_COMMANDS_SETUP_TIMEOUT
 pytestmark = [
     pytest.mark.django_db(transaction=True),
     pytest.mark.integration,
-    pytest.mark.concurrent,
 ]
-pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
 # Test-only bound (seconds) for asserting the startup hook returns on its own
 # when command registration hangs. Chosen a little *above* the production
@@ -40,15 +38,19 @@ class TestOnStartup:
 
     @pytest.mark.asyncio
     async def test_startup_disabled_when_no_marker_path(self) -> None:
-        """When ``BOT_LIVENESS_FILE`` is empty, the hook is a no-op."""
+        """When ``BOT_LIVENESS_FILE`` is empty, the hook is a no-op but still
+        writes the Redis liveness marker."""
         from telegram_bot.lifecycle import _on_startup
 
+        mock_redis = AsyncMock()
         with patch("telegram_bot.lifecycle._marker_path", return_value=None):
             with patch(
                 "telegram_bot.lifecycle._write_redis_marker",
-                new=AsyncMock(),
+                new=mock_redis,
             ):
                 await _on_startup(MagicMock(), MagicMock())
+
+        mock_redis.assert_awaited_once()
 
 
     @pytest.mark.asyncio

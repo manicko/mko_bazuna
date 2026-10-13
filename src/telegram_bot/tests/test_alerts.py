@@ -17,6 +17,7 @@ from asgiref.sync import sync_to_async
 
 from apps.search.models import SavedSearch
 from apps.users.models import User
+from telegram_bot.schemas.callbacks import BotCallbackPrefix
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -60,7 +61,6 @@ class TestHandleUnsubscribeCallback:
     ) -> None:
         """An owned unsubscribe token disables the search and swaps the button."""
         from telegram_bot.handlers.alerts import handle_unsubscribe_callback
-        from telegram_bot.schemas.callbacks import BotCallbackPrefix
 
         bot = AsyncMock()
 
@@ -85,7 +85,6 @@ class TestHandleUnsubscribeCallback:
     async def test_unknown_token_alert(self, owner) -> None:
         """An unknown token triggers a failure alert."""
         from telegram_bot.handlers.alerts import handle_unsubscribe_callback
-        from telegram_bot.schemas.callbacks import BotCallbackPrefix
 
         bot = AsyncMock()
 
@@ -107,7 +106,6 @@ class TestHandleUnsubscribeCallback:
     async def test_non_owner_rejected(self, owner, stranger, saved_search) -> None:
         """A non-owner's token triggers a failure alert (no state leak)."""
         from telegram_bot.handlers.alerts import handle_unsubscribe_callback
-        from telegram_bot.schemas.callbacks import BotCallbackPrefix
 
         bot = AsyncMock()
 
