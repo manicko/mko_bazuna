@@ -22,10 +22,7 @@ from telegram_bot.services.rate_limit import (
     check_upload_rate_limit,
 )
 
-pytestmark = [
-    pytest.mark.django_db,
-    pytest.mark.integration,
-]
+pytestmark = [pytest.mark.unit]
 
 
 @pytest.fixture(autouse=True)

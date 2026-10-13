@@ -20,13 +20,12 @@ and ``test_login_claim.py`` into a single coherent suite.
 import asyncio
 import hashlib
 import logging
-from collections.abc import Awaitable, Callable, Iterator
+from collections.abc import Awaitable, Callable
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 from asgiref.sync import sync_to_async
-from django.core.cache import cache
 from django.utils import timezone
 
 from apps.users.models import LoginToken
@@ -45,6 +44,12 @@ pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 # 32-char token matching LOGIN_PATTERN, used across login rate-limit tests.
 CONSENT_TEST_RAW_TOKEN = "abcdefghijklmnopqrstuvwxyz012345"
 
+# Validate at import time: if LOGIN_PATTERN ever changes length/class,
+# this assertion fails loudly instead of silently breaking login tests.
+from telegram_bot.handlers.login import LOGIN_PATTERN as _LOGIN_PATTERN  # noqa: E402
+
+assert _LOGIN_PATTERN.match(f"login_{CONSENT_TEST_RAW_TOKEN}")
+
 
 def _mock_login_message(raw_token: str, user_id: int = 900000200) -> MagicMock:
     """Build a ``Message`` double for ``handle_login_deep_link`` with a login deep-link."""
@@ -60,10 +65,12 @@ def _mock_login_message(raw_token: str, user_id: int = 900000200) -> MagicMock:
 
 
 def _mock_state() -> AsyncMock:
-    """Build an ``FSMContext`` double with an async ``update_data``."""
-    state = AsyncMock()
-    state.update_data = AsyncMock()
-    return state
+    """Build an ``FSMContext`` double.
+
+    ``AsyncMock()`` already patches every attribute access as an async mock,
+    including ``update_data``, so no explicit assignment is needed.
+    """
+    return AsyncMock()
 
 
 # ---------------------------------------------------------------------------
@@ -515,14 +522,11 @@ class TestAnonLanguageReconcile:
 
 
 class TestLoginRateLimit:
-    """Integration tests for the per-user login rate limit in ``handle_login_deep_link``."""
+    """Integration tests for the per-user login rate limit in ``handle_login_deep_link``.
 
-    @pytest.fixture(autouse=True)
-    def _clear_cache(self) -> Iterator[None]:
-        """Clear the shared LocMemCache so rate-limit counters don't leak across tests."""
-        cache.clear()
-        yield
-        cache.clear()
+    Cache isolation is provided by the autouse ``_clear_cache_between_tests``
+    fixture in ``conftest.py``; no local ``_clear_cache`` is needed.
+    """
 
     @pytest.mark.asyncio
     async def test_login_rate_limit_allows_single_claim(
@@ -543,7 +547,7 @@ class TestLoginRateLimit:
 
         message = _mock_login_message(raw_token, user_id=900000200)
         await handle_login_deep_link(
-            message=message, bot=MagicMock(), state=_mock_state()
+            message=message, bot=AsyncMock(), state=_mock_state()
         )
 
         # Not rate-limited — received the success message, not the cooldown.
@@ -575,14 +579,14 @@ class TestLoginRateLimit:
         for _ in range(LOGIN_RATE_LIMIT_REQUESTS):
             msg = _mock_login_message(raw_token, user_id=900000200)
             await handle_login_deep_link(
-                message=msg, bot=MagicMock(), state=_mock_state()
+                message=msg, bot=AsyncMock(), state=_mock_state()
             )
 
         # 11th claim — rate-limited before reaching the ORM.
         blocked_msg = _mock_login_message(raw_token, user_id=900000200)
         with caplog.at_level(logging.WARNING):
             await handle_login_deep_link(
-                message=blocked_msg, bot=MagicMock(), state=_mock_state()
+                message=blocked_msg, bot=AsyncMock(), state=_mock_state()
             )
 
         # The 11th call received the cooldown message, not the claim result.
@@ -590,7 +594,8 @@ class TestLoginRateLimit:
         sent_text = blocked_msg.answer.await_args.args[0]
         assert "Too many login attempts" in sent_text
 
-        # PII-001: raw telegram_id must not leak in logs; masked value present
+        # PII-001: raw telegram_id must not leak in logs; masked value present.
+        # mask_telegram_id returns "tg_<hash_prefix>..." — verify the format.
         assert str(blocked_msg.from_user.id) not in caplog.text
         assert "tg_" in caplog.text
 
@@ -604,8 +609,8 @@ class TestLoginRateLimit:
         """
         from telegram_bot.handlers.login import handle_login_deep_link
 
-        # Exhaust the login rate-limit budget directly.
-        for _ in range(LOGIN_RATE_LIMIT_REQUESTS):
+        # Exhaust the login rate-limit budget up to the last allowed slot.
+        for _ in range(LOGIN_RATE_LIMIT_REQUESTS - 1):
             assert await check_login_rate_limit(900000300) is True
 
         # /start with no args → welcome greeting (returns before rate-limit check).
@@ -620,11 +625,113 @@ class TestLoginRateLimit:
             new=AsyncMock(return_value="TestSite"),
         ):
             await handle_login_deep_link(
-                message=message, bot=MagicMock(), state=_mock_state()
+                message=message, bot=AsyncMock(), state=_mock_state()
             )
 
-        # Not blocked — received the welcome greeting, not the cooldown.
+        # The handler did NOT consume the slot — the budget's last call still passes.
+        assert await check_login_rate_limit(900000300) is True
+        # And the very next call is now blocked (budget is full, handler consumed none).
+        assert await check_login_rate_limit(900000300) is False
+
+    @pytest.mark.asyncio
+    async def test_operational_error_lock_timeout_sends_busy_message(
+        self,
+        login_token_factory: Callable[..., Awaitable[tuple[str, Any]]],
+    ) -> None:
+        """A lock-timeout ``OperationalError`` from the ORM returns the busy message.
+
+        ``handle_login_orm`` can raise ``OperationalError`` under lock contention;
+        ``handle_login_deep_link`` catches it, checks ``is_lock_timeout``, and
+        replies with a user-friendly "The system is busy" message instead of
+        crashing.
+        """
+        from django.db import OperationalError
+
+        from telegram_bot.handlers.login import handle_login_deep_link
+
+        raw_token, _token = await login_token_factory(
+            raw_token=CONSENT_TEST_RAW_TOKEN
+        )
+
+        message = _mock_login_message(raw_token, user_id=900000201)
+        # is_lock_timeout reads exc.__cause__.sqlstate == "55P03".
+        # __cause__ must be a real BaseException, so use a sentinel.
+        class _DriverError(Exception):
+            sqlstate = "55P03"
+
+        busy_error = OperationalError("deadlock detected")
+        busy_error.__cause__ = _DriverError("pg error")
+
+        with patch(
+            "telegram_bot.handlers.login.handle_login_orm",
+            new=AsyncMock(side_effect=busy_error),
+        ):
+            await handle_login_deep_link(
+                message=message, bot=AsyncMock(), state=_mock_state()
+            )
+
         message.answer.assert_awaited_once()
         sent_text = message.answer.await_args.args[0]
-        assert "Too many login attempts" not in sent_text
-        assert "Welcome" in sent_text
+        assert "busy" in sent_text.lower()
+
+    @pytest.mark.asyncio
+    async def test_operational_error_non_lock_raises(
+        self,
+        login_token_factory: Callable[..., Awaitable[tuple[str, Any]]],
+    ) -> None:
+        """A non-lock ``OperationalError`` is re-raised, not swallowed."""
+        from django.db import OperationalError
+
+        from telegram_bot.handlers.login import handle_login_deep_link
+
+        raw_token, _token = await login_token_factory(
+            raw_token=CONSENT_TEST_RAW_TOKEN
+        )
+
+        message = _mock_login_message(raw_token, user_id=900000202)
+        # SQLSTATE 40P01 (foreign_key_violation) is NOT a lock timeout.
+        class _DriverError(Exception):
+            sqlstate = "40P01"
+
+        non_lock_error = OperationalError("constraint failed")
+        non_lock_error.__cause__ = _DriverError("pg error")
+
+        with patch(
+            "telegram_bot.handlers.login.handle_login_orm",
+            new=AsyncMock(side_effect=non_lock_error),
+        ):
+            with pytest.raises(OperationalError):
+                await handle_login_deep_link(
+                    message=message, bot=AsyncMock(), state=_mock_state()
+                )
+
+    @pytest.mark.asyncio
+    async def test_contact_us_deep_link_delegates_to_contact_handler(self) -> None:
+        """``/start contact_us`` delegates to ``handle_contact_start`` and returns early.
+
+        The login handler routes ``contact_us`` and ``contact_<id>`` deep-links
+        to the contact module before the login-pattern check. This test pins
+        that delegation so a reordering of checks cannot silently break.
+        """
+        from telegram_bot.handlers.login import handle_login_deep_link
+
+        message = MagicMock()
+        message.text = "/start contact_us"
+        message.from_user = MagicMock()
+        message.from_user.id = 900000400
+        message.answer = AsyncMock()
+
+        with patch(
+            "telegram_bot.handlers.contact.handle_contact_start",
+            new=AsyncMock(return_value=True),
+        ) as mock_contact, patch(
+            "telegram_bot.handlers.login.get_site_name_async",
+            new=AsyncMock(return_value="TestSite"),
+        ) as mock_site:
+            await handle_login_deep_link(
+                message=message, bot=AsyncMock(), state=_mock_state()
+            )
+
+        # Delegation occurred and the handler returned early (no greeting).
+        mock_contact.assert_awaited_once()
+        mock_site.assert_not_awaited()

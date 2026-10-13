@@ -68,3 +68,10 @@ class TestCheckLoginRateLimit:
 
         with patch.object(caches[DEFAULT_CACHE_ALIAS], "add", outage.add):
             assert await check_login_rate_limit(123) is True
+
+    @pytest.mark.asyncio
+    async def test_custom_limit_and_period(self) -> None:
+        """Custom ``limit`` and ``period`` kwargs override the defaults."""
+        for _ in range(3):
+            assert await check_login_rate_limit(999, limit=3, period=600) is True
+        assert await check_login_rate_limit(999, limit=3, period=600) is False

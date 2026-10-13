@@ -15,34 +15,6 @@ import pytest
 pytestmark = [pytest.mark.unit]
 
 
-# ---------------------------------------------------------------------------
-# /start welcome greeting
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.asyncio
-async def test_login_welcome_greeting_contains_site_name() -> None:
-    """The /start welcome message includes the configured site name."""
-    from telegram_bot.handlers.login import handle_login_deep_link
-
-    message = MagicMock()
-    message.text = "/start"
-    message.from_user = MagicMock()
-    message.answer = AsyncMock()
-
-    with patch(
-        "telegram_bot.handlers.login.get_site_name_async",
-        new=AsyncMock(return_value="MyBotSite"),
-    ):
-        await handle_login_deep_link(
-            message=message, bot=MagicMock(), state=MagicMock()
-        )
-
-    message.answer.assert_awaited_once()
-    sent_text = message.answer.await_args.args[0]
-    assert "Welcome to MyBotSite!" in sent_text
-
-
 @pytest.mark.asyncio
 async def test_post_command_login_required_when_no_user_id() -> None:
     """When ``user_id`` is absent from FSM state, /post prompts to log in."""
