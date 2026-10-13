@@ -29,7 +29,7 @@ from apps.ads.services.listings_query import (
 )
 from apps.categories.models import Category
 from apps.categories.services.fuzzy import match_category
-from apps.core.enums import AdSort, AnalyticsEventType, LanguageLocale
+from apps.core.enums import AdSort, AnalyticsEventType, LanguageLocale, RateLimitBudget
 from apps.core.services.analytics import record_event
 from apps.core.utils.rate_limit_response import rate_limited_response
 from apps.core.utils.sanitize import (
@@ -85,7 +85,7 @@ def search(request: HttpRequest) -> HttpResponse:
     Returns:
         Rendered search results page (full or HTMX partial)
     """
-    if not rate_limit_check(request, namespace="search"):
+    if not rate_limit_check(request, namespace="search", budget=RateLimitBudget.SEARCH_PAGE):
         return rate_limited_response()
 
     # Strip control characters (incl. NUL) at the input edge, trim surrounding

@@ -98,6 +98,7 @@ class TestVerifiedIndexShape:
             PopularSearch.objects.create(query="b", query_normalized="dup")
 
 
+@pytest.mark.xdist_group("popular_search_ddl")
 class TestDedupArithmetic:
     """The shipped ``0006`` forward function's merge contract (08-SRCH-003)."""
 
@@ -182,6 +183,7 @@ class TestSearchViewWithDuplicate:
         assert PopularSearch.objects.filter(query_normalized="велосипед").count() == 1
 
 
+@pytest.mark.xdist_group("popular_search_ddl")
 class TestSuggestionFloor:
     """``08-NEW-02``: the dedup floor holds on both edges."""
 

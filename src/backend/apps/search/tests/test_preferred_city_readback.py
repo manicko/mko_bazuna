@@ -24,7 +24,7 @@ from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
 from apps.users.models import User
-from conftest import create_test_ad
+from conftest import create_test_ad, create_test_ads_bulk
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
@@ -160,13 +160,13 @@ class TestListingsPreferredCityReadback:
         # Fill page 1 with Budva ads (plus a competing city) so page 2 is
         # non-empty and the city filter — not the all-ads fallthrough — decides
         # what page 2 shows. PER_PAGE is the view's constant 24.
-        budva_ids: list[int] = []
-        for _ in range(30):
-            budva_ids.append(
-                create_test_ad(seller, category, budva, status=AdStatus.PUBLISHED).id
-            )
-        for _ in range(30):
-            create_test_ad(seller, category, podgorica, status=AdStatus.PUBLISHED)
+        budva_ads = create_test_ads_bulk(
+            seller, category, budva, 30, title_prefix="Budva Ad"
+        )
+        budva_ids = [ad.id for ad in budva_ads]
+        create_test_ads_bulk(
+            seller, category, podgorica, 30, title_prefix="Podgorica Ad"
+        )
 
         client.cookies["preferred_city"] = "budva"
 

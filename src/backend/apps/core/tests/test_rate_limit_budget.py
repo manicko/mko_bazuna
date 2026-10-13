@@ -32,12 +32,13 @@ def _clear_cache() -> Generator[None]:
 class TestRateLimitBudgetTable:
     """Each limiter's numbers equal the declared ``RateLimitBudget`` member."""
 
-    def test_search_limiter_matches_its_budget(self) -> None:
-        """The search module's module-level pair is the declared budget."""
-        from apps.search.services import rate_limit
+    def test_rate_limit_check_defaults_to_autocomplete_budget(self) -> None:
+        """rate_limit_check defaults to the AUTOCOMPLETE budget."""
+        import inspect
 
-        assert rate_limit.RATE_LIMIT_REQUESTS == RateLimitBudget.SEARCH_PAGE.requests
-        assert rate_limit.RATE_LIMIT_PERIOD == RateLimitBudget.SEARCH_PAGE.period
+        from apps.search.services import rate_limit
+        sig = inspect.signature(rate_limit.rate_limit_check)
+        assert sig.parameters["budget"].default is RateLimitBudget.AUTOCOMPLETE
 
     def test_autocomplete_budget_equals_search_budget(self) -> None:
         """Autocomplete shares the search budget value but its own namespace."""

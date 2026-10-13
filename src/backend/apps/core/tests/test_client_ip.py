@@ -288,7 +288,7 @@ class TestConsumerAgreement:
     @pytest.mark.django_db
     def test_all_four_consumers_agree_on_one_key(self) -> None:
         """login, deep-link, search/autocomplete and consent recording share the IP."""
-        from apps.core.enums import ConsentChoice
+        from apps.core.enums import ConsentChoice, RateLimitBudget
         from apps.core.services.contact_rate_limit import (
             check_deep_link_render_rate_limit,
         )
@@ -309,7 +309,7 @@ class TestConsumerAgreement:
         assert login_rate_limit_check(request) is True
         assert check_deep_link_render_rate_limit(request) is True
         assert rate_limit_check(request, namespace="autocomplete") is True
-        assert rate_limit_check(request, namespace="search") is True
+        assert rate_limit_check(request, namespace="search", budget=RateLimitBudget.SEARCH_PAGE) is True
 
         expected = get_client_ip(request)
         assert expected == _SPOOF_A
