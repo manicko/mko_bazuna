@@ -262,6 +262,80 @@ class TestProcessPhotos:
         assert "too large" in answer_text.lower()
 
     @pytest.mark.asyncio
+    async def test_done_with_one_to_four_photos_advances_to_preview(
+        self, monkeypatch
+    ) -> None:
+        """'done' with 1-4 photos transitions to preview state and calls show_preview."""
+        from telegram_bot.handlers.ad_create import AdCreateForm, process_photos
+
+        state = _build_state({"photos": [{}], "user_id": _TEST_SELLER_ID})
+        state.update_data = AsyncMock()
+        state.set_state = AsyncMock()
+
+        message = _build_message(None)
+        message.text = "done"
+
+        with patch(
+            "telegram_bot.handlers.ad_create.photos.show_preview",
+            new=AsyncMock(),
+        ):
+            await process_photos(message, state)
+
+        state.set_state.assert_awaited_once_with(AdCreateForm.preview)
+
+    @pytest.mark.asyncio
+    async def test_download_failure_shows_error(self, monkeypatch) -> None:
+        """When download_photo returns None, the bot shows a download-failure message."""
+        from telegram_bot.handlers.ad_create import process_photos
+
+        monkeypatch.setattr(
+            "telegram_bot.handlers.ad_create.photos.check_upload_rate_limit",
+            AsyncMock(return_value=True),
+        )
+
+        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
+        message = _build_photo_message()
+
+        with patch(
+            "telegram_bot.handlers.ad_create.photos.download_photo",
+            new=AsyncMock(return_value=None),
+        ):
+            await process_photos(message, state)
+
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "download" in answer_text.lower()
+
+    @pytest.mark.asyncio
+    async def test_validation_failure_shows_error(self, monkeypatch) -> None:
+        """When validate_photo returns (False, error), the bot shows Invalid: {error}."""
+        from telegram_bot.handlers.ad_create import process_photos
+
+        monkeypatch.setattr(
+            "telegram_bot.handlers.ad_create.photos.check_upload_rate_limit",
+            AsyncMock(return_value=True),
+        )
+
+        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
+        message = _build_photo_message()
+
+        with (
+            patch(
+                "telegram_bot.handlers.ad_create.photos.download_photo",
+                new=AsyncMock(return_value=b"fake bytes"),
+            ),
+            patch(
+                "telegram_bot.handlers.ad_create.photos.validate_photo",
+                return_value=(False, "not a JPEG"),
+            ),
+        ):
+            await process_photos(message, state)
+
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "not a JPEG" in answer_text
+
+    @pytest.mark.asyncio
     async def test_process_photos_integration_real_jpg(
         self, monkeypatch, tmp_path
     ) -> None:
@@ -766,3 +840,15 @@ class TestDeleteDraftCrashRecovery:
                 assert (tmp_path / key).exists(), (
                     f"File {key} should still exist on disk"
                 )
+
+
+class TestGetAdStatus:
+    """Tests for _get_ad_status helper (GAP-7)."""
+
+    @pytest.mark.asyncio
+    async def test_returns_none_for_nonexistent_ad(self) -> None:
+        """A non-existent ad ID yields None, not an exception."""
+        from telegram_bot.services.ad_data import _get_ad_status
+
+        result = await _get_ad_status(999_999_999)
+        assert result is None

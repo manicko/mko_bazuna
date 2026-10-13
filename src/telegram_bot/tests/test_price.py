@@ -146,7 +146,6 @@ class TestProcessPrice:
         from telegram_bot.handlers.ad_create.price import process_price
 
         state = MagicMock()
-        state.get_data = AsyncMock(return_value={})
         state.update_data = AsyncMock()
         state.get_data = AsyncMock(
             return_value={"price_currency": CurrencyCode.EUR}

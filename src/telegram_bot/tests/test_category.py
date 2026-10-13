@@ -139,7 +139,6 @@ class TestProcessPurpose:
             new=AsyncMock(return_value=purpose),
         ):
             state = MagicMock()
-            state.get_data = AsyncMock(return_value={})
             state.update_data = AsyncMock()
             state.get_data = AsyncMock(return_value={"category_id": 42})
 
@@ -195,7 +194,6 @@ class TestProcessCondition:
             new=AsyncMock(return_value=condition),
         ):
             state = MagicMock()
-            state.get_data = AsyncMock(return_value={})
             state.update_data = AsyncMock()
             state.get_data = AsyncMock(return_value={"category_id": 42})
 
@@ -245,7 +243,6 @@ class TestProcessFeatures:
         from telegram_bot.schemas.callbacks import BotCallbackPrefix
 
         state = MagicMock()
-        state.get_data = AsyncMock(return_value={})
         state.update_data = AsyncMock()
         state.set_state = AsyncMock()
         state.get_data = AsyncMock(return_value={"feature_ids": [1, 2]})
@@ -279,7 +276,6 @@ class TestProcessFeatures:
                 return_value=MagicMock(),
             ):
                 state = MagicMock()
-                state.get_data = AsyncMock(return_value={})
                 state.update_data = AsyncMock()
                 state.get_data = AsyncMock(return_value={"feature_ids": [], "category_id": 1})
 
@@ -293,3 +289,229 @@ class TestProcessFeatures:
 
         state.update_data.assert_awaited_with(feature_ids=[5])
         callback.message.edit_reply_markup.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_feature_toggle_removes_from_selection(self) -> None:
+        """Toggling an already-selected feature removes it from the selection set."""
+        from telegram_bot.handlers.ad_create.category import process_features
+        from telegram_bot.schemas.callbacks import BotCallbackPrefix
+
+        feature = MagicMock(slug="premium")
+
+        with patch(
+            "telegram_bot.handlers.ad_create.category.get_resolved_features",
+            new=AsyncMock(return_value=[feature]),
+        ):
+            with patch(
+                "telegram_bot.handlers.ad_create.category.build_feature_keyboard",
+                return_value=MagicMock(),
+            ):
+                state = MagicMock()
+                state.update_data = AsyncMock()
+                state.get_data = AsyncMock(
+                    return_value={"feature_ids": [5], "category_id": 1}
+                )
+
+                callback = MagicMock()
+                callback.data = f"{BotCallbackPrefix.FEATURE}5"
+                callback.message = MagicMock()
+                callback.message.edit_reply_markup = AsyncMock()
+                callback.answer = AsyncMock()
+
+                await process_features(callback, state)
+
+        state.update_data.assert_awaited_with(feature_ids=[])
+
+
+class TestProcessCategorySelected:
+    """Tests for process_category_selected — purpose resolution branches."""
+
+    @pytest.mark.asyncio
+    async def test_no_purposes_falls_back_to_sell(self) -> None:
+        """When category has no purposes, 'sell' is auto-selected and proceeds."""
+        from telegram_bot.handlers.ad_create.category import process_category_selected
+
+        sell_purpose = MagicMock(id=99)
+
+        with patch(
+            "telegram_bot.handlers.ad_create.category.get_resolved_purposes",
+            new=AsyncMock(return_value=[]),
+        ), patch(
+            "telegram_bot.handlers.ad_create.category.get_lookup_item_by_slug",
+            new=AsyncMock(return_value=sell_purpose),
+        ) as mock_lookup, patch(
+            "telegram_bot.handlers.ad_create.category.proceed_to_features_or_city",
+            new=AsyncMock(),
+        ):
+            state = MagicMock()
+            state.update_data = AsyncMock()
+            category = MagicMock(id=42)
+            message = MagicMock()
+
+            await process_category_selected(message, state, category)
+
+        state.update_data.assert_awaited_with(listing_purpose_id=99)
+        assert mock_lookup.call_args.args[0] == "sell"
+
+    @pytest.mark.asyncio
+    async def test_no_purposes_and_sell_missing_shows_error(self) -> None:
+        """When no purposes and sell fallback is missing, an error is shown."""
+        from telegram_bot.handlers.ad_create.category import process_category_selected
+
+        with patch(
+            "telegram_bot.handlers.ad_create.category.get_resolved_purposes",
+            new=AsyncMock(return_value=[]),
+        ):
+            with patch(
+                "telegram_bot.handlers.ad_create.category.get_lookup_item_by_slug",
+                new=AsyncMock(return_value=None),
+            ):
+                state = MagicMock()
+                message = MagicMock()
+                message.answer = AsyncMock()
+                category = MagicMock(id=42)
+
+                await process_category_selected(message, state, category)
+
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "support" in answer_text.lower()
+
+    @pytest.mark.asyncio
+    async def test_single_purpose_auto_selects(self) -> None:
+        """When category has one purpose, it is auto-selected and proceeds."""
+        from telegram_bot.handlers.ad_create.category import process_category_selected
+
+        purpose = MagicMock(id=10, slug="sell")
+
+        with patch(
+            "telegram_bot.handlers.ad_create.category.get_resolved_purposes",
+            new=AsyncMock(return_value=[purpose]),
+        ):
+            with patch(
+                "telegram_bot.handlers.ad_create.category.proceed_to_features_or_city",
+                new=AsyncMock(),
+            ):
+                state = MagicMock()
+                state.update_data = AsyncMock()
+                category = MagicMock(id=42)
+                message = MagicMock()
+
+                await process_category_selected(message, state, category)
+
+        state.update_data.assert_awaited_with(listing_purpose_id=10)
+
+    @pytest.mark.asyncio
+    async def test_multiple_purposes_shows_keyboard(self) -> None:
+        """When category has multiple purposes, a keyboard is shown."""
+        from telegram_bot.handlers.ad_create.category import process_category_selected
+
+        purpose1 = MagicMock(id=10, slug="sell")
+        purpose2 = MagicMock(id=11, slug="buy")
+
+        with patch(
+            "telegram_bot.handlers.ad_create.category.get_resolved_purposes",
+            new=AsyncMock(return_value=[purpose1, purpose2]),
+        ):
+            with patch(
+                "telegram_bot.handlers.ad_create.category.get_default_purpose",
+                new=AsyncMock(return_value=purpose1),
+            ):
+                with patch(
+                    "telegram_bot.handlers.ad_create.category.build_purpose_keyboard",
+                    return_value=MagicMock(),
+                ):
+                    state = MagicMock()
+                    state.update_data = AsyncMock()
+                    state.set_state = AsyncMock()
+                    category = MagicMock(id=42)
+                    category.get_name.return_value = "Electronics"
+                    message = MagicMock()
+                    message.answer = AsyncMock()
+
+                    await process_category_selected(message, state, category)
+
+        state.set_state.assert_awaited_once()
+
+
+class TestShowFeaturesOrCityStep:
+    """Tests for _show_features_or_city_step — features vs city routing."""
+
+    @pytest.mark.asyncio
+    async def test_features_present_shows_keyboard(self) -> None:
+        """When non-condition features exist, the features keyboard is shown."""
+        from telegram_bot.handlers.ad_create import AdCreateForm
+        from telegram_bot.handlers.ad_create.category import _show_features_or_city_step
+
+        feature = MagicMock(slug="premium")
+
+        with patch(
+            "telegram_bot.handlers.ad_create.category.get_resolved_features",
+            new=AsyncMock(return_value=[feature]),
+        ), patch(
+            "telegram_bot.handlers.ad_create.category.build_feature_keyboard",
+            return_value=MagicMock(),
+        ):
+            state = MagicMock()
+            state.update_data = AsyncMock()
+            state.set_state = AsyncMock()
+            category = MagicMock(id=42)
+            message = MagicMock()
+            message.answer = AsyncMock()
+
+            await _show_features_or_city_step(message, state, category.id)
+
+        state.set_state.assert_awaited_once_with(AdCreateForm.features)
+        state.update_data.assert_awaited_once_with(feature_ids=[])
+        message.answer.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_only_condition_features_skips_to_city(self) -> None:
+        """When only new/used features exist, skip to city state."""
+        from telegram_bot.handlers.ad_create import AdCreateForm
+        from telegram_bot.handlers.ad_create.category import _show_features_or_city_step
+
+        new_feature = MagicMock(slug="new")
+        used_feature = MagicMock(slug="used")
+
+        with patch(
+            "telegram_bot.handlers.ad_create.category.get_resolved_features",
+            new=AsyncMock(return_value=[new_feature, used_feature]),
+        ):
+            state = MagicMock()
+            state.update_data = AsyncMock()
+            state.set_state = AsyncMock()
+            category = MagicMock(id=42)
+            message = MagicMock()
+            message.answer = AsyncMock()
+
+            await _show_features_or_city_step(message, state, category.id)
+
+        state.set_state.assert_awaited_once_with(AdCreateForm.city)
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "city" in answer_text.lower()
+
+    @pytest.mark.asyncio
+    async def test_no_features_skips_to_city(self) -> None:
+        """When no features exist, skip to city state."""
+        from telegram_bot.handlers.ad_create import AdCreateForm
+        from telegram_bot.handlers.ad_create.category import _show_features_or_city_step
+
+        with patch(
+            "telegram_bot.handlers.ad_create.category.get_resolved_features",
+            new=AsyncMock(return_value=[]),
+        ):
+            state = MagicMock()
+            state.update_data = AsyncMock()
+            state.set_state = AsyncMock()
+            category = MagicMock(id=42)
+            message = MagicMock()
+            message.answer = AsyncMock()
+
+            await _show_features_or_city_step(message, state, category.id)
+
+        state.set_state.assert_awaited_once_with(AdCreateForm.city)
+        message.answer.assert_awaited_once()
+        answer_text = message.answer.await_args[0][0]
+        assert "city" in answer_text.lower()

@@ -15,6 +15,7 @@ import pytest
 from django.utils import timezone
 
 from apps.ads.models import Ad
+from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
 
 pytestmark = [
@@ -26,7 +27,7 @@ pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
 
 @pytest.fixture
-def source_ad(seller, category, city, db):
+def source_ad(seller, category, city):
     """Create a published ad owned by ``seller``."""
     return Ad.objects.create(
         user=seller,
@@ -37,7 +38,7 @@ def source_ad(seller, category, city, db):
         price_amount=Decimal("10.00"),
         price_currency=CurrencyCode.EUR,
         published_at=timezone.now(),
-        status="published",
+        status=AdStatus.PUBLISHED,
     )
 
 

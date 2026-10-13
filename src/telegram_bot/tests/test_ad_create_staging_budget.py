@@ -22,6 +22,8 @@ from PIL import Image
 # payload value here — nothing is persisted, so the exact id is irrelevant).
 _TEST_SELLER_ID = 900000100
 
+pytestmark = [pytest.mark.unit]
+
 
 def _real_jpeg_bytes() -> bytes:
     """Return a minimal decodable JPEG so the real save path is exercised."""

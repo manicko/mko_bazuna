@@ -115,49 +115,6 @@ class TestCreateDraftAdCrashRecovery:
     recovered DRAFT rather than propagated.
     """
 
-    @pytest.mark.asyncio
-    async def test_delete_draft_rollback_preserves_db_row_and_files(
-        self, user: object
-    ) -> None:
-        """If ad.delete() raises inside transaction.atomic(), the DB row
-        survives the rollback and delete_photo is NOT called (post-commit
-        FS deletion is skipped)."""
-        from unittest.mock import patch
-
-        from apps.ads.models import Ad, AdImage
-        from telegram_bot.services.ad_data import create_draft_ad, delete_draft
-
-        ad = await create_draft_ad(user_id=user.id)  # type: ignore[arg-type]
-
-        # Attach an AdImage with storage keys so delete_draft would collect them
-        await sync_to_async(AdImage.objects.create)(
-            ad=ad,
-            image="crash-test-image.jpg",
-            thumbnail_small="crash-test-image-small.jpg",
-            thumbnail_medium="crash-test-image-medium.jpg",
-            thumbnail_large="crash-test-image-large.jpg",
-        )
-
-        # Patch Ad.delete to raise — simulates crash inside transaction.atomic()
-        with patch(
-            "apps.ads.models.Ad.delete",
-            side_effect=RuntimeError("simulated crash"),
-        ):
-            # Patch delete_photo to verify it is NOT called
-            # (post-commit FS deletion is skipped on rollback)
-            with patch("telegram_bot.services.ad_data.orm.delete_photo") as mock_delete:
-                with pytest.raises(RuntimeError, match="simulated crash"):
-                    await delete_draft(ad.id)
-
-        # DB row survived the rollback (ad.delete() was inside atomic, rolled back)
-        exists = await sync_to_async(Ad.objects.filter(id=ad.id).exists)()
-        assert exists, "Ad row should survive transaction rollback"
-
-        # delete_photo was NOT called — FS deletion only happens post-commit
-        assert mock_delete.call_count == 0, (
-            "delete_photo should not be called when ad.delete() raises "
-            "inside transaction.atomic()"
-        )
 
     @pytest.mark.asyncio
     async def test_create_draft_atomic_rollback_preserves_existing_draft(
