@@ -87,7 +87,7 @@ class TestRecipientResolution:
         with override_settings(
             SUPPORT_NOTIFICATION_RECIPIENTS=["admin@example.com"]
         ):
-            await send_support_notification_email(ticket, bot_username="bot")
+            await send_support_notification_email(ticket)
 
         assert len(mail.outbox) == 1
         assert mail.outbox[0].to == ["admin@example.com"]
@@ -100,7 +100,7 @@ class TestRecipientResolution:
         await _make_email_contact("support@example.com")
 
         with override_settings(SUPPORT_NOTIFICATION_RECIPIENTS=[]):
-            await send_support_notification_email(ticket, bot_username="bot")
+            await send_support_notification_email(ticket)
 
         assert len(mail.outbox) == 1
         assert mail.outbox[0].to == ["support@example.com"]
@@ -117,7 +117,7 @@ class TestRecipientResolution:
         )
 
         with override_settings(SUPPORT_NOTIFICATION_RECIPIENTS=[]):
-            await send_support_notification_email(ticket, bot_username="bot")
+            await send_support_notification_email(ticket)
 
         assert len(mail.outbox) == 1
         assert mail.outbox[0].to == ["support@example.com"]
@@ -134,7 +134,7 @@ class TestEmailContent:
         with override_settings(
             SUPPORT_NOTIFICATION_RECIPIENTS=["admin@example.com"]
         ):
-            await send_support_notification_email(ticket, bot_username="bot")
+            await send_support_notification_email(ticket)
 
         assert len(mail.outbox) == 1
         assert "SUP-202609-001" in mail.outbox[0].subject
@@ -152,7 +152,7 @@ class TestEmailContent:
         with override_settings(
             SUPPORT_NOTIFICATION_RECIPIENTS=["admin@example.com"]
         ):
-            await send_support_notification_email(ticket, bot_username="bot")
+            await send_support_notification_email(ticket)
 
         assert len(mail.outbox) == 1
         body = mail.outbox[0].body
@@ -171,7 +171,7 @@ class TestFailOpen:
         ticket = await _make_ticket()
 
         with override_settings(SUPPORT_NOTIFICATION_RECIPIENTS=[]):
-            await send_support_notification_email(ticket, bot_username="bot")
+            await send_support_notification_email(ticket)
 
         assert mail.outbox == []
 
@@ -188,6 +188,6 @@ class TestFailOpen:
                 side_effect=RuntimeError("SMTP down"),
             ):
                 # Must not raise despite the email backend failure.
-                await send_support_notification_email(ticket, bot_username="bot")
+                await send_support_notification_email(ticket)
 
         assert mail.outbox == []

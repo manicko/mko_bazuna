@@ -172,9 +172,7 @@ async def handle_support_message(
         await state.set_state(ContactUsState.IDLE)
         return
 
-    bot_username = await _get_bot_username(bot)
-
-    await send_support_notification_email(ticket, bot_username)
+    await send_support_notification_email(ticket)
     active_contacts = await get_support_contacts_async()
     await send_support_notification_telegram(ticket, bot, active_contacts)
 
@@ -260,17 +258,3 @@ async def _actor_may_store(chat_id: int) -> bool:
         return can_store_personal_data(user)
 
     return await _check()
-
-
-async def _get_bot_username(bot: Bot) -> str:
-    """Return the bot's Telegram username, or an empty string if unavailable.
-
-    Resolved via ``bot.get_me()``; never raises so support delivery is not
-    disrupted by a temporary API failure.
-    """
-    try:
-        me = await bot.get_me()
-        return me.username or ""
-    except Exception:
-        logger.exception("Failed to resolve bot username for support delivery")
-        return ""

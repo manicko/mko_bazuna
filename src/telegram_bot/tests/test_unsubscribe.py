@@ -9,7 +9,6 @@ Covers:
   owned token -> "disabled" message; unknown/foreign -> "invalid".
 """
 
-import inspect
 import threading
 import time
 
@@ -20,6 +19,7 @@ from django.utils import translation
 
 from apps.search.models import SavedSearch
 from apps.users.models import User
+from telegram_bot.services.alerts import resolve_reenable, resolve_unsubscribe
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -52,8 +52,6 @@ class TestResolveUnsubscribe:
 
     @pytest.mark.asyncio
     async def test_owned_search_disabled(self, owner: User) -> None:
-        from telegram_bot.handlers.alerts import resolve_unsubscribe
-
         ss = await sync_to_async(SavedSearch.objects.create)(
             user=owner, query="велосипед", is_active=True
         )
@@ -66,8 +64,6 @@ class TestResolveUnsubscribe:
 
     @pytest.mark.asyncio
     async def test_non_owner_rejected(self, owner: User, stranger: User) -> None:
-        from telegram_bot.handlers.alerts import resolve_unsubscribe
-
         ss = await sync_to_async(SavedSearch.objects.create)(
             user=owner, query="велосипед", is_active=True
         )
@@ -80,8 +76,6 @@ class TestResolveUnsubscribe:
 
     @pytest.mark.asyncio
     async def test_unknown_token_rejected(self, stranger: User) -> None:
-        from telegram_bot.handlers.alerts import resolve_unsubscribe
-
         result = await resolve_unsubscribe(
             "no_such_token_with_40_chars_xxxxxxxx", stranger.chat_id
         )
@@ -89,8 +83,6 @@ class TestResolveUnsubscribe:
 
     @pytest.mark.asyncio
     async def test_reenable_owned_search(self, owner: User) -> None:
-        from telegram_bot.handlers.alerts import resolve_reenable
-
         ss = await sync_to_async(SavedSearch.objects.create)(
             user=owner, query="велосипед", is_active=False
         )
@@ -170,40 +162,32 @@ class TestUnsubscribeDeepLink:
         handled = await handle_unsubscribe_start(FakeMessage(), None, "login_abc")
         assert handled is False
 
+    @pytest.mark.asyncio
+    async def test_none_from_user_rejected(self, owner: User) -> None:
+        """A deep-link with ``from_user = None`` is rejected (chat_id = None).
 
-class TestResolveOwnedLocking:
-    """Verify _resolve_owned uses row-level locking (03-DB-002).
-
-    These structural assertions guard against accidental removal of the
-    ``select_for_update()`` / ``transaction.atomic()`` pattern in
-    ``_resolve_owned`` — the fix for the lost-update race on ``is_active``
-    between concurrent disable/enable toggles (audit finding 03-DB-002).
-    """
-
-    def test_resolve_owned_uses_select_for_update_and_atomic(self) -> None:
-        """_resolve_owned source contains select_for_update inside atomic."""
-        from telegram_bot.services import alerts
-
-        source = inspect.getsource(alerts._resolve_owned)
-        assert "transaction.atomic" in source
-        assert "select_for_update" in source
-
-    def test_resolve_owned_fetches_inside_atomic(self) -> None:
-        """The locked fetch must appear inside the transaction.atomic() block.
-
-        Verifies the ``SELECT … FOR UPDATE`` lookup is performed within the
-        atomic block (not before it), so the row lock is held across the
-        read-check-write.
+        Production ``handle_unsubscribe_start`` guards ``from_user`` being None
+        by setting ``chat_id = None``, which causes ``resolve_unsubscribe`` to
+        return None and the "invalid link" message to be shown.
         """
-        from telegram_bot.services import alerts
+        from telegram_bot.handlers.alerts import handle_unsubscribe_start
 
-        source = inspect.getsource(alerts._resolve_owned)
-        atomic_idx = source.index("transaction.atomic")
-        sfu_idx = source.index("select_for_update")
-        assert sfu_idx > atomic_idx, (
-            "select_for_update fetch must appear inside the transaction.atomic() "
-            "block, not before it"
-        )
+        messages: list[str] = []
+
+        class FakeMessage:
+            text = "/start unsub_deadbeef"
+            from_user = None
+
+            async def answer(self, text: str) -> None:
+                messages.append(str(text))
+
+        with translation.override("ru"):
+            handled = await handle_unsubscribe_start(
+                FakeMessage(), None, "unsub_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            )
+
+        assert handled is True
+        assert any("недействительна" in m for m in messages)
 
 
 class TestResolveOwnedConcurrency:

@@ -23,9 +23,7 @@ from apps.users.models import User
 pytestmark = [
     pytest.mark.django_db(transaction=True),
     pytest.mark.integration,
-    pytest.mark.concurrent,
 ]
-pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
 
 class TestCmdLanguage:
@@ -52,7 +50,8 @@ class TestCmdLanguage:
 
     @pytest.mark.asyncio
     async def test_cmd_language_shows_keyboard(self, seller: User) -> None:
-        """When logged in, the bot shows the language keyboard."""
+        """When logged in, the bot shows the language keyboard with a checkmark
+        on the user's current language."""
         from telegram_bot.handlers.language import cmd_language
 
         state = MagicMock()
@@ -65,9 +64,17 @@ class TestCmdLanguage:
         await cmd_language(message, state)
 
         message.answer.assert_awaited_once()
-        # Verify keyboard was sent (reply_markup kwarg).
         call_kwargs = message.answer.call_args
-        assert call_kwargs.kwargs.get("reply_markup") is not None
+        reply_markup = call_kwargs.kwargs.get("reply_markup")
+        assert reply_markup is not None
+        # The current language button must carry a checkmark.
+        current_locale = seller.telegram_language
+        for row in reply_markup.inline_keyboard:
+            for btn in row:
+                if btn.callback_data.endswith(current_locale):
+                    assert btn.text.startswith("✅"), (
+                        f"current language button ({btn.text!r}) must start with ✅"
+                    )
 
 
 class TestHandleLanguageCallback:

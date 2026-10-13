@@ -151,13 +151,18 @@ def test_configure_dispatcher_accepts_redis_storage() -> None:
 
 
 def test_configure_dispatcher_registers_error_handler() -> None:
-    """configure_dispatcher registers the TelegramRetryAfter error handler (EXT-002)."""
+    """configure_dispatcher registers the transient-error handler (EXT-002)."""
     from telegram_bot.main import configure_dispatcher
+    from telegram_bot.retry import retry_transient
 
     dp = configure_dispatcher(MemoryStorage())
 
-    # The dp.errors handler for TelegramRetryAfter must be registered.
+    # The dp.errors handler for transient Telegram errors must be registered
+    # with the correct callback and exception filter.
     assert len(dp.errors.handlers) >= 1
+    handler = dp.errors.handlers[-1]
+    assert handler.callback is retry_transient
+    assert handler.filters
 
 
 def test_main_placeholder_token_raises_before_aiogram_wiring() -> None:

@@ -8,9 +8,8 @@ Covers ``send_support_notification_telegram``:
   mandated ``retry_after`` sleep;
 - the DM body carries the ticket_ref, telegram_id, username, and message text.
 
-The ``bot`` fixture is a real aiogram ``Bot`` (token from settings); its
-outbound ``send_message`` is mocked per-test with an ``AsyncMock`` so no
-Telegram network call is ever made.
+The ``bot`` is a plain ``AsyncMock`` (``_make_bot``) with a mockable
+``send_message`` so no Telegram network call is ever made.
 """
 
 from __future__ import annotations
@@ -33,8 +32,7 @@ pytestmark = [
 ]
 
 
-@pytest.fixture
-def bot() -> AsyncMock:
+def _make_bot() -> AsyncMock:
     """A fake bot exposing a mockable ``send_message``.
 
     The service only ever calls ``bot.send_message``, so a plain ``AsyncMock``
@@ -83,7 +81,7 @@ class TestDeliveryToContacts:
     """Sends to TELEGRAM contacts, skips EMAIL contacts."""
 
     @pytest.mark.asyncio
-    async def test_sends_to_every_active_telegram_contact(self, bot) -> None:
+    async def test_sends_to_every_active_telegram_contact(self) -> None:
         """Every active TELEGRAM contact receives the DM."""
         ticket = await _make_ticket()
         contact_a = await _make_contact(
@@ -93,6 +91,7 @@ class TestDeliveryToContacts:
             SupportChannelType.TELEGRAM, telegram_id=22222
         )
 
+        bot = _make_bot()
         await send_support_notification_telegram(
             ticket, bot, [contact_a, contact_b]
         )
@@ -103,7 +102,7 @@ class TestDeliveryToContacts:
         assert sent_ids == {11111, 22222}
 
     @pytest.mark.asyncio
-    async def test_skips_email_contacts(self, bot) -> None:
+    async def test_skips_email_contacts(self) -> None:
         """EMAIL-type contacts are not messaged."""
         ticket = await _make_ticket()
         telegram_contact = await _make_contact(
@@ -111,6 +110,7 @@ class TestDeliveryToContacts:
         )
         email_contact = await _make_contact(SupportChannelType.EMAIL)
 
+        bot = _make_bot()
         await send_support_notification_telegram(
             ticket, bot, [telegram_contact, email_contact]
         )
@@ -124,7 +124,7 @@ class TestPerContactIsolation:
     """One failing contact does not stop delivery to the others."""
 
     @pytest.mark.asyncio
-    async def test_failing_contact_does_not_block_others(self, bot) -> None:
+    async def test_failing_contact_does_not_block_others(self) -> None:
         """A raised send_message on the first contact is isolated."""
         ticket = await _make_ticket()
         contact_a = await _make_contact(
@@ -134,6 +134,7 @@ class TestPerContactIsolation:
             SupportChannelType.TELEGRAM, telegram_id=22222
         )
 
+        bot = _make_bot()
         async def _flaky(chat_id: int, **kwargs: object) -> None:
             if chat_id == 11111:
                 raise RuntimeError("Contact blocked the bot")
@@ -153,7 +154,7 @@ class TestRetryAfterHandling:
     """A 429 triggers one retry after the mandated sleep."""
 
     @pytest.mark.asyncio
-    async def test_retries_after_telegram_retry_after(self, bot, monkeypatch) -> None:
+    async def test_retries_after_telegram_retry_after(self, monkeypatch) -> None:
         """First send raises 429, second succeeds after retry_after sleep."""
         ticket = await _make_ticket()
         contact = await _make_contact(
@@ -172,6 +173,7 @@ class TestRetryAfterHandling:
             return None
 
         send_mock = AsyncMock(side_effect=_flaky)
+        bot = _make_bot()
         bot.send_message = send_mock
 
         # Patch asyncio.sleep so the test doesn't actually wait a second.
@@ -189,12 +191,56 @@ class TestRetryAfterHandling:
         assert send_mock.await_count == 2
         assert sleeps == [1]
 
+    @pytest.mark.asyncio
+    async def test_retry_failure_is_logged_not_raised(self, monkeypatch) -> None:
+        """When the retry after 429 also fails, the service logs and continues.
+
+        The inner ``except Exception`` at ``support_delivery_telegram.py:82-85``
+        catches the retry failure, logs it, and lets the outer loop continue
+        to the next contact. The service must never raise.
+        """
+        ticket = await _make_ticket()
+        contact_a = await _make_contact(
+            SupportChannelType.TELEGRAM, telegram_id=66666
+        )
+        contact_b = await _make_contact(
+            SupportChannelType.TELEGRAM, telegram_id=77777
+        )
+
+        async def _always_429(chat_id: int, **kwargs: object) -> None:
+            raise TelegramRetryAfter(
+                method=None, message="flood", retry_after=0
+            )
+
+        send_mock = AsyncMock(side_effect=_always_429)
+        flaky_bot = AsyncMock()
+        flaky_bot.send_message = send_mock
+
+        sleeps: list[float] = []
+        async def _fake_sleep(delay: float) -> None:
+            sleeps.append(delay)
+
+        monkeypatch.setattr(
+            "telegram_bot.services.support_delivery_telegram.asyncio.sleep",
+            _fake_sleep,
+        )
+
+        # Must not raise despite double-failure on contact_a.
+        await send_support_notification_telegram(
+            ticket, flaky_bot, [contact_a, contact_b]
+        )
+
+        # contact_a: initial 429 → retry → retry also fails (2 calls).
+        # contact_b: initial 429 → retry → retry also fails (2 calls).
+        assert send_mock.await_count == 4
+        assert sleeps == [0, 0]
+
 
 class TestMessageBody:
     """The DM body carries ticket details."""
 
     @pytest.mark.asyncio
-    async def test_body_includes_ticket_details(self, bot) -> None:
+    async def test_body_includes_ticket_details(self) -> None:
         """Body contains ticket_ref, telegram_id, username, and message text."""
         ticket = await _make_ticket(
             ticket_ref="SUP-202609-003",
@@ -207,6 +253,7 @@ class TestMessageBody:
         )
 
         send_mock = AsyncMock(return_value=None)
+        bot = _make_bot()
         bot.send_message = send_mock
 
         await send_support_notification_telegram(ticket, bot, [contact])

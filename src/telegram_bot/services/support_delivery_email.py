@@ -46,18 +46,17 @@ def _send_mail(
 
 
 async def send_support_notification_email(
-    ticket: SupportTicket, bot_username: str
+    ticket: SupportTicket,
 ) -> None:
     """Deliver a support-ticket notification to configured email recipients.
 
     Resolves recipients from ``settings.SUPPORT_NOTIFICATION_RECIPIENTS`` when
-    non-empty, otherwise falls back to active EMAIL-type support contacts. Fails
+    non-empty, otherwise falls back to active EMAIL-type ``SupportContact`` rows. Fails
     open: missing recipients or a raised ``send_mail`` error are logged, never
     propagated.
 
     Args:
         ticket: The ``SupportTicket`` that triggered the notification.
-        bot_username: The bot's username, included for context.
     """
     # 1. Resolve recipients: settings first, then EMAIL-type contacts.
     recipients = list(settings.SUPPORT_NOTIFICATION_RECIPIENTS)
