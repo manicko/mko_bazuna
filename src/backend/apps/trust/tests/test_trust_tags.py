@@ -13,14 +13,13 @@ from django.contrib.auth.models import AnonymousUser
 from django.template import Context, Template
 
 from apps.core.enums import TrustLevel
-from apps.trust.models import SellerTrustScore, SellerVerification
-from apps.users.models import User
+from apps.trust.models import SellerTrustScore
 from conftest import make_user
 
 pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
-def _render(user) -> str:
+def _render(user: object) -> str:
     """Render the template tag for the given user and return the HTML."""
     template = Template("{% load trust_tags %}{% render_trust_badge user %}")
     context = Context({"user": user, "request": None})
@@ -38,7 +37,6 @@ def trust_users():
     )
 
     verified_user = make_user(990100002)
-    SellerVerification.objects.create(user=verified_user, verified_by_admin=True)
     SellerTrustScore.objects.create(
         user=verified_user,
         trust_level=TrustLevel.VERIFIED,
@@ -77,11 +75,7 @@ class TestRenderTrustBadge:
 
     def test_no_badge_for_user_without_trust_score(self) -> None:
         """User without SellerTrustScore renders no badge."""
-        no_score_user = User.objects.create(
-            telegram_id=990100005,
-            chat_id=990100005,
-            password="x",
-        )
+        no_score_user = make_user(990100005)
         html = _render(no_score_user)
         assert html == ""
 

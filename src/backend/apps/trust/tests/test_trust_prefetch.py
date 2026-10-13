@@ -47,7 +47,16 @@ def _render(user: object) -> str:
 
 
 def _trust_queries(captured: list[dict[str, object]]) -> int:
-    return len([q for q in captured if "seller_trust_scores" in str(q["sql"])])
+    """Count SELECT queries against the ``seller_trust_scores`` table.
+
+    The filter checks both that the SQL starts with SELECT (avoiding
+    SAVEPOINT / SET CONSTRAINTS false-positives) and contains the table name.
+    """
+    return len([
+        q for q in captured
+        if str(q["sql"]).lstrip().startswith("SELECT")
+        and "seller_trust_scores" in str(q["sql"])
+    ])
 
 
 def test_prefetched_relation_issues_zero_extra_queries(seller, category, city) -> None:
@@ -104,7 +113,7 @@ def test_prefetched_absent_score_renders_no_badge(seller, category, city) -> Non
         html = _render(prefetched.user)
 
     assert html == ""
-    assert _trust_queries(ctx.captured_queries) <= 1
+    assert _trust_queries(ctx.captured_queries) == 1
 
 
 def test_unprefetched_absent_score_renders_no_badge(seller, category, city) -> None:

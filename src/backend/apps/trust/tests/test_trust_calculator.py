@@ -30,21 +30,23 @@ pytestmark = [pytest.mark.django_db, pytest.mark.integration]
 
 
 def _make_category(slug: str = "trust-test-cat") -> Category:
-    """Create a Category with sensible defaults."""
-    return Category.objects.create(
-        name="Trust Test Category",
+    """Create a Category with sensible defaults (idempotent for --reuse-db)."""
+    return Category.objects.get_or_create(
         slug=slug,
-    )
+        defaults={"name": "Trust Test Category"},
+    )[0]
 
 
 def _make_city(slug: str = "trust-test-city") -> City:
-    """Create a City with sensible defaults."""
-    return City.objects.create(
-        country_code="ME",
-        name="Trust Test City",
-        region="Trust Test Region",
+    """Create a City with sensible defaults (idempotent for --reuse-db)."""
+    return City.objects.get_or_create(
         slug=slug,
-    )
+        defaults={
+            "country_code": "ME",
+            "name": "Trust Test City",
+            "region": "Trust Test Region",
+        },
+    )[0]
 
 
 def _make_verification(
@@ -76,24 +78,15 @@ def _make_event(
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.django_db
-@pytest.mark.integration
 class TestTrustCalculator:
     """Comprehensive tests for TrustCalculator scoring algorithm."""
 
     @pytest.fixture(autouse=True)
-    def _setup_shared(self, db: None) -> None:
-        """Create shared fixtures for all test methods.
-
-        ``db`` fixture grants DB access, then we populate shared state.
-        """
+    def _setup_shared(self) -> None:
+        """Create shared fixtures for all test methods."""
         self.calculator = TrustCalculator()
         self.category = _make_category()
         self.city = _make_city()
-        self.user = make_user(990010001)
-        self.verified_user = make_user(990010002, username="verified_seller")
-        _make_verification(self.verified_user, verified_by_admin=True)
-        self.premium_user = make_user(990010003, telegram_premium=True)
 
     # ── helpers ────────────────────────────────────────────────────────
 
@@ -305,7 +298,7 @@ class TestTrustCalculator:
         # quality: (1 - 3/3) * 30 = 0
         # total = 0
         assert score.score == 0
-        assert score.rejection_rate == 100.0
+        assert float(score.rejection_rate) == 100.0
 
     def test_mixed_rejected_and_moderation_failed(self) -> None:
         """Both REJECTED and ON_MODERATION_FAILED count as rejected for quality."""
@@ -400,11 +393,7 @@ class TestTrustCalculator:
         """Score at VERIFIED_THRESHOLD (31) maps to VERIFIED."""
         user = make_user(990021001)
 
-        # Need score >= 31
-        # 5 published → activity = 25
-        # 3 published, 0 rejected → quality = 30
-        # total = 25 + 30 = 55 (well above 31)
-        # Let's be more precise: 3 published, 2 rejected (of 5 = 40% rejection)
+        # 3 published, 2 rejected (of 5 = 40% rejection)
         # quality = (1 - 2/5) * 30 = 18
         # activity = 3 * 5 = 15
         # total = 15 + 18 = 33
@@ -494,7 +483,99 @@ class TestTrustCalculator:
         assert score.trust_level == TrustLevel.PRO
         assert score.score >= 86
 
-    # ── test_response_score ────────────────────────────────────────────
+    # --- test_trust_level_boundaries ---
+
+    def test_trust_level_boundary_unverified_to_verified(self) -> None:
+        """Exact boundary: score=30 -> UNVERIFIED, score=31 -> VERIFIED."""
+        # 6 archived ads: activity=0, quality=30, response=0 -> total=30
+        user = make_user(990023001)
+        for i in range(6):
+            create_test_ad(
+                user, self.category, self.city,
+                title=f"Archived {i}", status=AdStatus.ARCHIVED,
+            )
+        score = self._score(user)
+        assert score.score == 30
+        assert score.trust_level == TrustLevel.UNVERIFIED
+
+        # score=31: 6 archived (quality=30) + 1 response out of 30 inits
+        # response = (1/30)*30 = 1.0 -> total = 31
+        for _ in range(30):
+            _make_event(None, AnalyticsEventType.CONTACT_INITIATED)
+        _make_event(None, AnalyticsEventType.CONTACT_RESPONSE, user=user)
+        score = self._score(user)
+        assert score.score == 31
+        assert score.trust_level == TrustLevel.VERIFIED
+
+    def test_trust_level_boundary_verified_to_trusted(self) -> None:
+        """Exact boundary: score=60 -> VERIFIED, score=61 -> TRUSTED."""
+        # 7 published (activity=35) + 1 rejected of 8 -> quality=26 -> total=61
+        user = make_user(990023002)
+        for i in range(7):
+            create_test_ad(
+                user, self.category, self.city,
+                title=f"Published {i}", status=AdStatus.PUBLISHED,
+            )
+        create_test_ad(
+            user, self.category, self.city,
+            title="Rejected", status=AdStatus.REJECTED,
+        )
+        score = self._score(user)
+        assert score.score == 61
+        assert score.trust_level == TrustLevel.TRUSTED
+
+        # score=60: 6 published (activity=30) + 1 rejected of 7 -> quality=25
+        # base=55, need +5 response via 30 contact inits, 5 user responses
+        user2 = make_user(990023003)
+        for i in range(6):
+            create_test_ad(
+                user2, self.category, self.city,
+                title=f"Published {i}", status=AdStatus.PUBLISHED,
+            )
+        create_test_ad(
+            user2, self.category, self.city,
+            title="Rejected", status=AdStatus.REJECTED,
+        )
+        for _ in range(30):
+            _make_event(None, AnalyticsEventType.CONTACT_INITIATED)
+        for _ in range(5):
+            _make_event(None, AnalyticsEventType.CONTACT_RESPONSE, user=user2)
+        score2 = self._score(user2)
+        assert score2.score == 60
+        assert score2.trust_level == TrustLevel.VERIFIED
+
+    def test_trust_level_boundary_trusted_to_pro(self) -> None:
+        """Exact boundary: score=85 -> TRUSTED, score=86 -> PRO."""
+        # score=85: 8 published (activity=40), 0 rejected (quality=30)
+        # base=70, response=15 via 10 inits, 5 responses: (5/10)*30=15
+        user = make_user(990023004)
+        for i in range(8):
+            create_test_ad(
+                user, self.category, self.city,
+                title=f"Published {i}", status=AdStatus.PUBLISHED,
+            )
+        for _ in range(10):
+            _make_event(None, AnalyticsEventType.CONTACT_INITIATED)
+        for _ in range(5):
+            _make_event(None, AnalyticsEventType.CONTACT_RESPONSE, user=user)
+        score = self._score(user)
+        assert score.score == 85
+        assert score.trust_level == TrustLevel.TRUSTED
+
+        # score=86: 7 published (activity=35), 0 rejected (quality=30)
+        # base=65, response=21 via 10 total inits (from score=85 case) + 7
+        # user2 responses: (7/10)*30 = 21 → total = 86
+        user2 = make_user(990023005)
+        for i in range(7):
+            create_test_ad(
+                user2, self.category, self.city,
+                title=f"Published {i}", status=AdStatus.PUBLISHED,
+            )
+        for _ in range(7):
+            _make_event(None, AnalyticsEventType.CONTACT_RESPONSE, user=user2)
+        score2 = self._score(user2)
+        assert score2.score == 86
+        assert score2.trust_level == TrustLevel.PRO
 
     def test_response_score_with_no_contacts(self) -> None:
         """Response score is 0 when there are no contact-initiated events."""
@@ -605,8 +686,6 @@ class TestTrustCalculator:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.django_db
-@pytest.mark.integration
 class TestQualityScoreTruncation:
     """Edge cases for ``int()``/``round()`` truncation in TrustCalculator scoring."""
 
@@ -669,8 +748,6 @@ class TestQualityScoreTruncation:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.django_db
-@pytest.mark.integration
 class TestTrustLevelFloor:
     """Verify the VERIFIED floor at exactly score=0 (admin / Telegram Premium)."""
 
