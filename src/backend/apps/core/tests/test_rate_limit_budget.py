@@ -36,8 +36,8 @@ class TestRateLimitBudgetTable:
         """The search module's module-level pair is the declared budget."""
         from apps.search.services import rate_limit
 
-        assert rate_limit.RATE_LIMIT_REQUESTS == RateLimitBudget.AUTOCOMPLETE.requests
-        assert rate_limit.RATE_LIMIT_PERIOD == RateLimitBudget.AUTOCOMPLETE.period
+        assert rate_limit.RATE_LIMIT_REQUESTS == RateLimitBudget.SEARCH_PAGE.requests
+        assert rate_limit.RATE_LIMIT_PERIOD == RateLimitBudget.SEARCH_PAGE.period
 
     def test_autocomplete_budget_equals_search_budget(self) -> None:
         """Autocomplete shares the search budget value but its own namespace."""

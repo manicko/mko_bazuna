@@ -19,10 +19,10 @@ from apps.core.utils.client_ip import get_client_ip
 logger = logging.getLogger(__name__)
 
 # Maximum number of requests per IP within the time window (08-SRCH-010).
-RATE_LIMIT_REQUESTS: int = RateLimitBudget.AUTOCOMPLETE.requests
+RATE_LIMIT_REQUESTS: int = RateLimitBudget.SEARCH_PAGE.requests
 
 # Time window in seconds.
-RATE_LIMIT_PERIOD: int = RateLimitBudget.AUTOCOMPLETE.period
+RATE_LIMIT_PERIOD: int = RateLimitBudget.SEARCH_PAGE.period
 
 # Cache key pattern — {namespace} and {ip} are replaced with the rate-limit
 # namespace and the client's IP address respectively.
