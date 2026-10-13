@@ -328,6 +328,41 @@ class TestSellerTrustDashboardView:
         assert "Total Views (30d)" in html
         assert "Total Contacts (30d)" in html
 
+    def test_unverified_trust_band_renders_for_rejected_seller(
+        self, seller, category, city
+    ) -> None:
+        """Seller whose score falls below VERIFIED_THRESHOLD renders UNVERIFIED.
+
+        The autouse ``dashboard_seller`` fixture gives the seller 1 published ad
+        (score contribution +10, total so far 60). Adding 3 rejected ads
+        (-30) brings the total to 50 + 10 - 30 = 30, below the VERIFIED threshold
+        of 31, so the trust level resolves to UNVERIFIED.
+
+        Verifies both the context value and the rendered HTML badge.
+        """
+        from django.test import Client
+
+        for i in range(3):
+            create_test_ad(
+                seller,
+                category,
+                city,
+                title=f"Rejected Ad {i}",
+                status=AdStatus.REJECTED,
+            )
+
+        client = Client()
+        client.force_login(seller)
+        response = client.get(reverse("analytics:seller_trust_dashboard"))
+
+        # Score: 50 (base) + 10 (1 published) - 30 (3 rejected) = 30.0
+        assert response.context["trust_score"] == 30.0
+        assert response.context["trust_level"] == TrustLevel.UNVERIFIED
+
+        # HTML renders the UNVERIFIED label
+        html = response.content.decode()
+        assert "Unverified" in html
+
 
 # ---------------------------------------------------------------------------
 # Tests: ModerationAnalytics View

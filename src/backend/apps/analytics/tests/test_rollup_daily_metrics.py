@@ -68,7 +68,12 @@ def rollup_data(seller, category, city):
     - seller1 (passed as ``seller`` fixture) has 2 ads with events.
     - seller2 has 1 ad with no events (noise).
     - Today events and non-target event types are noise.
+
+    A fixed ``fixed_date`` (yesterday) is computed once and passed to all
+    ``_make_event`` calls so the fixture and the rollup command share the
+    same reference date even when the test crosses midnight.
     """
+    fixed_date = timezone.now().date() - timedelta(days=1)
     seller1 = seller
     seller2 = make_user(telegram_id=990050102)
 
@@ -87,15 +92,21 @@ def rollup_data(seller, category, city):
     )
 
     # Events for ad1: 3 views, 2 contacts
-    _make_event(ad1, AnalyticsEventType.AD_VIEWED, hours_ago=10)
-    _make_event(ad1, AnalyticsEventType.AD_VIEWED, hours_ago=8)
-    _make_event(ad1, AnalyticsEventType.AD_VIEWED, hours_ago=6)
-    _make_event(ad1, AnalyticsEventType.CONTACT_INITIATED, hours_ago=4)
-    _make_event(ad1, AnalyticsEventType.CONTACT_COMPLETED, hours_ago=2)
+    _make_event(ad1, AnalyticsEventType.AD_VIEWED, hours_ago=10, date=fixed_date)
+    _make_event(ad1, AnalyticsEventType.AD_VIEWED, hours_ago=8, date=fixed_date)
+    _make_event(ad1, AnalyticsEventType.AD_VIEWED, hours_ago=6, date=fixed_date)
+    _make_event(
+        ad1, AnalyticsEventType.CONTACT_INITIATED, hours_ago=4, date=fixed_date
+    )
+    _make_event(
+        ad1, AnalyticsEventType.CONTACT_COMPLETED, hours_ago=2, date=fixed_date
+    )
 
     # Events for ad2: 1 view, 1 contact
-    _make_event(ad2, AnalyticsEventType.AD_VIEWED, hours_ago=9)
-    _make_event(ad2, AnalyticsEventType.CONTACT_INITIATED, hours_ago=3)
+    _make_event(ad2, AnalyticsEventType.AD_VIEWED, hours_ago=9, date=fixed_date)
+    _make_event(
+        ad2, AnalyticsEventType.CONTACT_INITIATED, hours_ago=3, date=fixed_date
+    )
 
     # Ad3 has no events
 
@@ -111,9 +122,18 @@ def rollup_data(seller, category, city):
     )
 
     # Noise: non-target event type for ad1
-    _make_event(ad1, AnalyticsEventType.DASHBOARD_VIEWED, hours_ago=5)
+    _make_event(
+        ad1, AnalyticsEventType.DASHBOARD_VIEWED, hours_ago=5, date=fixed_date
+    )
 
-    return {"seller1": seller1, "seller2": seller2, "ad1": ad1, "ad2": ad2, "ad3": ad3}
+    return {
+        "seller1": seller1,
+        "seller2": seller2,
+        "ad1": ad1,
+        "ad2": ad2,
+        "ad3": ad3,
+        "fixed_date": fixed_date,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -154,61 +174,58 @@ class TestRollupDailyMetricsAggregation:
         """Command aggregates views and contacts correctly per ad."""
         ad1 = rollup_data["ad1"]
         ad2 = rollup_data["ad2"]
+        fixed_date = rollup_data["fixed_date"]
 
-        call_command("rollup_daily_metrics")
-
-        yesterday = timezone.now().date() - timedelta(days=1)
+        call_command("rollup_daily_metrics", f"--date={fixed_date.isoformat()}")
 
         # Ad1 should have 3 views and 2 contacts
-        metrics_ad1 = DailyAdMetrics.objects.get(ad=ad1, date=yesterday)
+        metrics_ad1 = DailyAdMetrics.objects.get(ad=ad1, date=fixed_date)
         assert metrics_ad1.views_count == 3
         assert metrics_ad1.contacts_count == 2
 
         # Ad2 should have 1 view and 1 contact
-        metrics_ad2 = DailyAdMetrics.objects.get(ad=ad2, date=yesterday)
+        metrics_ad2 = DailyAdMetrics.objects.get(ad=ad2, date=fixed_date)
         assert metrics_ad2.views_count == 1
         assert metrics_ad2.contacts_count == 1
 
     def test_skips_ads_without_events(self, rollup_data) -> None:
         """Ads with no analytics events do not get a DailyAdMetrics record."""
         ad3 = rollup_data["ad3"]
+        fixed_date = rollup_data["fixed_date"]
 
-        call_command("rollup_daily_metrics")
-
-        yesterday = timezone.now().date() - timedelta(days=1)
+        call_command("rollup_daily_metrics", f"--date={fixed_date.isoformat()}")
 
         with pytest.raises(DailyAdMetrics.DoesNotExist):
-            DailyAdMetrics.objects.get(ad=ad3, date=yesterday)
+            DailyAdMetrics.objects.get(ad=ad3, date=fixed_date)
 
     def test_excludes_today_events(self, rollup_data) -> None:
         """Events from today are not included in yesterday's rollup."""
         ad1 = rollup_data["ad1"]
+        fixed_date = rollup_data["fixed_date"]
 
-        call_command("rollup_daily_metrics")
+        call_command("rollup_daily_metrics", f"--date={fixed_date.isoformat()}")
 
-        yesterday = timezone.now().date() - timedelta(days=1)
-
-        metrics_ad1 = DailyAdMetrics.objects.get(ad=ad1, date=yesterday)
+        metrics_ad1 = DailyAdMetrics.objects.get(ad=ad1, date=fixed_date)
         assert metrics_ad1.views_count == 3
 
     def test_excludes_non_target_event_types(self, rollup_data) -> None:
         """Events with non-target types (e.g. DASHBOARD_VIEWED) are excluded."""
         ad1 = rollup_data["ad1"]
+        fixed_date = rollup_data["fixed_date"]
 
-        call_command("rollup_daily_metrics")
+        call_command("rollup_daily_metrics", f"--date={fixed_date.isoformat()}")
 
-        yesterday = timezone.now().date() - timedelta(days=1)
-        metrics_ad1 = DailyAdMetrics.objects.get(ad=ad1, date=yesterday)
+        metrics_ad1 = DailyAdMetrics.objects.get(ad=ad1, date=fixed_date)
         assert metrics_ad1.views_count == 3
 
     def test_trust_score_and_avg_response_time_remain_null(self, rollup_data) -> None:
         """Command only sets views_count/contacts_count; other fields stay null."""
         ad1 = rollup_data["ad1"]
+        fixed_date = rollup_data["fixed_date"]
 
-        call_command("rollup_daily_metrics")
+        call_command("rollup_daily_metrics", f"--date={fixed_date.isoformat()}")
 
-        yesterday = timezone.now().date() - timedelta(days=1)
-        metrics = DailyAdMetrics.objects.get(ad=ad1, date=yesterday)
+        metrics = DailyAdMetrics.objects.get(ad=ad1, date=fixed_date)
         assert metrics.trust_score is None
         assert metrics.avg_response_time is None
 
@@ -216,12 +233,11 @@ class TestRollupDailyMetricsAggregation:
         """Two ads with events produce two DailyAdMetrics records."""
         ad1 = rollup_data["ad1"]
         ad2 = rollup_data["ad2"]
+        fixed_date = rollup_data["fixed_date"]
 
-        call_command("rollup_daily_metrics")
+        call_command("rollup_daily_metrics", f"--date={fixed_date.isoformat()}")
 
-        yesterday = timezone.now().date() - timedelta(days=1)
-
-        records = DailyAdMetrics.objects.filter(date=yesterday)
+        records = DailyAdMetrics.objects.filter(date=fixed_date)
         assert records.count() == 2
 
         ad_ids = {r.ad_id for r in records}
@@ -257,11 +273,11 @@ class TestRollupDailyMetricsLock:
     def test_runs_under_advisory_lock(self, rollup_data) -> None:
         """Command runs successfully with advisory lock acquisition."""
         ad1 = rollup_data["ad1"]
+        fixed_date = rollup_data["fixed_date"]
 
-        call_command("rollup_daily_metrics")
+        call_command("rollup_daily_metrics", f"--date={fixed_date.isoformat()}")
 
-        yesterday = timezone.now().date() - timedelta(days=1)
-        metrics = DailyAdMetrics.objects.get(ad=ad1, date=yesterday)
+        metrics = DailyAdMetrics.objects.get(ad=ad1, date=fixed_date)
         assert metrics.views_count == 3
 
     @pytest.mark.django_db(transaction=True)
@@ -274,13 +290,16 @@ class TestRollupDailyMetricsLock:
         complete without deadlock.
         """
         ad1 = rollup_data["ad1"]
+        fixed_date = rollup_data["fixed_date"]
         errors: list[BaseException] = []
         barrier = threading.Barrier(2, timeout=30)
 
         def _run() -> None:
             try:
                 barrier.wait()
-                call_command("rollup_daily_metrics")
+                call_command(
+                    "rollup_daily_metrics", f"--date={fixed_date.isoformat()}"
+                )
             except Exception as exc:
                 errors.append(exc)
 
@@ -293,8 +312,7 @@ class TestRollupDailyMetricsLock:
 
         assert not errors
 
-        yesterday = timezone.now().date() - timedelta(days=1)
-        metrics = DailyAdMetrics.objects.get(ad=ad1, date=yesterday)
+        metrics = DailyAdMetrics.objects.get(ad=ad1, date=fixed_date)
         assert metrics.views_count == 3
 
 
@@ -331,27 +349,28 @@ class TestRollupDailyMetricsIdempotency:
     def test_runs_produce_same_metrics(self, rollup_data) -> None:
         """Running the command twice yields identical DailyAdMetrics records."""
         ad1 = rollup_data["ad1"]
+        fixed_date = rollup_data["fixed_date"]
 
         # First run
-        call_command("rollup_daily_metrics")
-        yesterday = timezone.now().date() - timedelta(days=1)
-        metrics_first = DailyAdMetrics.objects.get(ad=ad1, date=yesterday)
+        call_command("rollup_daily_metrics", f"--date={fixed_date.isoformat()}")
+        metrics_first = DailyAdMetrics.objects.get(ad=ad1, date=fixed_date)
 
         # Second run
-        call_command("rollup_daily_metrics")
-        metrics_second = DailyAdMetrics.objects.get(ad=ad1, date=yesterday)
+        call_command("rollup_daily_metrics", f"--date={fixed_date.isoformat()}")
+        metrics_second = DailyAdMetrics.objects.get(ad=ad1, date=fixed_date)
 
         assert metrics_first.views_count == metrics_second.views_count
         assert metrics_first.contacts_count == metrics_second.contacts_count
 
     def test_idempotent_does_not_create_duplicate_records(self, rollup_data) -> None:
         """Running the command twice does not create duplicate DailyAdMetrics."""
-        call_command("rollup_daily_metrics")
-        call_command("rollup_daily_metrics")
+        fixed_date = rollup_data["fixed_date"]
+        date_arg = f"--date={fixed_date.isoformat()}"
 
-        yesterday = timezone.now().date() - timedelta(days=1)
+        call_command("rollup_daily_metrics", date_arg)
+        call_command("rollup_daily_metrics", date_arg)
 
-        records = DailyAdMetrics.objects.filter(date=yesterday)
+        records = DailyAdMetrics.objects.filter(date=fixed_date)
         assert records.count() == 2
 
 
@@ -371,19 +390,19 @@ class TestRollupDailyMetricsBulkUpsert:
     def test_second_run_updates_existing_row_in_place(self, rollup_data) -> None:
         """A stale pre-existing row is overwritten in place, not duplicated."""
         ad1 = rollup_data["ad1"]
-        yesterday = timezone.now().date() - timedelta(days=1)
+        fixed_date = rollup_data["fixed_date"]
 
         # Pre-seed a stale row for ad1 with wrong counts.
         DailyAdMetrics.objects.create(
             ad=ad1,
-            date=yesterday,
+            date=fixed_date,
             views_count=99,
             contacts_count=99,
         )
 
-        call_command("rollup_daily_metrics")
+        call_command("rollup_daily_metrics", f"--date={fixed_date.isoformat()}")
 
-        rows = DailyAdMetrics.objects.filter(ad=ad1, date=yesterday)
+        rows = DailyAdMetrics.objects.filter(ad=ad1, date=fixed_date)
         assert rows.count() == 1, "upsert must update in place, not duplicate"
         metrics = rows.get()
         assert metrics.views_count == 3
@@ -392,29 +411,31 @@ class TestRollupDailyMetricsBulkUpsert:
     def test_rerun_overwrites_changed_aggregate(self, rollup_data) -> None:
         """A subsequent run reflects the new aggregate over the same ad+date."""
         ad1 = rollup_data["ad1"]
-        yesterday = timezone.now().date() - timedelta(days=1)
+        fixed_date = rollup_data["fixed_date"]
 
-        call_command("rollup_daily_metrics")
-        first = DailyAdMetrics.objects.get(ad=ad1, date=yesterday)
+        call_command("rollup_daily_metrics", f"--date={fixed_date.isoformat()}")
+        first = DailyAdMetrics.objects.get(ad=ad1, date=fixed_date)
         assert first.views_count == 3
 
         # A new view event for the same ad and target date.
-        _make_event(ad1, AnalyticsEventType.AD_VIEWED, hours_ago=7)
+        _make_event(
+            ad1, AnalyticsEventType.AD_VIEWED, hours_ago=7, date=fixed_date
+        )
 
-        call_command("rollup_daily_metrics")
+        call_command("rollup_daily_metrics", f"--date={fixed_date.isoformat()}")
 
-        rows = DailyAdMetrics.objects.filter(ad=ad1, date=yesterday)
+        rows = DailyAdMetrics.objects.filter(ad=ad1, date=fixed_date)
         assert rows.count() == 1
         assert rows.get().views_count == 4
 
     def test_created_row_carries_timestamps(self, rollup_data) -> None:
         """``bulk_create`` bypasses ``auto_now``; the command sets both stamps."""
         ad1 = rollup_data["ad1"]
-        yesterday = timezone.now().date() - timedelta(days=1)
+        fixed_date = rollup_data["fixed_date"]
 
-        call_command("rollup_daily_metrics")
+        call_command("rollup_daily_metrics", f"--date={fixed_date.isoformat()}")
 
-        metrics = DailyAdMetrics.objects.get(ad=ad1, date=yesterday)
+        metrics = DailyAdMetrics.objects.get(ad=ad1, date=fixed_date)
         assert metrics.created_at is not None
         assert metrics.updated_at is not None
 
@@ -440,46 +461,61 @@ class TestRollupDailyMetricsSeedExclusion:
         - 2 production AD_VIEWED, 1 production CONTACT_INITIATED,
           1 production CONTACT_COMPLETED
         - 2 seed AD_VIEWED, 1 seed CONTACT_INITIATED, 1 seed CONTACT_COMPLETED
+
+        A fixed ``fixed_date`` (yesterday) is computed once and passed to all
+        ``_make_event`` calls so the fixture and the rollup command share the
+        same reference date even when the test crosses midnight.
         """
+        fixed_date = timezone.now().date() - timedelta(days=1)
         ad = create_test_ad(
             seller, category, city, title="Seed Exclusion Ad", status=AdStatus.PUBLISHED
         )
 
         # Production events (source=None = production)
-        _make_event(ad, AnalyticsEventType.AD_VIEWED, hours_ago=10)
-        _make_event(ad, AnalyticsEventType.AD_VIEWED, hours_ago=8)
-        _make_event(ad, AnalyticsEventType.CONTACT_INITIATED, hours_ago=6)
-        _make_event(ad, AnalyticsEventType.CONTACT_COMPLETED, hours_ago=4)
+        _make_event(ad, AnalyticsEventType.AD_VIEWED, hours_ago=10, date=fixed_date)
+        _make_event(ad, AnalyticsEventType.AD_VIEWED, hours_ago=8, date=fixed_date)
+        _make_event(
+            ad, AnalyticsEventType.CONTACT_INITIATED, hours_ago=6, date=fixed_date
+        )
+        _make_event(
+            ad, AnalyticsEventType.CONTACT_COMPLETED, hours_ago=4, date=fixed_date
+        )
 
         # Seed-source events (source=AdSource.SEED) — should be excluded after _clean
-        _make_event(ad, AnalyticsEventType.AD_VIEWED, hours_ago=5, source=AdSource.SEED)
-        _make_event(ad, AnalyticsEventType.AD_VIEWED, hours_ago=3, source=AdSource.SEED)
+        _make_event(
+            ad, AnalyticsEventType.AD_VIEWED, hours_ago=5, source=AdSource.SEED, date=fixed_date
+        )
+        _make_event(
+            ad, AnalyticsEventType.AD_VIEWED, hours_ago=3, source=AdSource.SEED, date=fixed_date
+        )
         _make_event(
             ad,
             AnalyticsEventType.CONTACT_INITIATED,
             hours_ago=4,
             source=AdSource.SEED,
+            date=fixed_date,
         )
         _make_event(
             ad,
             AnalyticsEventType.CONTACT_COMPLETED,
             hours_ago=2,
             source=AdSource.SEED,
+            date=fixed_date,
         )
 
-        return {"ad": ad}
+        return {"ad": ad, "fixed_date": fixed_date}
 
     def test_seed_events_excluded_after_clean(self, seed_exclusion_data) -> None:
         """After ``_clean`` removes seed events, rollup counts production only."""
         ad = seed_exclusion_data["ad"]
+        fixed_date = seed_exclusion_data["fixed_date"]
 
         # Simulate SeedService._clean() purging seed-source events
         AnalyticsEvent.objects.filter(source=AdSource.SEED).delete()
 
-        call_command("rollup_daily_metrics")
+        call_command("rollup_daily_metrics", f"--date={fixed_date.isoformat()}")
 
-        yesterday = timezone.now().date() - timedelta(days=1)
-        metrics = DailyAdMetrics.objects.get(ad=ad, date=yesterday)
+        metrics = DailyAdMetrics.objects.get(ad=ad, date=fixed_date)
         assert metrics.views_count == 2
         assert metrics.contacts_count == 2
 
@@ -491,10 +527,10 @@ class TestRollupDailyMetricsSeedExclusion:
         mechanism.
         """
         ad = seed_exclusion_data["ad"]
+        fixed_date = seed_exclusion_data["fixed_date"]
 
-        call_command("rollup_daily_metrics")
+        call_command("rollup_daily_metrics", f"--date={fixed_date.isoformat()}")
 
-        yesterday = timezone.now().date() - timedelta(days=1)
-        metrics = DailyAdMetrics.objects.get(ad=ad, date=yesterday)
+        metrics = DailyAdMetrics.objects.get(ad=ad, date=fixed_date)
         assert metrics.views_count == 4
         assert metrics.contacts_count == 4
