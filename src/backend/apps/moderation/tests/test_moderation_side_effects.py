@@ -157,6 +157,7 @@ class TestApproveAdPriority:
         assert priority.ad_id == ad.id
 
 
+@pytest.mark.xdist_group("concurrent")
 class TestCriteriaCacheInvalidation:
     """Verify the post_save signal clears the moderation_criteria cache."""
 
