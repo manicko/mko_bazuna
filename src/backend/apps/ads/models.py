@@ -708,7 +708,17 @@ class AdImage(models.Model):
         return f"AdImage {self.id} for Ad {self.ad_id}"
 
     def save(self, *args, **kwargs) -> None:
-        """Auto-compute SHA-256 on creation if the underlying file exists.
+        """Auto-compute SHA-256 from the on-disk file when ``sha256`` is unset.
+
+        On insert, if ``sha256`` is not already set and the underlying file
+        exists on disk, populate it via ``FileHashService``.  On update, skip
+        the file-based recomputation when ``sha256`` is already populated.
+
+        This fallback exists for callers that use ``AdImage.objects.create()``
+        directly without pre-computing the digest (e.g. in tests or admin
+        tooling).  The primary upload path — ``AdImageService.create_or_skip()``
+        — always supplies a pre-computed ``sha256``, so the recomputation is
+        skipped on the service path.
 
         Deduplication is intentionally **not** performed here — use
         ``AdImageService.create_or_skip()`` for bot-uploaded photos so that
@@ -719,7 +729,7 @@ class AdImage(models.Model):
 
         assert_storage_key_contained(self.image)
 
-        if self._state.adding or not self.sha256:
+        if not self.sha256:
             media_root = settings.MEDIA_ROOT
             if isinstance(media_root, str):
                 file_path = os.path.join(media_root, self.image)

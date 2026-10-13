@@ -1,8 +1,11 @@
 """
 Ad image service — creation with SHA-256 hashing and per-ad deduplication.
 
-Extracted from ``AdImage.save()`` (QLT-012) so the model no longer performs
-file I/O or silently skips saves for duplicate uploads.
+Extracted from ``AdImage.save()`` (QLT-012) so the *service* path computes the
+SHA-256 digest before ``create()``, letting ``save()`` skip the redundant file
+I/O it would otherwise perform as a fallback on insert when ``sha256`` is empty.
+The model still retains that fallback for direct ``AdImage.objects.create()``
+calls that do not pass a pre-computed ``sha256`` (e.g. tests or admin tooling).
 """
 
 import logging
