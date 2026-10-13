@@ -160,7 +160,8 @@ class TestIssueToken:
 
         issued = issue_token()
         assert len(issued.raw_token) == RAW_TOKEN_ENTROPY_BYTES * 4 // 3
-        assert len(issued.token_hash) == 64
+        # SHA-256 hex digest is always 64 chars.
+        assert len(issued.token_hash) == len(hashlib.sha256(b"").hexdigest())
         # The stored value is the hash, never the raw token.
         stored = LoginToken.objects.get(token_hash=issued.token_hash)
         assert stored.token_hash != issued.raw_token

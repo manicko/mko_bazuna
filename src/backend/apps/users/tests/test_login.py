@@ -75,6 +75,7 @@ class TestLoginIssue:
         remaining = token.expires_at - timezone.now()
         assert 240 <= remaining.total_seconds() <= 300
 
+    @override_settings(RATE_LIMITING_ENABLED=True)
     def test_login_issue_returns_429_on_rate_limit(self) -> None:
         """Exceeding 10 requests/minute from the same IP returns 429."""
         client = Client()

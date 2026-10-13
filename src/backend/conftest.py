@@ -14,6 +14,7 @@ satisfying the strict database check constraints (e.g.
 
 from __future__ import annotations
 
+import datetime
 import hashlib
 import tempfile
 from collections.abc import Generator
@@ -333,6 +334,7 @@ def make_user(
     *,
     is_staff: bool = False,
     consent_revoked: bool = False,
+    consent_given_at: datetime.datetime | None = None,
     **overrides: object,
 ) -> User:
     """Create a ``User`` with sensible defaults for tests.
@@ -342,7 +344,14 @@ def make_user(
     mirrors ``telegram_id``, ``password`` defaults to ``"x"``, and
     ``username`` to ``None``. Pass ``is_staff=True`` to elevate to a staff
     user, ``consent_revoked=True`` to set ``consent_revoked_at`` to the
-    current time, or supply additional fields via ``**overrides``.
+    current time, ``consent_given_at=<datetime>`` to set the consent
+    timestamp (or ``None`` to leave it unset), or supply additional fields
+    via ``**overrides``.
+
+    ``consent_given_at`` is applied via post-creation assignment (mirroring
+    the ``user`` fixture's ``--reuse-db`` safety pattern): the row is created
+    first, then the field is set and saved with ``update_fields`` so the
+    value is always applied regardless of database state.
     """
     defaults: dict[str, Any] = {
         "telegram_id": telegram_id,
@@ -353,7 +362,10 @@ def make_user(
     if consent_revoked:
         defaults["consent_revoked_at"] = timezone.now()
     defaults.update(overrides)
-    user = User.objects.create(**defaults)  # type: ignore[arg-type]
+    user = User.objects.create(**defaults)
+    if consent_given_at is not None:
+        user.consent_given_at = consent_given_at
+        user.save(update_fields=["consent_given_at"])
     if is_staff:
         user.is_staff = True
         user.save(update_fields=["is_staff"])

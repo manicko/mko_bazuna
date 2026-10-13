@@ -410,6 +410,7 @@ class TestGiveConsent:
 
     def test_give_consent_does_not_alter_other_flags(self, user: User):
         """give_consent only sets consent_given_at; other flags remain unchanged."""
+        original_username = user.username
         give_consent(user)
 
         user.refresh_from_db()
@@ -419,7 +420,7 @@ class TestGiveConsent:
         assert user.ads_auto_publish is True
         assert user.consent_revoked_at is None
         assert user.telegram_id is not None
-        assert user.username is None  # default for test fixture
+        assert user.username == original_username
 
     def test_give_consent_after_decline_restores_publishing(self, user: User):
         """give_consent after decline_consent clears decline state (D6)."""
