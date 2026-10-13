@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 
 import pytest
+from _compose_helpers import _service_block
 
 pytestmark = [pytest.mark.unit]
 # Resolve repository root by searching upward for pyproject.toml.
@@ -44,37 +45,6 @@ _HARDENING_KEYS = [
     "mem_limit:",
     "cpus:",
 ]
-
-
-# NOTE: This `_service_block` helper is intentionally duplicated in
-# test_deploy_workflow.py. Keep both copies in sync — see the comment there.
-def _service_block(compose_path: Path, service_name: str) -> str:
-    """Extract a service's YAML block from a compose file.
-
-    Services are 2-space-indented keys under ``services:``.  The block
-    extends until the next 2-space service definition or a 0-indent
-    top-level key (e.g. ``volumes:``).
-    """
-    text = compose_path.read_text()
-    pattern = rf"^  {re.escape(service_name)}:\s*$"
-    lines = text.split("\n")
-    start = None
-    for i, line in enumerate(lines):
-        if re.match(pattern, line):
-            start = i
-            break
-    if start is None:
-        return ""
-    block: list[str] = [lines[start]]
-    for line in lines[start + 1 :]:
-        # Stop at a 0-indented top-level key (not a comment or empty line).
-        if line and not line.startswith(" "):
-            break
-        # Stop at the next sibling service (exactly 2-space indent).
-        if re.match(r"^  [A-Za-z_][A-Za-z0-9_]*:\s*$", line):
-            break
-        block.append(line)
-    return "\n".join(block)
 
 
 # --- web ------------------------------------------------------------------
@@ -303,6 +273,27 @@ def test_compose_oneshot_flags() -> None:
 # --- image-tag reproducibility (09-API-016) --------------------------------
 
 
+def _app_service_count_with_image_tag() -> int:
+    """Count prod services whose ``image`` uses ``${IMAGE_TAG:?...}``.
+
+    Parses ``docker-compose.prod.yml`` with ruamel.yaml to count the services
+    that pin the application image via ``IMAGE_TAG`` (as opposed to third-party
+    images like ``postgres:18.6-alpine`` or ``edoburu/pgbouncer:1.25.2``).
+    This derived count replaces the previously hardcoded magic number ``8``
+    (B9-13): the manifest is the single source of truth for how many
+    application services exist.
+    """
+    from ruamel.yaml import YAML
+
+    data = YAML(typ="safe").load(_PROD_COMPOSE.read_text(encoding="utf-8")) or {}
+    services = (data.get("services") or {}).items()
+    return sum(
+        1
+        for _name, svc in services
+        if isinstance(svc, dict) and "IMAGE_TAG" in str(svc.get("image", ""))
+    )
+
+
 def test_prod_app_services_require_image_tag() -> None:
     """No production application service resolves to a floating ``latest`` tag.
 
@@ -317,10 +308,16 @@ def test_prod_app_services_require_image_tag() -> None:
         for line in text.split("\n")
         if line.strip().startswith("image:") and "IMAGE_TAG" in line
     ]
-    # Eight application services share the pinned image reference.
-    assert len(image_lines) >= 8, (
-        "at least eight production application services must pin the image tag; "
-        f"found {len(image_lines)}"
+    # The YAML-derived count of services using IMAGE_TAG must equal the
+    # string-level scan count — one image line per app service. Deriving the
+    # expected count from the manifest itself removes the hardcoded ``8``
+    # magic number (B9-13): adding or removing a service updates both views
+    # automatically.
+    expected_count = _app_service_count_with_image_tag()
+    assert len(image_lines) == expected_count, (
+        "the number of IMAGE_TAG image lines must equal the number of prod "
+        "services whose image uses IMAGE_TAG; string scan and YAML parse "
+        f"disagree ({len(image_lines)} lines vs {expected_count} services)"
     )
     for line in image_lines:
         assert "${IMAGE_TAG:?" in line, (

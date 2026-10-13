@@ -474,6 +474,48 @@ def _docs_ops_files_with_production_invocations() -> dict[str, str]:
     return found
 
 
+def _docs_ops_files_with_registry_coordinates() -> set[str]:
+    """Return the filenames under docs/ops that quote a canonical ghcr.io coordinate."""
+    found: set[str] = set()
+    for path in _docs_ops_markdown():
+        text = path.read_text(encoding="utf-8")
+        if _CANONICAL_COORDINATE_RE.findall(text):
+            found.add(path.name)
+    return found
+
+
+def test_docs_ops_manifests_match_live_corpus() -> None:
+    """The static manifests agree with the live docs/ops corpus (B9-10 self-check).
+
+    The two static frozensets are intentional deletion-guards (see their
+    comment block): they anchor *which* files the per-file parity tests below
+    must keep green. This test converts them into self-verifying assertions by
+    re-deriving both sets from the live ``docs/ops/*.md`` corpus using the same
+    selectors the guards use. If a runbook is added, removed, or stops making
+    the claim it used to, this test fails first and points the maintainer at the
+    exact manifest set to update — eliminating the silent hand-sync drift that
+    the static forms were vulnerable to (12-VAL-003).
+    """
+    derived_invocations = {
+        name
+        for name, text in _docs_ops_files_with_production_invocations().items()
+    }
+    derived_coordinates = _docs_ops_files_with_registry_coordinates()
+
+    assert derived_invocations == set(_DOCS_OPS_FILES_WITH_PRODUCTION_INVOCATIONS), (
+        "static manifest _DOCS_OPS_FILES_WITH_PRODUCTION_INVOCATIONS disagrees with the "
+        "live docs/ops corpus (12-VAL-003); see B9-10 self-check. "
+        f"derived={sorted(derived_invocations)} "
+        f"manifest={sorted(_DOCS_OPS_FILES_WITH_PRODUCTION_INVOCATIONS)}"
+    )
+    assert derived_coordinates == set(_DOCS_OPS_FILES_WITH_REGISTRY_COORDINATES), (
+        "static manifest _DOCS_OPS_FILES_WITH_REGISTRY_COORDINATES disagrees with the "
+        "live docs/ops corpus (12-VAL-003); see B9-10 self-check. "
+        f"derived={sorted(derived_coordinates)} "
+        f"manifest={sorted(_DOCS_OPS_FILES_WITH_REGISTRY_COORDINATES)}"
+    )
+
+
 def test_docs_ops_production_compose_invocations_carry_env_file() -> None:
     """Every production `docker compose` invocation in docs/ops carries the flags.
 
