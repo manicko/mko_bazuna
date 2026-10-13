@@ -64,10 +64,9 @@ class TestSuggestCity:
 
     def test_above_cutoff_query_resolves(self, podgorica_city: City) -> None:
         """A near-miss query above the cutoff resolves to the closest slug."""
-        # "Podgoric" is above the CITY_FUZZY_CUTOFF (0.6) threshold. The actual
-        # comparison is against the lowercase slug "podgorica" (ratio ≈ 0.8235),
-        # not the capitalized "Podgorica" (ratio 0.9412) that get_close_matches
-        # does not see.
+        # "Podgoric" is above the CITY_FUZZY_CUTOFF (0.6) threshold. The
+        # comparison is against the lowercase slug 'podgorica', not the
+        # capitalized 'Podgorica' — get_close_matches is case-sensitive.
         assert suggest_city("Podgoric") == "podgorica"
 
     def test_tier1_exact_case_insensitive_match(self, podgorica_city: City) -> None:

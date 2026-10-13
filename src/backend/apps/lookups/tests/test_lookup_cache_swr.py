@@ -36,8 +36,8 @@ from apps.categories.services.lookup_resolution import (
     resolved_lookup_key,
 )
 from apps.core.utils.swr_cache import (
-    _CACHE_LOCK_SUFFIX,
     get_with_stale_revalidate,
+    lock_key_for,
 )
 from apps.lookups.enums import LookupGroupCode
 from apps.lookups.models import LookupGroup, LookupItem
@@ -169,7 +169,7 @@ class TestLookupCacheServiceSwr:
     def test_cold_miss_lock_held_returns_default(self):
         """Cold miss with lock held by another worker returns default."""
         key = all_groups_key()
-        lock_key = f"{key}{_CACHE_LOCK_SUFFIX}"
+        lock_key = lock_key_for(key)
         cache.add(lock_key, "1", LOOKUP_CACHE_LOCK_TTL)
 
         call_count = 0
@@ -356,7 +356,7 @@ class TestLookupResolverSwr:
         segment = RESOLVED_PURPOSES_SEGMENT
         category_id = 55
         key = resolved_lookup_key(segment, category_id)
-        lock_key = f"{key}{_CACHE_LOCK_SUFFIX}"
+        lock_key = lock_key_for(key)
         cache.add(lock_key, "1", LOOKUP_RESOLVE_CACHE_LOCK_TTL)
 
         call_count = 0
@@ -629,7 +629,7 @@ class TestLookupCacheSWR:
         risking a flaky ``call_count > 1``. The 0.2s margin keeps this LOW.
         """
         key = "test:swr:single_flight"
-        lock_key = f"{key}{_CACHE_LOCK_SUFFIX}"
+        lock_key = lock_key_for(key)
         cache.delete(key)
         cache.delete(lock_key)
 
@@ -680,7 +680,7 @@ class TestLookupCacheSWR:
         above for the flakiness caveat (LOW risk under the existing margin).
         """
         key = "test:swr:stale_concurrent"
-        lock_key = f"{key}{_CACHE_LOCK_SUFFIX}"
+        lock_key = lock_key_for(key)
         cache.delete(key)
         cache.delete(lock_key)
 

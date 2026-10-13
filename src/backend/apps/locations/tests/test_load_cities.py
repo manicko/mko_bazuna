@@ -7,7 +7,6 @@ CATALOG_LOAD advisory lock (ID 104), session-scoped, and is idempotent.
 from __future__ import annotations
 
 import json
-import shutil
 from pathlib import Path
 from unittest.mock import DEFAULT, MagicMock
 
@@ -115,22 +114,56 @@ class TestLoadCities:
         assert lock_calls[0][1] is True
 
     def test_custom_config_path(self, tmp_path: Path) -> None:
-        """The --config flag loads from the specified fixture path.
+        """The --config flag loads independently from the specified fixture path.
 
-        Limitation: this test copies the identical 15-city fixture to a temp
-        path and asserts the same count as the default-path test. It verifies
-        that the ``--config`` argument is wired through to ``_load_cities``,
-        but it does not prove the custom path is parsed independently of the
-        default path (it loads the same fixture data).
+        Writes a trimmed 3-city fixture to a temp path and asserts that exactly
+        those three cities are loaded. This proves the ``--config`` argument is
+        parsed independently of the default ``cities.json`` fixture — if the
+        command fell back to the default path, the count would differ.
         """
         City.objects.all().delete()
 
+        cities = [
+            {
+                "model": "locations.city",
+                "fields": {
+                    "name": "Подгорица",
+                    "slug": "podgorica",
+                    "region": "Central Montenegro",
+                    "country_code": "ME",
+                    "name_i18n": {"ru": "Подгорица", "bs": "Podgorica", "en": "Podgorica"},
+                },
+            },
+            {
+                "model": "locations.city",
+                "fields": {
+                    "name": "Бар",
+                    "slug": "bar",
+                    "region": "Coastal Montenegro",
+                    "country_code": "ME",
+                    "name_i18n": {"ru": "Бар", "bs": "Bar", "en": "Bar"},
+                },
+            },
+            {
+                "model": "locations.city",
+                "fields": {
+                    "name": "Будва",
+                    "slug": "budva",
+                    "region": "Coastal Montenegro",
+                    "country_code": "ME",
+                    "name_i18n": {"ru": "Будва", "bs": "Budva", "en": "Budva"},
+                },
+            },
+        ]
+
         custom = tmp_path / "cities.json"
-        shutil.copy(CITIES_JSON_PATH, custom)
+        custom.write_text(
+            json.dumps(cities, ensure_ascii=False), encoding="utf-8"
+        )
 
         call_command("load_cities", "--config", str(custom))
 
-        assert City.objects.count() == EXPECTED_CITY_COUNT
+        assert City.objects.count() == 3
 
     def test_missing_fixture_raises_command_error(self, tmp_path: Path) -> None:
         """A nonexistent --config path raises CommandError.
