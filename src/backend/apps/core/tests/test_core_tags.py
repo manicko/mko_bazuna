@@ -316,6 +316,68 @@ class TestGetDescriptionFilter:
         assert result == "Bosnian desc"
 
 
+@pytest.mark.django_db
+@pytest.mark.integration
+class TestGetDescriptionFilterDB:
+    """Integration tests for ``get_description`` with a DB-persisted Ad.
+
+    Gap 5: the in-memory ``_make_ad`` helper bypasses the ORM, so the
+    template filter was never exercised against a row whose locale column is
+    actually NULL in the database. These tests persist a real ``Ad`` via the
+    shared ``create_test_ad`` helper and render through the template engine,
+    mirroring ``TestGetTitleFilterDB``.
+    """
+
+    def test_get_description_falls_back_to_base_when_description_en_is_null(
+        self, seller, category, city
+    ) -> None:
+        """A persisted Ad with description set but description_en=NULL falls back.
+
+        The fallback chain is ``description_en`` → ``description``: when the
+        English column is NULL (the common partial-localisation case), the
+        Russian base ``description`` must be returned, proving the template
+        filter reads the real DB row and not a pre-populated in-memory stub.
+        """
+        from conftest import create_test_ad
+
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.PUBLISHED,
+            description="Описание для поля",
+        )
+        # description_en is not set by create_test_ad defaults → NULL in the DB.
+        assert ad.description_en in (None, "")
+
+        template = Template(
+            "{% load localized_content %}{{ ad|get_description:'en' }}"
+        )
+        result = template.render(Context({"ad": ad}))
+        assert result == "Описание для поля"
+
+    def test_get_description_returns_english_when_description_en_populated(
+        self, seller, category, city
+    ) -> None:
+        """A persisted Ad with description_en populated returns the English desc."""
+        from conftest import create_test_ad
+
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.PUBLISHED,
+            description="Описание для поля",
+            description_en="Description for the field",
+        )
+
+        template = Template(
+            "{% load localized_content %}{{ ad|get_description:'en' }}"
+        )
+        result = template.render(Context({"ad": ad}))
+        assert result == "Description for the field"
+
+
 # ---------------------------------------------------------------------------
 # get_item filter (unit — plain dict, no DB)
 # ---------------------------------------------------------------------------

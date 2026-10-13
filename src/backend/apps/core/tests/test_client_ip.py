@@ -28,8 +28,6 @@ _SPOOF_A = "8.8.8.8"
 _SPOOF_B = "9.9.9.9"
 _TRUSTED_NETWORK = ("10.0.0.0/8",)
 
-pytestmark = [pytest.mark.unit]
-
 
 class _SessionStub:
     """Minimal session exposing only what ``record_consent_action`` reads."""
@@ -47,6 +45,7 @@ def _request(meta: dict[str, str]) -> HttpRequest:
     return request
 
 
+@pytest.mark.unit
 class TestPublicPeerCannotSpoof:
     """A public peer outside every listed network cannot have its headers read.
 
@@ -84,6 +83,7 @@ class TestPublicPeerCannotSpoof:
         assert spoofed == bare == _UNTRUSTED_PEER
 
 
+@pytest.mark.unit
 class TestTrustedPeerHeaderHandling:
     """When the gate is open, headers are honoured with a fixed precedence."""
 
@@ -126,6 +126,7 @@ class TestTrustedPeerHeaderHandling:
         assert result == _SPOOF_B
 
 
+@pytest.mark.unit
 class TestDegradedInput:
     """Malformed and absent metadata never raise."""
 
@@ -146,6 +147,7 @@ class TestDegradedInput:
         assert get_client_ip(HttpRequest()) == "unknown"
 
 
+@pytest.mark.unit
 class TestKeyStability:
     """Canonicalisation keeps equivalent spellings in one bucket."""
 
@@ -156,6 +158,7 @@ class TestKeyStability:
         assert expanded == compressed
 
 
+@pytest.mark.unit
 class TestIsTrustedPeer:
     """Direct unit tests for the peer-trust gate (``_is_trusted_peer``).
 
@@ -215,6 +218,7 @@ class TestIsTrustedPeer:
             )
 
 
+@pytest.mark.unit
 class TestIPv6PeerTrust:
     """IPv6 peers are handled correctly by the trust gate and header resolution.
 
@@ -322,6 +326,7 @@ class TestConsumerAgreement:
         assert record.ip_address == "8.8.8.0"
 
 
+@pytest.mark.unit
 class TestPublicPeerUntrustedUnlessOperatorListed:
     """A public peer is untrusted unless an operator lists a network containing it.
 
@@ -381,6 +386,7 @@ class TestPublicPeerUntrustedUnlessOperatorListed:
         assert result == _SPOOF_B
 
 
+@pytest.mark.unit
 class TestTrustedNetworksCannotNarrowPeerTrust:
     """``TRUSTED_PROXY_NETWORKS`` is purely additive: it can never remove trust.
 

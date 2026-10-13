@@ -51,7 +51,7 @@ class CSPReportPayload(BaseModel):
 
     model_config = ConfigDict(populate_by_name=True, extra="ignore")
 
-    document_uri: str | None = Field(default=None, alias="document-uri")
+    document_uri: str | None = Field(default=None, alias="document-uri", strict=True)
     referrer: str | None = None
     violated_directive: str | None = Field(default=None, alias="violated-directive")
     blocked_uri: str | None = Field(default=None, alias="blocked-uri")
