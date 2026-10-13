@@ -884,6 +884,54 @@ class TestCallPipeline:
         handler.assert_awaited_once_with(update, {})
 
     @pytest.mark.asyncio
+    async def test_call_message_without_from_user_falls_through(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """A Message update whose from_user is None (e.g. channel post) short-circuits.
+
+        Channel posts have from_user=None; the middleware must not attempt a
+        DB lookup (no chat_id to resolve) and must pass the update to the
+        handler unconditionally.
+        """
+        from aiogram.types import Chat, Message, Update
+
+        handler = AsyncMock(return_value="channel-proceed")
+        event = Update(
+            update_id=next(_next_update_id),
+            message=Message(
+                message_id=1,
+                date=timezone.now(),
+                chat=Chat(id=_BASE_CHAT_ID + 999, type="channel"),
+                from_user=None,  # channel post — no acting user
+            ),
+        )
+
+        result = await AccountStateMiddleware()(handler, event, {})
+
+        assert result == "channel-proceed"
+        handler.assert_awaited_once_with(event, {})
+
+    @pytest.mark.asyncio
+    async def test_call_update_without_message_falls_through(self) -> None:
+        """An Update with neither message nor callback_query short-circuits.
+
+        Some update types (e.g. edited_message for a removed message, or
+        webhook heartbeats) carry no message and no callback_query. The
+        middleware must pass these through without attempting a DB lookup.
+        """
+        from aiogram.types import Update
+
+        handler = AsyncMock(return_value="no-msg-proceed")
+        event = Update(
+            update_id=next(_next_update_id),  # no message, no callback
+        )
+
+        result = await AccountStateMiddleware()(handler, event, {})
+
+        assert result == "no-msg-proceed"
+        handler.assert_awaited_once_with(event, {})
+
+    @pytest.mark.asyncio
     async def test_two_consecutive_updates_do_not_share_a_resolved_user(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
