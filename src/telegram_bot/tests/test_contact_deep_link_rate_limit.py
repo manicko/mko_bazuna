@@ -30,13 +30,10 @@ used, plus the shared ``create_test_ad`` (imported from the backend conftest via
 
 from __future__ import annotations
 
-from typing import Any
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from asgiref.sync import sync_to_async
-from django.core.cache import DEFAULT_CACHE_ALIAS, caches
-from django_redis.exceptions import ConnectionInterrupted
 
 from apps.ads.models import Ad
 from apps.analytics.models import AnalyticsEvent
@@ -55,6 +52,11 @@ from telegram_bot.services.rate_limit import (
     check_contact_deep_link_buyer_rate_limit,
     check_contact_seller_rate_limit,
 )
+
+# Base for synthetic buyer Telegram IDs used to exhaust the per-buyer budget.
+# These IDs never correspond to real User rows — they are ``from_user.id``
+# values passed to the rate limiter, not DB lookups.
+_BUYER_ID_BASE = 800_000_000
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -128,7 +130,7 @@ async def _exhaust_seller_budget_from_distinct_buyers(ad_id: int) -> None:
     budget, so only the per-seller cap can refuse the final trigger. This is the
     sequence that proves a per-buyer-only implementation is insufficient.
     """
-    base = 800_000_000
+    base = _BUYER_ID_BASE
     for offset in range(CONTACT_SELLER_RATE_LIMIT_REQUESTS):
         message = _mock_message(base + offset)
         bot = _mock_bot()
@@ -311,47 +313,39 @@ class TestDeclinedAccountCovered:
 
 
 # ---------------------------------------------------------------------------
-# Fail-open on a cache outage (backend-seam idiom)
+# Fail-open on a cache outage (shared ``cache_outage`` fixture from conftest)
+#
+# The ``cache_outage`` fixture patches the shared cache backend
+# (``caches[DEFAULT_CACHE_ALIAS]``) so ``cache.add`` raises
+# ``ConnectionInterrupted``.  It is the single source of truth for
+# cache-outage simulation across all rate-limit test files (B27-2.2 /
+# B28-11.4).
 # ---------------------------------------------------------------------------
-
-def _cache_outage() -> Any:
-    """Patch the shared cache backend so ``add`` raises.
-
-    ``caches[DEFAULT_CACHE_ALIAS]`` is the one backend every guard reaches
-    through; ``django.core.cache.cache`` is a single ``ConnectionProxy`` over it,
-    so patching the backend is invariant to which module holds a reference.
-    """
-    outage = MagicMock()
-    outage.add.side_effect = ConnectionInterrupted(None)
-    return patch.object(caches[DEFAULT_CACHE_ALIAS], "add", outage.add)
 
 
 class TestNewGuardsFailOpen:
     """Both new guards allow the contact when the shared cache is unreachable."""
 
     @pytest.mark.asyncio
-    async def test_buyer_guard_fails_open(self) -> None:
+    async def test_buyer_guard_fails_open(self, cache_outage: object) -> None:
         """``check_contact_deep_link_buyer_rate_limit`` allows on cache outage."""
-        with _cache_outage():
-            assert await check_contact_deep_link_buyer_rate_limit(910_000_001) is True
+        assert await check_contact_deep_link_buyer_rate_limit(910_000_001) is True
 
     @pytest.mark.asyncio
-    async def test_seller_guard_fails_open(self) -> None:
+    async def test_seller_guard_fails_open(self, cache_outage: object) -> None:
         """``check_contact_seller_rate_limit`` allows on cache outage."""
-        with _cache_outage():
-            assert await check_contact_seller_rate_limit(910_000_002) is True
+        assert await check_contact_seller_rate_limit(910_000_002) is True
 
     @pytest.mark.asyncio
     async def test_buyer_guard_under_outage_reaches_seller(
-        self, seller: User, category: Category, city: City
+        self, seller: User, category: Category, city: City, cache_outage: object
     ) -> None:
         """A cache outage does not refuse a legitimate buyer (end-to-end)."""
         ad = await _make_ad(seller, category, city)
         message = _mock_message(910_000_003)
         bot = _mock_bot()
 
-        with _cache_outage():
-            assert await handle_contact(message, bot, ad.id) is True
+        assert await handle_contact(message, bot, ad.id) is True
 
         bot.send_message.assert_awaited_once()
 

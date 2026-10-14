@@ -13,6 +13,9 @@ Covers ``send_support_notification_email``:
 Uses the locmem email backend forced by the test settings
 (``django.core.mail.backends.locmem.EmailBackend``) which captures sent
 messages in ``django.core.mail.outbox``.
+
+Uses the shared ``make_ticket`` and ``make_contact`` fixtures from the bot
+conftest (consolidated from previously-duplicated local helpers — B28-SUPP-2).
 """
 
 from __future__ import annotations
@@ -20,12 +23,10 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-from asgiref.sync import sync_to_async
 from django.core import mail
 from django.test import override_settings
 
 from apps.core.enums import SupportChannelType
-from apps.core.models import SupportContact, SupportTicket
 from telegram_bot.services.support_delivery_email import (
     send_support_notification_email,
 )
@@ -42,47 +43,16 @@ def _clear_mail_outbox() -> None:
     mail.outbox.clear()
 
 
-async def _make_ticket(**kwargs: object) -> SupportTicket:
-    """Create a SupportTicket row with sensible defaults (off the event loop).
-
-    ``SupportTicket.save`` always auto-generates ``ticket_ref`` on first save,
-    so an explicitly requested reference is applied via a follow-up save.
-    """
-    explicit_ref = kwargs.pop("ticket_ref", None)
-    defaults: dict[str, object] = {
-        "chat_id": 900000001,
-        "telegram_id": 900000001,
-        "username": "ticket_user",
-        "text": "Help me please",
-    }
-    defaults.update(kwargs)
-    ticket = await sync_to_async(SupportTicket.objects.create)(**defaults)
-    if explicit_ref is not None:
-        ticket.ticket_ref = str(explicit_ref)
-        await sync_to_async(ticket.save)(update_fields=["ticket_ref"])
-    return ticket
-
-
-async def _make_email_contact(
-    email: str, *, active: bool = True
-) -> SupportContact:
-    """Create an active EMAIL-type SupportContact row."""
-    return await sync_to_async(SupportContact.objects.create)(
-        channel_type=SupportChannelType.EMAIL,
-        label="Support email",
-        email=email,
-        is_active=active,
-    )
-
-
 class TestRecipientResolution:
     """Recipients come from settings first, then EMAIL-type contacts."""
 
     @pytest.mark.asyncio
-    async def test_uses_settings_recipients_when_set(self) -> None:
+    async def test_uses_settings_recipients_when_set(
+        self, make_ticket: callable, make_contact: callable
+    ) -> None:
         """Configured recipients take precedence over contacts."""
-        ticket = await _make_ticket()
-        await _make_email_contact("contact@example.com")
+        ticket = await make_ticket()
+        await make_contact(SupportChannelType.EMAIL, email="contact@example.com")
 
         with override_settings(
             SUPPORT_NOTIFICATION_RECIPIENTS=["admin@example.com"]
@@ -94,10 +64,12 @@ class TestRecipientResolution:
         assert "contact@example.com" not in mail.outbox[0].to
 
     @pytest.mark.asyncio
-    async def test_falls_back_to_email_contacts(self) -> None:
+    async def test_falls_back_to_email_contacts(
+        self, make_ticket: callable, make_contact: callable
+    ) -> None:
         """Empty settings fall back to active EMAIL-type support contacts."""
-        ticket = await _make_ticket()
-        await _make_email_contact("support@example.com")
+        ticket = await make_ticket()
+        await make_contact(SupportChannelType.EMAIL, email="support@example.com")
 
         with override_settings(SUPPORT_NOTIFICATION_RECIPIENTS=[]):
             await send_support_notification_email(ticket)
@@ -106,14 +78,14 @@ class TestRecipientResolution:
         assert mail.outbox[0].to == ["support@example.com"]
 
     @pytest.mark.asyncio
-    async def test_ignores_non_email_contacts(self) -> None:
+    async def test_ignores_non_email_contacts(
+        self, make_ticket: callable, make_contact: callable
+    ) -> None:
         """Only EMAIL-channel contacts are used as recipients."""
-        ticket = await _make_ticket()
-        await _make_email_contact("support@example.com")
-        await sync_to_async(SupportContact.objects.create)(
-            channel_type=SupportChannelType.TELEGRAM,
-            label="Telegram support",
-            telegram_id=12345,
+        ticket = await make_ticket()
+        await make_contact(SupportChannelType.EMAIL, email="support@example.com")
+        await make_contact(
+            SupportChannelType.TELEGRAM, telegram_id=12345
         )
 
         with override_settings(SUPPORT_NOTIFICATION_RECIPIENTS=[]):
@@ -127,9 +99,9 @@ class TestEmailContent:
     """The delivered email carries ticket details and reference."""
 
     @pytest.mark.asyncio
-    async def test_subject_contains_ticket_ref(self) -> None:
+    async def test_subject_contains_ticket_ref(self, make_ticket: callable) -> None:
         """Subject embeds the human-readable ticket reference."""
-        ticket = await _make_ticket(ticket_ref="SUP-202609-001")
+        ticket = await make_ticket(ticket_ref="SUP-202609-001")
 
         with override_settings(
             SUPPORT_NOTIFICATION_RECIPIENTS=["admin@example.com"]
@@ -140,9 +112,9 @@ class TestEmailContent:
         assert "SUP-202609-001" in mail.outbox[0].subject
 
     @pytest.mark.asyncio
-    async def test_body_includes_ticket_details(self) -> None:
+    async def test_body_includes_ticket_details(self, make_ticket: callable) -> None:
         """Body contains ticket_ref, telegram_id, username, and message text."""
-        ticket = await _make_ticket(
+        ticket = await make_ticket(
             ticket_ref="SUP-202609-002",
             telegram_id=900000042,
             username="buyer_42",
@@ -166,9 +138,9 @@ class TestFailOpen:
     """Delivery never raises on missing recipients or email failures."""
 
     @pytest.mark.asyncio
-    async def test_no_recipients_is_noop(self) -> None:
+    async def test_no_recipients_is_noop(self, make_ticket: callable) -> None:
         """Empty recipients log a warning and send nothing (fail-open)."""
-        ticket = await _make_ticket()
+        ticket = await make_ticket()
 
         with override_settings(SUPPORT_NOTIFICATION_RECIPIENTS=[]):
             await send_support_notification_email(ticket)
@@ -176,9 +148,9 @@ class TestFailOpen:
         assert mail.outbox == []
 
     @pytest.mark.asyncio
-    async def test_send_mail_failure_is_swallowed(self) -> None:
+    async def test_send_mail_failure_is_swallowed(self, make_ticket: callable) -> None:
         """A raised ``send_mail`` is logged, not propagated (fail-open)."""
-        ticket = await _make_ticket()
+        ticket = await make_ticket()
 
         with override_settings(
             SUPPORT_NOTIFICATION_RECIPIENTS=["admin@example.com"]

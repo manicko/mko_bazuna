@@ -10,9 +10,12 @@ any aiogram wiring, while an empty token takes the graceful skip path.
 
 from __future__ import annotations
 
+from unittest.mock import MagicMock
+
 import pytest
 from aiogram import Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.fsm.storage.redis import RedisStorage
 from django.core.exceptions import ImproperlyConfigured
 from django.test import override_settings
 
@@ -128,26 +131,14 @@ def test_configure_dispatcher_accepts_redis_storage() -> None:
     """configure_dispatcher works with RedisStorage (not just MemoryStorage).
 
     The storage parameter is typed as BaseStorage, so RedisStorage must be
-    accepted without error.
+    accepted without error. Uses a mock to avoid a real Redis dependency in
+    this unit test.
     """
-    from aiogram.fsm.storage.redis import RedisStorage
-
     from telegram_bot.main import configure_dispatcher
 
-    storage = RedisStorage.from_url("redis://localhost:6379/0")
-    try:
-        dp = configure_dispatcher(storage)
-        assert isinstance(dp, Dispatcher)
-    finally:
-        # Close the Redis connection to avoid resource leaks.
-        import asyncio
-
-        try:
-            asyncio.get_running_loop()
-        except RuntimeError:
-            loop = asyncio.new_event_loop()
-            loop.run_until_complete(storage.close())
-            loop.close()
+    storage = MagicMock(spec=RedisStorage)
+    dp = configure_dispatcher(storage)
+    assert isinstance(dp, Dispatcher)
 
 
 def test_configure_dispatcher_registers_error_handler() -> None:

@@ -9,16 +9,18 @@ import hashlib
 import threading
 from collections.abc import Awaitable, Callable, Iterator
 from typing import Any
+from unittest.mock import MagicMock, patch
 
 import pytest
 import pytest_asyncio
 from aiogram import Bot, Dispatcher
 from asgiref.sync import sync_to_async
 from django.conf import settings
-from django.core.cache import cache
+from django.core.cache import DEFAULT_CACHE_ALIAS, cache, caches
 from django.db import connections
 from django.db.backends.signals import connection_created
 from django.utils import timezone
+from django_redis.exceptions import ConnectionInterrupted
 
 from apps.categories.models import Category
 from apps.locations.models import City
@@ -130,6 +132,70 @@ def login_token_factory() -> Callable[..., Awaitable[tuple[str, Any]]]:
 
 
 @pytest.fixture
+def make_ticket() -> Callable[..., Awaitable[Any]]:
+    """Async factory for creating ``SupportTicket`` rows with sensible defaults.
+
+    Consolidated from the identical ``_make_ticket`` helpers previously
+    duplicated in ``test_support_delivery_email.py`` and
+    ``test_support_delivery_telegram.py``.
+    """
+
+    async def _create(**kwargs: object) -> Any:
+        from apps.core.models import SupportTicket
+
+        explicit_ref = kwargs.pop("ticket_ref", None)
+        defaults: dict[str, object] = {
+            "chat_id": 900000001,
+            "telegram_id": 900000001,
+            "username": "ticket_user",
+            "text": "Help me please",
+        }
+        defaults.update(kwargs)
+        ticket = await sync_to_async(SupportTicket.objects.create)(**defaults)
+        if explicit_ref is not None:
+            ticket.ticket_ref = str(explicit_ref)
+            await sync_to_async(ticket.save)(update_fields=["ticket_ref"])
+        return ticket
+
+    return _create
+
+
+@pytest.fixture
+def make_contact() -> Callable[..., Awaitable[Any]]:
+    """Async factory for creating ``SupportContact`` rows.
+
+    Consolidates the ``_make_email_contact`` (email-only) helper from
+    ``test_support_delivery_email.py`` and the ``_make_contact`` (any channel)
+    helper from ``test_support_delivery_telegram.py`` into a single flexible
+    factory.
+    """
+
+    async def _create(
+        channel_type: Any,
+        *,
+        email: str | None = None,
+        telegram_id: int | None = None,
+        active: bool = True,
+    ) -> Any:
+        from apps.core.enums import SupportChannelType
+        from apps.core.models import SupportContact
+
+        defaults: dict[str, object] = {
+            "channel_type": channel_type,
+            "label": f"Support {channel_type.value}",
+            "is_active": active,
+        }
+        if telegram_id is not None:
+            defaults["telegram_id"] = telegram_id
+            defaults["email"] = None
+        else:
+            defaults["email"] = email or "support@example.com"
+        return await sync_to_async(SupportContact.objects.create)(**defaults)
+
+    return _create
+
+
+@pytest.fixture
 def seller() -> User:
     """Create a seller user for ad-fixture composition.
 
@@ -151,6 +217,36 @@ def seller() -> User:
         user.consent_given_at = timezone.now()
         user.save(update_fields=["consent_given_at"])
     return user
+
+
+# ---------------------------------------------------------------------------
+# Shared owner/stranger users for saved-search / unsubscribe tests
+#
+# Previously duplicated in ``test_alerts.py`` (950000301/950000302) and
+# ``test_unsubscribe.py`` (950000201/950000202).  TransactionTestCase
+# truncation makes the IDs collision-free across files, so one canonical
+# pair now lives here and both files rely on it.
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def owner() -> User:
+    """Create an owner user for saved-search alert tests."""
+    return User.objects.create(
+        telegram_id=950000301,
+        chat_id=950000301,
+        username="alert_owner",
+    )
+
+
+@pytest.fixture
+def stranger() -> User:
+    """Create a stranger user for ownership-guard tests."""
+    return User.objects.create(
+        telegram_id=950000302,
+        chat_id=950000302,
+        username="alert_stranger",
+    )
 
 
 @pytest.fixture
@@ -282,3 +378,33 @@ def _clear_cache_between_tests() -> Iterator[None]:
     cache.clear()
     yield
     cache.clear()
+
+
+# ---------------------------------------------------------------------------
+# Cache-outage fixture (shared fail-open seam for rate-limit tests)
+#
+# Extracted from the per-file ``_cache_outage`` helpers that were triplicated
+# in ``test_rate_limit_service.py``, ``test_contact_deep_link_rate_limit.py``,
+# and ``test_login_rate_limit.py`` (B27-2.2 / B28-11.4).  Tests request the
+# fixture by name:
+#
+#     async def test_foo(self, cache_outage):
+#         # cache.add raises ConnectionInterrupted inside this body
+#         ...
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def cache_outage() -> Iterator[None]:
+    """Patch the shared cache backend so ``cache.add`` raises ``ConnectionInterrupted``.
+
+    ``caches[DEFAULT_CACHE_ALIAS]`` is the one backend every guard reaches
+    through — ``django.core.cache.cache`` is a single ``ConnectionProxy`` over
+    it, so patching the backend is invariant to which module holds a ``cache``
+    reference and cannot be neutralised by a guard gaining, losing, or
+    duplicating a ``cache`` import.
+    """
+    outage = MagicMock()
+    outage.add.side_effect = ConnectionInterrupted(None)
+    with patch.object(caches[DEFAULT_CACHE_ALIAS], "add", outage.add):
+        yield

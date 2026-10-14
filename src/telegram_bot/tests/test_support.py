@@ -43,6 +43,11 @@ pytestmark = [
     pytest.mark.integration,
 ]
 
+# Default synthetic Telegram user_id / chat_id for mock message doubles.
+# Mirrors the bot conftest's TEST_SELLER_ID (900000100); for guard-only tests
+# any non-registered id suffices.
+_TEST_USER_ID = 900000100
+
 
 @pytest.fixture
 def fsm_context() -> FSMContext:
@@ -52,7 +57,7 @@ def fsm_context() -> FSMContext:
     return FSMContext(storage=storage, key=key)
 
 
-def _mock_callback(user_id: int = 123, is_bot: bool = False) -> MagicMock:
+def _mock_callback(user_id: int = _TEST_USER_ID, is_bot: bool = False) -> MagicMock:
     """Build a ``CallbackQuery`` double for ``handle_support_start``."""
     callback = MagicMock()
     callback.data = SUPPORT_START_CALLBACK
@@ -67,14 +72,14 @@ def _mock_callback(user_id: int = 123, is_bot: bool = False) -> MagicMock:
 
 def _mock_message(
     text: str = "Hello support",
-    user_id: int = 123,
+    user_id: int = _TEST_USER_ID,
     is_bot: bool = False,
-    chat_id: int = 123,
+    chat_id: int = _TEST_USER_ID,
 ) -> MagicMock:
     """Build a ``Message`` double for ``handle_support_message``.
 
-    ``chat_id`` defaults to 123 (mirroring a private chat); pass a value
-    matching a registered user's ``User.chat_id`` for attribution tests.
+    ``chat_id`` defaults to ``_TEST_USER_ID``; pass a value matching a registered
+    user's ``User.chat_id`` for attribution tests.
     """
     message = MagicMock()
     message.from_user = MagicMock()

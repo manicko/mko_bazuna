@@ -735,3 +735,82 @@ class TestLoginRateLimit:
         # Delegation occurred and the handler returned early (no greeting).
         mock_contact.assert_awaited_once()
         mock_site.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_contact_ad_id_deep_link_delegates_to_contact_handler(
+        self,
+    ) -> None:
+        """``/start contact_<ad_id>`` delegates to ``handle_contact_start`` and returns
+        early — it does not match the login pattern.
+
+        The login handler routes ``contact_<ad_id>`` deep-links to the contact
+        module *before* the login-pattern check. This pins that delegation so a
+        reordering of checks cannot silently send a contact deep-link through the
+        login claim path.
+        """
+        from telegram_bot.handlers.login import handle_login_deep_link
+
+        message = MagicMock()
+        message.text = "/start contact_42"
+        message.from_user = MagicMock()
+        message.from_user.id = 900000500
+        message.from_user.username = "buyer"
+        message.from_user.first_name = "Buyer"
+        message.from_user.last_name = ""
+        message.answer = AsyncMock()
+
+        with patch(
+            "telegram_bot.handlers.contact.handle_contact_start",
+            new=AsyncMock(return_value=True),
+        ) as mock_contact, patch(
+            "telegram_bot.handlers.login.get_site_name_async",
+            new=AsyncMock(return_value="TestSite"),
+        ) as mock_site:
+            await handle_login_deep_link(
+                message=message, bot=AsyncMock(), state=_mock_state()
+            )
+
+        # Delegation occurred and the login greeting was NOT sent.
+        mock_contact.assert_awaited_once()
+        mock_site.assert_not_awaited()
+
+    @pytest.mark.asyncio
+    async def test_unsubscribe_deep_link_delegates_to_alerts_handler(
+        self,
+    ) -> None:
+        """``/start unsub_<token>`` delegates to ``handle_unsubscribe_start`` and returns
+        early — it does not match the login pattern.
+
+        The login handler routes unsubscribe deep-links to the alerts module
+        *before* the login-pattern check (lines 107-111 in ``handlers/login.py``).
+        This pins that delegation so a reordering of checks cannot silently send
+        an unsubscribe deep-link through the login claim path.
+        """
+        from telegram_bot.handlers.login import handle_login_deep_link
+
+        message = MagicMock()
+        message.text = "/start unsub_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        message.from_user = MagicMock()
+        message.from_user.id = 900000510
+        message.from_user.username = "buyer"
+        message.from_user.first_name = "Buyer"
+        message.from_user.last_name = ""
+        message.answer = AsyncMock()
+
+        with patch(
+            "telegram_bot.handlers.alerts.handle_unsubscribe_start",
+            new=AsyncMock(return_value=True),
+        ) as mock_unsub, patch(
+            "telegram_bot.handlers.login.get_site_name_async",
+            new=AsyncMock(return_value="TestSite"),
+        ) as mock_site:
+            await handle_login_deep_link(
+                message=message, bot=AsyncMock(), state=_mock_state()
+            )
+
+        # Delegation occurred and the login greeting was NOT sent.
+        mock_unsub.assert_awaited_once()
+        mock_site.assert_not_awaited()
+
+
+

@@ -10,7 +10,6 @@ Covers:
 """
 
 import threading
-import time
 
 import pytest
 from asgiref.sync import sync_to_async
@@ -27,24 +26,6 @@ pytestmark = [
     pytest.mark.concurrent,
 ]
 pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
-
-
-@pytest.fixture
-def owner() -> User:
-    return User.objects.create(
-        telegram_id=950000201,
-        chat_id=950000201,
-        username="owner",
-    )
-
-
-@pytest.fixture
-def stranger() -> User:
-    return User.objects.create(
-        telegram_id=950000202,
-        chat_id=950000202,
-        username="stranger",
-    )
 
 
 class TestResolveUnsubscribe:
@@ -239,9 +220,12 @@ class TestResolveOwnedConcurrency:
             # Wait for the background thread to start.
             assert started.wait(timeout=5), "Background thread did not start"
 
-            # The re-enable should block waiting for the row lock.
-            time.sleep(1.0)
-            assert not finished.is_set(), (
+            # The re-enable should block waiting for the row lock. Using
+            # ``finished.wait`` as the sync barrier instead of ``time.sleep`` is
+            # both faster (returns immediately if the thread unexpectedly
+            # completes — a bug) and more deterministic: it waits *just long
+            # enough* to let the worker reach the row-lock block, then yields.
+            assert not finished.wait(timeout=0.5), (
                 "Background toggle completed before the lock was released — "
                 "select_for_update did not serialize the concurrent toggles"
             )

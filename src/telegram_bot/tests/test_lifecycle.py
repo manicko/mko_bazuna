@@ -19,10 +19,7 @@ import pytest
 
 from telegram_bot.lifecycle import _BOT_COMMANDS_SETUP_TIMEOUT
 
-pytestmark = [
-    pytest.mark.django_db(transaction=True),
-    pytest.mark.integration,
-]
+pytestmark = [pytest.mark.unit]
 
 # Test-only bound (seconds) for asserting the startup hook returns on its own
 # when command registration hangs. Chosen a little *above* the production

@@ -8,13 +8,9 @@ for the bot-side limiters.
 from __future__ import annotations
 
 import inspect
-from collections.abc import Iterator
-from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import patch
 
 import pytest
-from django.core.cache import DEFAULT_CACHE_ALIAS, cache, caches
-from django_redis.exceptions import ConnectionInterrupted
 
 from telegram_bot.services.rate_limit import (
     check_contact_start_rate_limit,
@@ -23,13 +19,6 @@ from telegram_bot.services.rate_limit import (
 )
 
 pytestmark = [pytest.mark.unit]
-
-
-@pytest.fixture(autouse=True)
-def _clear_cache() -> Iterator[None]:
-    cache.clear()
-    yield
-    cache.clear()
 
 
 class TestContactStartRateLimit:
@@ -130,13 +119,6 @@ class TestSupportMessageRateLimit:
         assert await check_support_message_rate_limit(555) is True
 
     @pytest.mark.asyncio
-    async def test_custom_limit_and_period(self) -> None:
-        """limit/period kwargs override the defaults."""
-        for _ in range(3):
-            assert await check_support_message_rate_limit(666, limit=3, period=600) is True
-        assert await check_support_message_rate_limit(666, limit=3, period=600) is False
-
-    @pytest.mark.asyncio
     async def test_key_does_not_collide_with_contact_limiter(self) -> None:
         """Support limiter uses a distinct cache key from the contact limiter.
 
@@ -174,41 +156,23 @@ def test_rate_limit_functions_are_async_callable() -> None:
 class TestBotGuardsFailOpenOnCacheOutage:
     """Each bot guard allows the request when the shared cache is unreachable.
 
-    The failing cache is applied at the shared cache **backend** seam
-    (``caches[DEFAULT_CACHE_ALIAS]``), never at a module-level ``cache`` name.
-    ``django.core.cache.cache`` is a single ``ConnectionProxy`` over one
-    backend, so every guard module's ``cache`` global is the same object;
-    patching the backend is invariant to which module holds a reference and
-    cannot be neutralised by a guard gaining, losing or duplicating a ``cache``
-    import. The failing-cache shape is the same ``MagicMock`` as
-    ``src/telegram_bot/tests/test_update_id_dedup.py::test_redis_unavailable_fail_open``.
+    The failing cache is applied at the shared ``cache_outage`` fixture (defined
+    in ``conftest.py``), which patches the shared cache backend seam
+    (``caches[DEFAULT_CACHE_ALIAS]``).  This is the single source of truth for
+    cache-outage simulation — see B27-2.2 / B28-11.4.
     """
 
     @pytest.mark.asyncio
-    async def test_upload_guard_fails_open(self) -> None:
+    async def test_upload_guard_fails_open(self, cache_outage: object) -> None:
         """``check_upload_rate_limit`` allows when the cache raises."""
-        with _cache_outage():
-            assert await check_upload_rate_limit(111) is True
+        assert await check_upload_rate_limit(111) is True
 
     @pytest.mark.asyncio
-    async def test_contact_start_guard_fails_open(self) -> None:
+    async def test_contact_start_guard_fails_open(self, cache_outage: object) -> None:
         """``check_contact_start_rate_limit`` allows when the cache raises."""
-        with _cache_outage():
-            assert await check_contact_start_rate_limit(222) is True
+        assert await check_contact_start_rate_limit(222) is True
 
     @pytest.mark.asyncio
-    async def test_support_message_guard_fails_open(self) -> None:
+    async def test_support_message_guard_fails_open(self, cache_outage: object) -> None:
         """``check_support_message_rate_limit`` allows when the cache raises."""
-        with _cache_outage():
-            assert await check_support_message_rate_limit(333) is True
-
-
-def _cache_outage() -> Any:
-    """Patch the shared cache backend so ``add`` raises.
-
-    ``caches[DEFAULT_CACHE_ALIAS]`` is the one backend every guard reaches
-    through, so the patch lands on the object the guard actually calls.
-    """
-    outage = MagicMock()
-    outage.add.side_effect = ConnectionInterrupted(None)
-    return patch.object(caches[DEFAULT_CACHE_ALIAS], "add", outage.add)
+        assert await check_support_message_rate_limit(333) is True

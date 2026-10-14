@@ -27,22 +27,10 @@ pytestmark = [
 pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
 
-@pytest.fixture
-def owner() -> User:
-    return User.objects.create(
-        telegram_id=950000301,
-        chat_id=950000301,
-        username="alert_owner",
-    )
-
-
-@pytest.fixture
-def stranger() -> User:
-    return User.objects.create(
-        telegram_id=950000302,
-        chat_id=950000302,
-        username="alert_stranger",
-    )
+# The ``owner`` / ``stranger`` fixtures are provided by the bot-suite conftest
+# (conftest.py), which defines the canonical pair (telegram_id 950 000 301 /
+# 950 000 302).  This file previously duplicated them with identical IDs — the
+# local copies have been removed to keep a single source of truth (B28-1.3).
 
 
 @pytest.fixture
@@ -74,12 +62,11 @@ class TestHandleUnsubscribeCallback:
 
         await handle_unsubscribe_callback(callback, bot)
 
+        # The DB state-flip is verified in test_unsubscribe.py::test_owned_search_disabled,
+        # which tests ``resolve_unsubscribe`` directly. Here we focus on the callback
+        # handler's observable behaviour: the button-swap and the answer text.
         bot.edit_message_reply_markup.assert_awaited_once()
         callback.answer.assert_awaited_with("Notifications disabled")
-
-        # Verify the search was disabled in the DB.
-        ss = await sync_to_async(SavedSearch.objects.get)(pk=saved_search.pk)
-        assert ss.is_active is False
 
     @pytest.mark.asyncio
     async def test_unknown_token_alert(self, owner) -> None:
