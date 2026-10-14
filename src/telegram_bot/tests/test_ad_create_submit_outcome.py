@@ -22,11 +22,12 @@ message (the fix must not make the bot non-recoverable either way).
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
 from apps.core.enums import AdStatus
+from telegram_bot.testing.bot_helpers import build_message, build_state, mock_translate
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -52,38 +53,10 @@ _PHOTO_UNAVAILABLE_REPLY = (
 )
 
 
-def _build_message(text: str = "confirm", language_code: str | None = "en-US"):
-    user_mock = MagicMock()
-    user_mock.language_code = language_code
-    user_mock.id = 900000100
-    user_mock.username = None
-    user_mock.first_name = "Test"
-    user_mock.last_name = "User"
-    message = MagicMock()
-    message.text = text
-    message.from_user = user_mock
-    message.answer = AsyncMock()
-    return message
-
-
-def _build_state(data: dict) -> MagicMock:
-    state = MagicMock()
-    state.get_data = AsyncMock(return_value=data)
-    state.clear = AsyncMock()
-    state.update = AsyncMock()
-    state.update_data = AsyncMock()
-    state.set_state = AsyncMock()
-    return state
-
-
-async def _mock_translate(text: str, target_locales: list[str]) -> dict[str, str]:
-    return {loc: f"{text}-{loc}" for loc in target_locales}
-
-
 def _preview_data(seller, category, city, **overrides) -> dict:
     """Build the FSM data a preview confirm carries."""
     data = {
-        "ad_id": 999_999_999,
+        "ad_id": -1,
         "title": "Naslov oglasa",
         "description": "Opis oglasa dovoljne dužine za test.",
         "price_amount": 100,
@@ -113,19 +86,19 @@ class TestProcessPreviewOutcomes:
         from telegram_bot.handlers.ad_create import process_preview
 
         data = _preview_data(seller, category, city)  # absent id → DRAFT_GONE
-        state = _build_state(data)
-        message = _build_message()
+        state = build_state(data)
+        message = build_message()
 
         with patch(
             "telegram_bot.handlers.ad_create.submit.translate_all_languages",
-            _mock_translate,
+            mock_translate,
         ):
             await process_preview(message, state)
 
         state.clear.assert_not_awaited()
         state.update.assert_awaited_once()
         new_ad_id = state.update.await_args.args[0]["ad_id"]
-        assert new_ad_id != 999_999_999
+        assert new_ad_id != -1
 
         from asgiref.sync import sync_to_async
 
@@ -143,12 +116,12 @@ class TestProcessPreviewOutcomes:
         from telegram_bot.handlers.ad_create import process_preview
 
         data = _preview_data(seller, category, city)
-        state = _build_state(data)
-        message = _build_message()
+        state = build_state(data)
+        message = build_message()
 
         with patch(
             "telegram_bot.handlers.ad_create.submit.translate_all_languages",
-            _mock_translate,
+            mock_translate,
         ):
             await process_preview(message, state)
 
@@ -183,13 +156,13 @@ class TestProcessPreviewOutcomes:
         }
 
         for outcome, expected_reply in expected.items():
-            state = _build_state(_preview_data(seller, category, city))
-            message = _build_message()
+            state = build_state(_preview_data(seller, category, city))
+            message = build_message()
 
             with (
                 patch(
                     "telegram_bot.handlers.ad_create.submit.translate_all_languages",
-                    _mock_translate,
+                    mock_translate,
                 ),
                 patch(
                     "telegram_bot.handlers.ad_create.submit.submit_ad",
@@ -232,13 +205,13 @@ class TestProcessPreviewOutcomes:
                 {"storage_key": "staging/gone", "telegram_file_id": "f", "position": 0}
             ],
         )
-        state = _build_state(data)
-        message = _build_message()
+        state = build_state(data)
+        message = build_message()
 
         with (
             patch(
                 "telegram_bot.handlers.ad_create.submit.translate_all_languages",
-                _mock_translate,
+                mock_translate,
             ),
             patch(
                 "telegram_bot.handlers.ad_create.submit.submit_ad",
@@ -290,13 +263,13 @@ class TestProcessPreviewOutcomes:
         )
         from telegram_bot.handlers.ad_create import process_preview
 
-        state = _build_state(_preview_data(seller, category, city))
-        message = _build_message()
+        state = build_state(_preview_data(seller, category, city))
+        message = build_message()
 
         with (
             patch(
                 "telegram_bot.handlers.ad_create.submit.translate_all_languages",
-                _mock_translate,
+                mock_translate,
             ),
             patch(
                 "telegram_bot.handlers.ad_create.submit.submit_ad",
@@ -322,13 +295,13 @@ class TestProcessPreviewOutcomes:
         )
         from telegram_bot.handlers.ad_create import process_preview
 
-        state = _build_state(_preview_data(seller, category, city, ad_id=1))
-        message = _build_message()
+        state = build_state(_preview_data(seller, category, city, ad_id=1))
+        message = build_message()
 
         with (
             patch(
                 "telegram_bot.handlers.ad_create.submit.translate_all_languages",
-                _mock_translate,
+                mock_translate,
             ),
             patch(
                 "telegram_bot.handlers.ad_create.submit.submit_ad",

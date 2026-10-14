@@ -12,11 +12,13 @@ and the byte reading only touches the filesystem.
 """
 
 import os
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from django.test import override_settings
 from PIL import Image
+
+from telegram_bot.testing.bot_helpers import build_photo_message, build_state
 
 # Keep in sync with the bot test conftest seller range (used only as an FSM
 # payload value here — nothing is persisted, so the exact id is irrelevant).
@@ -33,28 +35,6 @@ def _real_jpeg_bytes() -> bytes:
     buffer = io.BytesIO()
     image.save(buffer, format="JPEG", quality=95)
     return buffer.getvalue()
-
-
-def _build_state(data: dict) -> MagicMock:
-    """Build a mock FSMContext backed by the given state data."""
-    state = MagicMock()
-    state.get_data = AsyncMock(return_value=data)
-    state.update_data = AsyncMock()
-    state.set_state = AsyncMock()
-    return state
-
-
-def _build_photo_message(file_size: int = 1024) -> MagicMock:
-    """Build a mock Telegram message carrying a single in-limit photo."""
-    photo_item = MagicMock()
-    photo_item.file_id = "test_file_id"
-    photo_item.file_size = file_size
-    message = MagicMock()
-    message.text = None
-    message.photo = [photo_item]
-    message.answer = AsyncMock()
-    message.bot = MagicMock()
-    return message
 
 
 def _write_staging_file(media_root, name: str, size: int) -> None:
@@ -79,8 +59,8 @@ class TestStagingBudgetBoundary:
 
         _write_staging_file(tmp_path, "existing.jpg", 10)
 
-        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
-        message = _build_photo_message()
+        state = build_state({"photos": [], "user_id": _TEST_SELLER_ID})
+        message = build_photo_message()
 
         with (
             override_settings(
@@ -111,8 +91,8 @@ class TestStagingBudgetBoundary:
         budget = 1024
         _write_staging_file(tmp_path, "existing.jpg", budget)
 
-        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
-        message = _build_photo_message()
+        state = build_state({"photos": [], "user_id": _TEST_SELLER_ID})
+        message = build_photo_message()
 
         with (
             override_settings(
@@ -148,8 +128,8 @@ class TestStagingBudgetBoundary:
 
         _write_staging_file(tmp_path, "existing.jpg", 4096)
 
-        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
-        message = _build_photo_message()
+        state = build_state({"photos": [], "user_id": _TEST_SELLER_ID})
+        message = build_photo_message()
 
         with (
             override_settings(
@@ -189,8 +169,8 @@ class TestStagingBudgetBoundary:
 
         _write_staging_file(tmp_path, "existing.jpg", 20)
 
-        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
-        message = _build_photo_message()
+        state = build_state({"photos": [], "user_id": _TEST_SELLER_ID})
+        message = build_photo_message()
 
         with (
             override_settings(
@@ -232,8 +212,8 @@ class TestStagingBudgetIsBounded:
 
         _write_staging_file(tmp_path, "existing.jpg", 10)
 
-        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
-        message = _build_photo_message()
+        state = build_state({"photos": [], "user_id": _TEST_SELLER_ID})
+        message = build_photo_message()
 
         with (
             override_settings(
@@ -305,8 +285,8 @@ class TestStagingBudgetFsmCoherence:
 
         _write_staging_file(tmp_path, "existing.jpg", 4096)
 
-        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
-        message = _build_photo_message()
+        state = build_state({"photos": [], "user_id": _TEST_SELLER_ID})
+        message = build_photo_message()
 
         with (
             override_settings(
@@ -345,8 +325,8 @@ class TestStagingBudgetReadingSource:
         """The decision is driven by the value ``staging_bytes_used`` returns."""
         from telegram_bot.handlers.ad_create import process_photos
 
-        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
-        message = _build_photo_message()
+        state = build_state({"photos": [], "user_id": _TEST_SELLER_ID})
+        message = build_photo_message()
 
         # Force the reading over budget even though staging is empty; if the
         # handler re-derived the total itself, it would let this through.

@@ -16,6 +16,12 @@ import pytest
 from asgiref.sync import sync_to_async
 
 from apps.users.models import User
+from telegram_bot.testing.bot_helpers import (
+    build_message,
+    build_photo_message,
+    build_state,
+    mock_translate,
+)
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -37,55 +43,6 @@ def seller_id(seller: User) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
-def _build_message(language_code: str | None) -> MagicMock:
-    """Build a mock Telegram message for the preview/confirm step."""
-    user_mock = MagicMock()
-    user_mock.language_code = language_code
-    message = MagicMock()
-    message.text = "confirm"
-    message.from_user = user_mock
-    message.answer = AsyncMock()
-    return message
-
-
-def _build_state(data: dict) -> MagicMock:
-    """Build a mock FSMContext backed by the given state data."""
-    state = MagicMock()
-    state.get_data = AsyncMock(return_value=data)
-    state.clear = AsyncMock()
-    return state
-
-
-async def _mock_translate(text: str, target_locales: list[str]) -> dict[str, str]:
-    """Return deterministic translations without hitting the real API."""
-    return {loc: f"{text}-{loc}" for loc in target_locales}
-
-
-def _build_photo_message(file_size: int | None = 1024) -> MagicMock:
-    """Build a mock Telegram message containing a single photo upload.
-
-    Args:
-        file_size: The ``PhotoSize.file_size`` value to set on the mock photo.
-            Defaults to 1024 (within the 2 MB limit) so existing tests proceed
-            past the pre-check. Pass ``None`` to simulate Telegram omitting
-            the field, or an int above the limit to trigger rejection.
-    """
-    photo_item = MagicMock()
-    photo_item.file_id = "test_file_id"
-    photo_item.file_size = file_size
-    message = MagicMock()
-    message.text = None
-    message.photo = [photo_item]
-    message.answer = AsyncMock()
-    message.bot = MagicMock()
-    return message
-
-
-# ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
 
@@ -103,7 +60,7 @@ class TestProcessPreviewLanguageDetection:
 
         ad = await create_draft_ad(user_id=seller_id)
 
-        state = _build_state(
+        state = build_state(
             {
                 "ad_id": ad.id,
                 "title": "Valid Title",
@@ -115,11 +72,11 @@ class TestProcessPreviewLanguageDetection:
             }
         )
 
-        message = _build_message("en-US")
+        message = build_message("en-US")
 
         with patch(
             "telegram_bot.handlers.ad_create.submit.translate_all_languages",
-            _mock_translate,
+            mock_translate,
         ):
             await process_preview(message, state)
 
@@ -138,7 +95,7 @@ class TestProcessPreviewLanguageDetection:
 
         ad = await create_draft_ad(user_id=seller_id)
 
-        state = _build_state(
+        state = build_state(
             {
                 "ad_id": ad.id,
                 "title": "Valid Title",
@@ -150,11 +107,11 @@ class TestProcessPreviewLanguageDetection:
             }
         )
 
-        message = _build_message(None)
+        message = build_message(None)
 
         with patch(
             "telegram_bot.handlers.ad_create.submit.translate_all_languages",
-            _mock_translate,
+            mock_translate,
         ):
             await process_preview(message, state)
 
@@ -165,17 +122,25 @@ class TestProcessPreviewLanguageDetection:
 
 
 class TestProcessPhotos:
-    """Tests for process_photos — upload cap, rate limit, and done handling."""
+    """Tests for process_photos — upload cap, rate limit, and done handling.
+
+    Mock-only: the full download/validate/save chain is stubbed, so no
+    database is required. The class-level ``django_db(transaction=False)``
+    overrides the module's ``transaction=True`` to skip the expensive
+    per-test ``TRUNCATE ... CASCADE`` while keeping the connection cheap.
+    """
+
+    pytestmark = [pytest.mark.unit, pytest.mark.django_db(transaction=False)]
 
     @pytest.mark.asyncio
     async def test_process_photos_rejects_after_five(self) -> None:
         """5 photos already in state — a new photo upload is rejected with the cap message."""
         from telegram_bot.handlers.ad_create import process_photos
 
-        state = _build_state(
+        state = build_state(
             {"photos": [{}, {}, {}, {}, {}], "user_id": _TEST_SELLER_ID}
         )
-        message = _build_photo_message()
+        message = build_photo_message()
 
         with patch("telegram_bot.handlers.ad_create.photos.download_photo") as mock_download:
             await process_photos(message, state)
@@ -190,8 +155,8 @@ class TestProcessPhotos:
         """'done' with 0 photos shows 'at least 1', not 'at most 5'."""
         from telegram_bot.handlers.ad_create import process_photos
 
-        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
-        message = _build_message(None)
+        state = build_state({"photos": [], "user_id": _TEST_SELLER_ID})
+        message = build_message(None)
         message.text = "done"
 
         await process_photos(message, state)
@@ -206,8 +171,8 @@ class TestProcessPhotos:
         """'done' with 6 photos shows 'at most 5', not 'at least 1'."""
         from telegram_bot.handlers.ad_create import process_photos
 
-        state = _build_state({"photos": [{}] * 6, "user_id": _TEST_SELLER_ID})
-        message = _build_message(None)
+        state = build_state({"photos": [{}] * 6, "user_id": _TEST_SELLER_ID})
+        message = build_message(None)
         message.text = "done"
 
         await process_photos(message, state)
@@ -227,8 +192,8 @@ class TestProcessPhotos:
             AsyncMock(return_value=False),
         )
 
-        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
-        message = _build_photo_message()
+        state = build_state({"photos": [], "user_id": _TEST_SELLER_ID})
+        message = build_photo_message()
 
         with patch("telegram_bot.handlers.ad_create.photos.download_photo") as mock_download:
             await process_photos(message, state)
@@ -250,8 +215,8 @@ class TestProcessPhotos:
             AsyncMock(return_value=True),
         )
 
-        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
-        message = _build_photo_message(file_size=3 * 1024 * 1024)
+        state = build_state({"photos": [], "user_id": _TEST_SELLER_ID})
+        message = build_photo_message(file_size=3 * 1024 * 1024)
 
         with patch("telegram_bot.handlers.ad_create.photos.download_photo") as mock_download:
             await process_photos(message, state)
@@ -268,11 +233,11 @@ class TestProcessPhotos:
         """'done' with 1-4 photos transitions to preview state and calls show_preview."""
         from telegram_bot.handlers.ad_create import AdCreateForm, process_photos
 
-        state = _build_state({"photos": [{}], "user_id": _TEST_SELLER_ID})
+        state = build_state({"photos": [{}], "user_id": _TEST_SELLER_ID})
         state.update_data = AsyncMock()
         state.set_state = AsyncMock()
 
-        message = _build_message(None)
+        message = build_message(None)
         message.text = "done"
 
         with patch(
@@ -293,8 +258,8 @@ class TestProcessPhotos:
             AsyncMock(return_value=True),
         )
 
-        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
-        message = _build_photo_message()
+        state = build_state({"photos": [], "user_id": _TEST_SELLER_ID})
+        message = build_photo_message()
 
         with patch(
             "telegram_bot.handlers.ad_create.photos.download_photo",
@@ -316,8 +281,8 @@ class TestProcessPhotos:
             AsyncMock(return_value=True),
         )
 
-        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
-        message = _build_photo_message()
+        state = build_state({"photos": [], "user_id": _TEST_SELLER_ID})
+        message = build_photo_message()
 
         with (
             patch(
@@ -364,9 +329,9 @@ class TestProcessPhotos:
             AsyncMock(return_value=True),
         )
 
-        state = _build_state({"photos": [], "user_id": _TEST_SELLER_ID})
+        state = build_state({"photos": [], "user_id": _TEST_SELLER_ID})
         state.update_data = AsyncMock()
-        message = _build_photo_message(file_size=1024)
+        message = build_photo_message(file_size=1024)
 
         with (
             override_settings(MEDIA_ROOT=str(tmp_path)),
@@ -410,6 +375,8 @@ class TestDownloadPhotoBoundedRead:
     that raises as soon as the byte cap is crossed. These tests simulate
     aiogram's per-chunk ``destination.write()`` contract (64 KB chunks).
     """
+
+    pytestmark = [pytest.mark.unit, pytest.mark.django_db(transaction=False)]
 
     @pytest.mark.asyncio
     async def test_download_photo_aborts_on_oversized_stream(self) -> None:
@@ -556,7 +523,7 @@ class TestCancelAfterSubmit:
             # Call /cancel — ad is PUBLISHED, cleanup must be skipped
             cancel_msg = MagicMock()
             cancel_msg.answer = AsyncMock()
-            cancel_state = _build_state({"ad_id": ad.id})
+            cancel_state = build_state({"ad_id": ad.id})
 
             await cmd_cancel(cancel_msg, cancel_state)
 
@@ -642,7 +609,7 @@ class TestCancelAfterSubmit:
                 )
                 cancel_msg = MagicMock()
                 cancel_msg.answer = AsyncMock()
-                cancel_state = _build_state({"ad_id": ad.id})
+                cancel_state = build_state({"ad_id": ad.id})
 
                 await cmd_cancel(cancel_msg, cancel_state)
 
@@ -683,7 +650,7 @@ class TestCancelAfterSubmit:
             staging_file.write_bytes(b"staging data")
 
             # FSM state with a staging key (as process_photos would store)
-            cancel_state = _build_state(
+            cancel_state = build_state(
                 {
                     "ad_id": ad.id,
                     "photos": [

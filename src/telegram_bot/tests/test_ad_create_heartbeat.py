@@ -28,6 +28,7 @@ from django.db import OperationalError
 from apps.core.enums import AdStatus
 from apps.media.services.filesystem import STAGING_PREFIX
 from conftest import create_test_ad
+from telegram_bot.testing.bot_helpers import build_state
 
 pytestmark = [
     pytest.mark.django_db(transaction=True),
@@ -46,15 +47,6 @@ def _lock_timeout_error() -> OperationalError:
     return exc
 
 
-def _build_state(data: dict) -> MagicMock:
-    state = MagicMock()
-    state.get_data = AsyncMock(return_value=data)
-    state.clear = AsyncMock()
-    state.update_data = AsyncMock()
-    state.set_state = AsyncMock()
-    return state
-
-
 # ---------------------------------------------------------------------------
 # The heartbeat fires on dialog-handler entry
 # ---------------------------------------------------------------------------
@@ -68,7 +60,7 @@ class TestHeartbeatFiresOnEntry:
         """``process_city`` heartbeats with the ad id from the FSM state."""
         from telegram_bot.handlers.ad_create.city import process_city
 
-        state = _build_state({"ad_id": 4242})
+        state = build_state({"ad_id": 4242})
         message = MagicMock()
         message.text = "Podgorica"
         message.answer = AsyncMock()
@@ -96,7 +88,7 @@ class TestHeartbeatFiresOnEntry:
         """A dialog state with no ``ad_id`` does not heartbeat."""
         from telegram_bot.handlers.ad_create.text import process_title
 
-        state = _build_state({"title": "x"})
+        state = build_state({"title": "x"})
         message = MagicMock()
         message.text = "A valid enough title"
         message.answer = AsyncMock()

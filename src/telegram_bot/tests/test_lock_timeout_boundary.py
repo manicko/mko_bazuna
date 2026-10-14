@@ -20,6 +20,8 @@ import pytest
 from django.db import OperationalError
 from django.utils import translation  # noqa: F401 - used by localisation tests
 
+from telegram_bot.testing.bot_helpers import build_message, build_state, mock_translate
+
 pytestmark = [
     pytest.mark.django_db(transaction=True),
     pytest.mark.integration,
@@ -37,33 +39,6 @@ def _lock_timeout_error() -> OperationalError:
     return exc
 
 
-def _build_message(text: str = "confirm", language_code: str | None = "en-US"):
-    user_mock = MagicMock()
-    user_mock.language_code = language_code
-    user_mock.id = 900000100
-    user_mock.username = None
-    user_mock.first_name = "Test"
-    user_mock.last_name = "User"
-    message = MagicMock()
-    message.text = text
-    message.from_user = user_mock
-    message.answer = AsyncMock()
-    return message
-
-
-def _build_state(data: dict) -> MagicMock:
-    state = MagicMock()
-    state.get_data = AsyncMock(return_value=data)
-    state.clear = AsyncMock()
-    state.update = AsyncMock()
-    state.update_data = AsyncMock()
-    return state
-
-
-async def _mock_translate(text: str, target_locales: list[str]) -> dict[str, str]:
-    return {loc: f"{text}-{loc}" for loc in target_locales}
-
-
 class TestProcessPreviewLockTimeout:
     """``process_preview`` keeps the dialog alive on a transient lock failure."""
 
@@ -71,7 +46,7 @@ class TestProcessPreviewLockTimeout:
     async def test_lock_timeout_answers_busy_and_keeps_state(self) -> None:
         from telegram_bot.handlers.ad_create import process_preview
 
-        state = _build_state(
+        state = build_state(
             {
                 "ad_id": 1,
                 "title": "Valid Title",
@@ -82,12 +57,12 @@ class TestProcessPreviewLockTimeout:
                 "user_id": 900000100,
             }
         )
-        message = _build_message()
+        message = build_message()
 
         with (
             patch(
                 "telegram_bot.handlers.ad_create.submit.translate_all_languages",
-                _mock_translate,
+                mock_translate,
             ),
             patch(
                 "telegram_bot.handlers.ad_create.submit.submit_ad",
@@ -122,7 +97,7 @@ class TestProcessPreviewLockTimeout:
         from telegram_bot.services.ad_data import create_draft_ad
 
         ad = await create_draft_ad(user_id=seller.id)
-        state = _build_state(
+        state = build_state(
             {
                 "ad_id": ad.id,
                 "title": "Valid Title",
@@ -133,12 +108,12 @@ class TestProcessPreviewLockTimeout:
                 "user_id": 900000100,
             }
         )
-        message = _build_message()
+        message = build_message()
 
         with (
             patch(
                 "telegram_bot.handlers.ad_create.submit.translate_all_languages",
-                _mock_translate,
+                mock_translate,
             ),
             patch(
                 "telegram_bot.handlers.ad_create.submit.submit_ad",
@@ -158,7 +133,7 @@ class TestProcessPreviewLockTimeout:
         """An unrelated ``OperationalError`` is not swallowed."""
         from telegram_bot.handlers.ad_create import process_preview
 
-        state = _build_state(
+        state = build_state(
             {
                 "ad_id": 1,
                 "title": "Valid Title",
@@ -169,13 +144,13 @@ class TestProcessPreviewLockTimeout:
                 "user_id": 900000100,
             }
         )
-        message = _build_message()
+        message = build_message()
         unrelated = OperationalError("connection refused")
 
         with (
             patch(
                 "telegram_bot.handlers.ad_create.submit.translate_all_languages",
-                _mock_translate,
+                mock_translate,
             ),
             patch(
                 "telegram_bot.handlers.ad_create.submit.submit_ad",
@@ -227,13 +202,13 @@ class TestProcessPreviewLocalisedErrors:
 
         data = self._payload(seller, category, city)
         data["ad_id"] = 999_999_999  # forces submit_ad's DRAFT_GONE outcome
-        state = _build_state(data)
-        message = _build_message()
+        state = build_state(data)
+        message = build_message()
 
         with (
             patch(
                 "telegram_bot.handlers.ad_create.submit.translate_all_languages",
-                _mock_translate,
+                mock_translate,
             ),
             translation.override("ru"),
         ):
@@ -261,13 +236,13 @@ class TestProcessPreviewLocalisedErrors:
 
         data = self._payload(seller, category, city)
         data["ad_id"] = 999_999_999
-        state = _build_state(data)
-        message = _build_message()
+        state = build_state(data)
+        message = build_message()
 
         with (
             patch(
                 "telegram_bot.handlers.ad_create.submit.translate_all_languages",
-                _mock_translate,
+                mock_translate,
             ),
             translation.override("bs"),
         ):
@@ -315,12 +290,12 @@ class TestHandleLoginLockTimeout:
         # The handler hashes the raw token before calling handle_login_orm.
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
-        message = _build_message(text=f"/start login_{raw_token}")
+        message = build_message(text=f"/start login_{raw_token}")
         message.from_user.id = 900000100
         message.from_user.language_code = "en"
 
         bot = MagicMock()
-        state = _build_state({})
+        state = build_state({})
 
         with (
             patch.object(
@@ -374,11 +349,11 @@ class TestHandleLoginLockTimeout:
         raw_token = "bbbdefghijklmnopqrstuvwxyz012345"
         token_hash = hashlib.sha256(raw_token.encode()).hexdigest()
 
-        message = _build_message(text=f"/start login_{raw_token}")
+        message = build_message(text=f"/start login_{raw_token}")
         message.from_user.id = 900000100
         message.from_user.language_code = "en"
         bot = MagicMock()
-        state = _build_state({})
+        state = build_state({})
 
         @sync_to_async
         def _raise_in_worker() -> None:
