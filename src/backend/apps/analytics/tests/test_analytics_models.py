@@ -15,7 +15,7 @@ import pytest
 from django.db import IntegrityError, transaction
 
 from apps.analytics.models import AnalyticsEvent, DailyAdMetrics
-from apps.core.enums import AnalyticsEventType
+from apps.core.enums import AdStatus, AnalyticsEventType
 from conftest import create_test_ad
 
 pytestmark = [pytest.mark.django_db, pytest.mark.unit]
@@ -34,7 +34,8 @@ class TestDailyAdMetricsUniqueConstraint:
     ) -> None:
         """Creating two DailyAdMetrics rows with the same (ad, date) raises IntegrityError."""
         ad = create_test_ad(
-            seller, category, city, title="Unique Constraint Ad"
+            seller, category, city, title="Unique Constraint Ad",
+            status=AdStatus.PUBLISHED,
         )
         target_date = date(2026, 1, 15)
 
@@ -46,7 +47,7 @@ class TestDailyAdMetricsUniqueConstraint:
         )
 
         with pytest.raises(IntegrityError):
-            with transaction.atomic():
+            with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
                 DailyAdMetrics.objects.create(
                     ad=ad,
                     date=target_date,
@@ -59,10 +60,12 @@ class TestDailyAdMetricsUniqueConstraint:
     ) -> None:
         """Rows with the same date but different ads are allowed."""
         ad1 = create_test_ad(
-            seller, category, city, title="Constraint Ad 1"
+            seller, category, city, title="Constraint Ad 1",
+            status=AdStatus.PUBLISHED,
         )
         ad2 = create_test_ad(
-            seller, category, city, title="Constraint Ad 2"
+            seller, category, city, title="Constraint Ad 2",
+            status=AdStatus.PUBLISHED,
         )
         target_date = date(2026, 1, 15)
 
@@ -80,7 +83,8 @@ class TestDailyAdMetricsUniqueConstraint:
     ) -> None:
         """Multiple dates for the same ad are allowed (no cross-day conflict)."""
         ad = create_test_ad(
-            seller, category, city, title="Multi Date Ad"
+            seller, category, city, title="Multi Date Ad",
+            status=AdStatus.PUBLISHED,
         )
 
         DailyAdMetrics.objects.create(
@@ -104,7 +108,8 @@ class TestAnalyticsEventSourceDefault:
     def test_created_without_source_has_none(self, seller, category, city) -> None:
         """An AnalyticsEvent created without ``source`` has ``source=None``."""
         ad = create_test_ad(
-            seller, category, city, title="Source Default Ad"
+            seller, category, city, title="Source Default Ad",
+            status=AdStatus.PUBLISHED,
         )
 
         event = AnalyticsEvent.objects.create(
@@ -145,7 +150,8 @@ class TestDailyAdMetricsTimestamps:
     def test_created_at_set_on_create(self, seller, category, city) -> None:
         """``created_at`` is automatically populated on insert."""
         ad = create_test_ad(
-            seller, category, city, title="Created At Ad"
+            seller, category, city, title="Created At Ad",
+            status=AdStatus.PUBLISHED,
         )
 
         metrics = DailyAdMetrics.objects.create(
@@ -157,7 +163,8 @@ class TestDailyAdMetricsTimestamps:
     def test_updated_at_set_on_create(self, seller, category, city) -> None:
         """``updated_at`` is automatically populated on insert."""
         ad = create_test_ad(
-            seller, category, city, title="Updated At Ad"
+            seller, category, city, title="Updated At Ad",
+            status=AdStatus.PUBLISHED,
         )
 
         metrics = DailyAdMetrics.objects.create(
@@ -169,7 +176,8 @@ class TestDailyAdMetricsTimestamps:
     def test_updated_at_refreshed_on_save(self, seller, category, city) -> None:
         """``updated_at`` is refreshed on ``save()``; ``created_at`` is not."""
         ad = create_test_ad(
-            seller, category, city, title="Save Refresh Ad"
+            seller, category, city, title="Save Refresh Ad",
+            status=AdStatus.PUBLISHED,
         )
 
         metrics = DailyAdMetrics.objects.create(

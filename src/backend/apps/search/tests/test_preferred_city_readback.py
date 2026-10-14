@@ -161,11 +161,13 @@ class TestListingsPreferredCityReadback:
         # non-empty and the city filter — not the all-ads fallthrough — decides
         # what page 2 shows. PER_PAGE is the view's constant 24.
         budva_ads = create_test_ads_bulk(
-            seller, category, budva, 30, title_prefix="Budva Ad"
+            seller, category, budva, 30, title_prefix="Budva Ad",
+            status=AdStatus.PUBLISHED,
         )
         budva_ids = [ad.id for ad in budva_ads]
         create_test_ads_bulk(
-            seller, category, podgorica, 30, title_prefix="Podgorica Ad"
+            seller, category, podgorica, 30, title_prefix="Podgorica Ad",
+            status=AdStatus.PUBLISHED,
         )
 
         client.cookies["preferred_city"] = "budva"

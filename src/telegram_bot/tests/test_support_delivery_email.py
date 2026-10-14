@@ -20,6 +20,8 @@ conftest (consolidated from previously-duplicated local helpers — B28-SUPP-2).
 
 from __future__ import annotations
 
+from collections.abc import Callable
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -48,7 +50,7 @@ class TestRecipientResolution:
 
     @pytest.mark.asyncio
     async def test_uses_settings_recipients_when_set(
-        self, make_ticket: callable, make_contact: callable
+        self, make_ticket: Callable[..., Any], make_contact: Callable[..., Any]
     ) -> None:
         """Configured recipients take precedence over contacts."""
         ticket = await make_ticket()
@@ -65,7 +67,7 @@ class TestRecipientResolution:
 
     @pytest.mark.asyncio
     async def test_falls_back_to_email_contacts(
-        self, make_ticket: callable, make_contact: callable
+        self, make_ticket: Callable[..., Any], make_contact: Callable[..., Any]
     ) -> None:
         """Empty settings fall back to active EMAIL-type support contacts."""
         ticket = await make_ticket()
@@ -79,7 +81,7 @@ class TestRecipientResolution:
 
     @pytest.mark.asyncio
     async def test_ignores_non_email_contacts(
-        self, make_ticket: callable, make_contact: callable
+        self, make_ticket: Callable[..., Any], make_contact: Callable[..., Any]
     ) -> None:
         """Only EMAIL-channel contacts are used as recipients."""
         ticket = await make_ticket()
@@ -99,7 +101,7 @@ class TestEmailContent:
     """The delivered email carries ticket details and reference."""
 
     @pytest.mark.asyncio
-    async def test_subject_contains_ticket_ref(self, make_ticket: callable) -> None:
+    async def test_subject_contains_ticket_ref(self, make_ticket: Callable[..., Any]) -> None:
         """Subject embeds the human-readable ticket reference."""
         ticket = await make_ticket(ticket_ref="SUP-202609-001")
 
@@ -112,7 +114,7 @@ class TestEmailContent:
         assert "SUP-202609-001" in mail.outbox[0].subject
 
     @pytest.mark.asyncio
-    async def test_body_includes_ticket_details(self, make_ticket: callable) -> None:
+    async def test_body_includes_ticket_details(self, make_ticket: Callable[..., Any]) -> None:
         """Body contains ticket_ref, telegram_id, username, and message text."""
         ticket = await make_ticket(
             ticket_ref="SUP-202609-002",
@@ -138,7 +140,7 @@ class TestFailOpen:
     """Delivery never raises on missing recipients or email failures."""
 
     @pytest.mark.asyncio
-    async def test_no_recipients_is_noop(self, make_ticket: callable) -> None:
+    async def test_no_recipients_is_noop(self, make_ticket: Callable[..., Any]) -> None:
         """Empty recipients log a warning and send nothing (fail-open)."""
         ticket = await make_ticket()
 
@@ -148,7 +150,7 @@ class TestFailOpen:
         assert mail.outbox == []
 
     @pytest.mark.asyncio
-    async def test_send_mail_failure_is_swallowed(self, make_ticket: callable) -> None:
+    async def test_send_mail_failure_is_swallowed(self, make_ticket: Callable[..., Any]) -> None:
         """A raised ``send_mail`` is logged, not propagated (fail-open)."""
         ticket = await make_ticket()
 

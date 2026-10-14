@@ -8,6 +8,7 @@ in ``test_rate_limit_service.py``.
 
 from __future__ import annotations
 
+import pytest
 from django.core.cache import cache
 
 from telegram_bot.services.rate_limit import (

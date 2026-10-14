@@ -118,7 +118,12 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     ca-certificates \
     coreutils \
     gettext \
+    # apt-get upgrade patches general OS packages; the explicit
+    # --only-upgrade for curl/libcurl4t64 handles the case where a version
+    # bump introduces new dependencies — apt-get upgrade skips such packages
+    # (they are "kept back"), leaving CVEs unresolved (12-OPS-013, GH-218).
     && apt-get upgrade -y --no-install-recommends \
+    && apt-get install -y --only-upgrade --no-install-recommends curl libcurl4t64 \
     && rm -rf /var/lib/apt/lists/*
 
 # Remove system-level Python packages from the base image that are not needed

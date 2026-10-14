@@ -20,7 +20,7 @@ from django.db.models import Min
 def dedup_media_deletion_errors(apps: object, schema_editor: object) -> None:
     MediaDeletionError = apps.get_model("media", "MediaDeletionError")  # type: ignore[attr-defined]
 
-    with transaction.atomic():
+    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]
         keep_ids = list(
             MediaDeletionError.objects.values("storage_key", "error_type")
             .annotate(keep_id=Min("id"))

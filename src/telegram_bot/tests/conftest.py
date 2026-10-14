@@ -177,7 +177,6 @@ def make_contact() -> Callable[..., Awaitable[Any]]:
         telegram_id: int | None = None,
         active: bool = True,
     ) -> Any:
-        from apps.core.enums import SupportChannelType
         from apps.core.models import SupportContact
 
         defaults: dict[str, object] = {

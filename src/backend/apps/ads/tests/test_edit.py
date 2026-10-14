@@ -23,6 +23,7 @@ from decimal import Decimal
 from unittest.mock import patch
 
 import pytest
+from django.core.cache import cache
 from django.db.models.signals import post_save
 from django.test import Client
 from django.urls import reverse
@@ -36,6 +37,7 @@ from apps.ads.views.edit import (
 )
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
+from apps.currencies.models import ExchangeRate
 from apps.currencies.services.price_normalizer import PriceNormalizer
 from conftest import create_test_ad, make_user
 
@@ -338,6 +340,25 @@ class TestPublishedTextEdit:
     PUBLISHED (no auto-moderation) and restart the auto-archive clock.
     Mixed edits follow the text rule.
     """
+
+    @pytest.fixture(autouse=True)
+    def _seed_eur_rate(self) -> None:
+        """Ensure the EUR exchange rate exists for PriceNormalizer.
+
+        Mirrors the autouse fixture in ``test_submission.py``: ``django_db``
+        tests share transaction rollback, and the session-scoped exchange-rate
+        seed may be truncated if a prior ``transaction=True`` worker rolled back.
+        """
+        cache.clear()
+        ExchangeRate.objects.update_or_create(
+            currency=CurrencyCode.EUR.value,
+            defaults={
+                "rate_to_eur": "1.0",
+                "effective_date": "2026-08-22",
+                "source": "manual_seed",
+                "is_current": True,
+            },
+        )
 
     def test_edit_published_text_edit_transitions_to_on_moderation(
         self, client_, seller, category, city
