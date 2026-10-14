@@ -231,16 +231,21 @@ class TestImageGenerator:
 
     @pytest.fixture(autouse=True)
     def _setup_class(self, db: None) -> None:
-        user = User.objects.create(
-            username="imguser",
+        user = User.objects.get_or_create(
             telegram_id=9999,
-            chat_id=9999,
-            password="!",
-        )
-        cat = Category.objects.create(name="Тест", slug="apartments")
-        city = City.objects.create(
-            name="Тест", slug="test-city", region="Test", country_code="ME"
-        )
+            defaults={
+                "username": "imguser",
+                "chat_id": 9999,
+                "password": "!",
+            },
+        )[0]
+        cat = Category.objects.get_or_create(
+            slug="apartments", defaults={"name": "Тест"}
+        )[0]
+        city = City.objects.get_or_create(
+            slug="test-city",
+            defaults={"name": "Тест", "region": "Test", "country_code": "ME"},
+        )[0]
         self.ad = create_test_ad(
             user,
             cat,
@@ -392,16 +397,21 @@ class TestImageGeneratorTruthfulness:
     @pytest.fixture(autouse=True)
     def _setup_class(self, db: None) -> None:
         """Reuse the standard status-grounded test ad and category."""
-        user = User.objects.create(
-            username="imgtruth-user",
+        user = User.objects.get_or_create(
             telegram_id=9998,
-            chat_id=9998,
-            password="!",
-        )
-        cat = Category.objects.create(name="Тест", slug="apartments")
-        city = City.objects.create(
-            name="Тест", slug="truth-city", region="Test", country_code="ME"
-        )
+            defaults={
+                "username": "imgtruth-user",
+                "chat_id": 9998,
+                "password": "!",
+            },
+        )[0]
+        cat = Category.objects.get_or_create(
+            slug="apartments", defaults={"name": "Тест"}
+        )[0]
+        city = City.objects.get_or_create(
+            slug="truth-city",
+            defaults={"name": "Тест", "region": "Test", "country_code": "ME"},
+        )[0]
         self.ad = create_test_ad(
             user,
             cat,
@@ -757,9 +767,10 @@ class TestSeedCommand:
     @pytest.fixture(autouse=True)
     def _setup_class(self, db: None) -> None:
         # Create prerequisite data (categories and cities)
-        Category.objects.create(name="Тест", slug="test-seed")
-        City.objects.create(
-            name="Будва", slug="budva", region="Coastal", country_code="ME"
+        Category.objects.get_or_create(slug="test-seed", defaults={"name": "Тест"})
+        City.objects.get_or_create(
+            slug="budva",
+            defaults={"name": "Будва", "region": "Coastal", "country_code": "ME"},
         )
 
     def test_seed_with_zero_count(self) -> None:
@@ -1099,9 +1110,10 @@ class TestSeedCommandEnhanced:
         from apps.categories.models import Category
         from apps.locations.models import City
 
-        Category.objects.create(name="Тест", slug="test-seed")
-        City.objects.create(
-            name="Будва", slug="budva", region="Coastal", country_code="ME"
+        Category.objects.get_or_create(slug="test-seed", defaults={"name": "Тест"})
+        City.objects.get_or_create(
+            slug="budva",
+            defaults={"name": "Будва", "region": "Coastal", "country_code": "ME"},
         )
 
     @override_settings(MEDIA_ROOT=tempfile.mkdtemp())
@@ -1197,11 +1209,13 @@ class TestSeedCategoryIntegration:
         )
         load_catalog(CATALOG_PATH)
 
-        City.objects.create(
-            name="Будва", slug="budva", region="Coastal", country_code="ME"
+        City.objects.get_or_create(
+            slug="budva",
+            defaults={"name": "Будва", "region": "Coastal", "country_code": "ME"},
         )
-        City.objects.create(
-            name="Подгорица", slug="podgorica", region="Central", country_code="ME"
+        City.objects.get_or_create(
+            slug="podgorica",
+            defaults={"name": "Подгорица", "region": "Central", "country_code": "ME"},
         )
 
     def test_builder_loads_all_leaf_slugs(self) -> None:
