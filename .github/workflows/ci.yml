@@ -72,10 +72,12 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           # Trivy v0.56+ defaults to mirror.gcr.io/aquasec/trivy-db:2 (tried first),
-          # which intermittently returns 404. The built-in fallback to ghcr.io only
-          # triggers on transient errors (429/5xx), not 404, so the scan crashes.
-          # Override to use ghcr.io directly (ref: trivy.dev/docs/configuration/db/).
-          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
+          # which intermittently 404s; its built-in ghcr.io fallback only triggers on
+          # transient errors (429/5xx), not 404, so a 404 crashes the scan. Pin to
+          # the official AWS ECR Public mirror instead (ref: trivy.dev/docs/configuration/db/)
+          # — the maintainers' primary mirror and, unlike a ghcr.io namespace, it
+          # satisfies the 12-OPS-009 canonical-coordinate guard (test_ci_image_coordinate.py).
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
         with:
           image-ref: ghcr.io/${{ env.IMAGE_REPOSITORY }}:ci
           exit-code: 1
@@ -380,10 +382,12 @@ jobs:
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           # Trivy v0.56+ defaults to mirror.gcr.io/aquasec/trivy-db:2 (tried first),
-          # which intermittently returns 404. The built-in fallback to ghcr.io only
-          # triggers on transient errors (429/5xx), not 404, so the scan crashes.
-          # Override to use ghcr.io directly (ref: trivy.dev/docs/configuration/db/).
-          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
+          # which intermittently 404s; its built-in ghcr.io fallback only triggers on
+          # transient errors (429/5xx), not 404, so a 404 crashes the scan. Pin to
+          # the official AWS ECR Public mirror instead (ref: trivy.dev/docs/configuration/db/)
+          # — the maintainers' primary mirror and, unlike a ghcr.io namespace, it
+          # satisfies the 12-OPS-009 canonical-coordinate guard (test_ci_image_coordinate.py).
+          TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
         with:
           scan-type: fs
           scan-ref: .
