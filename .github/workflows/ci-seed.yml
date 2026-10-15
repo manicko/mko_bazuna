@@ -74,6 +74,12 @@ jobs:
           DJANGO_SETTINGS_MODULE: config.settings.test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+          # pytest-cov defaults --cov-config to .coveragerc, but the coverage
+          # config ([tool.coverage.run]) lives in the repo-root pyproject.toml.
+          # CI runs from src/backend, so coverage.py's CWD-only auto-discovery
+          # never finds it — omit patterns are silently absent and test files
+          # leak into coverage at 0%. Point coverage at the repo-root config.
+          COVERAGE_RCFILE: ${{ github.workspace }}/pyproject.toml
         run: uv run pytest -m "seed" --tb=short --cov=apps.seed --cov-fail-under=80 --durations=10 --cov-report=term --cov-report=xml --reuse-db
         working-directory: src/backend
 
