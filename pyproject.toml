@@ -186,7 +186,7 @@ markers = [
 [tool.coverage.run]
 branch = true
 source = ["src/backend", "src/telegram_bot"]
-omit = ["*/migrations/*", "*/tests/*", "*/test_*.py", "*/conftest.py", "*/manage.py", "*/wsgi.py", "*/asgi.py"]
+omit = ["**/migrations/*", "**/tests/*", "**/test_*.py", "**/conftest.py", "**/manage.py", "**/wsgi.py", "**/asgi.py"]
 
 [tool.coverage.report]
 fail_under = 80

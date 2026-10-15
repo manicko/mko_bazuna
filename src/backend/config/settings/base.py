@@ -309,6 +309,9 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    # Required explicitly in Django 6.0+ for PostgreSQL-specific features
+    # (SearchVectorField, GinIndex) used by apps.ads; harmless under Django 5.x.
+    "django.contrib.postgres",
     # Third-party
     "tailwind",
     "django_htmx",
