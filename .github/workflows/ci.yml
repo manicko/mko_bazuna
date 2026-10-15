@@ -70,6 +70,12 @@ jobs:
       - name: Scan Docker image for vulnerabilities
         if: always()
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          # Trivy v0.56+ defaults to mirror.gcr.io/aquasec/trivy-db:2 (tried first),
+          # which intermittently returns 404. The built-in fallback to ghcr.io only
+          # triggers on transient errors (429/5xx), not 404, so the scan crashes.
+          # Override to use ghcr.io directly (ref: trivy.dev/docs/configuration/db/).
+          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
         with:
           image-ref: ghcr.io/${{ env.IMAGE_REPOSITORY }}:ci
           exit-code: 1
@@ -88,7 +94,7 @@ jobs:
           retention-days: 14
 
       - name: Upload Docker image scan results
-        if: always()
+        if: ${{ always() && hashFiles('trivy-image-results.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: trivy-image-results.sarif
@@ -372,6 +378,12 @@ jobs:
       # --- Filesystem vulnerability + config scanning ---
       - name: Run Trivy vulnerability scanner in fs mode
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        env:
+          # Trivy v0.56+ defaults to mirror.gcr.io/aquasec/trivy-db:2 (tried first),
+          # which intermittently returns 404. The built-in fallback to ghcr.io only
+          # triggers on transient errors (429/5xx), not 404, so the scan crashes.
+          # Override to use ghcr.io directly (ref: trivy.dev/docs/configuration/db/).
+          TRIVY_DB_REPOSITORY: ghcr.io/aquasecurity/trivy-db:2
         with:
           scan-type: fs
           scan-ref: .
@@ -382,7 +394,9 @@ jobs:
           severity: CRITICAL,HIGH
 
       # --- Secret scanning ---
+      # Runs independently of the Trivy step so a Trivy crash does not skip secret scanning.
       - name: Run gitleaks secret scan
+        if: always()
         run: |
           curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.27.2/gitleaks_8.27.2_linux_x64.tar.gz | tar xz
           ./gitleaks detect --source . --exit-code 1 --report-format sarif --report-path gitleaks-results.sarif
@@ -395,19 +409,24 @@ jobs:
       # exit 2 and scanned nothing (12-OPS-001). Test trees are excluded via
       # [tool.bandit] exclude_dirs so the scan reports production code only.
       - name: Run SAST (bandit)
+        # Runs independently of the Trivy/gitleaks steps so a scanner crash
+        # does not skip static analysis.
+        if: always()
         run: uv run bandit -r src/backend src/telegram_bot -c pyproject.toml
         working-directory: .
 
       # --- SARIF uploads (runs even if scans find issues) ---
+      # Guard with hashFiles() so a skipped/crashed scan step does not produce
+      # a "Path does not exist" error on the upload.
       - name: Upload Trivy SARIF results
-        if: always()
+        if: ${{ always() && hashFiles('trivy-results.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: trivy-results.sarif
           category: trivy
 
       - name: Upload gitleaks SARIF results
-        if: always()
+        if: ${{ always() && hashFiles('gitleaks-results.sarif') != '' }}
         uses: github/codeql-action/upload-sarif@2892aa5e19bbd11bc0cff5427e3b750a04d9e3c2 # v4.38.2
         with:
           sarif_file: gitleaks-results.sarif
