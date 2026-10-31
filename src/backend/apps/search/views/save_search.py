@@ -5,6 +5,11 @@ Authenticated-only POST target for the "Сохранить поиск" modal. Ca
 current query + optional city/category/price filters, creates an active
 ``SavedSearch`` for the request user (with their ``LANGUAGE_CODE``), and
 returns an HTMX success fragment.
+
+The persistence semantics live in
+``apps.search.services.saved_searches.create_saved_search`` so the modal and the
+future ``/api/v1/`` create endpoint share one mutator stack (S3.1); this view
+keeps only the HTTP-shaped concerns (method gate, 400 refusal, modal re-render).
 """
 
 import logging
@@ -16,16 +21,20 @@ from django.utils.translation import gettext as _
 from pydantic import ValidationError
 
 from apps.categories.models import Category
-from apps.core.enums import LanguageLocale
-from apps.core.utils.sanitize import redact_free_text
-from apps.search.models import SavedSearch
 from apps.search.schemas import SavedSearchInput
+from apps.search.services.saved_searches import (
+    QUERY_MAX_LENGTH,
+    QueryTooLongError,
+    bound_query,
+    create_saved_search,
+)
 
 logger = logging.getLogger(__name__)
 
 # The persisted ``SavedSearch.query`` column bound; values over this are refused
-# at the boundary rather than silently truncated (08-SRCH-011).
-_QUERY_MAX_LENGTH = 200
+# at the boundary rather than silently truncated (08-SRCH-011). Re-exported from
+# the service so this module stays the single name existing tests import.
+_QUERY_MAX_LENGTH = QUERY_MAX_LENGTH
 
 
 @login_required
@@ -45,10 +54,10 @@ def save_search(request: HttpRequest) -> HttpResponse:
     it rejects — e.g. a negative price — re-renders this modal with an error
     and the submitted values preserved, and stores nothing.
 
-    ``redact_free_text`` is used rather than ``redact_search_query`` because the
-    latter truncates to 100 characters, which would silently change what the
-    saved search matches and contradict the ``max_length=200`` column bound this
-    view enforces (08-SRCH-011).
+    ``redact_free_text`` (used inside the service) is preferred over
+    ``redact_search_query`` because the latter truncates to 100 characters,
+    which would silently change what the saved search matches and contradict
+    the ``max_length=200`` column bound this view enforces (08-SRCH-011).
 
     Returns:
         The ``save_search_success.html`` fragment (or 405 for non-POST, 400 for
@@ -58,12 +67,13 @@ def save_search(request: HttpRequest) -> HttpResponse:
     if request.method != "POST":
         return HttpResponse(status=405)
 
-    query = redact_free_text((request.POST.get("query") or "").strip())
-    if len(query) > _QUERY_MAX_LENGTH:
+    try:
+        query = bound_query(request.POST.get("query") or "")
+    except QueryTooLongError as exc:
         logger.warning(
             "Refused over-cap saved-search query for user %s: %s chars > %s (08-SRCH-011)",
             request.user.pk,
-            len(query),
+            exc.length,
             _QUERY_MAX_LENGTH,
         )
         return HttpResponseBadRequest()
@@ -82,17 +92,12 @@ def save_search(request: HttpRequest) -> HttpResponse:
         )
         return _render_modal_error(request, query)
 
-    saved_search = SavedSearch.objects.create(
-        user=request.user,
-        query=query or None,
-        city_id=filters.city_id,
-        category_id=filters.category_id,
-        min_price=filters.min_price,
-        max_price=filters.max_price,
-        language=request.LANGUAGE_CODE or LanguageLocale.BOSNIAN.value,
-        is_active=True,
+    saved_search = create_saved_search(
+        request.user,
+        query=query,
+        filters=filters,
+        language=request.LANGUAGE_CODE,
     )
-    logger.info("Saved search %s created for user %s", saved_search.pk, request.user.pk)
 
     return render(
         request,

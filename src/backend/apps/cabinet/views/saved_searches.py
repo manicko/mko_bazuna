@@ -4,26 +4,39 @@ Cabinet Saved-Search management views (CAB-003).
 Per-search list with enable/disable, edit, and delete. Disable only flips
 ``is_active`` (the search stays saved — D9); delete removes the row, so it
 no longer fires alerts.
+
+The write semantics live in ``apps.search.services.saved_searches`` so these
+views and the future ``/api/v1/`` endpoints share one mutator stack (S3.1);
+these views keep only the HTTP-shaped concerns (405 gate, form re-render,
+redirect).
 """
 
 import logging
 
 from django.contrib.auth.decorators import login_required
-from django.http import HttpRequest, HttpResponse, HttpResponseRedirect
-from django.shortcuts import get_object_or_404, render
+from django.http import Http404, HttpRequest, HttpResponse, HttpResponseRedirect
+from django.shortcuts import render
 from django.urls import reverse
 from django.utils.translation import gettext as _
 from pydantic import ValidationError
 
 from apps.search.models import SavedSearch
 from apps.search.schemas import SavedSearchInput
+from apps.search.services.saved_searches import (
+    delete_saved_search,
+    toggle_saved_search,
+    update_saved_search,
+)
 
 logger = logging.getLogger(__name__)
 
 
 def _user_search(request: HttpRequest, pk: int) -> SavedSearch:
     """Return a saved search scoped to the request user or 404."""
-    return get_object_or_404(SavedSearch, pk=pk, user=request.user)
+    try:
+        return SavedSearch.objects.get(pk=pk, user=request.user)
+    except SavedSearch.DoesNotExist as exc:
+        raise Http404 from exc
 
 
 @login_required
@@ -46,15 +59,7 @@ def saved_search_toggle(request: HttpRequest, pk: int) -> HttpResponse:
     """Flip ``is_active`` (disable ≠ delete — D9), then return the row."""
     if request.method != "POST":
         return HttpResponse(status=405)
-    saved_search = _user_search(request, pk)
-    saved_search.is_active = not saved_search.is_active
-    saved_search.save(update_fields=["is_active", "updated_at"])
-    logger.info(
-        "Saved search %s for user %s set active=%s",
-        saved_search.pk,
-        request.user.pk,
-        saved_search.is_active,
-    )
+    saved_search = _toggle_or_404(request.user, pk)
     return _render_row(request, saved_search)
 
 
@@ -77,18 +82,12 @@ def saved_search_edit(request: HttpRequest, pk: int) -> HttpResponse:
                 saved_search,
                 error=_("Price must not be negative."),
             )
-        _apply_filters(saved_search, filters, request.POST.get("query") or "")
-        saved_search.language = request.LANGUAGE_CODE or saved_search.language
-        saved_search.save(
-            update_fields=[
-                "query",
-                "city",
-                "category",
-                "min_price",
-                "max_price",
-                "language",
-                "updated_at",
-            ]
+        update_saved_search(
+            request.user,
+            pk,
+            query=request.POST.get("query") or "",
+            filters=filters,
+            language=request.LANGUAGE_CODE,
         )
         return HttpResponseRedirect(reverse("cabinet:saved-searches"))
 
@@ -100,13 +99,7 @@ def saved_search_delete(request: HttpRequest, pk: int) -> HttpResponse:
     """Delete the saved search row (removal, distinct from disable — D9)."""
     if request.method != "POST":
         return HttpResponse(status=405)
-    saved_search = _user_search(request, pk)
-    logger.info(
-        "Deleting saved search %s for user %s",
-        saved_search.pk,
-        request.user.pk,
-    )
-    saved_search.delete()
+    _delete_or_404(request.user, pk)
     # HTMX: return an empty body so the row is swapped out of the list.
     if request.headers.get("HX-Request"):
         return HttpResponse("")
@@ -116,6 +109,22 @@ def saved_search_delete(request: HttpRequest, pk: int) -> HttpResponse:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
+
+def _toggle_or_404(user, pk: int) -> SavedSearch:
+    """Toggle ``pk`` for ``user`` or raise ``Http404`` on a foreign/missing row."""
+    try:
+        return toggle_saved_search(user, pk)
+    except SavedSearch.DoesNotExist as exc:
+        raise Http404 from exc
+
+
+def _delete_or_404(user, pk: int) -> None:
+    """Delete ``pk`` for ``user`` or raise ``Http404`` on a foreign/missing row."""
+    try:
+        delete_saved_search(user, pk)
+    except SavedSearch.DoesNotExist as exc:
+        raise Http404 from exc
 
 
 def _parse_filters(request: HttpRequest) -> SavedSearchInput | None:
@@ -133,28 +142,6 @@ def _parse_filters(request: HttpRequest) -> SavedSearchInput | None:
         )
     except ValidationError:
         return None
-
-
-def _apply_filters(
-    saved_search: SavedSearch, filters: SavedSearchInput, query: str
-) -> None:
-    """Copy the posted query + validated filters onto the saved search."""
-    from apps.categories.models import Category
-    from apps.locations.models import City
-
-    saved_search.query = query.strip() or None
-
-    saved_search.city = (
-        City.objects.filter(pk=filters.city_id).first() if filters.city_id else None
-    )
-    saved_search.category = (
-        Category.objects.filter(pk=filters.category_id).first()
-        if filters.category_id
-        else None
-    )
-
-    saved_search.min_price = filters.min_price
-    saved_search.max_price = filters.max_price
 
 
 def _render_edit_form(
