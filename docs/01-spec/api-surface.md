@@ -240,3 +240,11 @@ side effects should use the service tier or the `verify_parity` command (the pol
 - **S0.5:** `RateLimitBudget.API_PUBLIC_READ` (60 req / 60 s) and `RateLimitBudget.API_WRITE`
   (30 req / 60 s) shipped as StrEnum members in `apps/core/enums.py`; pins extended in
   `apps/core/tests/test_rate_limit_budget.py`. Numbers live in the enum property dicts — no env vars.
+- **S1.1:** the FTS search pipeline is extracted verbatim from `apps/search/views/search.py` into
+  `apps/search/services/fts.py` (endpoint #2's service, "planned" above). The one approved
+  de-coupling is the explicit `LanguageLocale` parameter (locale resolved once from
+  `request.LANGUAGE_CODE` in the view and threaded down); vectors are accessed only via
+  `LanguageLocale.fts_vector_field` / `LanguageLocale.fts_config`. The view is now a thin caller and
+  the pre-existing search suites pass unmodified (regression proof). `alert_query.py`,
+  `apps/search/services/__init__.py` and the rate-limit entry block are untouched
+  (`apps/search/tests/test_fts_service.py` adds the service-tier coverage).
