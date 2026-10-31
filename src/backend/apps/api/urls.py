@@ -15,4 +15,5 @@ from django.urls import include, path
 
 urlpatterns: list = [
     path("ads/", include("apps.ads.api_urls")),
+    path("search/", include("apps.search.api_urls")),
 ]

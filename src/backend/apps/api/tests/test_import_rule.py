@@ -29,6 +29,9 @@ PAIRING_TABLE: list[tuple[str, str]] = [
     # S1.3 — listings read. The API adapter mirrors the HTML listings view and
     # calls the exact same `ListingsQuery`/`build_listings_context` service tier.
     ("apps.ads.views.api.listings", "apps.ads.views.listings"),
+    # S1.4 — FTS search read. The API adapter mirrors the HTML search view and
+    # calls the exact same `apps.search.services.fts` pipeline + shared cache.
+    ("apps.search.views.api.search", "apps.search.views.search"),
 ]
 
 # Modules an API view may import even though its HTML mirror does not.
@@ -41,11 +44,16 @@ PAIRING_TABLE: list[tuple[str, str]] = [
 #   happens to use the deep-link-render limiter instead, but the plan mandates
 #   `rate_limit_check` with the dedicated `api_*` budgets for every `/api/v1/`
 #   read route, so the API adapter must import it though its mirror does not.
+# - `apps.core.schemas`: the mandated `BaseInputModel` base for every
+#   client-input DTO. Both API adapters build their GET-dimension DTO on it
+#   (the HTML views parse `request.GET` inline and never need the base), so it
+#   is a shared `/api/v1/` helper, not a mirror-specific edge.
 ALLOWLIST: frozenset[str] = frozenset(
     {
         "apps.core.utils.problem",
         "apps.core.utils.api_auth",
         "apps.search.services.rate_limit",
+        "apps.core.schemas",
     }
 )
 

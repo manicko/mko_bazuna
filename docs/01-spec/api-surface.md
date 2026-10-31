@@ -66,7 +66,7 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 | # | Action | Service | Endpoint · Method | Auth | Error notes | Status |
 |---|---|---|---|---|---|---|
 | 1 | Listings | `ListingsQuery.build_queryset` / `build_listings_context` | `GET /api/v1/ads/` | PUB | 422; 429 problem (§Errors) | shipped (S1.3) |
-| 2 | FTS search | `apps/search/services/fts.py` (S1.1) | `GET /api/v1/search/?q&category&city&min_price&max_price&listing_purpose&condition&features&sort&page&all_categories` | PUB | fuzzy / did-you-mean / narrowed fields; cap semantics; 429 problem | planned |
+| 2 | FTS search | `apps/search/services/fts.py` (S1.1) | `GET /api/v1/search/?q&category&city&min_price&max_price&listing_purpose&condition&features&sort&page&all_categories` | PUB | fuzzy / did-you-mean / narrowed fields; cap semantics; 429 problem | shipped (S1.4) |
 | 3 | Ad detail | audience predicate + serialize | `GET /api/v1/ads/{id}/` | PUB | uniform 404; `AD_VIEWED` recorded | planned |
 | 4 | Autocomplete | (existing) | unchanged `/api/search/autocomplete` | PUB | stance: not aliased; legacy 429 `{"error":"rate_limit"}` | covered/frozen |
 | 5 | Create/publish | `create_draft_ad` + `submit_ad` | `POST /api/v1/ads/{id}/submit/` (existing DRAFT; dialog/photo staging bot-only) | SESS (consent via outcome) | `SubmitAdOutcome` map (§Errors) | planned |
@@ -285,3 +285,31 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `apps/ads/tests/test_listings_api.py` (incl. `TestExhaustiveFilterSortPageMatrix` — the rule-18
   matrix owner — audience parity, 429/422 problems, HTML/JSON parity incl. warm-cache, and the
   pagination envelope).
+- **S1.4:** `GET /api/v1/search/` shipped (endpoint row #2 → `shipped`). New
+  `apps/search/api_urls.py` (`app_name="search_api"`, one route `""` → `search`),
+  `apps/search/views/api/` (`__init__`, `search.py` with `_serialize_ad`) and the aggregator
+  include in `apps/api/urls.py` (route `/api/v1/search/`). The endpoint mirrors the HTML search
+  view 1:1 (same `q`/`category`/`city`/`min_price`/`max_price`/`listing_purpose`/`condition`/
+  `features`/`sort`/`page`/`all_categories` GET dimensions; `city` is documented-accepted while the
+  real filter city comes from the middleware-resolved `request.current_city`; **`per_page` is fixed
+  at 24 — `ListingsQuery.PER_PAGE` — exactly like the HTML search view**) and calls the **same**
+  `apps.search.services.fts` pipeline + shared cache + `ListingsQuery`/`build_listings_context`
+  service tier, so audience parity (`account_state_q`), ordering and the cache-hit rank restore
+  (`_rank_cache_hit_page`) hold by construction. Envelope = the pagination envelope
+  `{page, per_page, total_count, results_truncated, results[], has_next}` plus `narrowed_category`
+  (`{slug,name}` or null), `suggested_category` (slug or null), `suggested_city` (slug or null) and
+  `search_cache_max_hits`. `total_count` may be `SEARCH_CACHE_MAX_HITS + 1` on a truncated search —
+  `results_truncated` stays the authoritative signal (**O-2b**, §"Endpoint inventory" envelope note
+  above). Analytics/history — `SEARCH_PERFORMED` + popular-search + search-history — are recorded
+  inline (same three calls, same order, and the same session arg as the HTML view), so an API and
+  an HTML search for the same query have identical side effects (incl. warm cache). Errors: 422
+  `validation_failed` via `validation_problem` (the single 422 trigger is a `features` list over
+  `MAX_FEATURE_FILTER_SLUGS`); 429 `rate_limited` problem + `Retry-After` via
+  `rate_limit_check(namespace="api_search", budget=API_PUBLIC_READ)` + `rate_limited_problem`. The
+  HTML search view is **untouched** (zero diff; its legacy `{"error":"rate_limit"}` 429 shape is
+  frozen). Pairing row `("apps.search.views.api.search", "apps.search.views.search")` registered in
+  `apps/api/tests/test_import_rule.py`; the mandated `apps.core.schemas` (`BaseInputModel`) is added
+  to that harness's ALLOWLIST (the shared DTO base the API adapters use). Tests:
+  `apps/search/tests/test_search_api.py` (param parity across every dimension, cap/truncation
+  through the warm-cache seam, HTML/JSON parity incl. warm-cache, analytics/history parity, `?lang`
+  locale parity, and the 422/429 problems).
