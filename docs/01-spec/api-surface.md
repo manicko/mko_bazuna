@@ -227,3 +227,9 @@ side effects should use the service tier or the `verify_parity` command (the pol
   the compliance section is recorded, and the dual-429, five-branch-edit and lock-timeout
   HTML-shape differences are confirmed.
 - **S0.2:** `/api/v1/` mounted; URL-only aggregator + import-rule harness shipped (no endpoints yet).
+- **S0.3:** RFC 9457 problem helper shipped — `apps/core/utils/problem.py` (`problem`, `validation_problem`,
+  `rate_limited_problem`) plus `apps/core/tests/test_problem_response.py`. Every §Errors outcome family is
+  constructible; the helper mints `application/problem+json` documents with a stable ASCII `type`. The
+  `Retry-After` header is derived here from `RateLimitBudget.period`. The legacy 429 renderer
+  (`rate_limit_response.py`) is **untouched** — legacy 429s carry **no** `Retry-After`; only `/api/v1/`
+  adds it (R1).
