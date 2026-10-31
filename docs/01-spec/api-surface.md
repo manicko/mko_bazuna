@@ -233,3 +233,7 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `Retry-After` header is derived here from `RateLimitBudget.period`. The legacy 429 renderer
   (`rate_limit_response.py`) is **untouched** — legacy 429s carry **no** `Retry-After`; only `/api/v1/`
   adds it (R1).
+- **S0.4:** session-auth decorator shipped — `apps/core/utils/api_auth.py` (`login_required_api`) plus
+  `apps/core/tests/test_api_auth.py`. Anonymous requests are refused with a 401 `unauthenticated`
+  problem document and **no** `WWW-Authenticate` header; identity is checked before the method
+  (anonymous `POST` → 401, not 405), mirroring `staff_required_api` exactly (phase 15 owns any reorder).
