@@ -23,9 +23,12 @@ import ast
 import sys
 from pathlib import Path
 
-# Declared pairing table: (API view module, mirrored HTML view module).
-# Rows are added by the endpoint tasks (S1.3+). Empty at S0.2.
-PAIRING_TABLE: list[tuple[str, str]] = [
+# Declared pairing table: (API view module, mirrored HTML view module(s)).
+# The mirror entry is a module path, or a **tuple** of module paths when one API
+# module has several behavioral mirrors (its imports are validated against the
+# UNION of those mirrors' imports plus the allowlist). Rows are added by the
+# endpoint tasks (S1.3+). Empty at S0.2.
+PAIRING_TABLE: list[tuple[str, str | tuple[str, ...]]] = [
     # S1.3 — listings read. The API adapter mirrors the HTML listings view and
     # calls the exact same `ListingsQuery`/`build_listings_context` service tier.
     ("apps.ads.views.api.listings", "apps.ads.views.listings"),
@@ -95,6 +98,26 @@ PAIRING_TABLE: list[tuple[str, str]] = [
     # S3.3 — logout write. The API adapter mirrors the HTML logout view
     # (`apps.users.views.logout`) and flushes the session the same way.
     ("apps.users.views.api.logout", "apps.users.views.logout"),
+    # S3.4 — saved-search writes. One module (`saved_search_writes`) whose four
+    # operations have two behavioral mirrors: create mirrors the modal create view
+    # (`apps.search.views.save_search`), while toggle/edit/delete mirror the
+    # cabinet management views (`apps.cabinet.views.saved_searches`). The mirror
+    # entry is therefore a TUPLE and the API module's imports are validated
+    # against the UNION of both mirrors' imports (plus the allowlist).
+    (
+        "apps.cabinet.views.api.saved_search_writes",
+        (
+            "apps.search.views.save_search",
+            "apps.cabinet.views.saved_searches",
+        ),
+    ),
+    # S3.5 — search-history clear. The API adapter mirrors the HTML cabinet clear
+    # view (`apps.cabinet.views.search_history`) and deletes the same scope (the
+    # caller's whole history).
+    (
+        "apps.cabinet.views.api.search_history_clear",
+        "apps.cabinet.views.search_history",
+    ),
 ]
 
 # Modules an API view may import even though its HTML mirror does not.
@@ -111,6 +134,12 @@ PAIRING_TABLE: list[tuple[str, str]] = [
 #   client-input DTO. Both API adapters build their GET-dimension DTO on it
 #   (the HTML views parse `request.GET` inline and never need the base), so it
 #   is a shared `/api/v1/` helper, not a mirror-specific edge.
+# - `apps.cabinet.views.api.saved_searches`: the S2.7 read module's serializer
+#   (`_serialize_saved_search`). The S3.4 write module reuses the **exact same**
+#   entity serialization the S2.7 list read ships (plan row 16: the write
+#   responses carry "the same serialization S2.7's list read uses"), so this is
+#   an intra-app API-package serializer-reuse edge (its shape is documented in
+#   `docs/01-spec/api-surface.md`), not a mirror-specific import.
 # - `apps.users.services.account_state`: the A14-mandated **shared consent
 #   seam** (`can_create_ad`). The dashboard HTML mirror gates through its
 #   view-local `_seller_may_create_ad` wrapper (which itself reaches
@@ -131,6 +160,7 @@ ALLOWLIST: frozenset[str] = frozenset(
         "apps.core.utils.api_auth",
         "apps.search.services.rate_limit",
         "apps.core.schemas",
+        "apps.cabinet.views.api.saved_searches",
         "apps.users.services.account_state",
         "pydantic",
     }
@@ -138,15 +168,26 @@ ALLOWLIST: frozenset[str] = frozenset(
 
 
 def test_pairing_table_rows_satisfy_import_rule() -> None:
-    """Every registered API module's imports are a subset of its mirror's."""
-    for api_module_path, mirror_module_path in PAIRING_TABLE:
+    """Every registered API module's imports are a subset of its mirror(')s'.
+
+    A row's mirror entry may be one module path or a tuple of module paths; a
+    tuple is the UNION of those mirrors' imports, covering the multi-mirror case
+    (one API module whose operations are the JSON siblings of several HTML
+    views).
+    """
+    for api_module_path, mirror_entry in PAIRING_TABLE:
         api_imports = _imports_of(api_module_path)
-        mirror_imports = _imports_of(mirror_module_path)
+        mirrors = (
+            (mirror_entry,) if isinstance(mirror_entry, str) else tuple(mirror_entry)
+        )
+        mirror_imports: set[str] = set()
+        for mirror_module_path in mirrors:
+            mirror_imports |= _imports_of(mirror_module_path)
         allowed = mirror_imports | ALLOWLIST | _stdlib_and_django(api_imports)
 
         offending = sorted(api_imports - allowed)
         assert not offending, _violation_message(
-            api_module_path, mirror_module_path, offending
+            api_module_path, ", ".join(mirrors), offending
         )
 
 

@@ -80,9 +80,9 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 | 13 | Single actions | `admin_actions.approve_ad/reject_ad/ban_user_for_ad` | `POST /api/v1/moderation/{approve,reject,ban}/{id}/` | STAFF | §Errors mappings | planned |
 | 14 | Bulk | (existing) — **frozen shape** | unchanged `/moderation/api/v1/bulk-action/` | STAFF | no change | covered/frozen |
 | 15 | Favorites | extend `apps/ads/services/favorites.py` (list + toggle) | `GET /api/v1/favorites/` (shipped S2.4) · `POST /api/v1/favorites/{ad_id}/toggle/` (shipped S3.2) | SESS | 200 `{ad_id,is_favorited,favorites_count}`; uniform 404 | shipped (S2.4 + S3.2) |
-| 16 | Saved-search CRUD | `apps/search/services/saved_searches.py` (S3.1) on shared `SavedSearchInput` | `GET/POST /api/v1/saved-searches/`, `POST …/{pk}/{toggle,edit,delete}/` | SESS | 422; uniform 404 | partial: list shipped (S2.7) |
+| 16 | Saved-search CRUD | `apps/search/services/saved_searches.py` (S3.1) on shared `SavedSearchInput` | `GET/POST /api/v1/saved-searches/` (GET shipped S2.7, POST shipped S3.4), `POST …/{pk}/{toggle,edit,delete}/` (shipped S3.4) | SESS | 422 `validation_failed` (create/edit body); 400 `query_too_long` (over-cap create query); uniform 404 `not_found` | shipped (S2.7 + S3.4) |
 | 17 | Alert delivery | `send_alerts` + services | unchanged (bot digest + scheduler) | — | stance: no HTTP endpoint; agent-visible substitute is `SavedSearchNotification.delivered_at` (read via `verify_parity`/shell tier) | covered/frozen |
-| 18 | Search history list/clear | `search_history` service | `GET /api/v1/search-history/` · `POST /api/v1/search-history/clear/` | **SESS** (HTML mirrors are `@login_required`; anon session history is only reachable via autocomplete #4) | 204 clear | partial: list shipped (S2.7) |
+| 18 | Search history list/clear | `search_history` service | `GET /api/v1/search-history/` (shipped S2.7) · `POST /api/v1/search-history/clear/` (shipped S3.5) | **SESS** (HTML mirrors are `@login_required`; anon session history is only reachable via autocomplete #4) | 200 idempotent clear `{cleared,remaining}` (supersedes the earlier `204` note; see row-18 change log) | shipped (S2.7 + S3.5) |
 | 19 | Preferred-city | (existing) | unchanged `/api/preferred-city/` | anon + consent cookie | stance: not aliased; **no rate limiter exists** | covered/frozen |
 | 20 | Consent | `give/decline/withdraw_consent` | `POST /api/v1/consent/{accept,decline,withdraw}/` (shipped S3.3) | accept/decline anon-allowed (HTML parity); withdraw SESS | cookie quartet stays HTML; withdraw still `logout()`s; 200 consent-state JSON | shipped (S3.3) |
 | 21 | Login issue/status | `issue/consume_token` (predicates frozen) | **No new endpoint** — `/login/status/` is the machine contract (200/204/410); GET-issuance gap owned by phase 15 | anon | uniform 410, anti-enumeration | planned |
@@ -653,3 +653,59 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `apps/api/tests/test_import_rule.py`. Tests: `apps/users/tests/test_consent_api.py` (accept/decline
   401-free anon + session + soft-deleted 403, withdraw anon-401/session-flush, logout anon-401/204
   flushed, 405 matrix, 429 problem, API-vs-HTML end-state equivalence).
+- **S3.4:** saved-search write endpoints shipped — `POST /api/v1/saved-searches/` (create) and
+  `POST /api/v1/saved-searches/{pk}/{toggle,edit,delete}/` (row #16 → `shipped`; the earlier
+  `edit`/`toggle`/`delete` verbs are the plan's exact row-16 forms). New
+  `apps/cabinet/views/api/saved_search_writes.py`, routed in `apps/cabinet/api_urls.py`
+  (`app_name="cabinet_api"`): the create route and the S2.7 read share the plan's single collection
+  URL (`GET/POST /api/v1/saved-searches/`) through a thin method dispatcher
+  (`saved_searches_collection_view` → GET delegates to the S2.7 `saved_searches_list_view`, POST to
+  the create view); toggle/edit/delete are `<int:pk>` sub-routes (`saved_search_toggle`,
+  `saved_search_edit`, `saved_search_delete`). Each endpoint is the JSON sibling of the matching HTML
+  view and consumes the **same** shared mutator stack (`apps.search.services.saved_searches`, S3.1) —
+  no API-only predicate. **Auth:** `login_required_api` on all four (401 `unauthenticated` problem,
+  no `WWW-Authenticate`, identity before method). **Method:** POST-only, else 405
+  `method_not_allowed` + `Allow: POST`. **Rate limit:** `rate_limit_check(namespace="api_write",
+  budget=API_WRITE)` checked **first** on all four; 429 `rate_limited` + `Retry-After`. **Body:**
+  `SavedSearchWriteInput` (`BaseInputModel`, `extra="forbid"`) carrying `query` + the four
+  `SavedSearchInput` filters in snake_case; an invalid body → 422 `validation_failed`
+  (`validation_problem`), nothing persisted; the filters are re-validated through the shared
+  `SavedSearchInput` (`to_filters()`), so coercion/`ge=0` semantics are identical to the HTML views.
+  **Over-cap query:** the service's `bound_query` refusal (`QueryTooLongError`) mirrors the HTML
+  create view's HTTP **400**, returned as a `query_too_long` problem (the HTML cabinet edit view does
+  not run the cap, so neither does the edit endpoint). **Not-found:** `SavedSearch.DoesNotExist` →
+  uniform 404 `not_found` (CWE-209 — a foreign row is indistinguishable from an absent one), the same
+  `Http404` refusal the HTML views raise. **Response:** create/edit/toggle answer the mutated entity
+  in the **same serialization** the S2.7 list read uses (`_serialize_saved_search`); the
+  `unsubscribe_token` capability token is never exposed. **Delete:** the Q8 idempotent confirmed
+  state `{"id": <pk>, "deleted": true}` (re-retrievable: the row is gone from the S2.7 list). **No
+  CSRF exemption** — middleware chain used as-is. Pairing row
+  `("apps.cabinet.views.api.saved_search_writes", ("apps.search.views.save_search",
+  "apps.cabinet.views.saved_searches"))` registered in `apps/api/tests/test_import_rule.py`; the
+  harness gained **union-of-mirrors** support (a row's mirror entry may be a tuple — one API module
+  with several behavioral mirrors validates against the union of their imports). The allowlist gained
+  `apps.cabinet.views.api.saved_searches` (intra-app API-package serializer reuse; the S2.7
+  `_serialize_saved_search` shape is documented above). Tests:
+  `apps/cabinet/tests/test_saved_search_write_api.py` (401/405/422/404-cross-owner matrices on all
+  four ops, happy paths asserting the S3.1 service effects incl. token stability, over-cap 400, 429
+  budget, API-vs-HTML end-state equivalence for create/toggle/edit/delete).
+- **S3.5:** `POST /api/v1/search-history/clear/` shipped (row #18 → `shipped`; the clear half). New
+  `apps/cabinet/views/api/search_history_clear.py`, routed in `apps/cabinet/api_urls.py`
+  (`search-history/clear/` → `search_history_clear`). It is the JSON sibling of the HTML cabinet
+  clear (`apps.cabinet.views.search_history.search_history_clear`) and deletes **exactly** the same
+  scope: the caller's whole `SearchHistory` set, no filter (`SearchHistory.objects.filter(
+  user=request.user).delete()`); the HTML logic is a one-line inline query, so the API replicates it
+  verbatim rather than inventing a service module. **Auth:** SESS (`login_required_api`, 401
+  `unauthenticated` problem, no `WWW-Authenticate`, A6 — the HTML mirror is `@login_required`), 
+  identity before method. **Method:** POST-only, else 405 `method_not_allowed` + `Allow: POST`.
+  **Rate limit:** `rate_limit_check(namespace="api_write", budget=API_WRITE)` checked **first**;
+  429 `rate_limited` + `Retry-After`. **Response (Q8 idempotent confirmed state):** `{"cleared":
+  true, "remaining": 0}` — `remaining` is the caller's post-clear row count, so the endpoint is
+  re-runnable and the cleared state is re-retrievable via the S2.7 `GET /api/v1/search-history/`
+  read (`total_count == 0`). This **supersedes** the earlier "204 clear" note on row #18: the Q8
+  confirmed-state clause requires a re-retrievable machine state, which a bare 204 does not carry.
+  Pairing row `("apps.cabinet.views.api.search_history_clear", "apps.cabinet.views.search_history")`
+  registered in `apps/api/tests/test_import_rule.py`. Tests:
+  `apps/cabinet/tests/test_search_history_clear_api.py` (401 anon incl. identity-before-method, 405,
+  clear → S2.7 read shows 0, idempotent re-POST, scope parity with the HTML clear / other users
+  untouched, 429 budget).
