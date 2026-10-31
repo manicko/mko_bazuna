@@ -163,8 +163,8 @@ mechanism remains the single enforcement point (R1); only the *rendering* of the
 
 | Budget | Limit | Namespaces | Notes |
 |---|---|---|---|
-| `API_PUBLIC_READ` | 60 req / 60 s | per-route namespaces `api_listings`, `api_search`, `api_detail`, `api_categories`, `api_cities` | **lands in S0.5** |
-| `API_WRITE` | 30 req / 60 s | shared `api_write` | **lands in S0.5** |
+| `API_PUBLIC_READ` | 60 req / 60 s | per-route namespaces `api_listings`, `api_search`, `api_detail`, `api_categories`, `api_cities` | **shipped** (S0.5) |
+| `API_WRITE` | 30 req / 60 s | shared `api_write` | **shipped** (S0.5) |
 
 ## i18n rules
 
@@ -237,3 +237,6 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `apps/core/tests/test_api_auth.py`. Anonymous requests are refused with a 401 `unauthenticated`
   problem document and **no** `WWW-Authenticate` header; identity is checked before the method
   (anonymous `POST` → 401, not 405), mirroring `staff_required_api` exactly (phase 15 owns any reorder).
+- **S0.5:** `RateLimitBudget.API_PUBLIC_READ` (60 req / 60 s) and `RateLimitBudget.API_WRITE`
+  (30 req / 60 s) shipped as StrEnum members in `apps/core/enums.py`; pins extended in
+  `apps/core/tests/test_rate_limit_budget.py`. Numbers live in the enum property dicts — no env vars.
