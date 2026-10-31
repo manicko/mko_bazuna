@@ -276,15 +276,34 @@ class ListingsQuery:
 
     @staticmethod
     def _apply_sort(queryset: QuerySet[Ad], sort: AdSort) -> QuerySet[Ad]:
-        """Apply the sort ordering to *queryset* and return the result."""
+        """Apply the sort ordering to *queryset* and return the result.
+
+        Every branch appends ``-id`` as a final tiebreaker. Ads sharing an
+        identical sort key (same ``published_at`` / same ``price_normalized_eur``
+        / both NULL) have no fixed relative order in PostgreSQL, so a page
+        boundary landing inside such a group could return the rows in a
+        different order between two requests — and, worse, could show one of the
+        rows twice or omit another across pages. ``-id`` is unique per ad, so it
+        makes every ordering total and every page deterministic (plan R2).
+
+        This is the single approved ordering delta of the API-parity program and
+        it lives in the shared service, so the HTML listings surface and the
+        ``/api/v1/ads/`` JSON surface both gain it from one place (R2: HTML ==
+        JSON). The FTS path in ``apps.search.services.fts`` carries its own
+        ``-id`` tiebreaker and is unaffected by this change.
+        """
         if sort == AdSort.DATE_OLD:
-            return queryset.order_by("published_at")
+            return queryset.order_by("published_at", "-id")
         if sort == AdSort.PRICE_LOW:
-            return queryset.order_by(F("price_normalized_eur").asc(nulls_last=True))
+            return queryset.order_by(
+                F("price_normalized_eur").asc(nulls_last=True), "-id"
+            )
         if sort == AdSort.PRICE_HIGH:
-            return queryset.order_by(F("price_normalized_eur").desc(nulls_last=True))
+            return queryset.order_by(
+                F("price_normalized_eur").desc(nulls_last=True), "-id"
+            )
         # DATE_NEW — default, newest first
-        return queryset.order_by("-published_at")
+        return queryset.order_by("-published_at", "-id")
 
     @staticmethod
     def active_price_range(

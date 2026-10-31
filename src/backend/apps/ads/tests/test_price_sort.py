@@ -81,3 +81,61 @@ class TestPriceSort:
         ids = list(a.id for a in response.context["page_obj"])
         assert cheap.id in ids and mid.id in ids and expensive.id in ids
         assert ids.index(expensive.id) < ids.index(mid.id) < ids.index(cheap.id)
+
+
+class TestPriceSortIdTiebreaker:
+    """Equal prices are resolved deterministically by the ``-id`` tiebreaker.
+
+    Ads sharing an identical ``price_normalized_eur`` have no fixed relative
+    order in PostgreSQL without a unique secondary key. The ``-id`` tiebreaker
+    (plan R2, the single approved ordering delta) makes both price directions
+    deterministic. Uses the real HTML listings view.
+    """
+
+    def test_price_asc_equal_prices_break_by_id_desc(
+        self, seller, category, city
+    ) -> None:
+        """PRICE_LOW with identical prices orders by ``-id`` within the tie."""
+        ads = [
+            create_test_ad(
+                seller,
+                category,
+                city,
+                title=f"Same price {i}",
+                price=100,
+                status=AdStatus.PUBLISHED,
+            )
+            for i in range(3)
+        ]
+        expected = sorted((a.id for a in ads), reverse=True)
+
+        client = Client()
+        response = client.get(f"/?sort={AdSort.PRICE_LOW}")
+
+        assert response.status_code == 200
+        ids = list(a.id for a in response.context["page_obj"])
+        assert ids == expected
+
+    def test_price_desc_equal_prices_break_by_id_desc(
+        self, seller, category, city
+    ) -> None:
+        """PRICE_HIGH with identical prices also breaks by ``-id``."""
+        ads = [
+            create_test_ad(
+                seller,
+                category,
+                city,
+                title=f"Same price {i}",
+                price=100,
+                status=AdStatus.PUBLISHED,
+            )
+            for i in range(3)
+        ]
+        expected = sorted((a.id for a in ads), reverse=True)
+
+        client = Client()
+        response = client.get(f"/?sort={AdSort.PRICE_HIGH}")
+
+        assert response.status_code == 200
+        ids = list(a.id for a in response.context["page_obj"])
+        assert ids == expected

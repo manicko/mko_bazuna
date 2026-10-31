@@ -79,3 +79,69 @@ class TestListingsSortOrder:
         assert response.status_code == 200
         ids = [a.id for a in response.context["page_obj"]]
         assert ids == [a.id for a in sorted(published_ads, key=lambda a: a.published_at, reverse=True)]
+
+
+class TestListingsSortIdTiebreaker:
+    """Equal sort keys are resolved deterministically by the ``-id`` tiebreaker.
+
+    Ads sharing an identical ``published_at`` have no fixed relative order in
+    PostgreSQL without a unique secondary key, so a page boundary inside the
+    tied group could reorder or duplicate rows. The ``-id`` tiebreaker (plan R2,
+    the single approved ordering delta) makes every page deterministic. These
+    tests pin BOTH the DATE_NEW and DATE_OLD directions, driven through the real
+    HTML listings view.
+    """
+
+    def test_date_new_equal_published_at_breaks_by_id_desc(
+        self, seller, category, city
+    ) -> None:
+        """DATE_NEW with identical ``published_at`` orders by ``-id`` (newest first)."""
+        shared = timezone.now()
+        ads = [
+            create_test_ad(
+                seller,
+                category,
+                city,
+                title=f"Tied {i}",
+                status=AdStatus.PUBLISHED,
+                published_at=shared,
+            )
+            for i in range(3)
+        ]
+        expected = sorted((a.id for a in ads), reverse=True)
+
+        client = Client()
+        response = client.get(f"/?sort={AdSort.DATE_NEW}")
+
+        assert response.status_code == 200
+        ids = [a.id for a in response.context["page_obj"]]
+        assert ids == expected
+
+    def test_date_old_equal_published_at_breaks_by_id_desc(
+        self, seller, category, city
+    ) -> None:
+        """DATE_OLD with identical ``published_at`` also breaks by ``-id``.
+
+        The tiebreaker is ``-id`` on every branch (not the primary direction),
+        so even the oldest-first ordering resolves ties newest-id-first.
+        """
+        shared = timezone.now()
+        ads = [
+            create_test_ad(
+                seller,
+                category,
+                city,
+                title=f"Tied {i}",
+                status=AdStatus.PUBLISHED,
+                published_at=shared,
+            )
+            for i in range(3)
+        ]
+        expected = sorted((a.id for a in ads), reverse=True)
+
+        client = Client()
+        response = client.get(f"/?sort={AdSort.DATE_OLD}")
+
+        assert response.status_code == 200
+        ids = [a.id for a in response.context["page_obj"]]
+        assert ids == expected

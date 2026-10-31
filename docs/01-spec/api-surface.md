@@ -154,6 +154,16 @@ regardless of the header — the `api_bulk.py:74` norm; if strictness is ever ad
 contract yet — this guards against future locale-merging caches). Analytics side effects (below)
 are agent-visible behavior.
 
+**Ordering contract (deterministic ties — R2).** Every plain-listings ordering applies `-id` as a
+final tiebreaker (`ListingsQuery._apply_sort`), so ads that share a sort key (`published_at` or
+`price_normalized_eur`, including the NULL-price group) have a total, deterministic order and page
+boundaries inside a tied group can neither reorder nor duplicate rows. This is the **single
+approved ordering delta** of the API-parity program and it lives in the shared service, so it
+applies **identically to the HTML listings surface and to `GET /api/v1/ads/`** (HTML == JSON). The
+FTS search path (`apps/search/services/fts.py`) carries its own `-rank, … , -id` ordering and is
+**not** affected by this change: relevance always ranks first and the tiebreaker never reorders
+across different relevance values.
+
 ## Rate-limit budgets
 
 Budgets are `RateLimitBudget` StrEnum members (`apps/core/enums.py`); the numbers live in the enum
@@ -248,3 +258,12 @@ side effects should use the service tier or the `verify_parity` command (the pol
   the pre-existing search suites pass unmodified (regression proof). `alert_query.py`,
   `apps/search/services/__init__.py` and the rate-limit entry block are untouched
   (`apps/search/tests/test_fts_service.py` adds the service-tier coverage).
+- **S1.2:** the shared listings sort gained a final `-id` tiebreaker on every branch of
+  `ListingsQuery._apply_sort` (**R2** — the single approved ordering delta of this program). Equal
+  sort keys now order deterministically, so a page boundary inside a tied group can neither reorder
+  nor duplicate rows; the change is in the shared service, so HTML listings and `GET /api/v1/ads/`
+  gain it from one place (HTML == JSON). The FTS search path keeps its own rank-first
+  `-rank, …, -id` ordering and is unaffected — relevance ranking stays rank-first and the tiebreaker
+  never reorders across different relevance values
+  (`apps/ads/tests/test_relevance_tiebreaker.py` pins this). See the *Ordering contract* clause in
+  §"Other response contract clauses".
