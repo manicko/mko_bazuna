@@ -1,4 +1,3 @@
-
 1. **English Only**  
    All comments, logs, docstrings, error messages, and documentation must be in clear English.
 
@@ -40,6 +39,7 @@
 
 14. Keep documentation updated continuously
     Architecture decisions, setup instructions, and API usage must always stay current.
+    
 15. **Small Modules and Functions**
     Short, focused files and functions give higher ROI in maintenance — they are
     easier to edit, review, and less prone to corruption.
@@ -49,4 +49,10 @@
 17. **Workspace Cleanliness**  
     Before creating any file, ask: 1) Is there an exact place for this in the task or module architecture? 2) Is it needed for project operation and future maintenance? If both are no — write only to `.ai/tmp`.
 
+18. **RFC 9457 for API Errors**  
+    All API errors must follow RFC 9457 (`application/problem+json`). Use standard HTTP status codes, consistent error structures, and stable error types. Centralize error handling on both backend and frontend.
+
+
+18. **Agent-First / API Parity Rule**
+    Every user-facing action must be accessible programmatically via an API, CLI, or callable function, sharing the same business logic as the UI. All filters, sorting, pagination, and search must be testable without browser automation. 
 
