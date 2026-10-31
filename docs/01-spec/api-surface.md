@@ -76,7 +76,7 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 | 9 | Delete | lifecycle service (S4.1) — gate-free | `POST /api/v1/ads/{id}/delete/` | SESS + owner | 204 | planned |
 | 10 | Copy | `copy_ad` (`copy_service.py:39` via `_build_ad_copy:15`) | `POST /api/v1/ads/{id}/copy/` | SESS | 200 `{ad_id}` — new DRAFT owned by seller; max-ads + consent predicates as in the bot flow | planned |
 | 11 | Dashboard reads | dashboard grouping (S2.2) + `SellerStats` | `GET /api/v1/dashboard/?time_range=` | SESS + consent | **403 `consent_required` when consent absent — never an empty list** (R-L1) | shipped (S2.3) |
-| 12 | Moderation queue/review | `PriorityService.get_queued_ads` / `get_priority_counts` | `GET /api/v1/moderation/queue/?priority&page`, `GET /api/v1/moderation/review/{id}/` | STAFF | 401 / 403 / 405 | planned |
+| 12 | Moderation queue/review | `PriorityService.get_queued_ads` / `get_priority_counts` | `GET /api/v1/moderation/queue/?priority&page`, `GET /api/v1/moderation/review/{id}/` | STAFF | 401 / 403 / 405 (problem docs) | shipped (S2.5) |
 | 13 | Single actions | `admin_actions.approve_ad/reject_ad/ban_user_for_ad` | `POST /api/v1/moderation/{approve,reject,ban}/{id}/` | STAFF | §Errors mappings | planned |
 | 14 | Bulk | (existing) — **frozen shape** | unchanged `/moderation/api/v1/bulk-action/` | STAFF | no change | covered/frozen |
 | 15 | Favorites | extend `apps/ads/services/favorites.py` (list + toggle) | `GET /api/v1/favorites/` (shipped S2.4) · `POST /api/v1/favorites/{ad_id}/toggle/` | SESS | 200 `{active,count}`; uniform 404 | partial: list shipped (S2.4) |
@@ -95,6 +95,8 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 | 28 | Admin actions | `admin_actions` | unchanged staff-web | — | — | covered/frozen |
 | 29 | Category tree read | `Category` models (direct; **no** fragment cache) | `GET /api/v1/categories/` | PUB | full active tree (`{categories:[{slug,name,children}]}`); 429 problem | shipped (S1.6) |
 | 30 | Cities read | `City` models (header city query) | `GET /api/v1/cities/` | PUB | `{cities:[{slug,name,region,country_code}]}`, `order_by("name")`; 429 problem | shipped (S1.6) |
+| 31 | Seller trust dashboard | `trust_analytics` (`calculate_seller_trust_score` / `get_seller_daily_metrics` / `get_trust_level`) + `seller_stats.SellerStats` | `GET /api/v1/trust/seller/` | SESS | 401 problem (no challenge); 405 | shipped (S2.6) |
+| 32 | Moderation trust dashboard | `moderation_analytics` (`get_moderation_stats` / `get_pending_queue_size` / `get_moderator_performance` / `get_rejection_reasons`) | `GET /api/v1/trust/moderation/` | STAFF | 401 / 403 / 405 problem docs (no challenge) | shipped (S2.6) |
 
 ## Auth model
 
@@ -450,3 +452,40 @@ side effects should use the service tier or the `verify_parity` command (the pol
   test). Pairing row `("apps.cabinet.views.api.favorites", "apps.cabinet.views.favorites")` registered
   in `apps/api/tests/test_import_rule.py`. Tests: `apps/cabinet/tests/test_favorites_list_api.py`
   (401 matrix, ownership scoping, multi-page envelope, HTML `page_obj` id/ordering parity).
+- **S2.5:** `GET /api/v1/moderation/queue/?priority&page` and
+  `GET /api/v1/moderation/review/{id}/` shipped (endpoint row #12 → `shipped`). New
+  `apps/moderation/api_urls.py` (`app_name="moderation_api"`; routes `queue/` → `queue`, `review/<int:ad_id>/`
+  → `review`), `apps/moderation/views/api/{__init__,queue,review}.py`, mounted in `apps/api/urls.py`
+  (`moderation/`). **Layout drift:** the plan's file list named a single
+  `apps/moderation/views/api/reads.py`; the module is split into `queue.py` + `review.py` because the
+  import-subset rule pairs each API module against **one** HTML mirror, and no single mirror imports both
+  `PriorityService` (queue mirror `apps/moderation/views/queue.py`) and `Ad` (review mirror
+  `apps/moderation/views/review.py`) — one row per API module with the correct mirror is the harness-clean
+  form. **Queue:** consumes the **same** `PriorityService.get_queued_ads` + `get_priority_counts`; `?priority=`
+  accepts the `PriorityFilter` members and the `ALL` sentinel (and any missing/unknown value) maps to **no**
+  filter, exactly as the HTML view's `PriorityFilter` parse does; ordering is the service's
+  `-base_score, -created_at`; response is the standard pagination envelope
+  `{page, per_page, total_count, results_truncated, results[], has_next}` plus `selected_priority` and
+  `priority_counts`. `results[]` carries the shared ad fields (D4) plus the queue-specific
+  `telegram_id`, `base_score`, `priority_level`. **Review:** the **same** lookup
+  (`.select_related("user","category","city").prefetch_related("images")`, status ∈ {`ON_MODERATION`,
+  `ON_MODERATION_FAILED`}) the HTML `moderation_review` uses; payload = the template-visible fields
+  (`id`, localized `title`/`description`, `status`/`status_display`, `price`/`currency`, localized
+  `category`/`city` `{slug,name}`, `telegram_id`, `image_urls`, timestamps, `absolute_url`). A missing id
+  and an out-of-pair status answer the **identical** uniform 404 `type="not_found"` problem (CWE-209).
+  **Auth:** STAFF via the new `staff_required_api_problem` (see the gap-fill line below) — 401 anon / 403
+  non-staff / 405 wrong method, all problem documents, **no** `WWW-Authenticate`. **Rate limit:** none —
+  the HTML moderation mirrors have no rate-limit check and the plan assigns no budget namespace here.
+  Pairing rows `("apps.moderation.views.api.queue", "apps.moderation.views.queue")` and
+  `("apps.moderation.views.api.review", "apps.moderation.views.review")` registered in
+  `apps/api/tests/test_import_rule.py`. Tests: `apps/moderation/tests/test_moderation_api_reads.py`
+  (401/403/405 matrix no-challenge, priority-filter parity incl. `ALL`/missing/unknown, envelope +
+  counts + ordering, review payload parity, uniform 404).
+- **Gap-fill (S2.5):** RFC 9457 staff gate `staff_required_api_problem` added to
+  `apps/core/utils/api_auth.py` for GET reads; frozen legacy `staff_required_api`
+  (`apps/moderation/views/decorators.py`, POST-only, plain `{"error": …}` body) is untouched. It refuses
+  anon with a 401 `unauthenticated`, non-staff with a 403 `forbidden`, and a wrong method with a 405
+  `method_not_allowed` (with an `Allow` header) — all problem documents, identity before method, **no**
+  `WWW-Authenticate` (09-API-010). Same session-cookie credential; no new scheme. Serves S2.5, S2.6, and
+  later S4.7 writes. `apps/core/utils/api_auth` is already in the import-rule ALLOWLIST (no new entry).
+  Unit tests appended to `apps/core/tests/test_api_auth.py` (`TestStaffRequiredApiProblem`).

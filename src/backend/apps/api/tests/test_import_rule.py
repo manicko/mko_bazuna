@@ -54,6 +54,14 @@ PAIRING_TABLE: list[tuple[str, str]] = [
     # favorites list and consumes the exact same `favorites_queryset` shared
     # service (S2.1) with the same `PER_PAGE` page size.
     ("apps.cabinet.views.api.favorites", "apps.cabinet.views.favorites"),
+    # S2.5 — moderation queue read. The API adapter mirrors the HTML queue view
+    # and consumes the exact same `PriorityService` (`get_queued_ads` +
+    # `get_priority_counts`) with the same `PriorityFilter` semantics.
+    ("apps.moderation.views.api.queue", "apps.moderation.views.queue"),
+    # S2.5 — moderation review read. The API adapter mirrors the HTML review view
+    # (same `select_related`/`prefetch_related` lookup restricted to the
+    # moderation status pair); the uniform 404 is a `problem` document.
+    ("apps.moderation.views.api.review", "apps.moderation.views.review"),
 ]
 
 # Modules an API view may import even though its HTML mirror does not.
