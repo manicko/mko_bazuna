@@ -489,3 +489,36 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `WWW-Authenticate` (09-API-010). Same session-cookie credential; no new scheme. Serves S2.5, S2.6, and
   later S4.7 writes. `apps/core/utils/api_auth` is already in the import-rule ALLOWLIST (no new entry).
   Unit tests appended to `apps/core/tests/test_api_auth.py` (`TestStaffRequiredApiProblem`).
+- **S2.6:** `GET /api/v1/trust/seller/` (endpoint row #31 → `shipped`) and
+  `GET /api/v1/trust/moderation/` (endpoint row #32 → `shipped`) shipped. New
+  `apps/analytics/api_urls.py` (`app_name="analytics_api"`; routes `seller/` → `seller`, `moderation/`
+  → `moderation`), `apps/analytics/views/api/{__init__,seller,moderation}.py`, mounted in
+  `apps/api/urls.py` (`trust/`). **Host vs prefix (A3):** both dashboards are **hosted in
+  `apps/analytics`** (they mirror `apps/analytics/views/{seller_dashboard,moderation_dashboard}.py`) but
+  their URLs keep the `trust/` prefix — the plan's S2.6 principle (*"URLs keep the trust prefix… prefix
+  orthogonal to module host"*). **Layout drift:** the plan's file list named a single
+  `apps/analytics/views/api/dashboards.py`; the module is split into `seller.py` + `moderation.py`
+  because the import-subset rule pairs each API module against **one** HTML mirror, and the seller mirror
+  imports only `trust_analytics` while the moderation mirror imports only `moderation_analytics` — one
+  row per API module with the correct mirror is the harness-clean form. **Seller payload:**
+  `{trust_score, trust_level, daily_metrics[], total_views, total_contacts}` — the same `trust_analytics`
+  service tier the HTML view calls (`calculate_seller_trust_score`, `get_trust_level`,
+  `get_seller_daily_metrics(days=30)`) and the same totals the view sums from the daily rows;
+  `trust_score` is rounded to one decimal exactly as the view does; `daily_metrics[]` rows expose the
+  `DailyAdMetrics` fields (date / ad_id / views_count / contacts_count / trust_score / avg_response_time).
+  **Moderation payload:** `{stats, pending_queue_size, moderator_performance[], rejection_reasons, days}`
+  — the same `moderation_analytics` service tier (`get_moderation_stats`, `get_pending_queue_size`,
+  `get_moderator_performance`, `get_rejection_reasons`, all `days=30`) and the same context keys the HTML
+  view sets. **No duplicated analytics logic** — both endpoints call the services the HTML mirrors use.
+  **Auth:** seller = SESS via `login_required_api` (anon → 401 `unauthenticated` problem, no
+  `WWW-Authenticate`) with an **inline GET-only method gate** (non-GET → 405 `method_not_allowed` problem
+  + `Allow: GET`); identity runs first (anon POST → 401). Moderation = STAFF via
+  `staff_required_api_problem` (401 anon / 403 non-staff / 405 wrong method, all problem documents, no
+  `WWW-Authenticate`) — mirroring the HTML mirror's `@staff_required` audience as a problem document
+  rather than the HTML 404. **Rate limit:** none — the HTML analytics dashboards have no rate-limit check
+  and the plan assigns no budget namespace here. Pairing rows
+  `("apps.analytics.views.api.seller", "apps.analytics.views.seller_dashboard")` and
+  `("apps.analytics.views.api.moderation", "apps.analytics.views.moderation_dashboard")` registered in
+  `apps/api/tests/test_import_rule.py`. Tests: `apps/analytics/tests/test_analytics_api.py` (auth matrix
+  no-challenge incl. the seller 405 + `Allow`, payload parity vs the HTML dashboards' context for the
+  same fixtures).

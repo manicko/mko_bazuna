@@ -62,6 +62,16 @@ PAIRING_TABLE: list[tuple[str, str]] = [
     # (same `select_related`/`prefetch_related` lookup restricted to the
     # moderation status pair); the uniform 404 is a `problem` document.
     ("apps.moderation.views.api.review", "apps.moderation.views.review"),
+    # S2.6 — seller trust dashboard read. Hosted in `apps.analytics` but served
+    # under `/api/v1/trust/`; consumes the exact same `trust_analytics` service
+    # tier the HTML dashboard uses.
+    ("apps.analytics.views.api.seller", "apps.analytics.views.seller_dashboard"),
+    # S2.6 — moderation trust dashboard read. Same `moderation_analytics` service
+    # tier as the HTML dashboard; staff gated via the `problem` variant.
+    (
+        "apps.analytics.views.api.moderation",
+        "apps.analytics.views.moderation_dashboard",
+    ),
 ]
 
 # Modules an API view may import even though its HTML mirror does not.
