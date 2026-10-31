@@ -45,6 +45,11 @@ PAIRING_TABLE: list[tuple[str, str]] = [
     # mirror is declared as `apps.core.context_processors`; the API module imports
     # the `locations` models only, exactly the import surface the mirror needs.
     ("apps.locations.api_cities", "apps.core.context_processors"),
+    # S2.3 — dashboard read. The API adapter mirrors the HTML dashboard view and
+    # consumes the exact same `ads_by_status` grouping service (S2.2) +
+    # `SellerStats` aggregation. The consent gate is re-asserted through the
+    # shared `can_create_ad` seam (A14), which is allowlisted below.
+    ("apps.ads.views.api.dashboard", "apps.ads.views.dashboard"),
 ]
 
 # Modules an API view may import even though its HTML mirror does not.
@@ -61,12 +66,20 @@ PAIRING_TABLE: list[tuple[str, str]] = [
 #   client-input DTO. Both API adapters build their GET-dimension DTO on it
 #   (the HTML views parse `request.GET` inline and never need the base), so it
 #   is a shared `/api/v1/` helper, not a mirror-specific edge.
+# - `apps.users.services.account_state`: the A14-mandated **shared consent
+#   seam** (`can_create_ad`). The dashboard HTML mirror gates through its
+#   view-local `_seller_may_create_ad` wrapper (which itself reaches
+#   `can_create_ad` transitively via `apps.ads.views.edit`), but the API view is
+#   forbidden by A14 from importing view privates: it must re-assert consent
+#   through the shared predicate directly. That makes this a sanctioned shared
+#   edge — the allowlist's exact purpose — not a mirror-specific import.
 ALLOWLIST: frozenset[str] = frozenset(
     {
         "apps.core.utils.problem",
         "apps.core.utils.api_auth",
         "apps.search.services.rate_limit",
         "apps.core.schemas",
+        "apps.users.services.account_state",
     }
 )
 

@@ -75,7 +75,7 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 | 8 | Reactivate | lifecycle service (S4.1), same `auto_moderate` decision | `POST /api/v1/ads/{id}/reactivate/` | SESS + owner + consent | 200 outcome; 409; 503 lock-timeout | planned |
 | 9 | Delete | lifecycle service (S4.1) — gate-free | `POST /api/v1/ads/{id}/delete/` | SESS + owner | 204 | planned |
 | 10 | Copy | `copy_ad` (`copy_service.py:39` via `_build_ad_copy:15`) | `POST /api/v1/ads/{id}/copy/` | SESS | 200 `{ad_id}` — new DRAFT owned by seller; max-ads + consent predicates as in the bot flow | planned |
-| 11 | Dashboard reads | dashboard grouping (S2.2) + `SellerStats` | `GET /api/v1/dashboard/?time_range=` | SESS + consent | **403 `consent_required` when consent absent — never an empty list** (R-L1) | planned |
+| 11 | Dashboard reads | dashboard grouping (S2.2) + `SellerStats` | `GET /api/v1/dashboard/?time_range=` | SESS + consent | **403 `consent_required` when consent absent — never an empty list** (R-L1) | shipped (S2.3) |
 | 12 | Moderation queue/review | `PriorityService.get_queued_ads` / `get_priority_counts` | `GET /api/v1/moderation/queue/?priority&page`, `GET /api/v1/moderation/review/{id}/` | STAFF | 401 / 403 / 405 | planned |
 | 13 | Single actions | `admin_actions.approve_ad/reject_ad/ban_user_for_ad` | `POST /api/v1/moderation/{approve,reject,ban}/{id}/` | STAFF | §Errors mappings | planned |
 | 14 | Bulk | (existing) — **frozen shape** | unchanged `/moderation/api/v1/bulk-action/` | STAFF | no change | covered/frozen |
@@ -402,3 +402,32 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `apps.users.services.account_state.can_create_ad` seam is **not** imported by the service or the
   view here; the later S2.3 endpoint re-asserts consent via that shared seam with an equivalence
   test). No new endpoint ships in this task.
+- **S2.3:** `GET /api/v1/dashboard/` shipped (endpoint row #11 → `shipped`). New
+  `apps/ads/views/api/dashboard.py` and a **second** URL module
+  `apps/ads/api_dashboard_urls.py` (`app_name="dashboard_api"`, route `""` → `dashboard`), mounted in
+  `apps/api/urls.py` (`dashboard/`). **Layout extension note:** the dashboard is hosted in the
+  `ads` app but the plan's URL is `GET /api/v1/dashboard/` (row 11) with **no** `/ads/` prefix; per
+  the plan's S2.6 principle (*"URLs keep the trust prefix… prefix orthogonal to module host"*) the
+  route got its own ads URL module rather than a divergent `/ads/dashboard/` prefix. The existing
+  `apps/ads/api_urls.py` (`ads/` listings + detail) is **unchanged**.
+  **Response shape:** `{time_range, time_range_options, groups, stats}` where `groups` is keyed by
+  `AdStatus` in the dashboard's canonical order (published / on_moderation / on_moderation_failed /
+  archived / rejected), each `{count, results[]}`, and `results[]` uses the same ad fields the
+  listings serializer exposes (D4). `stats` is the `SellerStats` block the HTML dashboard renders
+  (`total_views` / `total_contacts` / `ads_published` / `per_ad_stats`).
+  **Consent gate (A14 / R-L1):** consent is re-asserted through the shared
+  `apps.users.services.account_state.can_create_ad` seam (the same predicate the HTML view's
+  `_seller_may_create_ad` wraps) — the API view never imports the HTML view's private. Absent /
+  withdrawn consent and banned sellers are refused with a **403 `consent_required`** problem
+  **before** any grouping is built, so a forbidden account can never receive a silent empty
+  grouping. `apps.users.services.account_state` is added to the import-rule ALLOWLIST (the A14
+  shared seam — the allowlist's exact purpose). **Rate limit:** none — the HTML dashboard mirror has
+  no rate-limit check and the plan assigns no private-read budget namespace to this route, so
+  adding one would be drift rather than parity. **`?time_range=`:** accepted values are `all_time`
+  (default), `30_days`, `7_days`; a missing or invalid value falls back to `all_time` (byte-identical
+  to the HTML view's `TimeRange` parse). Pairing row
+  `("apps.ads.views.api.dashboard", "apps.ads.views.dashboard")` registered in
+  `apps/api/tests/test_import_rule.py`. Tests: `apps/ads/tests/test_dashboard_api.py` (auth matrix,
+  R-L1 403-never-empty-groups, API↔HTML gate-equivalence parametrized over
+  consented/never-consented/withdrawn/banned, `?time_range=` parity incl. invalid/empty fallback,
+  grouped/stats payload shape).
