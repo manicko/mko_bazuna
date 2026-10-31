@@ -79,7 +79,7 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 | 12 | Moderation queue/review | `PriorityService.get_queued_ads` / `get_priority_counts` | `GET /api/v1/moderation/queue/?priority&page`, `GET /api/v1/moderation/review/{id}/` | STAFF | 401 / 403 / 405 (problem docs) | shipped (S2.5) |
 | 13 | Single actions | `admin_actions.approve_ad/reject_ad/ban_user_for_ad` | `POST /api/v1/moderation/{approve,reject,ban}/{id}/` | STAFF | §Errors mappings | planned |
 | 14 | Bulk | (existing) — **frozen shape** | unchanged `/moderation/api/v1/bulk-action/` | STAFF | no change | covered/frozen |
-| 15 | Favorites | extend `apps/ads/services/favorites.py` (list + toggle) | `GET /api/v1/favorites/` (shipped S2.4) · `POST /api/v1/favorites/{ad_id}/toggle/` | SESS | 200 `{active,count}`; uniform 404 | partial: list shipped (S2.4) |
+| 15 | Favorites | extend `apps/ads/services/favorites.py` (list + toggle) | `GET /api/v1/favorites/` (shipped S2.4) · `POST /api/v1/favorites/{ad_id}/toggle/` (shipped S3.2) | SESS | 200 `{ad_id,is_favorited,favorites_count}`; uniform 404 | shipped (S2.4 + S3.2) |
 | 16 | Saved-search CRUD | `apps/search/services/saved_searches.py` (S3.1) on shared `SavedSearchInput` | `GET/POST /api/v1/saved-searches/`, `POST …/{pk}/{toggle,edit,delete}/` | SESS | 422; uniform 404 | partial: list shipped (S2.7) |
 | 17 | Alert delivery | `send_alerts` + services | unchanged (bot digest + scheduler) | — | stance: no HTTP endpoint; agent-visible substitute is `SavedSearchNotification.delivered_at` (read via `verify_parity`/shell tier) | covered/frozen |
 | 18 | Search history list/clear | `search_history` service | `GET /api/v1/search-history/` · `POST /api/v1/search-history/clear/` | **SESS** (HTML mirrors are `@login_required`; anon session history is only reachable via autocomplete #4) | 204 clear | partial: list shipped (S2.7) |
@@ -599,3 +599,26 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `apps/search/services/__init__.py` gained no imports; `telegram_bot/services/alerts.py` is untouched
   (its token protocol is by design). Tests: new `apps/search/tests/test_saved_search_service.py`
   (service-tier CRUD, ownership refusals, token stability across update/toggle, the query bound).
+- **S3.2:** `POST /api/v1/favorites/{ad_id}/toggle/` shipped — the write half of endpoint row #15
+  (row #15 → `shipped`). The view lives in `apps/ads/views/api/favorite.py` but the route is
+  registered in `apps/cabinet/api_urls.py` (`favorites/<int:ad_id>/toggle/` → `favorite_toggle`,
+  `app_name="cabinet_api"`), because the plan's URL prefix is orthogonal to the module host: the
+  list half of the same gap hosted the `favorites/` prefix there (S2.4). It is the JSON sibling of
+  the HTML heart toggle and calls the **same** shared `toggle_favorite` service (S2.1) — no
+  API-only predicate. **Auth:** `login_required_api` (401 `unauthenticated` problem, no
+  `WWW-Authenticate`) applied **before** the view's method gate, so an anonymous POST is 401, not
+  405. **Method:** POST-only, otherwise a 405 `method_not_allowed` problem with `Allow: POST`.
+  **Body:** a `BaseInputModel` DTO `{"ad_id": int}` (extra keys forbidden); malformed / missing /
+  wrongly-typed → 422 `validation_failed` problem via `validation_problem` (the S1+ helper).
+  **Rate limit:** `rate_limit_check(namespace="api_write", budget=API_WRITE)` checked **first**,
+  before the body is parsed (the `api_bulk` write ordering); 429 `rate_limited` problem +
+  `Retry-After: 60`. All writes share the single `api_write` namespace (plan Q4). **Missing /
+  non-PUBLISHED ad:** the service raises `Ad.DoesNotExist`, mapped to the uniform 404 `not_found`
+  problem (CWE-209), mirroring the HTML toggle's `Http404`. **Response:** the post-toggle machine
+  state `{"ad_id", "is_favorited", "favorites_count"}` (the `FavoriteToggleResult` fields). **No
+  CSRF exemption** — the middleware chain is used as-is; writes are POST-only. Pairing row
+  `("apps.ads.views.api.favorite", "apps.ads.views.favorite")` registered in
+  `apps/api/tests/test_import_rule.py`; `pydantic` added to the ALLOWLIST (the shared DTO/422
+  boundary dependency every API write needs, while the read mirrors do not import it). Tests:
+  `apps/ads/tests/test_favorites_toggle_api.py` (401/405/422/404 matrices, toggle cycle,
+  ownership scoping, 429 problem, namespace reverse).

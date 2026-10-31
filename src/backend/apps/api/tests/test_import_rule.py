@@ -81,6 +81,12 @@ PAIRING_TABLE: list[tuple[str, str]] = [
     # 100-entry cap); session-only per A6, so it imports only the mirror's
     # `SearchHistory` model edge.
     ("apps.cabinet.views.api.search_history", "apps.cabinet.views.search_history"),
+    # S3.2 — favorites toggle write. The API adapter mirrors the HTML heart
+    # toggle (`apps.ads.views.favorite`) and calls the exact same shared
+    # `toggle_favorite` service (S2.1); the write routes under the cabinet
+    # `favorites/` prefix (URL prefix orthogonal to module host) but the module
+    # itself lives in `apps.ads`.
+    ("apps.ads.views.api.favorite", "apps.ads.views.favorite"),
 ]
 
 # Modules an API view may import even though its HTML mirror does not.
@@ -104,6 +110,13 @@ PAIRING_TABLE: list[tuple[str, str]] = [
 #   forbidden by A14 from importing view privates: it must re-assert consent
 #   through the shared predicate directly. That makes this a sanctioned shared
 #   edge — the allowlist's exact purpose — not a mirror-specific import.
+# - `pydantic`: the validation library every client-input DTO is built on. The
+#   READ mirrors parse `request.GET`/query strings without a DTO and so never
+#   import it, but every API **write** validates a `BaseInputModel` body and
+#   catches `ValidationError` to emit the 422 problem — a shared `/api/v1/`
+#   boundary dependency, not a mirror-specific edge. (The listings HTML mirror
+#   happens to import it; the favorites HTML mirror does not, which is exactly
+#   why it must be allowlisted rather than inherited.)
 ALLOWLIST: frozenset[str] = frozenset(
     {
         "apps.core.utils.problem",
@@ -111,6 +124,7 @@ ALLOWLIST: frozenset[str] = frozenset(
         "apps.search.services.rate_limit",
         "apps.core.schemas",
         "apps.users.services.account_state",
+        "pydantic",
     }
 )
 
