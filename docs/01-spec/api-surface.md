@@ -226,3 +226,4 @@ side effects should use the service tier or the `verify_parity` command (the pol
 - **This file is finalized at S5.3** (docs close-out): all rows become `shipped`/`stanced`,
   the compliance section is recorded, and the dual-429, five-branch-edit and lock-timeout
   HTML-shape differences are confirmed.
+- **S0.2:** `/api/v1/` mounted; URL-only aggregator + import-rule harness shipped (no endpoints yet).

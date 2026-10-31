@@ -58,6 +58,7 @@ urlpatterns = [
     path("metrics", _metrics_gate, name="prometheus-django-metrics"),
     path("", include("django_prometheus.urls")),
     path("admin/", admin.site.urls),
+    path("api/v1/", include("apps.api.urls")),
     path("moderation/", include("apps.moderation.urls")),
     path("analytics/", include("apps.analytics.urls")),
     path("cabinet/", include("apps.cabinet.urls")),

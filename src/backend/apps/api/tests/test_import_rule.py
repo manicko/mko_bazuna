@@ -1,0 +1,122 @@
+"""R-F2 mechanical import-subset harness for the ``/api/v1/`` surface.
+
+The ratified import rule (plan §2.3) is:
+
+    An API view module's imports must be a **subset** of its mirrored HTML view
+    module's imports, plus an explicit allowlist (``apps.core.utils.problem``,
+    ``apps.core.utils.api_auth``) and all stdlib / ``django.*`` modules.
+
+Rationale: the API view must reuse exactly the dependency edges its HTML mirror
+already needs, so mounting ``/api/v1/`` can never introduce a new import cycle
+(audit risk 6) and can never reach a service the HTML consumer does not use.
+
+**Pairing table.** ``PAIRING_TABLE`` is the declared, explicit registry of
+``(api_module_path, mirror_module_path)`` rows. It ships **empty** at S0.2;
+every later endpoint task registers its row here in the same task that ships the
+endpoint. With zero rows the harness passes trivially, which is the S0.2
+acceptance criterion — but it is a live guard from day one.
+"""
+
+from __future__ import annotations
+
+import ast
+import sys
+from pathlib import Path
+
+# Declared pairing table: (API view module, mirrored HTML view module).
+# Rows are added by the endpoint tasks (S1.3+). Empty at S0.2.
+PAIRING_TABLE: list[tuple[str, str]] = []
+
+# Modules an API view may import even though its HTML mirror does not.
+ALLOWLIST: frozenset[str] = frozenset(
+    {
+        "apps.core.utils.problem",
+        "apps.core.utils.api_auth",
+    }
+)
+
+
+def test_pairing_table_rows_satisfy_import_rule() -> None:
+    """Every registered API module's imports are a subset of its mirror's."""
+    for api_module_path, mirror_module_path in PAIRING_TABLE:
+        api_imports = _imports_of(api_module_path)
+        mirror_imports = _imports_of(mirror_module_path)
+        allowed = mirror_imports | ALLOWLIST | _stdlib_and_django(api_imports)
+
+        offending = sorted(api_imports - allowed)
+        assert not offending, _violation_message(
+            api_module_path, mirror_module_path, offending
+        )
+
+
+def test_pairing_table_has_no_duplicate_rows() -> None:
+    """The pairing table must not register the same API module twice."""
+    api_modules = [api_module for api_module, _ in PAIRING_TABLE]
+    duplicates = sorted({m for m in api_modules if api_modules.count(m) > 1})
+    assert not duplicates, f"Duplicate API modules in PAIRING_TABLE: {duplicates}"
+
+
+def _imports_of(dotted_module_path: str) -> set[str]:
+    """Return the absolute imported module names of a source module.
+
+    ``dotted_module_path`` is a module such as ``apps.ads.views.api.listings``;
+    it is resolved to a source file via ``src/backend`` on the file system.
+    """
+    source_path = _source_path_for(dotted_module_path)
+    tree = ast.parse(source_path.read_text(encoding="utf-8"), filename=str(source_path))
+
+    package_parts = dotted_module_path.split(".")
+    modules: set[str] = set()
+    for node in ast.walk(tree):
+        if isinstance(node, ast.Import):
+            for alias in node.names:
+                modules.add(alias.name)
+        elif isinstance(node, ast.ImportFrom):
+            if node.level:
+                modules.add(_resolve_relative(node, package_parts))
+            elif node.module:
+                modules.add(node.module)
+    return modules
+
+
+def _source_path_for(dotted_module_path: str) -> Path:
+    """Map a dotted module path to its ``.py`` file under ``src/backend``."""
+    backend_root = Path(__file__).resolve().parents[4]
+    return backend_root.joinpath(*dotted_module_path.split(".")).with_suffix(".py")
+
+
+def _resolve_relative(node: ast.ImportFrom, package_parts: list[str]) -> str:
+    """Resolve a relative ``ImportFrom`` node to its absolute dotted name."""
+    base = package_parts[: len(package_parts) - node.level]
+    prefix = ".".join(base)
+    if node.module:
+        return f"{prefix}.{node.module}" if prefix else node.module
+    return prefix
+
+
+def _stdlib_and_django(imported: set[str]) -> set[str]:
+    """Filter ``imported`` down to stdlib and ``django.*`` modules."""
+    return {
+        module
+        for module in imported
+        if module.split(".", 1)[0] == "django"
+        or module.split(".", 1)[0] in sys.stdlib_module_names
+    }
+
+
+def _violation_message(
+    api_module_path: str, mirror_module_path: str, offending: list[str]
+) -> str:
+    """Build a clear failure message listing the offending imports."""
+    lines = [
+        f"Import-rule violation for '{api_module_path}':",
+        f"  its mirror is '{mirror_module_path}'.",
+        "  The following imports are not in the mirror's imports and are not "
+        "allowlisted:",
+    ]
+    lines.extend(f"    - {module}" for module in offending)
+    lines.append(
+        "  Fix: either reuse only the mirror's imports, or add the module to "
+        "ALLOWLIST if it is a shared API helper."
+    )
+    return "\n".join(lines)
