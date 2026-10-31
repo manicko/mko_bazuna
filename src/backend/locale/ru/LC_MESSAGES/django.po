@@ -1748,3 +1748,64 @@ msgstr "Объявление #%(ad_id)s не прошло модерацию и 
 #, python-format
 msgid "Ad #%(ad_id)s not found."
 msgstr "Объявление #%(ad_id)s не найдено."
+
+#: src/backend/apps/ads/views/api/detail.py
+msgid "Ad not found."
+msgstr "Объявление не найдено."
+
+#: src/backend/apps/core/utils/api_auth.py
+msgid "Authentication required."
+msgstr "Требуется аутентификация."
+
+#: src/backend/apps/core/utils/problem.py
+msgid "Bad Request"
+msgstr "Неверный запрос"
+
+#: src/backend/apps/core/utils/problem.py
+msgid "Unauthorized"
+msgstr "Не авторизован"
+
+#: src/backend/apps/core/utils/problem.py
+msgid "Forbidden"
+msgstr "Доступ запрещён"
+
+#: src/backend/apps/core/utils/problem.py
+msgid "Not Found"
+msgstr "Не найдено"
+
+#: src/backend/apps/core/utils/problem.py
+msgid "Method Not Allowed"
+msgstr "Метод не поддерживается"
+
+#: src/backend/apps/core/utils/problem.py
+msgid "Conflict"
+msgstr "Конфликт"
+
+#: src/backend/apps/core/utils/problem.py
+msgid "Unprocessable Entity"
+msgstr "Необрабатываемый объект"
+
+#: src/backend/apps/core/utils/problem.py
+msgid "Too Many Requests"
+msgstr "Слишком много запросов"
+
+#: src/backend/apps/core/utils/problem.py
+msgid "Service Unavailable"
+msgstr "Сервис недоступен"
+
+#: src/backend/apps/core/utils/problem.py
+msgid "Internal Server Error"
+msgstr "Внутренняя ошибка сервера"
+
+#: src/backend/apps/core/utils/problem.py
+msgid "Error"
+msgstr "Ошибка"
+
+#: src/backend/apps/core/utils/problem.py
+msgid "Request body failed validation."
+msgstr "Тело запроса не прошло валидацию."
+
+#: src/backend/apps/core/utils/problem.py
+msgid "Too many requests; retry after the indicated delay."
+msgstr "Слишком много запросов; повторите попытку после указанной задержки."
+

@@ -27,6 +27,8 @@ from http import HTTPStatus
 from typing import TYPE_CHECKING, Final
 
 from django.http import JsonResponse
+from django.utils.functional import Promise
+from django.utils.translation import gettext as _, gettext_lazy
 
 from apps.core.utils.sanitize import pydantic_errors_json
 
@@ -48,19 +50,22 @@ RETRY_AFTER_HEADER: Final[str] = "Retry-After"
 TYPE_VALIDATION_FAILED: Final[str] = "validation_failed"
 TYPE_RATE_LIMITED: Final[str] = "rate_limited"
 
-# Short English titles keyed on the standard HTTP status. The title is a
-# fallback presentation string; callers usually supply ``detail`` as well.
-_STATUS_TITLES: Final[dict[int, str]] = {
-    HTTPStatus.BAD_REQUEST: "Bad Request",
-    HTTPStatus.UNAUTHORIZED: "Unauthorized",
-    HTTPStatus.FORBIDDEN: "Forbidden",
-    HTTPStatus.NOT_FOUND: "Not Found",
-    HTTPStatus.METHOD_NOT_ALLOWED: "Method Not Allowed",
-    HTTPStatus.CONFLICT: "Conflict",
-    HTTPStatus.UNPROCESSABLE_ENTITY: "Unprocessable Entity",
-    HTTPStatus.TOO_MANY_REQUESTS: "Too Many Requests",
-    HTTPStatus.SERVICE_UNAVAILABLE: "Service Unavailable",
-    HTTPStatus.INTERNAL_SERVER_ERROR: "Internal Server Error",
+# Short English titles keyed on the standard HTTP status. Each value is a
+# ``gettext_lazy`` proxy so the msgid is cataloged from this module AND the
+# title is resolved for the active request locale when the document renders.
+# The title is a fallback presentation string; callers usually supply ``detail``
+# as well.
+_STATUS_TITLES: Final[dict[int, str | Promise]] = {
+    HTTPStatus.BAD_REQUEST: gettext_lazy("Bad Request"),
+    HTTPStatus.UNAUTHORIZED: gettext_lazy("Unauthorized"),
+    HTTPStatus.FORBIDDEN: gettext_lazy("Forbidden"),
+    HTTPStatus.NOT_FOUND: gettext_lazy("Not Found"),
+    HTTPStatus.METHOD_NOT_ALLOWED: gettext_lazy("Method Not Allowed"),
+    HTTPStatus.CONFLICT: gettext_lazy("Conflict"),
+    HTTPStatus.UNPROCESSABLE_ENTITY: gettext_lazy("Unprocessable Entity"),
+    HTTPStatus.TOO_MANY_REQUESTS: gettext_lazy("Too Many Requests"),
+    HTTPStatus.SERVICE_UNAVAILABLE: gettext_lazy("Service Unavailable"),
+    HTTPStatus.INTERNAL_SERVER_ERROR: gettext_lazy("Internal Server Error"),
 }
 
 
@@ -73,11 +78,11 @@ def _title_for(status: int) -> str:
     """
     known = _STATUS_TITLES.get(status)
     if known is not None:
-        return known
+        return str(known)
     try:
         return HTTPStatus(status).phrase
     except ValueError:
-        return "Error"
+        return _("Error")
 
 
 def _problem_response(
@@ -138,7 +143,7 @@ def validation_problem(exc: ValidationError) -> JsonResponse:
             "type": TYPE_VALIDATION_FAILED,
             "title": _title_for(status),
             "status": status,
-            "detail": "Request body failed validation.",
+            "detail": _("Request body failed validation."),
             "errors": pydantic_errors_json(exc),
         },
     )
@@ -165,7 +170,7 @@ def rate_limited_problem(budget: RateLimitBudget) -> JsonResponse:
             "type": TYPE_RATE_LIMITED,
             "title": _title_for(status),
             "status": status,
-            "detail": "Too many requests; retry after the indicated delay.",
+            "detail": _("Too many requests; retry after the indicated delay."),
         },
     )
     response[RETRY_AFTER_HEADER] = str(budget.period)

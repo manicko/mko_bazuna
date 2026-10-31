@@ -20,6 +20,7 @@ from functools import wraps
 from http import HTTPStatus
 
 from django.http import HttpRequest, JsonResponse
+from django.utils.translation import gettext as _
 
 from apps.core.utils.problem import problem
 
@@ -54,7 +55,7 @@ def login_required_api(
             return problem(
                 HTTPStatus.UNAUTHORIZED,
                 TYPE_UNAUTHENTICATED,
-                "Authentication required.",
+                _("Authentication required."),
             )
         return view_func(request, *args, **kwargs)
 

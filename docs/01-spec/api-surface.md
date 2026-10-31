@@ -370,3 +370,12 @@ side effects should use the service tier or the `verify_parity` command (the pol
     (shape/structure, active-only filtering, per-locale names, orphan omission, HTML menu parity,
     429 problem) and `apps/locations/tests/test_cities_api.py` (shape/order, per-locale names,
     header-context parity, 429 problem).
+- **S1.7:** Stage S1 i18n batch applied. The Stage S1 API surface's user-visible `detail`/`title`
+  strings are now cataloged as English msgids and translatable in `ru`/`bs`/`en`
+  (`apps/core/utils/problem.py` — the 10 status titles, `"Error"`,
+  `"Request body failed validation."`, `"Too many requests; retry after the indicated delay."`;
+  `apps/core/utils/api_auth.py` — `"Authentication required."`;
+  `apps/ads/views/api/detail.py` — `"Ad not found."`). `type` tokens stay stable ASCII (never
+  translated, Q6); no JSON key, status code or response shape changed. Catalogs hand-applied from a
+  safe scratch extraction (`--no-location --no-obsolete`); `ru`/`bs` `msgstr` are non-empty, `en`
+  stays empty (the English msgid is the source). `apps/ads/tests/test_i18n_completeness.py` green.

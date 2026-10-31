@@ -26,6 +26,8 @@ from http import HTTPStatus
 from typing import Any, Final
 
 from django.http import HttpRequest, JsonResponse
+from django.utils.functional import Promise
+from django.utils.translation import gettext_lazy as _
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus, AnalyticsEventType, RateLimitBudget
@@ -47,9 +49,10 @@ _RATE_LIMIT_NAMESPACE: Final[str] = "api_detail"
 # (plan §2.5 CWE-209 discipline).
 _TYPE_NOT_FOUND: Final[str] = "not_found"
 
-# The stable 404 detail. English msgid (cataloged later); never translated at
-# runtime here (``problem`` carries the plain English source).
-_DETAIL_NOT_FOUND: Final[str] = "Ad not found."
+# The stable 404 detail. English msgid (cataloged in ``ru``/``bs``/``en``);
+# ``gettext_lazy`` defers resolution to render time so the string is translated
+# for the active request locale, while the English text stays the msgid.
+_DETAIL_NOT_FOUND: Final[str | Promise] = _("Ad not found.")
 
 
 def detail_view(request: HttpRequest, ad_id: int) -> JsonResponse:
