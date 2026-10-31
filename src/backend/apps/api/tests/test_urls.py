@@ -24,11 +24,10 @@ from django.test import Client
 from apps.api import urls as api_urls
 
 # Arbitrary paths that currently have no route registered under /api/v1/.
-# ``/api/v1/ads/`` (S1.3) and ``/api/v1/search/`` (S1.4) are excluded: they are
-# shipped routes.
+# ``/api/v1/ads/`` (S1.3), ``/api/v1/ads/<id>/`` (S1.5) and ``/api/v1/search/``
+# (S1.4) are excluded: they are shipped routes.
 ARBITRARY_PATHS = [
     "/api/v1/",
-    "/api/v1/ads/1/",
     "/api/v1/does-not-exist/",
     "/api/v1/deeply/nested/unknown/path/",
 ]

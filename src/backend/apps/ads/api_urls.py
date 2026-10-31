@@ -2,10 +2,12 @@
 
 from django.urls import path
 
+from apps.ads.views.api.detail import detail_view
 from apps.ads.views.api.listings import listings_view
 
 app_name = "ads_api"
 
 urlpatterns = [
     path("", listings_view, name="listings"),
+    path("<int:ad_id>/", detail_view, name="ad_detail"),
 ]

@@ -67,7 +67,7 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 |---|---|---|---|---|---|---|
 | 1 | Listings | `ListingsQuery.build_queryset` / `build_listings_context` | `GET /api/v1/ads/` | PUB | 422; 429 problem (§Errors) | shipped (S1.3) |
 | 2 | FTS search | `apps/search/services/fts.py` (S1.1) | `GET /api/v1/search/?q&category&city&min_price&max_price&listing_purpose&condition&features&sort&page&all_categories` | PUB | fuzzy / did-you-mean / narrowed fields; cap semantics; 429 problem | shipped (S1.4) |
-| 3 | Ad detail | audience predicate + serialize | `GET /api/v1/ads/{id}/` | PUB | uniform 404; `AD_VIEWED` recorded | planned |
+| 3 | Ad detail | audience predicate + serialize | `GET /api/v1/ads/{id}/` | PUB | uniform 404; `AD_VIEWED` recorded | shipped (S1.5) |
 | 4 | Autocomplete | (existing) | unchanged `/api/search/autocomplete` | PUB | stance: not aliased; legacy 429 `{"error":"rate_limit"}` | covered/frozen |
 | 5 | Create/publish | `create_draft_ad` + `submit_ad` | `POST /api/v1/ads/{id}/submit/` (existing DRAFT; dialog/photo staging bot-only) | SESS (consent via outcome) | `SubmitAdOutcome` map (§Errors) | planned |
 | 6 | Edit | edit-flow helper (S4.2) — five branches | `POST /api/v1/ads/{id}/edit/` | SESS + owner | refusal → 409 `not_editable` (HTML renders 200+form — deliberate machine mapping); price-only and direct-save stay distinct from `submit_ad` | planned |
@@ -313,3 +313,25 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `apps/search/tests/test_search_api.py` (param parity across every dimension, cap/truncation
   through the warm-cache seam, HTML/JSON parity incl. warm-cache, analytics/history parity, `?lang`
   locale parity, and the 422/429 problems).
+- **S1.5:** `GET /api/v1/ads/{id}/` shipped (endpoint row #3 → `shipped`). New
+  `apps/ads/views/api/detail.py` and a second route in `apps/ads/api_urls.py`
+  (`<int:ad_id>/` → `ad_detail`; the listings `""` route is untouched). The endpoint mirrors the
+  HTML `ad_detail` view (which lives in `apps.ads.views.listings`) with the **same** audience
+  predicate (`account_state_q("user__")` + `status=PUBLISHED`) and the **same** `AD_VIEWED`
+  side effect (seller attribution), so audience parity and the analytics side effect hold by
+  construction. A **missing** id and every audience-blocked cause (draft / unpublished, deleted /
+  declined / banned / consent-withdrawn seller) answer the **identical** uniform 404 problem
+  document (`type="not_found"`, English detail `"Ad not found."`) — the distinction is never
+  leaked (CWE-209). Payload extends the listings `_serialize_ad` shape with `description`
+  (localized), `is_favorited` (the same `ad.favorites.filter(...)` source the HTML view uses;
+  anonymous reads `False`) and `contact_url` — the Telegram deep-link
+  `https://t.me/<bot_username>?start=contact_<ad_id>` assembled from the shared `SiteConfig` bot
+  username (plan stance #23), `null` when the seller is not contactable (the inlined Zone R2
+  predicate: PUBLISHED, seller has a `telegram_id`, not deleted, not banned, consent not
+  withdrawn). Media stays URLs-only (plan stance #26). Errors: 429 `rate_limited` problem +
+  `Retry-After` via `rate_limit_check(namespace="api_detail", budget=API_PUBLIC_READ)` +
+  `rate_limited_problem`. The HTML detail view / `apps.ads.views.listings` are **untouched** (zero
+  diff). Pairing row `("apps.ads.views.api.detail", "apps.ads.views.listings")` registered in
+  `apps/api/tests/test_import_rule.py`. Tests: `apps/ads/tests/test_ad_detail_api.py` (audience
+  matrix incl. identical-404-shape, HTML/API `AD_VIEWED` parity, favorites tri-state, media-URLs-
+  only, contact-deep-link presence/absence matrix, and the 429 problem).

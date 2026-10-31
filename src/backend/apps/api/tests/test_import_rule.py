@@ -32,6 +32,10 @@ PAIRING_TABLE: list[tuple[str, str]] = [
     # S1.4 — FTS search read. The API adapter mirrors the HTML search view and
     # calls the exact same `apps.search.services.fts` pipeline + shared cache.
     ("apps.search.views.api.search", "apps.search.views.search"),
+    # S1.5 — ad detail read. The API adapter mirrors the HTML `ad_detail` view
+    # (which lives in `apps.ads.views.listings`) and applies the exact same
+    # `account_state_q` audience predicate + `AD_VIEWED` side effect.
+    ("apps.ads.views.api.detail", "apps.ads.views.listings"),
 ]
 
 # Modules an API view may import even though its HTML mirror does not.
