@@ -50,6 +50,10 @@ PAIRING_TABLE: list[tuple[str, str]] = [
     # `SellerStats` aggregation. The consent gate is re-asserted through the
     # shared `can_create_ad` seam (A14), which is allowlisted below.
     ("apps.ads.views.api.dashboard", "apps.ads.views.dashboard"),
+    # S2.4 — favorites list read. The API adapter mirrors the HTML cabinet
+    # favorites list and consumes the exact same `favorites_queryset` shared
+    # service (S2.1) with the same `PER_PAGE` page size.
+    ("apps.cabinet.views.api.favorites", "apps.cabinet.views.favorites"),
 ]
 
 # Modules an API view may import even though its HTML mirror does not.

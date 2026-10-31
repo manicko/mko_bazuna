@@ -79,7 +79,7 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 | 12 | Moderation queue/review | `PriorityService.get_queued_ads` / `get_priority_counts` | `GET /api/v1/moderation/queue/?priority&page`, `GET /api/v1/moderation/review/{id}/` | STAFF | 401 / 403 / 405 | planned |
 | 13 | Single actions | `admin_actions.approve_ad/reject_ad/ban_user_for_ad` | `POST /api/v1/moderation/{approve,reject,ban}/{id}/` | STAFF | §Errors mappings | planned |
 | 14 | Bulk | (existing) — **frozen shape** | unchanged `/moderation/api/v1/bulk-action/` | STAFF | no change | covered/frozen |
-| 15 | Favorites | extend `apps/ads/services/favorites.py` (list + toggle) | `GET /api/v1/favorites/` · `POST /api/v1/favorites/{ad_id}/toggle/` | SESS | 200 `{active,count}`; uniform 404 | planned |
+| 15 | Favorites | extend `apps/ads/services/favorites.py` (list + toggle) | `GET /api/v1/favorites/` (shipped S2.4) · `POST /api/v1/favorites/{ad_id}/toggle/` | SESS | 200 `{active,count}`; uniform 404 | partial: list shipped (S2.4) |
 | 16 | Saved-search CRUD | `apps/search/services/saved_searches.py` (S3.1) on shared `SavedSearchInput` | `GET/POST /api/v1/saved-searches/`, `POST …/{pk}/{toggle,edit,delete}/` | SESS | 422; uniform 404 | planned |
 | 17 | Alert delivery | `send_alerts` + services | unchanged (bot digest + scheduler) | — | stance: no HTTP endpoint; agent-visible substitute is `SavedSearchNotification.delivered_at` (read via `verify_parity`/shell tier) | covered/frozen |
 | 18 | Search history list/clear | `search_history` service | `GET /api/v1/search-history/` · `POST /api/v1/search-history/clear/` | **SESS** (HTML mirrors are `@login_required`; anon session history is only reachable via autocomplete #4) | 204 clear | planned |
@@ -431,3 +431,22 @@ side effects should use the service tier or the `verify_parity` command (the pol
   R-L1 403-never-empty-groups, API↔HTML gate-equivalence parametrized over
   consented/never-consented/withdrawn/banned, `?time_range=` parity incl. invalid/empty fallback,
   grouped/stats payload shape).
+- **S2.4:** `GET /api/v1/favorites/` list half shipped (endpoint row #15 → list half `shipped`; the
+  toggle `POST …/{ad_id}/toggle/` half lands at S3.2). New `apps/cabinet/api_urls.py`
+  (`app_name="cabinet_api"`, route `""` → `favorites`) and
+  `apps/cabinet/views/api/{__init__,favorites}.py`, mounted in `apps/api/urls.py` (`favorites/`).
+  The endpoint mirrors the HTML cabinet favorites list 1:1: the **same** shared
+  `favorites_queryset(request.user)` (S2.1 — PUBLISHED + `account_state_q("user__")` audience,
+  most-recently-favorited first), paginated at the **same** `PER_PAGE` (24), in the standard
+  pagination envelope `{page, per_page, total_count, results_truncated, results[], has_next}`.
+  **Ownership scoping** is inherent in the queryset (the caller's own favorites relation only), so
+  another user's favorites are never visible. `results[]` uses the same ad fields the listings
+  serializer exposes (D4). **Rate limit:** none — the HTML cabinet favorites mirror has no
+  rate-limit check and the plan assigns no budget namespace to this session-gated read.
+  **Ordering (R2 / tie note):** no `-id` tiebreaker is added to `favorites_queryset` (R2 lives only
+  in `ListingsQuery._apply_sort`, the program's single approved ordering delta); the S2.1
+  equal-key `-favorites__created_at` tie observation is carried unchanged, and because both surfaces
+  run the one shared queryset the tie resolves identically on HTML and JSON (proven by the parity
+  test). Pairing row `("apps.cabinet.views.api.favorites", "apps.cabinet.views.favorites")` registered
+  in `apps/api/tests/test_import_rule.py`. Tests: `apps/cabinet/tests/test_favorites_list_api.py`
+  (401 matrix, ownership scoping, multi-page envelope, HTML `page_obj` id/ordering parity).

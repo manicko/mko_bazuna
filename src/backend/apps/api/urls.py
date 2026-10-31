@@ -22,4 +22,5 @@ urlpatterns: list = [
     path("search/", include("apps.search.api_urls")),
     path("categories/", include("apps.categories.api_urls")),
     path("cities/", include("apps.locations.api_urls")),
+    path("favorites/", include("apps.cabinet.api_urls")),
 ]
