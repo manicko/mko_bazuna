@@ -22,7 +22,10 @@ urlpatterns: list = [
     path("search/", include("apps.search.api_urls")),
     path("categories/", include("apps.categories.api_urls")),
     path("cities/", include("apps.locations.api_urls")),
-    path("favorites/", include("apps.cabinet.api_urls")),
+    # The cabinet API module hosts several prefix-based routes
+    # (favorites/, saved-searches/, search-history/), so it is mounted at the
+    # /api/v1/ root rather than under a single `favorites/` prefix.
+    path("", include("apps.cabinet.api_urls")),
     path("moderation/", include("apps.moderation.api_urls")),
     path("trust/", include("apps.analytics.api_urls")),
 ]

@@ -80,9 +80,9 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 | 13 | Single actions | `admin_actions.approve_ad/reject_ad/ban_user_for_ad` | `POST /api/v1/moderation/{approve,reject,ban}/{id}/` | STAFF | §Errors mappings | planned |
 | 14 | Bulk | (existing) — **frozen shape** | unchanged `/moderation/api/v1/bulk-action/` | STAFF | no change | covered/frozen |
 | 15 | Favorites | extend `apps/ads/services/favorites.py` (list + toggle) | `GET /api/v1/favorites/` (shipped S2.4) · `POST /api/v1/favorites/{ad_id}/toggle/` | SESS | 200 `{active,count}`; uniform 404 | partial: list shipped (S2.4) |
-| 16 | Saved-search CRUD | `apps/search/services/saved_searches.py` (S3.1) on shared `SavedSearchInput` | `GET/POST /api/v1/saved-searches/`, `POST …/{pk}/{toggle,edit,delete}/` | SESS | 422; uniform 404 | planned |
+| 16 | Saved-search CRUD | `apps/search/services/saved_searches.py` (S3.1) on shared `SavedSearchInput` | `GET/POST /api/v1/saved-searches/`, `POST …/{pk}/{toggle,edit,delete}/` | SESS | 422; uniform 404 | partial: list shipped (S2.7) |
 | 17 | Alert delivery | `send_alerts` + services | unchanged (bot digest + scheduler) | — | stance: no HTTP endpoint; agent-visible substitute is `SavedSearchNotification.delivered_at` (read via `verify_parity`/shell tier) | covered/frozen |
-| 18 | Search history list/clear | `search_history` service | `GET /api/v1/search-history/` · `POST /api/v1/search-history/clear/` | **SESS** (HTML mirrors are `@login_required`; anon session history is only reachable via autocomplete #4) | 204 clear | planned |
+| 18 | Search history list/clear | `search_history` service | `GET /api/v1/search-history/` · `POST /api/v1/search-history/clear/` | **SESS** (HTML mirrors are `@login_required`; anon session history is only reachable via autocomplete #4) | 204 clear | partial: list shipped (S2.7) |
 | 19 | Preferred-city | (existing) | unchanged `/api/preferred-city/` | anon + consent cookie | stance: not aliased; **no rate limiter exists** | covered/frozen |
 | 20 | Consent | `give/decline/withdraw_consent` | `POST /api/v1/consent/{accept,decline,withdraw}/` | accept/decline anon-allowed (HTML parity); withdraw SESS | cookie quartet stays HTML; withdraw still `logout()`s | planned |
 | 21 | Login issue/status | `issue/consume_token` (predicates frozen) | **No new endpoint** — `/login/status/` is the machine contract (200/204/410); GET-issuance gap owned by phase 15 | anon | uniform 410, anti-enumeration | planned |
@@ -522,3 +522,48 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `apps/api/tests/test_import_rule.py`. Tests: `apps/analytics/tests/test_analytics_api.py` (auth matrix
   no-challenge incl. the seller 405 + `Allow`, payload parity vs the HTML dashboards' context for the
   same fixtures).
+
+- **S2.7:** `GET /api/v1/saved-searches/` (endpoint row #16 → read half `shipped`; the
+  create/toggle/edit/delete write halves land at S3.4) and `GET /api/v1/search-history/`
+  (endpoint row #18 → read half `shipped`; the clear half lands at S3.5) shipped. New
+  `apps/cabinet/views/api/{saved_searches,search_history}.py`, mounted in
+  `apps/api/urls.py`.
+  - **URL restructure (Tech Lead ruling).** `apps/cabinet/api_urls.py` is now
+    **prefix-based**, hosting all cabinet endpoints in one module per the plan's Q1
+    file inventory: `path("favorites/", …)`, `path("saved-searches/", …)`,
+    `path("search-history/", …)`. The aggregator line changed from
+    `path("favorites/", include("apps.cabinet.api_urls"))` to
+    `path("", include("apps.cabinet.api_urls"))`, so the public URLs are exactly
+    `GET /api/v1/favorites/` (**unchanged**), `GET /api/v1/saved-searches/` and
+    `GET /api/v1/search-history/`. No `test_urls.py` constant entry became live
+    (`/api/v1/` itself still has no route and stays 404).
+  - **Saved searches.** Mirrors the HTML cabinet saved-searches list 1:1: the **same**
+    `SavedSearch.objects.filter(user=request.user).select_related("city",
+    "category").order_by("-created_at")` queryset and the **same** per-row facts the HTML
+    row renders (query, localized `city`/`category` `{id,slug,name}`, `min_price`/
+    `max_price`, `is_active` toggle) plus the model timestamps (`created_at`/
+    `updated_at`/`last_notified_at`). The `unsubscribe_token` capability token is
+    deliberately never exposed. The HTML mirror is **unpaginated** (it renders every
+    saved search on one page), so there is no HTML page size to mirror; `PER_PAGE` (24)
+    is the one addition the mandated pagination envelope requires. **Ownership scoping**
+    is the `user=request.user` filter — another user's rows are never visible.
+  - **Search history — SESS-only (A6).** The HTML mirror is `@login_required` and the
+    cabinet docstring states anonymous (session) search history is never shown there, so
+    this endpoint is **session-only** and mirrors that gate exactly: anonymous requests
+    answer the 401 `unauthenticated` problem and anonymous session history is **never**
+    exposed. **The earlier "anon readback" claim is dropped** — anonymous session history
+    remains machine-reachable only through the autocomplete endpoint (#4, out of scope).
+    Payload = the template fields `{query, created_at}` with the same `-created_at`
+    ordering and the same 100-entry cap (`_HISTORY_LIMIT`) as the HTML view; the caller's
+    own history only.
+  - **Auth:** both reads are SESS via `login_required_api` (anonymous → 401
+    `unauthenticated` problem, **no** `WWW-Authenticate`). **Rate limit:** none — neither
+    HTML cabinet mirror has a rate-limit check and the plan assigns no budget namespace to
+    these session-gated reads. Pairing rows
+    `("apps.cabinet.views.api.saved_searches", "apps.cabinet.views.saved_searches")` and
+    `("apps.cabinet.views.api.search_history", "apps.cabinet.views.search_history")`
+    registered in `apps/api/tests/test_import_rule.py`. Tests:
+    `apps/cabinet/tests/test_saved_searches_api.py` (401 matrix for both endpoints no
+    challenge, ownership scoping for both, pagination envelope + ordering parity with the
+    HTML mirrors, the A6 anon-history assertion, and a restructure guard that
+    `GET /api/v1/favorites/` still works exactly as after S2.4).

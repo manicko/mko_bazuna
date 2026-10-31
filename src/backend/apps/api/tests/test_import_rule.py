@@ -72,6 +72,15 @@ PAIRING_TABLE: list[tuple[str, str]] = [
         "apps.analytics.views.api.moderation",
         "apps.analytics.views.moderation_dashboard",
     ),
+    # S2.7 — saved-searches list read. The API adapter mirrors the HTML cabinet
+    # saved-searches list and consumes the exact same `SavedSearch` queryset
+    # (same `select_related`/`-created_at` ordering) restricted to the caller.
+    ("apps.cabinet.views.api.saved_searches", "apps.cabinet.views.saved_searches"),
+    # S2.7 — search-history list read. The API adapter mirrors the HTML cabinet
+    # search-history list (same `SearchHistory` queryset, `-created_at` order,
+    # 100-entry cap); session-only per A6, so it imports only the mirror's
+    # `SearchHistory` model edge.
+    ("apps.cabinet.views.api.search_history", "apps.cabinet.views.search_history"),
 ]
 
 # Modules an API view may import even though its HTML mirror does not.
