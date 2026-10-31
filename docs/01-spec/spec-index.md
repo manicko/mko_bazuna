@@ -155,9 +155,18 @@ Owner decisions O1–O5 (plain, owner-readable) live in
 zone-resolution summary (C1–C8, R1–R9, D1–D12) is distributed inline across the spec and database
 docs by zone ID.
 
+## API surface
+
+The `/api/v1/` JSON API surface is a **multi-consumer, machine-readable** contract (rule 18 /
+Agent-First parity) — plain Django JSON views + Pydantic DTOs (no DRF). Its authoritative
+endpoint inventory, auth categories (PUB/SESS/STAFF), RFC 9457 error taxonomy and rate-limit
+budgets live in [`api-surface.md`](api-surface.md); the layout and import rule are in
+[`architecture-structure.md`](architecture-structure.md#api-surface-contract).
+
 ## Deferred to post-MVP
 
-DRF API, Celery/Redis, django-storages/boto3, Telethon group-scraping.
+Celery/Redis, django-storages/boto3, Telethon group-scraping. (The JSON API surface is **not**
+deferred: `/api/v1/` is now the ratified multi-consumer surface — see [`api-surface.md`](api-surface.md).)
 
 ## Phase 2 Features
 

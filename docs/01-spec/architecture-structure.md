@@ -12,6 +12,7 @@ related:
   - packages-list
   - local-https-mkcert
   - media-store-operations
+  - api-surface
 ---
 
 ## Purpose
@@ -130,9 +131,11 @@ src/
 │   │   │   ├── tests/
 │   │   │   ├── apps.py
 │   │   │   └── models.py
-│   │   └── api/                   # DRF API — DEFERRED to post-MVP (phase 1 = HTMX MPA)
-│   │       ├── serializers/
-│   │       └── views/
+│   │   └── api/                   # URL-only aggregator for the /api/v1/ JSON surface (apps/api/urls.py;
+│   │       ├── urls.py            #   imports zero views/services/models, NOT in INSTALLED_APPS). No DRF:
+│   │       └── tests/             #   per-app plain Django JSON views + Pydantic DTOs. Per-app routes live
+│   │                              #   in apps/<app>/api_urls.py (app_name = "<app>_api") and API views in
+│   │                              #   apps/<app>/views/api/. See docs/01-spec/api-surface.md.
 │   └── manage.py
 ├── telegram_bot/                  # separate entrypoint; runs django.setup() + shared ORM
 │   ├── lifecycle.py               # bot startup/shutdown hooks (writes liveness marker, drops pending updates, closes sessions)
@@ -431,7 +434,59 @@ The production nginx configuration (`docker/nginx/nginx.conf`) implements:
 
 ## API Surface Contract
 
-The HTTP API surface is an **internal HTMX/JSON surface for a single-consumer frontend**, not a public API. `/api/v1/` is the **only** versioned prefix (the moderation bulk-action endpoint at `/moderation/api/v1/bulk-action/`). Versioning the remaining routes is a **deliberate non-goal** while there is one consumer; adding a second consumer is the trigger to revisit it. Authentication on the moderation API is the Django session cookie — the `staff_required_api` 401 carries no `WWW-Authenticate` challenge, because no bearer scheme exists to name (`09-API-010`).
+The HTTP API surface is a **multi-consumer, machine-readable JSON API** at the `/api/v1/`
+prefix. It supersedes the earlier single-consumer framing (the "DRF deferred" / "not a public
+API while there is one consumer" position): rule 18 (Agent-First / API Parity) requires every
+user-facing action to be reachable programmatically, so the surface is now built deliberately
+and is expected to serve more than one consumer. The HTMX/MPA site remains the interactive
+consumer of the same service layer; no business predicate exists on the API side that is absent
+from its HTML or bot mirror. The authoritative endpoint inventory, error taxonomy and response
+contract live in [`api-surface.md`](api-surface.md) — this section states only the layout.
+
+### Layout
+
+- **Mount:** `config/urls.py` mounts `path("api/v1/", include("apps.api.urls"))`. `apps/api` is a
+  **URL-only aggregator**: `apps/api/urls.py` imports zero views, services or models and the app
+  is **not** in `INSTALLED_APPS` — this avoids import cycles by construction.
+- **Routes:** each app owns `<app>/api_urls.py` with `app_name = "<app>_api"` (namespaces:
+  `ads_api`, `search_api`, `cabinet_api`, `moderation_api`, `analytics_api`, `users_api`,
+  `categories_api`, `locations_api`).
+- **Views:** per-app API views live under `apps/<app>/views/api/…` where the app has a `views/`
+  package (ads, search, moderation, cabinet, users, analytics). Apps whose views are a single
+  module use one-off modules instead — `apps/categories/api_tree.py`, `apps/locations/api_cities.py`
+  (a `views/` package beside an existing `views.py` module would collide on import).
+- **Style:** plain Django JSON views with Pydantic `BaseInputModel` DTOs, following the shipped
+  `apps/moderation/api_bulk.py` precedent — **no DRF, no django-ninja** (D1). Writes are POST-only
+  (`@require_POST`); request bodies are parsed as JSON regardless of the `Content-Type` header
+  (lenient norm mirroring `api_bulk.py`).
+- **Errors:** RFC 9457 problem documents (`application/problem+json`), built by
+  `apps/core/utils/problem.py`. `type` is a stable ASCII token (never translated); `detail` is an
+  English msgid cataloged in the ru/bs/en catalogs. Validation errors render `422` with
+  `errors = pydantic_errors_json(exc)`. See [`api-surface.md`](api-surface.md) for the full taxonomy.
+- **i18n:** locale resolves through the shared middleware chain (`?lang` > `lang_pref` cookie >
+  `Accept-Language`); no per-view locale code.
+
+### Import rule
+
+An API view module's imports must be a **subset of its mirrored HTML view module's imports**,
+plus an explicit allowlist (`apps.core.utils.problem`, `apps.core.utils.api_auth`, and
+stdlib/Django). This keeps the API layer a thin adapter over the same service calls as its HTML
+mirror. It is enforced mechanically by `apps/api/tests/test_import_rule.py`, whose declared
+pairing table (API module → mirror module) each endpoint task extends. Where the mirror itself
+imports another app, the API view mirrors those same imports.
+
+### Auth categories
+
+| Category | Meaning |
+|---|---|
+| **PUB** | anonymous access, subject to the same audience predicate (`account_state_q`) as the HTML surface |
+| **SESS** | session cookie required, enforced by `login_required_api` (mirror of `staff_required_api`; 401 problem document, no `WWW-Authenticate` challenge) |
+| **STAFF** | staff session required, enforced by `staff_required_api` (unchanged) |
+
+Writes are POST-only; the Django session cookie is the **only** non-staff credential (no new auth
+scheme, no CSRF exemption, no bearer token). Per-route rate-limit budgets and both 429 realities
+(new `/api/v1/` RFC 9457 problem; frozen legacy shapes) are specified in
+[`api-surface.md`](api-surface.md).
 
 ## Audit Zone References
 

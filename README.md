@@ -96,6 +96,7 @@ Uses transaction-mode pooling with `edoburu/pgbouncer:1.25.2`. Enable in product
 | `docs/01-spec/technical-specification.md` | Product & domain spec (decisions A–L) |
 | `docs/05-owner-decisions/index.md` | Owner decisions O1–O5 (plain, owner-readable) |
 | `docs/01-spec/architecture-structure.md` | Source layout & Docker deployment |
+| `docs/01-spec/api-surface.md` | JSON API surface — endpoints, auth, errors, budgets (single source of truth) |
 | `docs/02-database/db-schema.md` | Tables, columns, relationships, enums reference |
 | `docs/02-database/db-indexes.md` | Indexes & `search_vector` trigger SQL |
 | `docs/02-database/db-enums.md` | `StrEnum` types (AdStatus, EventType, etc.) |
@@ -138,4 +139,10 @@ docs/
 ## Notes
 **Phase 1 scope:** ads only via our Telegram bot.
 
-**Deferred (post-MVP):** DRF API, Celery/Redis, S3/R2 storage, Telethon scraping, EAV attributes, tags, multi-currency.
+**Deferred (post-MVP):** Celery/Redis, S3/R2 storage, Telethon scraping, EAV attributes, tags, multi-currency.
+
+**JSON API:** `/api/v1/` is a ratified **multi-consumer, machine-readable** JSON surface (plain
+Django JSON views + Pydantic DTOs — no DRF), created under the Agent-First / API Parity rule so
+every user-facing action is reachable programmatically. The HTMX/MPA site remains the interactive
+consumer of the same services. Authoritative endpoint inventory, error taxonomy and rate-limit
+budgets: [`docs/01-spec/api-surface.md`](docs/01-spec/api-surface.md).

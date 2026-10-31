@@ -12,9 +12,14 @@ from django.http import HttpRequest, HttpResponse
 from django.urls import include, path
 from django_prometheus.exports import ExportToDjangoView
 
-# The API surface is an internal HTMX/JSON surface for a single-consumer
-# frontend. `/api/v1/` is the only versioned prefix (moderation bulk actions);
-# versioning the rest is a deliberate non-goal while there is one consumer. See
+# `/api/v1/` is the JSON API surface: a multi-consumer, machine-readable
+# contract (D1/D2 of the API-parity program). It is mounted through the
+# URL-only aggregator `apps.api.urls`, whose per-app `api_urls.py` modules route
+# to plain Django JSON views backed by Pydantic `BaseInputModel` DTOs (422
+# problem on validation errors, `@require_POST` for writes). Errors are RFC 9457
+# problem documents built by `apps/core/utils/problem.py`. The HTMX/MPA site
+# remains the interactive consumer of the same services; there is no DRF. See
+# docs/01-spec/api-surface.md (single source of truth) and
 # docs/01-spec/architecture-structure.md.
 
 
