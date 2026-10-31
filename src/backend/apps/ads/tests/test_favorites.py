@@ -12,13 +12,20 @@ Covers:
 - The ``annotate_favorites`` helper annotates the correct initial state.
 """
 
+from datetime import timedelta
+
 import pytest
 from django.test import Client
 from django.urls import reverse
 from django.utils import timezone
 
 from apps.ads.models import Ad, AdFavorite
-from apps.ads.services.favorites import annotate_favorites
+from apps.ads.services.favorites import (
+    FavoriteToggleResult,
+    annotate_favorites,
+    favorites_queryset,
+    toggle_favorite,
+)
 from apps.categories.models import Category
 from apps.core.enums import AdStatus
 from apps.locations.models import City
@@ -233,3 +240,142 @@ class TestFavoritesList:
         resp = client.get("/cabinet/favorites/?lang=ru")
         assert resp.status_code == 200
         assert "Пока нет избранного" in resp.content.decode()
+
+
+# ---------------------------------------------------------------------------
+# favorites_queryset service (S2.1)
+# ---------------------------------------------------------------------------
+
+
+class TestFavoritesQuerysetService:
+    """Service-level tests for ``favorites_queryset`` (the shared list stack)."""
+
+    def test_returns_only_the_callers_favorites(
+        self, buyer: User, user: User, seller: User, category: Category, city: City
+    ) -> None:
+        """Ownership scoping: only the caller's favorited ads are returned."""
+        mine = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        theirs = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        AdFavorite.objects.create(user=buyer, ad=mine)
+        AdFavorite.objects.create(user=user, ad=theirs)
+
+        ids = {a.id for a in favorites_queryset(buyer)}
+
+        assert mine.id in ids
+        assert theirs.id not in ids
+
+    def test_orders_most_recently_favorited_first(
+        self, buyer: User, seller: User, category: Category, city: City
+    ) -> None:
+        """Ordering matches the cabinet list: ``-favorites__created_at``."""
+        first = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        second = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        fav_first = AdFavorite.objects.create(user=buyer, ad=first)
+        AdFavorite.objects.create(user=buyer, ad=second)
+        # ``created_at`` is ``auto_now_add``, so passing it to ``create()`` is
+        # ignored — backdate via queryset ``update()`` for a deterministic order.
+        AdFavorite.objects.filter(pk=fav_first.pk).update(
+            created_at=timezone.now() - timedelta(days=1)
+        )
+
+        ordered = list(favorites_queryset(buyer).values_list("id", flat=True))
+
+        assert ordered == [second.id, first.id]
+
+    def test_annotates_favorited_state_true(
+        self, buyer: User, seller: User, category: Category, city: City
+    ) -> None:
+        """Every returned row carries ``is_favorited=True`` (they are favorites)."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        AdFavorite.objects.create(user=buyer, ad=ad)
+
+        row = favorites_queryset(buyer).get(pk=ad.pk)
+
+        assert row.is_favorited is True
+
+    def test_excludes_non_published_and_blocked_sellers(
+        self, buyer: User, seller: User, category: Category, city: City
+    ) -> None:
+        """Only PUBLISHED ads from account-state-passing sellers are returned."""
+        published = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        draft = create_test_ad(seller, category, city, status=AdStatus.DRAFT)
+        banned = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        for ad in (published, draft, banned):
+            AdFavorite.objects.create(user=buyer, ad=ad)
+
+        seller.is_banned = True
+        seller.save(update_fields=["is_banned"])
+
+        # Both PUBLISHED rows belong to the (now banned) seller → none pass.
+        assert list(favorites_queryset(buyer)) == []
+
+
+# ---------------------------------------------------------------------------
+# toggle_favorite service (S2.1)
+# ---------------------------------------------------------------------------
+
+
+class TestToggleFavoriteService:
+    """Service-level tests for ``toggle_favorite`` (the shared toggle stack)."""
+
+    def test_toggle_on_off_on_reports_active_and_count(
+        self, buyer: User, seller: User, category: Category, city: City
+    ) -> None:
+        """on -> off -> on flips ``is_favorited`` and tracks the count."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+
+        first = toggle_favorite(buyer, ad.id)
+        assert first.is_favorited is True
+        assert first.favorites_count == 1
+        assert AdFavorite.objects.filter(user=buyer, ad=ad).exists()
+
+        second = toggle_favorite(buyer, ad.id)
+        assert second.is_favorited is False
+        assert second.favorites_count == 0
+        assert not AdFavorite.objects.filter(user=buyer, ad=ad).exists()
+
+        third = toggle_favorite(buyer, ad.id)
+        assert third.is_favorited is True
+        assert third.favorites_count == 1
+
+    def test_returns_the_toggled_ad(
+        self, buyer: User, seller: User, category: Category, city: City
+    ) -> None:
+        """The result carries the resolved ad for the caller to render."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+
+        result = toggle_favorite(buyer, ad.id)
+
+        assert isinstance(result, FavoriteToggleResult)
+        assert result.ad.id == ad.id
+
+    def test_count_is_scoped_to_the_caller(
+        self, buyer: User, user: User, seller: User, category: Category, city: City
+    ) -> None:
+        """The count reflects only the caller's favorites, not other users'."""
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        AdFavorite.objects.create(user=user, ad=ad)
+
+        result = toggle_favorite(buyer, ad.id)
+
+        assert result.is_favorited is True
+        assert result.favorites_count == 1  # buyer only; ``user``'s favorite excluded
+
+    def test_non_published_ad_raises_does_not_exist(
+        self, buyer: User, seller: User, category: Category, city: City
+    ) -> None:
+        """A non-PUBLISHED ad raises ``Ad.DoesNotExist`` (caller maps to 404)."""
+        ad = create_test_ad(
+            seller,
+            category,
+            city,
+            status=AdStatus.ARCHIVED,
+            archived_at=timezone.now(),
+        )
+
+        with pytest.raises(Ad.DoesNotExist):
+            toggle_favorite(buyer, ad.id)
+
+    def test_missing_ad_raises_does_not_exist(self, buyer: User) -> None:
+        with pytest.raises(Ad.DoesNotExist):
+            toggle_favorite(buyer, 999999)

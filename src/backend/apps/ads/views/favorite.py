@@ -5,6 +5,9 @@ The heart toggle is an auth-gated HTMX endpoint. It uses a **manual** auth
 check so an anonymous tap returns the ``login_prompt`` fragment (HTTP 200,
 no 302) that htmx swaps in place, instead of following a redirect blindly
 (R7 / F10 / C4). ``@login_required`` is deliberately NOT used here.
+
+The toggle mechanics live in ``apps.ads.services.favorites`` (S2.1) so the
+HTML fragment and the future ``/api/v1/`` toggle endpoint share one stack.
 """
 
 import logging
@@ -13,8 +16,8 @@ from django.http import Http404, HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.views.decorators.http import require_POST
 
-from apps.ads.models import Ad, AdFavorite
-from apps.core.enums import AdStatus
+from apps.ads.models import Ad
+from apps.ads.services.favorites import toggle_favorite as toggle_favorite_service
 
 logger = logging.getLogger(__name__)
 
@@ -46,20 +49,12 @@ def toggle_favorite(request: HttpRequest, ad_id: int) -> HttpResponse:
         )
 
     try:
-        ad = Ad.objects.get(id=ad_id, status=AdStatus.PUBLISHED)
+        result = toggle_favorite_service(request.user, ad_id)
     except Ad.DoesNotExist:
         raise Http404("Ad not found") from None
-
-    # Upsert-or-delete. Unique (user, ad) constraint guards against races.
-    favorite, created = AdFavorite.objects.get_or_create(
-        user=request.user,
-        ad=ad,
-    )
-    if not created:
-        favorite.delete()
 
     return render(
         request,
         _FAVORITE_HEART_TEMPLATE,
-        {"ad": ad, "is_favorited": created},
+        {"ad": result.ad, "is_favorited": result.is_favorited},
     )

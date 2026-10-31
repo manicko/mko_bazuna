@@ -379,3 +379,16 @@ side effects should use the service tier or the `verify_parity` command (the pol
   translated, Q6); no JSON key, status code or response shape changed. Catalogs hand-applied from a
   safe scratch extraction (`--no-location --no-obsolete`); `ru`/`bs` `msgstr` are non-empty, `en`
   stays empty (the English msgid is the source). `apps/ads/tests/test_i18n_completeness.py` green.
+- **S2.1:** the favorites service `apps/ads/services/favorites.py` is **extended** (plan Q2/A1 —
+  one shared favorites stack, no new module) with a list function and a toggle function; no new
+  endpoint ships in this task. `favorites_queryset(user)` reproduces the cabinet list contract
+  exactly (PUBLISHED + `account_state_q("user__")` audience, `.select_related("category","city",
+  "user")`, `.prefetch_related("images","features","user__trust_score")`,
+  `.order_by("-favorites__created_at")`, `annotate_favorites` applied) and is the future
+  `GET /api/v1/favorites/` service; `toggle_favorite(user, ad_id)` returns a
+  `FavoriteToggleResult(ad, is_favorited, count)` — the post-toggle state and the caller's total
+  count, i.e. the `{active,count}` facts the future `POST /api/v1/favorites/{ad_id}/toggle/`
+  endpoint (#15) will serialize. `annotate_favorites` is untouched. The HTML callers
+  `apps/ads/views/favorite.py` and `apps/cabinet/views/favorites.py` are rewired to thin callers;
+  their fragments are byte-identical (pinned by the untouched pre-existing suites). The toggle's
+  `Http404` mapping (`Ad.DoesNotExist` → 404) stays view-side.
