@@ -15,6 +15,7 @@ from django.test import Client
 from django.utils import timezone
 
 from apps.ads.models import Ad
+from apps.ads.services.dashboard_query import ads_by_status
 from apps.analytics.models import AnalyticsEvent
 from apps.core.enums import AdStatus, AnalyticsEventType, TimeRange
 from apps.users.models import User
@@ -299,3 +300,107 @@ class TestDashboardEdgeCases:
         assert len(stats["per_ad_stats"]) == 1
         assert stats["per_ad_stats"][0]["views"] == 0
         assert stats["per_ad_stats"][0]["contacts"] == 0
+
+
+# ---------------------------------------------------------------------------
+# Dashboard grouping service (S2.2)
+# ---------------------------------------------------------------------------
+
+
+class TestAdsByStatusService:
+    """Service-level tests for ``apps.ads.services.dashboard_query.ads_by_status``."""
+
+    def test_groups_each_ad_into_its_status_bucket(self, category, city) -> None:
+        """Every status bucket contains only that seller's ads of that status."""
+        seller = make_user(991002001, consent_given_at=timezone.now())
+        published = create_test_ad(
+            seller, category, city, title="Pub", status=AdStatus.PUBLISHED
+        )
+        archived = create_test_ad(
+            seller, category, city, title="Arch", status=AdStatus.ARCHIVED
+        )
+        rejected = create_test_ad(
+            seller, category, city, title="Rej", status=AdStatus.REJECTED
+        )
+        failed = create_test_ad(
+            seller, category, city, title="Fail", status=AdStatus.ON_MODERATION_FAILED
+        )
+
+        groups = ads_by_status(seller.id)
+
+        assert {a.id for a in groups[AdStatus.PUBLISHED]} == {published.id}
+        assert {a.id for a in groups[AdStatus.ARCHIVED]} == {archived.id}
+        assert {a.id for a in groups[AdStatus.REJECTED]} == {rejected.id}
+        assert {a.id for a in groups[AdStatus.ON_MODERATION_FAILED]} == {failed.id}
+
+    def test_returns_all_five_dashboard_statuses(self, category, city) -> None:
+        """The dict carries exactly the five dashboard statuses, in order."""
+        seller = make_user(991002002, consent_given_at=timezone.now())
+
+        groups = ads_by_status(seller.id)
+
+        assert list(groups.keys()) == [
+            AdStatus.PUBLISHED,
+            AdStatus.ON_MODERATION,
+            AdStatus.ON_MODERATION_FAILED,
+            AdStatus.ARCHIVED,
+            AdStatus.REJECTED,
+        ]
+
+    def test_scoped_to_the_seller(self, category, city) -> None:
+        """Another seller's ads never appear in any group."""
+        seller = make_user(991002003, consent_given_at=timezone.now())
+        other = make_user(991002004, consent_given_at=timezone.now())
+        mine = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        other_ad = create_test_ad(other, category, city, status=AdStatus.PUBLISHED)
+
+        pub_ids = {a.id for a in ads_by_status(seller.id)[AdStatus.PUBLISHED]}
+
+        assert mine.id in pub_ids
+        assert other_ad.id not in pub_ids
+
+    def test_prefetch_and_select_related_parity(self, category, city) -> None:
+        """PUBLISHED and ARCHIVED prefetch images; all groups select category/city."""
+        seller = make_user(991002005, consent_given_at=timezone.now())
+
+        groups = ads_by_status(seller.id)
+
+        assert groups[AdStatus.PUBLISHED]._prefetch_related_lookups == ("images",)
+        assert groups[AdStatus.ARCHIVED]._prefetch_related_lookups == ("images",)
+        for status in (
+            AdStatus.ON_MODERATION,
+            AdStatus.ON_MODERATION_FAILED,
+            AdStatus.REJECTED,
+        ):
+            assert groups[status]._prefetch_related_lookups == ()
+        for status in AdStatus:
+            if status in groups:
+                assert set(groups[status].query.select_related) == {"category", "city"}
+
+    def test_empty_for_seller_without_ads(self, category, city) -> None:
+        """A seller with no ads gets empty groups, not an error."""
+        seller = make_user(991002006, consent_given_at=timezone.now())
+
+        groups = ads_by_status(seller.id)
+
+        for status in (
+            AdStatus.PUBLISHED,
+            AdStatus.ON_MODERATION,
+            AdStatus.ON_MODERATION_FAILED,
+            AdStatus.ARCHIVED,
+            AdStatus.REJECTED,
+        ):
+            assert list(groups[status]) == []
+
+    def test_view_consumes_service_grouping(
+        self, dashboard_client, dashboard_seller
+    ) -> None:
+        """The rewired view exposes the same grouping the service returns."""
+        response = dashboard_client.get("/dashboard/")
+
+        ads_by_status_ctx = response.context["ads_by_status"]
+
+        assert {a.id for a in ads_by_status_ctx[AdStatus.PUBLISHED]} == {
+            dashboard_seller["ad_a"].id,
+            dashboard_seller["ad_b"].id,
+        }

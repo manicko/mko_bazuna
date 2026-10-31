@@ -12,7 +12,7 @@ from django.http import HttpRequest, HttpResponse
 from django.shortcuts import render
 from django.utils.translation import gettext_lazy as _
 
-from apps.ads.models import Ad
+from apps.ads.services.dashboard_query import ads_by_status as ads_by_status_querysets
 from apps.ads.views.edit import (
     EDIT_FORM_AVAILABLE_STATUSES,
     _consent_required_forbidden,
@@ -66,28 +66,9 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         if ad_id is not None:
             per_ad_stats_dict[ad_id] = row
 
-    # Fetch all ads for the current user, grouped by status
-    ads_by_status = {
-        AdStatus.PUBLISHED: Ad.objects.filter(
-            user_id=request.user.id, status=AdStatus.PUBLISHED
-        )
-        .prefetch_related("images")
-        .select_related("category", "city"),
-        AdStatus.ON_MODERATION: Ad.objects.filter(
-            user_id=request.user.id, status=AdStatus.ON_MODERATION
-        ).select_related("category", "city"),
-        AdStatus.ON_MODERATION_FAILED: Ad.objects.filter(
-            user_id=request.user.id, status=AdStatus.ON_MODERATION_FAILED
-        ).select_related("category", "city"),
-        AdStatus.ARCHIVED: Ad.objects.filter(
-            user_id=request.user.id, status=AdStatus.ARCHIVED
-        )
-        .prefetch_related("images")
-        .select_related("category", "city"),
-        AdStatus.REJECTED: Ad.objects.filter(
-            user_id=request.user.id, status=AdStatus.REJECTED
-        ).select_related("category", "city"),
-    }
+    # Fetch all ads for the current user, grouped by status (shared service,
+    # S2.2). The create-time storage-consent gate above stays view-side (A14).
+    ads_by_status = ads_by_status_querysets(request.user.id)
 
     context = {
         "ads_by_status": ads_by_status,

@@ -392,3 +392,13 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `apps/ads/views/favorite.py` and `apps/cabinet/views/favorites.py` are rewired to thin callers;
   their fragments are byte-identical (pinned by the untouched pre-existing suites). The toggle's
   `Http404` mapping (`Ad.DoesNotExist` → 404) stays view-side.
+- **S2.2:** the dashboard grouping block is extracted verbatim from `apps/ads/views/dashboard.py`
+  into `apps/ads/services/dashboard_query.py` — `ads_by_status(user_id)` returns the grouped `Ad`
+  querysets keyed by `AdStatus` (PUBLISHED / ON_MODERATION / ON_MODERATION_FAILED / ARCHIVED /
+  REJECTED, same key order) with the same `.select_related("category","city")` and the same
+  `.prefetch_related("images")` on PUBLISHED/ARCHIVED; the view is rewired to consume it
+  (request-free, returns ORM objects). The create-time storage-consent gate
+  `_seller_may_create_ad` **stays view-side** (A14 — it is **not** relocated, and the shared
+  `apps.users.services.account_state.can_create_ad` seam is **not** imported by the service or the
+  view here; the later S2.3 endpoint re-asserts consent via that shared seam with an equivalence
+  test). No new endpoint ships in this task.
