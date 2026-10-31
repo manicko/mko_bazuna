@@ -87,6 +87,14 @@ PAIRING_TABLE: list[tuple[str, str]] = [
     # `favorites/` prefix (URL prefix orthogonal to module host) but the module
     # itself lives in `apps.ads`.
     ("apps.ads.views.api.favorite", "apps.ads.views.favorite"),
+    # S3.3 — consent accept/decline/withdraw write. Single API module mirroring
+    # the HTML consent views (`apps.users.views.consent`); delegates to the same
+    # `give/decline/withdraw_consent` + `record_consent_action` services, no
+    # API-only predicate.
+    ("apps.users.views.api.consent", "apps.users.views.consent"),
+    # S3.3 — logout write. The API adapter mirrors the HTML logout view
+    # (`apps.users.views.logout`) and flushes the session the same way.
+    ("apps.users.views.api.logout", "apps.users.views.logout"),
 ]
 
 # Modules an API view may import even though its HTML mirror does not.

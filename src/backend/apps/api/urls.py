@@ -7,8 +7,8 @@ import graph acyclic and is enforced mechanically by
 ``apps/api/tests/test_import_rule.py`` (the R-F2 API→mirror import-subset
 harness).
 
-No routes exist yet: later stages append one ``path("<prefix>/",
-include("<app>.api_urls"))`` line per app to ``urlpatterns`` below.
+Each app that owns ``/api/v1/`` routes contributes one ``path(...,
+include("<app>.api_urls"))`` line to ``urlpatterns`` below.
 """
 
 from django.urls import include, path
@@ -26,6 +26,10 @@ urlpatterns: list = [
     # (favorites/, saved-searches/, search-history/), so it is mounted at the
     # /api/v1/ root rather than under a single `favorites/` prefix.
     path("", include("apps.cabinet.api_urls")),
+    # The users API module hosts two prefix-based routes (consent/ for consent
+    # accept/decline/withdraw and auth/logout/ for logout), so it is mounted at
+    # the /api/v1/ root rather than under a single prefix.
+    path("", include("apps.users.api_urls")),
     path("moderation/", include("apps.moderation.api_urls")),
     path("trust/", include("apps.analytics.api_urls")),
 ]

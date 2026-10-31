@@ -84,9 +84,9 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 | 17 | Alert delivery | `send_alerts` + services | unchanged (bot digest + scheduler) | — | stance: no HTTP endpoint; agent-visible substitute is `SavedSearchNotification.delivered_at` (read via `verify_parity`/shell tier) | covered/frozen |
 | 18 | Search history list/clear | `search_history` service | `GET /api/v1/search-history/` · `POST /api/v1/search-history/clear/` | **SESS** (HTML mirrors are `@login_required`; anon session history is only reachable via autocomplete #4) | 204 clear | partial: list shipped (S2.7) |
 | 19 | Preferred-city | (existing) | unchanged `/api/preferred-city/` | anon + consent cookie | stance: not aliased; **no rate limiter exists** | covered/frozen |
-| 20 | Consent | `give/decline/withdraw_consent` | `POST /api/v1/consent/{accept,decline,withdraw}/` | accept/decline anon-allowed (HTML parity); withdraw SESS | cookie quartet stays HTML; withdraw still `logout()`s | planned |
+| 20 | Consent | `give/decline/withdraw_consent` | `POST /api/v1/consent/{accept,decline,withdraw}/` (shipped S3.3) | accept/decline anon-allowed (HTML parity); withdraw SESS | cookie quartet stays HTML; withdraw still `logout()`s; 200 consent-state JSON | shipped (S3.3) |
 | 21 | Login issue/status | `issue/consume_token` (predicates frozen) | **No new endpoint** — `/login/status/` is the machine contract (200/204/410); GET-issuance gap owned by phase 15 | anon | uniform 410, anti-enumeration | planned |
-| 22 | Logout | Django `logout` | `POST /api/v1/auth/logout/` | SESS | 204 | planned |
+| 22 | Logout | Django `logout` | `POST /api/v1/auth/logout/` (shipped S3.3) | SESS | 204 empty | shipped (S3.3) |
 | 23 | Contact seller | bot-only by design | deep-link protocol — detail payload carries the `t.me` link | — | stance: no HTTP endpoint | covered/frozen |
 | 24 | Support ticket | bot writer only (06-PII-101) | in-process callable; no HTTP intake in v1 | — | stance: bot-only support intake | covered/frozen |
 | 25 | Language | shared middleware | `?lang` works identically on `/api/v1/` URLs; bot `/language` untouched | — | locale parity by construction | planned |
@@ -622,3 +622,34 @@ side effects should use the service tier or the `verify_parity` command (the pol
   boundary dependency every API write needs, while the read mirrors do not import it). Tests:
   `apps/ads/tests/test_favorites_toggle_api.py` (401/405/422/404 matrices, toggle cycle,
   ownership scoping, 429 problem, namespace reverse).
+- **S3.3:** `POST /api/v1/consent/accept/`, `POST /api/v1/consent/decline/`,
+  `POST /api/v1/consent/withdraw/` (row #20 → `shipped`) and `POST /api/v1/auth/logout/`
+  (row #22 → `shipped`) shipped. New `apps/users/api_urls.py` (`app_name="users_api"`; routes
+  `consent/{accept,decline,withdraw}/` and `auth/logout/`), `apps/users/views/api/{__init__,consent,logout}.py`,
+  mounted in `apps/api/urls.py` at the `/api/v1/` root. Each endpoint is the JSON sibling of the
+  matching HTML view (`apps/users/views/consent.py`, `apps/users/views/logout.py`) and consumes the
+  **same** services (`give/decline/withdraw_consent` + `record_consent_action`), so the account
+  end-state is identical to the HTML flow — no API-only predicate. **Auth:** accept/decline are
+  **anonymous-allowed** (HTML parity: their HTML views carry no login gate); withdraw and logout are
+  **SESS** (`login_required_api`, 401 `unauthenticated` problem, no `WWW-Authenticate`, checked
+  before the method gate). **Method:** POST-only, else 405 `method_not_allowed` problem +
+  `Allow: POST`. **Rate limit:** `rate_limit_check(namespace="api_write", budget=API_WRITE)`
+  checked **first** on all four; 429 `rate_limited` problem + `Retry-After`. **Body:** optional and
+  lenient — the choice comes from the URL, so an empty/malformed body falls back to the HTML
+  defaults (`analytics` True for accept / False for decline, `preferences` True, `ConsentVersion`
+  `V1_0`); there is no 422 path. **Cookie quartet stays HTML:** unlike the HTML views, the API sets
+  **no** consent cookies — it answers machine state only (the endpoints are the machine contract).
+  **Payload:** `{"choice", "authenticated", "consent_given_at", "consent_revoked_at",
+  "is_declined", "ads_auto_publish", "is_deleted"}` — the mutated `User` consent-state fields, ISO
+  timestamps or `null` (withdraw additionally carries `"session_flushed": true`). **Soft-deleted
+  account:** accept/decline by a withdrawn identity → 403 `forbidden` problem (mirrors the HTML 403;
+  WITHDRAW is terminal). **Withdraw parity:** delegates to `withdraw_consent` (audit row inside its
+  transaction) and then `logout(request)`, flushing the session exactly as the HTML flow does
+  (04-AUT-002) — the `withdraw still logout()s` clause of row #20. **Logout:** flushes the session
+  as the HTML logout view does and answers **204 No Content** (empty body, per row #22). **No CSRF
+  exemption** — middleware chain used as-is. Pairing rows
+  `("apps.users.views.api.consent", "apps.users.views.consent")` and
+  `("apps.users.views.api.logout", "apps.users.views.logout")` registered in
+  `apps/api/tests/test_import_rule.py`. Tests: `apps/users/tests/test_consent_api.py` (accept/decline
+  401-free anon + session + soft-deleted 403, withdraw anon-401/session-flush, logout anon-401/204
+  flushed, 405 matrix, 429 problem, API-vs-HTML end-state equivalence).
