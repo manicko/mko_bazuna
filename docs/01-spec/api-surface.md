@@ -567,3 +567,20 @@ side effects should use the service tier or the `verify_parity` command (the pol
     challenge, ownership scoping for both, pagination envelope + ordering parity with the
     HTML mirrors, the A6 anon-history assertion, and a restructure guard that
     `GET /api/v1/favorites/` still works exactly as after S2.4).
+- **S2.8 — M2 gate:** Stage S2 i18n batch applied. The Stage S2 API surface's
+  user-visible `detail` strings are now cataloged as English msgids and translatable in
+  `ru`/`bs`/`en` (`apps/core/utils/api_auth.py` — `"Staff access required."`,
+  `"Method not allowed."`; `apps/analytics/views/api/seller.py` — `"Method not allowed."`;
+  `apps/ads/views/api/dashboard.py` — `"Storage consent is required to view the seller
+  dashboard."`). `apps/moderation/views/api/review.py`'s `"Ad not found."` reuses the
+  already-cataloged S1.7 msgid (no new entry). `type` tokens stay stable ASCII (never
+  translated, Q6); no JSON key, status code or response shape changed. Catalogs
+  hand-applied from a safe scratch extraction (`--no-location --no-obsolete`);
+  `ru`/`bs` `msgstr` are non-empty, `en` stays empty (the English msgid is the source).
+  **M2 gate verified:** fast gate green (3871 passed) with the pre-existing
+  favorites/cabinet/consent HTML suites untouched-green; the S2 API test files
+  (`test_dashboard_api.py`, `test_dashboard_stats.py`, `test_favorites_list_api.py`,
+  `test_saved_searches_api.py`, `test_moderation_api_reads.py`, `test_analytics_api.py`,
+  `test_api_auth.py`) green; `401/403/405` auth matrices green for every private
+  endpoint; `apps/ads/tests/test_i18n_completeness.py` green (30 passed). Gaps 11
+  (dashboard) and 12 (moderation reads) covered; gap 15/16/18 read halves covered.

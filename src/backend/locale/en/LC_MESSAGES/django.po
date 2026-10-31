@@ -1627,3 +1627,16 @@ msgstr ""
 msgid "Too many requests; retry after the indicated delay."
 msgstr ""
 
+#: src/backend/apps/core/utils/api_auth.py
+msgid "Staff access required."
+msgstr ""
+
+#: src/backend/apps/core/utils/api_auth.py
+#: src/backend/apps/analytics/views/api/seller.py
+msgid "Method not allowed."
+msgstr ""
+
+#: src/backend/apps/ads/views/api/dashboard.py
+msgid "Storage consent is required to view the seller dashboard."
+msgstr ""
+

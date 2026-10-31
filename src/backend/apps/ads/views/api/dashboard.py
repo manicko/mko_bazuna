@@ -30,6 +30,8 @@ from http import HTTPStatus
 from typing import Any, Final
 
 from django.http import HttpRequest, JsonResponse
+from django.utils.functional import Promise
+from django.utils.translation import gettext_lazy as _
 
 from apps.ads.services.dashboard_query import ads_by_status
 from apps.analytics.services.seller_stats import SellerStats
@@ -44,8 +46,10 @@ logger = logging.getLogger(__name__)
 _TYPE_CONSENT_REQUIRED: Final[str] = "consent_required"
 
 # English msgid for the consent-refusal detail (cataloged in ``ru``/``bs``/``en``
-# in the stage i18n batch; the English text is the msgid).
-_DETAIL_CONSENT_REQUIRED: Final[str] = (
+# in the stage i18n batch; ``gettext_lazy`` defers resolution to render time so
+# the string is translated for the active request locale, while the English text
+# stays the msgid).
+_DETAIL_CONSENT_REQUIRED: Final[str | Promise] = _(
     "Storage consent is required to view the seller dashboard."
 )
 

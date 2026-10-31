@@ -25,6 +25,7 @@ from http import HTTPStatus
 from typing import Any
 
 from django.http import HttpRequest, JsonResponse
+from django.utils.translation import gettext as _
 
 from apps.analytics.services.trust_analytics import (
     calculate_seller_trust_score,
@@ -61,7 +62,7 @@ def seller_dashboard_view(request: HttpRequest) -> JsonResponse:
         response = problem(
             HTTPStatus.METHOD_NOT_ALLOWED,
             TYPE_METHOD_NOT_ALLOWED,
-            "Method not allowed.",
+            _("Method not allowed."),
         )
         response["Allow"] = "GET"
         return response

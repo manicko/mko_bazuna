@@ -29,6 +29,8 @@ from http import HTTPStatus
 from typing import Any, Final
 
 from django.http import HttpRequest, JsonResponse
+from django.utils.functional import Promise
+from django.utils.translation import gettext_lazy as _
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
@@ -41,8 +43,10 @@ logger = logging.getLogger(__name__)
 TYPE_NOT_FOUND: Final[str] = "not_found"
 
 # English msgid for the 404 detail (cataloged in ``ru``/``bs``/``en`` in the
-# stage i18n batch; the English text is the msgid).
-_DETAIL_NOT_FOUND: Final[str] = "Ad not found."
+# stage i18n batch; ``gettext_lazy`` defers resolution to render time so the
+# string is translated for the active request locale, while the English text
+# stays the msgid).
+_DETAIL_NOT_FOUND: Final[str | Promise] = _("Ad not found.")
 
 # The moderation statuses the HTML review lookup is restricted to.
 _REVIEWABLE_STATUSES: Final[list[str]] = [

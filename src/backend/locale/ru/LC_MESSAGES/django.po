@@ -1809,3 +1809,16 @@ msgstr "Тело запроса не прошло валидацию."
 msgid "Too many requests; retry after the indicated delay."
 msgstr "Слишком много запросов; повторите попытку после указанной задержки."
 
+#: src/backend/apps/core/utils/api_auth.py
+msgid "Staff access required."
+msgstr "Требуется доступ для персонала."
+
+#: src/backend/apps/core/utils/api_auth.py
+#: src/backend/apps/analytics/views/api/seller.py
+msgid "Method not allowed."
+msgstr "Метод не поддерживается."
+
+#: src/backend/apps/ads/views/api/dashboard.py
+msgid "Storage consent is required to view the seller dashboard."
+msgstr "Для просмотра панели продавца требуется согласие на хранение данных."
+

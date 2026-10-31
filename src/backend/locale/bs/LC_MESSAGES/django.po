@@ -1790,3 +1790,16 @@ msgstr "Telo zahteva nije prošlo validaciju."
 msgid "Too many requests; retry after the indicated delay."
 msgstr "Previše zahteva; pokušajte ponovo nakon naznačenog kašnjenja."
 
+#: src/backend/apps/core/utils/api_auth.py
+msgid "Staff access required."
+msgstr "Potreban je pristup za osoblje."
+
+#: src/backend/apps/core/utils/api_auth.py
+#: src/backend/apps/analytics/views/api/seller.py
+msgid "Method not allowed."
+msgstr "Metoda nije dozvoljena."
+
+#: src/backend/apps/ads/views/api/dashboard.py
+msgid "Storage consent is required to view the seller dashboard."
+msgstr "Za prikaz prodavčeve kontrolne table potrebna je saglasnost za čuvanje podataka."
+
