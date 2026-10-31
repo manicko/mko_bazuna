@@ -11,4 +11,8 @@ No routes exist yet: later stages append one ``path("<prefix>/",
 include("<app>.api_urls"))`` line per app to ``urlpatterns`` below.
 """
 
-urlpatterns: list = []
+from django.urls import include, path
+
+urlpatterns: list = [
+    path("ads/", include("apps.ads.api_urls")),
+]

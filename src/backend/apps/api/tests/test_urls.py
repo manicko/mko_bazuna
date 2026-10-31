@@ -2,8 +2,9 @@
 
 Covers two guarantees established by task S0.2:
 
-1. **Mount smoke.** ``/api/v1/<arbitrary>`` resolves to 404 (no routes exist
-   yet) and never leaks an exception as a 500.
+1. **Mount smoke.** ``/api/v1/<arbitrary>`` resolves to 404 (no route exists)
+   and never leaks an exception as a 500. ``/api/v1/ads/`` itself is now a
+   live route (S1.3) and is deliberately NOT in the arbitrary-path list.
 2. **Aggregator purity.** ``apps/api/urls.py`` performs no non-django imports —
    it must import only ``django.*`` / stdlib modules so the aggregator can never
    drag a view, service or model (and thus a new import cycle) into the graph.
@@ -22,9 +23,9 @@ from django.test import Client
 from apps.api import urls as api_urls
 
 # Arbitrary paths that currently have no route registered under /api/v1/.
+# ``/api/v1/ads/`` is excluded: it is the shipped S1.3 listings route.
 ARBITRARY_PATHS = [
     "/api/v1/",
-    "/api/v1/ads/",
     "/api/v1/ads/1/",
     "/api/v1/search/",
     "/api/v1/does-not-exist/",

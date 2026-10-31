@@ -65,7 +65,7 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 
 | # | Action | Service | Endpoint · Method | Auth | Error notes | Status |
 |---|---|---|---|---|---|---|
-| 1 | Listings | `ListingsQuery.build_queryset` / `build_listings_context` | `GET /api/v1/ads/` | PUB | 422; 429 problem (§Errors) | planned |
+| 1 | Listings | `ListingsQuery.build_queryset` / `build_listings_context` | `GET /api/v1/ads/` | PUB | 422; 429 problem (§Errors) | shipped (S1.3) |
 | 2 | FTS search | `apps/search/services/fts.py` (S1.1) | `GET /api/v1/search/?q&category&city&min_price&max_price&listing_purpose&condition&features&sort&page&all_categories` | PUB | fuzzy / did-you-mean / narrowed fields; cap semantics; 429 problem | planned |
 | 3 | Ad detail | audience predicate + serialize | `GET /api/v1/ads/{id}/` | PUB | uniform 404; `AD_VIEWED` recorded | planned |
 | 4 | Autocomplete | (existing) | unchanged `/api/search/autocomplete` | PUB | stance: not aliased; legacy 429 `{"error":"rate_limit"}` | covered/frozen |
@@ -267,3 +267,21 @@ side effects should use the service tier or the `verify_parity` command (the pol
   never reorders across different relevance values
   (`apps/ads/tests/test_relevance_tiebreaker.py` pins this). See the *Ordering contract* clause in
   §"Other response contract clauses".
+- **S1.3:** `GET /api/v1/ads/` shipped (endpoint row #1 → `shipped`). New
+  `apps/ads/api_urls.py` (`app_name="ads_api"`, one route `""` → `listings`), `apps/ads/views/api/`
+  (`__init__`, `listings.py` with `_serialize_ad`), and the aggregator include in `apps/api/urls.py`.
+  The endpoint mirrors the HTML listings view 1:1 (same `category`/`city`/`listing_purpose`/
+  `condition`/`features`/`min_price`/`max_price`/`sort`/`page`/`per_page` GET dimensions) and calls
+  the **same** `ListingsQuery`/`build_listings_context` service tier, so audience parity
+  (`account_state_q`) and ordering (the R2 `-id` tiebreaker) hold by construction. Pagination
+  envelope `{page, per_page, total_count, results_truncated, results[], has_next}`. Errors: 422
+  `validation_failed` via `validation_problem`; 429 `rate_limited` problem + `Retry-After` via
+  `rate_limit_check(namespace="api_listings", budget=API_PUBLIC_READ)` + `rate_limited_problem`. The
+  HTML listings view is **untouched** (zero diff). Pairing row
+  `("apps.ads.views.api.listings", "apps.ads.views.listings")` registered in
+  `apps/api/tests/test_import_rule.py`; the shared rate-limit seam
+  `apps.search.services.rate_limit` is added to that harness's ALLOWLIST (it is the mandated
+  `/api/v1/` enforcement point and is not imported by the HTML mirror). Tests:
+  `apps/ads/tests/test_listings_api.py` (incl. `TestExhaustiveFilterSortPageMatrix` — the rule-18
+  matrix owner — audience parity, 429/422 problems, HTML/JSON parity incl. warm-cache, and the
+  pagination envelope).

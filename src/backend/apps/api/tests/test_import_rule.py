@@ -25,13 +25,27 @@ from pathlib import Path
 
 # Declared pairing table: (API view module, mirrored HTML view module).
 # Rows are added by the endpoint tasks (S1.3+). Empty at S0.2.
-PAIRING_TABLE: list[tuple[str, str]] = []
+PAIRING_TABLE: list[tuple[str, str]] = [
+    # S1.3 — listings read. The API adapter mirrors the HTML listings view and
+    # calls the exact same `ListingsQuery`/`build_listings_context` service tier.
+    ("apps.ads.views.api.listings", "apps.ads.views.listings"),
+]
 
 # Modules an API view may import even though its HTML mirror does not.
+#
+# - `apps.core.utils.problem` / `apps.core.utils.api_auth`: the two shared
+#   RFC 9457 / session-auth helpers the plan allows every `/api/v1/` view to use
+#   (§2.3 import rule).
+# - `apps.search.services.rate_limit`: the shared `rate_limit_check` +
+#   `RateLimitBudget` single enforcement point (R1/Q4). The HTML listings view
+#   happens to use the deep-link-render limiter instead, but the plan mandates
+#   `rate_limit_check` with the dedicated `api_*` budgets for every `/api/v1/`
+#   read route, so the API adapter must import it though its mirror does not.
 ALLOWLIST: frozenset[str] = frozenset(
     {
         "apps.core.utils.problem",
         "apps.core.utils.api_auth",
+        "apps.search.services.rate_limit",
     }
 )
 
@@ -81,7 +95,9 @@ def _imports_of(dotted_module_path: str) -> set[str]:
 
 def _source_path_for(dotted_module_path: str) -> Path:
     """Map a dotted module path to its ``.py`` file under ``src/backend``."""
-    backend_root = Path(__file__).resolve().parents[4]
+    # ``test_import_rule.py`` lives at ``src/backend/apps/api/tests/``; walking
+    # three parents up from the file's directory reaches ``src/backend``.
+    backend_root = Path(__file__).resolve().parents[3]
     return backend_root.joinpath(*dotted_module_path.split(".")).with_suffix(".py")
 
 
