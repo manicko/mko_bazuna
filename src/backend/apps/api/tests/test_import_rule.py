@@ -36,6 +36,15 @@ PAIRING_TABLE: list[tuple[str, str]] = [
     # (which lives in `apps.ads.views.listings`) and applies the exact same
     # `account_state_q` audience predicate + `AD_VIEWED` side effect.
     ("apps.ads.views.api.detail", "apps.ads.views.listings"),
+    # S1.6 — category tree read. The API adapter mirrors the HTML submenu view
+    # (`apps.categories.views`) and reads the `Category` models directly (it
+    # deliberately does NOT route through that view's rendered-fragment cache).
+    ("apps.categories.api_tree", "apps.categories.views"),
+    # S1.6 — cities read. The HTML consumer of the `locations` models is the
+    # header context processor (a single module, not an app views module), so the
+    # mirror is declared as `apps.core.context_processors`; the API module imports
+    # the `locations` models only, exactly the import surface the mirror needs.
+    ("apps.locations.api_cities", "apps.core.context_processors"),
 ]
 
 # Modules an API view may import even though its HTML mirror does not.

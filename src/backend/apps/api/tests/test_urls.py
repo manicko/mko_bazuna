@@ -24,8 +24,9 @@ from django.test import Client
 from apps.api import urls as api_urls
 
 # Arbitrary paths that currently have no route registered under /api/v1/.
-# ``/api/v1/ads/`` (S1.3), ``/api/v1/ads/<id>/`` (S1.5) and ``/api/v1/search/``
-# (S1.4) are excluded: they are shipped routes.
+# ``/api/v1/ads/`` (S1.3), ``/api/v1/ads/<id>/`` (S1.5), ``/api/v1/search/``
+# (S1.4), ``/api/v1/categories/`` and ``/api/v1/cities/`` (S1.6) are shipped
+# routes. The paths below remain unrouted and must still 404.
 ARBITRARY_PATHS = [
     "/api/v1/",
     "/api/v1/does-not-exist/",

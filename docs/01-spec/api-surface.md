@@ -93,6 +93,8 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 | 26 | Media | `media_gate` | unchanged; **URLs only** in payloads | — | binary protocol | covered/frozen |
 | 27 | Ops/metrics | `core/views` | unchanged; deliberately no `/api/v1/` index endpoint (D2) | — | — | covered/frozen |
 | 28 | Admin actions | `admin_actions` | unchanged staff-web | — | — | covered/frozen |
+| 29 | Category tree read | `Category` models (direct; **no** fragment cache) | `GET /api/v1/categories/` | PUB | full active tree (`{categories:[{slug,name,children}]}`); 429 problem | shipped (S1.6) |
+| 30 | Cities read | `City` models (header city query) | `GET /api/v1/cities/` | PUB | `{cities:[{slug,name,region,country_code}]}`, `order_by("name")`; 429 problem | shipped (S1.6) |
 
 ## Auth model
 
@@ -330,8 +332,41 @@ side effects should use the service tier or the `verify_parity` command (the pol
   predicate: PUBLISHED, seller has a `telegram_id`, not deleted, not banned, consent not
   withdrawn). Media stays URLs-only (plan stance #26). Errors: 429 `rate_limited` problem +
   `Retry-After` via `rate_limit_check(namespace="api_detail", budget=API_PUBLIC_READ)` +
-  `rate_limited_problem`. The HTML detail view / `apps.ads.views.listings` are **untouched** (zero
+  `rate_limited_problem`. The   HTML detail view / `apps.ads.views.listings` are **untouched** (zero
   diff). Pairing row `("apps.ads.views.api.detail", "apps.ads.views.listings")` registered in
   `apps/api/tests/test_import_rule.py`. Tests: `apps/ads/tests/test_ad_detail_api.py` (audience
   matrix incl. identical-404-shape, HTML/API `AD_VIEWED` parity, favorites tri-state, media-URLs-
   only, contact-deep-link presence/absence matrix, and the 429 problem).
+- **S1.6:** `GET /api/v1/categories/` and `GET /api/v1/cities/` shipped (endpoint rows #29 and #30 →
+  `shipped`). New single modules per auditor A2 (never a `views/` package beside the existing
+  `apps/categories/views.py` **module**): `apps/categories/api_tree.py` and
+  `apps/locations/api_cities.py`, plus `apps/categories/api_urls.py` (`app_name="categories_api"`,
+  route `""` → tree) and `apps/locations/api_urls.py` (`app_name="locations_api"`, route `""` →
+  cities); both mounted in `apps/api/urls.py` (`categories/`, `cities/`).
+  - **Categories:** returns the full **active** tree — parents with nested `children`,
+    `{cat: slug, name, children}` — assembled in one ORM query from the `Category` models
+    directly. **SWR verdict honoured (auditor Check-5):** the JSON tree does **not** route through
+    the submenu rendered-fragment cache in `apps.categories.views` / `apps.categories.cache`; it
+    reads the models itself, so it can never serve a stale rendered fragment. For the same reason
+    it does **not** expose the fragment-cache tree version — that counter versions rendered
+    fragments, not the tree data, so publishing it would falsely couple the JSON contract to a
+    render-cache seam. Parity with the header menu is by construction (same active-only filter at
+    every level, same `order_by("name")`; an active node under an inactive/absent parent is
+    unreachable and omitted), proven browserlessly in `test_categories_api.py`. `name` is localized
+    for the request locale and never translated at runtime for errors.
+  - **Cities:** mirrors the header city selector (`apps.core.context_processors.header_context`
+    `cities`); the declared import-rule mirror is `apps.core.context_processors` (the HTML consumer
+    of the `locations` models), and the API module imports the `locations` models **only**. Returns
+    `{cities:[{slug, name, region, country_code}]}` in the same `order_by("name")` order;
+    `region`/`country_code` come from the same row the header query already loads and help agents
+    disambiguate identically named cities.
+  - Errors: 429 `rate_limited` problem + `Retry-After` via
+    `rate_limit_check(namespace="api_categories"|"api_cities", budget=API_PUBLIC_READ)` +
+    `rate_limited_problem`. HTML sources are **untouched** (zero diff: `apps.categories.views`,
+    `apps.core.context_processors`). Pairing rows
+    `("apps.categories.api_tree", "apps.categories.views")` and
+    `("apps.locations.api_cities", "apps.core.context_processors")` registered in
+    `apps/api/tests/test_import_rule.py`. Tests: `apps/categories/tests/test_categories_api.py`
+    (shape/structure, active-only filtering, per-locale names, orphan omission, HTML menu parity,
+    429 problem) and `apps/locations/tests/test_cities_api.py` (shape/order, per-locale names,
+    header-context parity, 429 problem).
