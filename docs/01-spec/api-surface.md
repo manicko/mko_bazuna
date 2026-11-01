@@ -71,9 +71,9 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 | 4 | Autocomplete | (existing) | unchanged `/api/search/autocomplete` | PUB | stance: not aliased; legacy 429 `{"error":"rate_limit"}` | covered/frozen |
 | 5 | Create/publish | `create_draft_ad` + `submit_ad` | `POST /api/v1/ads/{id}/submit/` (existing DRAFT; dialog/photo staging bot-only) | SESS (consent via outcome) | `SubmitAdOutcome` map (§Errors) | planned |
 | 6 | Edit | edit-flow helper (S4.2) — five branches | `POST /api/v1/ads/{id}/edit/` | SESS + owner | refusal → 409 `not_editable` (HTML renders 200+form — deliberate machine mapping); price-only and direct-save stay distinct from `submit_ad` | planned |
-| 7 | Archive | lifecycle service (S4.1) | `POST /api/v1/ads/{id}/archive/` | SESS + owner + **consent** | 403 `consent_required`; 409 | planned |
-| 8 | Reactivate | lifecycle service (S4.1), same `auto_moderate` decision | `POST /api/v1/ads/{id}/reactivate/` | SESS + owner + consent | 200 outcome; 409; 503 lock-timeout | planned |
-| 9 | Delete | lifecycle service (S4.1) — gate-free | `POST /api/v1/ads/{id}/delete/` | SESS + owner | 204 | planned |
+| 7 | Archive | lifecycle service (S4.1) | `POST /api/v1/ads/{id}/archive/` | SESS + owner + **consent** | 403 `consent_required`; 409 `invalid_transition`; 200 post-action state | shipped (S4.3) |
+| 8 | Reactivate | lifecycle service (S4.1), same `auto_moderate` decision | `POST /api/v1/ads/{id}/reactivate/` | SESS + owner + consent | 200 `{outcome}` for both verdicts; 409 `invalid_transition`; 503 lock-timeout | shipped (S4.3) |
+| 9 | Delete | lifecycle service (S4.1) — gate-free | `POST /api/v1/ads/{id}/delete/` | SESS + owner | 200 confirmed deleted state (supersedes the 204 note — see row-9 change log); 409 `invalid_transition` | shipped (S4.3) |
 | 10 | Copy | `copy_ad` (`copy_service.py:39` via `_build_ad_copy:15`) | `POST /api/v1/ads/{id}/copy/` | SESS | 200 `{ad_id}` — new DRAFT owned by seller; max-ads + consent predicates as in the bot flow | planned |
 | 11 | Dashboard reads | dashboard grouping (S2.2) + `SellerStats` | `GET /api/v1/dashboard/?time_range=` | SESS + consent | **403 `consent_required` when consent absent — never an empty list** (R-L1) | shipped (S2.3) |
 | 12 | Moderation queue/review | `PriorityService.get_queued_ads` / `get_priority_counts` | `GET /api/v1/moderation/queue/?priority&page`, `GET /api/v1/moderation/review/{id}/` | STAFF | 401 / 403 / 405 (problem docs) | shipped (S2.5) |
@@ -764,6 +764,56 @@ side effects should use the service tier or the `verify_parity` command (the pol
   a second, normally unreachable check in this flow — this task neither added nor moved a gate.
   **`telegram_bot/**` is untouched:** the bot has no edit flow (it only creates ads, and its write path is
   `submit_ad`, which was not modified), so the plan names no bot call site to rewire.
-  Tests: new `apps/ads/tests/test_edit_flow_service.py` (predicate matrix — owner, non-owner, anonymous,
+  Tests: new   `apps/ads/tests/test_edit_flow_service.py` (predicate matrix — owner, non-owner, anonymous,
   consent-absent, banned, wrong-status; one case per `EditOutcome` branch; the every-status-one-outcome
   table; and refusal leaving the row byte-identical).
+- **S4.3:** the three lifecycle write endpoints shipped — `POST /api/v1/ads/{id}/archive/` (row 7),
+  `POST /api/v1/ads/{id}/reactivate/` (row 8) and `POST /api/v1/ads/{id}/delete/` (row 9) → `shipped`.
+  New `apps/ads/views/api/lifecycle_actions.py`, routed in the existing `apps/ads/api_urls.py`
+  (`app_name="ads_api"`: `<int:ad_id>/archive/`, `<int:ad_id>/reactivate/`, `<int:ad_id>/delete/`; the
+  listings/detail routes are untouched). Each is the JSON sibling of the matching HTML action view
+  (`apps.ads.views.edit.ad_archive` / `ad_reactivate`, `apps.ads.views.delete.ad_delete`) and runs the
+  **same** `apps.ads.services.lifecycle` state mechanics (ownership, `select_for_update`,
+  `transition_to`, reactivation's `auto_moderate` in one atomic block) — no API-only predicate.
+  **Pipeline (fixed order):** `login_required_api` (401 `unauthenticated`, no `WWW-Authenticate`,
+  identity before method) → POST-only (405 `method_not_allowed` + `Allow: POST`) →
+  `rate_limit_check(namespace="api_write", budget=API_WRITE)` (429 `rate_limited` + `Retry-After`,
+  checked before the ad is resolved) → optional-body validation (no body field is declared: an absent,
+  empty or form-encoded body is accepted as-is; an `application/json` body must be an object with no
+  keys, else 422 `validation_failed`) → ownership (uniform 404 `not_found` for a **missing** or
+  **non-owned** id — identical document, CWE-209) → **consent** (403 `consent_required`; archive and
+  reactivate only — delete is gate-free per row 9) → the service call.
+  **Consent ordering (strict §2.5):** the API asserts `can_create_ad` (the A14 shared seam) **before**
+  calling the service, so a consent-refused archive/reactivate provably leaves the row unchanged. The
+  HTML views keep their own later ordering (documented, unchanged — zero diff).
+  **Result → HTTP mapping** (the "result flag → outcome" table):
+
+  | Service result | HTTP outcome | `outcome` token |
+  |---|---|---|
+  | `ArchiveResult(archived=True)` | 200, `status=archived`, `archived_at` set | `archived` |
+  | `ArchiveResult(archived=False)` | 409 `invalid_transition` | — |
+  | `ReactivateResult(attempted=True, passed=True)` | 200, `status=published` | `reactivated` |
+  | `ReactivateResult(attempted=True, passed=False)` | 200, `status=on_moderation_failed`, `moderation_failed_at` set | `moderation_failed` |
+  | `ReactivateResult(attempted=False)` | 409 `invalid_transition` | — |
+  | `DeleteResult(deleted=True)` | 200, `status=deleted`, `deleted_at` set | `deleted` |
+  | `DeleteResult(deleted=False)` | 409 `invalid_transition` | — |
+
+  A failed re-moderation is **not** an error: the ad was committed as `ON_MODERATION_FAILED` (a change
+  *was* committed, so the boundary rule O-2a forbids a 4xx) and the verdict travels in `outcome`.
+  **Wrong status** is a silent no-op in HTML (redirect to dashboard); the API surfaces the service's
+  `archived=False` / `attempted=False` / `deleted=False` flags as 409 `invalid_transition` so a machine
+  caller is never told "done" for a request that wrote nothing. **Delete answers 200, not the 204 of
+  the original plan row:** a bare 204 carries no re-retrievable state, so the Q8 confirmed-state clause
+  is satisfied with the same post-action body (`status: "deleted"`, `deleted_at`) as its siblings.
+  **Payload:** `{id, outcome, status, title, price, currency, city, category, published_at,
+  archived_at, moderation_failed_at, deleted_at, updated_at}` — the post-action row re-read after the
+  service committed, with the listings serializer's display fields (D4). **503:** a lock timeout
+  (`55P03`) keeps the existing `DbLockTimeoutMiddleware` boundary (it already names all three template
+  paths) and any other escape renders the 503 `retryable` problem with `Retry-After: 30` — the JSON
+  surface never answers an HTML body. Pairing row
+  `("apps.ads.views.api.lifecycle_actions", ("apps.ads.views.edit", "apps.ads.views.delete"))`
+  registered in `apps/api/tests/test_import_rule.py` (union-of-mirrors: archive/reactivate mirror
+  `edit`, delete mirrors `delete`). Tests: `apps/ads/tests/test_lifecycle_api.py` (401 on every verb,
+  405 matrix incl. no state change, 429 budget, identical-404 for missing vs non-owned, consent 403 with
+  the row asserted unchanged + API↔HTML gate equivalence, the four happy paths with service-tier state
+  and analytics parity, and the 409 wrong-status matrix).

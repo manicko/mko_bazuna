@@ -118,6 +118,15 @@ PAIRING_TABLE: list[tuple[str, str | tuple[str, ...]]] = [
         "apps.cabinet.views.api.search_history_clear",
         "apps.cabinet.views.search_history",
     ),
+    # S4.3 — lifecycle actions (archive / reactivate / delete). One module whose
+    # three operations have two behavioral mirrors: archive and reactivate mirror
+    # `apps.ads.views.edit`, delete mirrors `apps.ads.views.delete`. The mirror
+    # entry is therefore a TUPLE and the API module's imports are validated
+    # against the UNION of both mirrors' imports (plus the allowlist).
+    (
+        "apps.ads.views.api.lifecycle_actions",
+        ("apps.ads.views.edit", "apps.ads.views.delete"),
+    ),
 ]
 
 # Modules an API view may import even though its HTML mirror does not.
