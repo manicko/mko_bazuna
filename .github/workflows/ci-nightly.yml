@@ -1,0 +1,158 @@
+name: CI Nightly
+
+# Nightly / release tier. The per-PR gate (ci.yml `test` job) excludes
+# seed/slow/real_images; ci.yml `test-full` restores slow + real_images on push;
+# ci-seed.yml owns the `seed` suite. This workflow is the ONLY tier that runs
+# everything (no marker exclusion at all) and adds two guards that cannot live
+# on the parallel fast path:
+#
+#   * bot serial drift — the Telegram bot tree is re-run SERIALLY (-p no:xdist)
+#     and the result set is compared with the parallel run above. The bot tests
+#     share FSM/cache state across a stale `bot_concurrent` group; a parallel
+#     pass alone cannot prove the pins are complete, only a serial control can.
+#   * marker parity — tests/test_docs_ci_parity.py asserts the fast-gate marker
+#     set is byte-identical across Makefile, Makefile.ps1 and ci.yml.
+#
+# Deliberately a SEPARATE workflow file: ci-seed.yml must not carry a
+# schedule:/cron: trigger (test_docs_ci_parity.py::test_seed_workflow_runs_on_push)
+# and ci.yml's PR-gate tokens are pinned by the same module (D7).
+
+on:
+  schedule:
+    # Daily at 03:00 UTC.
+    - cron: "0 3 * * *"
+  workflow_dispatch:
+
+# Nightly runs are advisory signal, not required checks, so a newer run may
+# cancel an older one: it always tests the default-branch tip, which makes an
+# in-flight run on an older commit redundant. (ci.yml keeps cancel-in-progress
+# false for the opposite reason — it backs a required status check.)
+concurrency:
+  group: ci-nightly-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  nightly:
+    runs-on: ubuntu-latest
+    # ≤45min target for the full tier; the padded cap absorbs a cold uv cache.
+    timeout-minutes: 60
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
+    services:
+      db:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: mko_bazuna
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+
+      - name: Check lockfile freshness
+        run: uv lock --check
+        working-directory: src/backend
+
+      - name: Install dependencies
+        run: uv sync --frozen --no-install-project --group dev
+        working-directory: src/backend
+
+      - name: Wait for database
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+        run: |
+          for i in $(seq 1 30); do
+            if uv run python -c "import psycopg; psycopg.connect('postgres://postgres:postgres@localhost:5432/mko_bazuna')" 2>/dev/null; then
+              echo "Database ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ERROR: Database unavailable after 30s" >&2
+          exit 1
+        working-directory: src/backend
+
+      - name: Run migrations
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run python manage.py bootstrap_reference_data
+        working-directory: src/backend
+
+      - name: Install gettext (for compilemessages)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gettext
+
+      - name: Compile translations
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+        run: |
+          uv run python manage.py compilemessages \
+            --ignore=.venv --ignore=.git --ignore=.kilo --ignore=__pycache__ --ignore='*.pyc' \
+            --ignore=.mypy_cache --ignore=.ruff_cache --ignore=.pytest_cache --ignore=node_modules \
+            --ignore=.tox --ignore=.nox --ignore=__pypackages__ --ignore=.uv --ignore=.cache \
+            --ignore=.local --ignore=.playwright-mcp --ignore=.coverage --ignore=.hypothesis \
+            --locale ru --locale bs --locale en
+        working-directory: src/backend
+
+      # Marker parity first: it is sub-second, and if the fast-gate marker set
+      # drifts, the full-tier result below is not comparable with the PR gate.
+      - name: Verify marker parity (Makefile / Makefile.ps1 / ci.yml)
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+        run: uv run pytest tests/test_docs_ci_parity.py -p no:xdist --tb=short
+        working-directory: src/backend
+
+      # Serial control for the bot tree (D8): `-p no:xdist` disables the xdist
+      # plugin so the whole tree runs in one process. Kept as an explicit,
+      # separate step rather than a `-n0` variant of the parallel run so a
+      # serial-only failure is attributed to the bot pins, not to the full tier.
+      # working-directory is src/backend (shared with every other step), so the
+      # bot tree resolves as ../telegram_bot/tests.
+      - name: Run bot suite serially (drift control)
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run pytest ../telegram_bot/tests -p no:xdist --tb=short --reuse-db
+        working-directory: src/backend
+
+      # Serial settings-package run. The settings tests spawn subprocesses and
+      # are not DB-bound; running them serially keeps their per-module import
+      # and subprocess timing honest, and keeps them out of the xdist worker a
+      # `migrations` xdist_group would otherwise serialize first.
+      - name: Run settings tests serially
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run pytest config/settings/tests -p no:xdist --tb=short --reuse-db
+        working-directory: src/backend
+
+      # Full tier: no marker exclusion — `slow`, `real_images` AND `seed` all run.
+      # `test_migrations.py` is held on a single worker by its `migrations`
+      # xdist_group; the two serial steps above cover the packages that are
+      # order-sensitive outside that group.
+      - name: Run pytest (nightly full tier, no marker exclusion)
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run pytest --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup
+        working-directory: src/backend

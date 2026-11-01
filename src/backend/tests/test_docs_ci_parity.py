@@ -10,6 +10,11 @@ doc drift into a CI gate:
 4. entrypoint-test.sh:41 default PYTEST_OPTS includes `--reuse-db` + `--dist loadgroup`.
 5. Makefile: `test-clean-db` target exists, is in `.PHONY`, and `test-recreate`
    depends on it (requires T4/§8-rec-4 to be implemented first).
+5b. Fast-gate marker parity: `Makefile` and `Makefile.ps1` both pass
+   `PYTEST_SKIP_MARKERS=seed or slow or real_images`, the byte-identical value
+   `ci.yml` expresses as `-m "not (seed or slow or real_images)"`. A local gate
+   that silently skips a different marker set than CI is a coverage hole no
+   other test can see (D9).
 6. docs/ops: every production `docker compose` invocation — embedded in a longer
    command, prefixed by a variable assignment, or split across shell
    backslash-continuations — carries its flags, and every canonical `ghcr.io`
@@ -284,6 +289,113 @@ def test_makefile_test_recreate_opts_match() -> None:
 
     assert "--no-reuse-db" not in make_opts, "Makefile must not use the nonexistent --no-reuse-db flag"
     assert "--no-reuse-db" not in ps1_opts, "Makefile.ps1 must not use the nonexistent --no-reuse-db flag"
+
+
+# --- fast-gate marker parity (D9) ------------------------------------------
+# The fast gate is expressed three times: twice as a `PYTEST_SKIP_MARKERS`
+# environment value (Makefile + Makefile.ps1, expanded by entrypoint-test.sh
+# into `-m "not (...)"`) and once as a literal pytest flag in ci.yml. Nothing in
+# the test suite observes the *value* of the skip set, so a local gate that
+# quietly stops excluding `slow` (or starts excluding `seed`) stays green while
+# diverging from CI. These assertions pin the value itself.
+#
+# Quoting is part of the assertion: `PYTEST_SKIP_MARKERS=seed or slow or
+# real_images` contains spaces, so an unquoted assignment (`--env
+# PYTEST_SKIP_MARKERS=seed or slow or real_images`) makes docker receive only
+# `PYTEST_SKIP_MARKERS=seed` and pass `or slow or real_images` as stray
+# arguments. The expected token therefore includes the surrounding quotes.
+
+_FAST_GATE_MARKERS = "seed or slow or real_images"
+_SKIP_MARKERS_TOKEN = f'"PYTEST_SKIP_MARKERS={_FAST_GATE_MARKERS}"'
+_CI_MARKER_EXPRESSION = f'-m "not ({_FAST_GATE_MARKERS})"'
+# Assignment contexts only: the QUOTED value of `--env`/`-e`. An unquoted value
+# is deliberately not matched — it is the defect, not an alternative spelling —
+# so the guard fails instead of silently accepting shell-split arguments.
+# `--env` is tried before the docker `-e` form, whose optional `KEY=VALUE`
+# prefix would otherwise consume the `v ` of `--env`.
+_SKIP_MARKERS_ASSIGNMENT_RE = re.compile(
+    r'(?:--env[ \t]+|(?<![\w-])-e[ \t]+(?:(?!--)[\w.-]+[ \t]+)?)'
+    r'"PYTEST_SKIP_MARKERS=([^"]*)"'
+)
+
+
+def _skip_marker_values(text: str) -> list[str]:
+    """Return every quoted PYTEST_SKIP_MARKERS value assigned in ``text``."""
+    return _SKIP_MARKERS_ASSIGNMENT_RE.findall(text)
+
+
+def _assert_skip_markers(text: str, name: str) -> list[str]:
+    """Assert ``text`` assigns only the fast-gate marker set, and return it.
+
+    Shared by the two file assertions and by the RED-proof test, so the
+    discriminating property is exercised on the same predicate that guards the
+    real files.
+    """
+    values = _skip_marker_values(text)
+    assert values, (
+        f"{name} must pass the fast-gate marker set as a quoted env value: "
+        f"{_SKIP_MARKERS_TOKEN} (D9). An unquoted value splits at the first "
+        "space and silently excludes only `seed`."
+    )
+    unexpected = sorted({value for value in values if value != _FAST_GATE_MARKERS})
+    assert not unexpected, (
+        f"{name} must set PYTEST_SKIP_MARKERS only to {_FAST_GATE_MARKERS!r}; "
+        f"found {unexpected}"
+    )
+    return values
+
+
+def test_makefile_skip_markers_match_ci() -> None:
+    """Makefile's PYTEST_SKIP_MARKERS is the quoted ci.yml marker set."""
+    _assert_skip_markers(_MAKEFILE.read_text(encoding="utf-8"), "Makefile")
+
+
+def test_makefile_ps1_skip_markers_match_ci() -> None:
+    """Makefile.ps1's PYTEST_SKIP_MARKERS is the quoted ci.yml marker set."""
+    _assert_skip_markers(_MAKEFILE_PS1.read_text(encoding="utf-8"), "Makefile.ps1")
+
+
+def test_makefiles_skip_markers_agree() -> None:
+    """Makefile and Makefile.ps1 declare the same skip-marker value (D9).
+
+    Each file is checked against the CI value independently above; this keeps
+    the pair from agreeing with each other on a *wrong* value that both drifted
+    to.
+    """
+    make_values = _skip_marker_values(_MAKEFILE.read_text(encoding="utf-8"))
+    ps1_values = _skip_marker_values(_MAKEFILE_PS1.read_text(encoding="utf-8"))
+    assert make_values == ps1_values, (
+        "Makefile and Makefile.ps1 must pass the identical PYTEST_SKIP_MARKERS "
+        f"value (D9): Makefile={make_values} Makefile.ps1={ps1_values}"
+    )
+
+
+def test_ci_gate_expression_matches_local_skip_markers() -> None:
+    """ci.yml's `-m` expression negates exactly the local skip-marker set."""
+    text = _CI_YML.read_text(encoding="utf-8")
+    assert _CI_MARKER_EXPRESSION in text, (
+        f"ci.yml must express the fast gate as {_CI_MARKER_EXPRESSION} (D9); "
+        f"the local Makefiles skip {_FAST_GATE_MARKERS!r}"
+    )
+
+
+def test_fast_gate_marker_parity_has_discriminating_power() -> None:
+    """The parity guard rejects wrong inputs (RED proof for the tests above).
+
+    A guard that only passes today's files is not a guard. This drives the same
+    predicate the file assertions use over representative wrong inputs: an
+    unquoted assignment (the exact silent misrouting D2 exists to prevent) and
+    a quoted value missing ``slow``. Both must be rejected, while the canonical
+    line passes.
+    """
+    good = '--env "PYTEST_SKIP_MARKERS=seed or slow or real_images" test'
+    unquoted = "--env PYTEST_SKIP_MARKERS=seed or slow or real_images test"
+    missing_slow = '--env "PYTEST_SKIP_MARKERS=seed or real_images" test'
+
+    assert _assert_skip_markers(good, "<good>") == [_FAST_GATE_MARKERS]
+    for wrong, label in ((unquoted, "unquoted"), (missing_slow, "missing slow")):
+        with pytest.raises(AssertionError):
+            _assert_skip_markers(wrong, label)
 
 
 # --- DR runbook executability (12-OPS-006) ---------------------------------
