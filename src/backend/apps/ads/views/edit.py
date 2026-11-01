@@ -7,6 +7,12 @@ Implements US-S5/S7 edit flow with zone C2 hide-on-text-edit behavior:
     - Mixed edits follow text rule (re-moderation)
     - Reactivate (ARCHIVED -> PUBLISHED): text re-checked, hidden until pass
 
+The status-to-branch table and the payload stages live in the shared
+edit-flow service (``apps.ads.services.edit_flow``, S4.2) so the HTML view and
+the future ``/api/v1/ads/{id}/edit/`` endpoint cannot drift. This module keeps
+what is view-shaped: the transaction + row lock, the rendered form, the
+redirects, the log lines and the 03-DB-004 lock-timeout re-render.
+
 Photos are not seller-editable in phase 1: this view never changes an ad's
 photos, and the bot affordance for seller-side photo editing was deliberately
 deferred (owner decision Q07-6=(b)). The only post-publish photo change is a
@@ -32,17 +38,18 @@ if TYPE_CHECKING:
     from apps.users.models import User
 
 from apps.ads.models import Ad
+from apps.ads.services.edit_flow import (
+    EDIT_FORM_AVAILABLE_STATUSES,
+    EDITABLE_DIRECT_SAVE_STATUSES,
+    EditOutcome,
+    apply_edit_payload,
+)
 from apps.ads.services.lifecycle import (
     archive_ad,
     assert_lifecycle_owner,
     reactivate_ad,
 )
-from apps.ads.services.submission import (
-    AdEditInput,
-    SubmitAdInput,
-    SubmitAdOutcome,
-    submit_ad,
-)
+from apps.ads.services.submission import AdEditInput
 from apps.core.enums import AdStatus
 from apps.core.utils.db_lock_timeout import is_lock_timeout
 from apps.currencies.enums import CurrencyCode
@@ -50,40 +57,13 @@ from apps.currencies.services.price_normalizer import normalize_price_to_eur
 
 logger = logging.getLogger(__name__)
 
-
-#: Statuses whose ad may be edited by a direct save (no status transition).
-#:
-#: This is the **branch** set: the single source of truth for which statuses
-#: take the ``ad_edit`` catch-all direct-save branch (``DRAFT`` and
-#: ``ON_MODERATION``). It is deliberately explicit: previously the catch-all
-#: ``else:`` admitted DRAFT, ON_MODERATION, ON_MODERATION_FAILED, REJECTED,
-#: DELETED, and (conditionally) ARCHIVED, so every status silently took the same
-#: write path. Naming the two coherent statuses — an unsubmitted DRAFT and a
-#: pending ON_MODERATION ad — makes every other status a defined refusal and
-#: turns any future re-broadening into a one-line, auditable diff
-#: (finding AD-002, BLOCK 8A).
-#:
-#: This set answers only "which statuses may take the direct save?" It is NOT
-#: the set of statuses whose edit form is reachable — see the UI affordance set
-#: ``EDIT_FORM_AVAILABLE_STATUSES`` below, which is derived from this one.
-EDITABLE_DIRECT_SAVE_STATUSES: frozenset[AdStatus] = frozenset(
-    {AdStatus.DRAFT, AdStatus.ON_MODERATION}
-)
-
-#: UI affordance set: the statuses for which ``ad_edit`` can succeed, i.e. the
-#: statuses whose dashboard Edit link must be shown.
-#:
-#: This is the **affordance** set and it is NOT the branch set. ``PUBLISHED``
-#: has its own working branch (text edit -> ``ON_MODERATION``; price-only edit
-#: stays ``PUBLISHED`` with a publish-clock reset) and ``ARCHIVED`` has a
-#: working reactivation path (``is_reactivation`` routes through ``submit_ad``),
-#: yet neither takes the direct save, so neither is in
-#: ``EDITABLE_DIRECT_SAVE_STATUSES`` above. It is derived from that branch set
-#: with ``|`` so the two can never drift: every direct-save status is also an
-#: edit-form status, and the two extra statuses are appended explicitly.
-EDIT_FORM_AVAILABLE_STATUSES: frozenset[AdStatus] = (
-    EDITABLE_DIRECT_SAVE_STATUSES | frozenset({AdStatus.PUBLISHED, AdStatus.ARCHIVED})
-)
+__all__ = [
+    "EDITABLE_DIRECT_SAVE_STATUSES",
+    "EDIT_FORM_AVAILABLE_STATUSES",
+    "ad_archive",
+    "ad_edit",
+    "ad_reactivate",
+]
 
 
 def _apply_price_change(
@@ -95,37 +75,16 @@ def _apply_price_change(
 
     Sets the source-of-truth fields (``price_amount``/``price_currency``) and
     recomputes the derived EUR-normalized value via ``normalize_price_to_eur``
-    (the shared BR-03 seam). When the currency is missing the normalized value
-    is cleared.
-    Returns the ad so the caller can persist it.
-
-    Args:
-        ad: The ad to update.
-        price_amount: The new price amount (Decimal("0") for Free).
-        price_currency: The new price currency (None preserves current).
-
-    Returns:
-        The updated ``ad`` instance.
+    (the shared BR-03 seam). The normalizer is resolved from *this* module's
+    namespace, which is the call-site the price-normalization parity test
+    patches. The edit flow calls the equivalent
+    ``edit_flow.apply_price_change``.
     """
     ad.price_amount = price_amount
     if price_currency is not None:
         ad.price_currency = price_currency.value
     normalize_price_to_eur(ad, price_amount, price_currency)
     return ad
-
-
-def _text_fields_changed(dto: AdEditInput, ad: Ad) -> bool:
-    """
-    Check if text fields (title/description) were changed in the edit.
-
-    Args:
-        dto: Validated edit input from the POST form.
-        ad: The ad being edited.
-
-    Returns:
-        True if title or description differs from the ad's current values.
-    """
-    return dto.title != ad.title or dto.description != ad.description
 
 
 def _seller_may_create_ad(user: User) -> bool:
@@ -226,9 +185,10 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
 
     # POST: process edit
     # re-fetch the Ad under a row lock inside a transaction so the
-    # status-driven branch below and the subsequent transition_to() operate
-    # on a locked, consistent row. The GET path returns before this block, so
-    # the lock is scoped to POST mutations only (mirrors review.py reject_ad).
+    # status-driven branch (now in the shared edit-flow service) and the
+    # subsequent transition_to() operate on a locked, consistent row. The GET
+    # path returns before this block, so the lock is scoped to POST mutations
+    # only (mirrors review.py reject_ad).
     #
     # 03-DB-004: a lock timeout aborts the transaction. Catch it OUTSIDE the
     # atomic block (any query after the failure inside the block is dead),
@@ -254,168 +214,63 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
                 {k: v for k, v in request.POST.items() if k in AdEditInput.model_fields}
             )
 
-            # Currency-fallback-on-invalid: None means preserve the ad's current
-            # currency (web-specific behavior that diverges from the bot flow).
-            if dto.price_currency is not None:
-                price_currency_value = dto.price_currency
-            else:
-                price_currency_value = (
-                    CurrencyCode(ad.price_currency) if ad.price_currency else None
-                )
-
-            # Determine edit type
-            has_text_change = _text_fields_changed(dto, ad)
-
+            # Status-to-branch table and payload application live in the shared
+            # edit-flow service (S4.2). This view keeps only the response shapes.
             if is_reactivation:
-                # Route through the shared submission orchestrator.
-                #
-                # The currency pre-coercion above (lines for price_currency_value)
-                # ensures it is a valid CurrencyCode | None — submit_ad's
-                # defensive coercion is a no-op here. This is an intentional
-                # divergence: the web edit path preserves the user's existing
-                # currency on invalid input, while the bot flow (always passes
-                # a valid CurrencyCode) has no such need. See submit_ad docstring.
-                #
-                # submit_ad fetches a fresh Ad row; the outer transaction's row
-                # lock guarantees no concurrent mutation, sets fields, saves,
-                # transitions ARCHIVED -> ON_MODERATION, then calls auto_moderate
-                # outside its own atomic.
-                result = submit_ad(
-                    SubmitAdInput(
-                        ad_id=ad_id,
-                        title_ru=dto.title,
-                        desc_ru=dto.description,
-                        category_id=ad.category_id,
-                        city_id=ad.city_id,
-                        price_amount=dto.price_amount,
-                        price_currency=price_currency_value,
-                        photos=[],
-                        user_id=ad.user_id,
-                        listing_condition_id=ad.listing_condition_id,
-                    )
+                result = apply_edit_payload(
+                    ad, dto, True, outcome_prefix=EditOutcome.REACTIVATED
                 )
-
-                if result.outcome is SubmitAdOutcome.PUBLISHED:
-                    return redirect("ads:dashboard")
-                else:
-                    ad = Ad.objects.prefetch_related("images").get(id=ad_id)
-                    return render(
-                        request,
-                        "ads/edit.html",
-                        {
-                            "ad": ad,
-                            "error": result.errors[0]
-                            if result.errors
-                            else _("Ad failed moderation checks"),
-                        },
-                    )
-
-            elif ad.status == AdStatus.PUBLISHED:
-                # Zone C2: Text edit -> ON_MODERATION, hidden immediately
-                # Price edit -> stays PUBLISHED (photos are not seller-editable in phase 1)
-                # Mixed edit -> follows text rule
-                if has_text_change:
-                    # Delegate to the shared submission orchestrator, mirroring the
-                    # reactivation branch above. submit_ad sets the fields, saves,
-                    # transitions to ON_MODERATION, then runs auto_moderate.
-                    #
-                    # The currency pre-coercion above (price_currency_value)
-                    # ensures it is a valid CurrencyCode | None — submit_ad
-                    # preserves the ad's current currency when None (web
-                    # "keep-current" semantic, Path A).
-                    result = submit_ad(
-                        SubmitAdInput(
-                            ad_id=ad_id,
-                            title_ru=dto.title,
-                            desc_ru=dto.description,
-                            category_id=ad.category_id,
-                            city_id=ad.city_id,
-                            price_amount=dto.price_amount,
-                            price_currency=price_currency_value,
-                            photos=[],
-                            user_id=ad.user_id,
-                            listing_condition_id=ad.listing_condition_id,
-                        )
-                    )
-
-                    if result.outcome is SubmitAdOutcome.PUBLISHED:
-                        logger.info("Ad %s text edited, moved to ON_MODERATION", ad_id)
-                        return redirect("ads:dashboard")
-
-                    ad = Ad.objects.prefetch_related("images").get(id=ad_id)
-                    return render(
-                        request,
-                        "ads/edit.html",
-                        {
-                            "ad": ad,
-                            "error": result.errors[0]
-                            if result.errors
-                            else _("Ad failed moderation checks"),
-                        },
-                    )
-                else:
-                    # Price-only edit: stays published; recompute normalized
-                    # price and restart the auto-archive clock. Photos are not
-                    # editable here (phase 1 defers seller-side photo editing,
-                    # Q07-6=(b)). The clock reset
-                    # shares the existing single save() deliberately: a second
-                    # save() would fire a second post_save and register a second
-                    # transaction.on_commit(deliver_immediate_alerts), which can
-                    # send a duplicate immediate alert.
-                    ad = _apply_price_change(ad, dto.price_amount, price_currency_value)
-                    update_fields = [
-                        "price_amount",
-                        "price_currency",
-                        "price_normalized_eur",
-                        "updated_at",
-                    ]
-                    ad.reset_publish_clock(update_fields)
-                    ad.save(update_fields=update_fields)
-                    logger.info("Ad %s price edited, stays PUBLISHED", ad_id)
-
-                return redirect("ads:dashboard")
-
             else:
-                # Explicit allow-list. The former ``else:`` catch-all admitted
-                # DRAFT, ON_MODERATION, ON_MODERATION_FAILED, REJECTED, DELETED,
-                # and (without a ``reactivate`` key) ARCHIVED, silently writing
-                # content for every one of them (finding AD-002). Only DRAFT and
-                # ON_MODERATION have a coherent direct save; every other status
-                # is refused below and the row is left untouched.
-                if ad.status in EDITABLE_DIRECT_SAVE_STATUSES:
-                    ad.title = dto.title
-                    ad.description = dto.description
-                    ad = _apply_price_change(ad, dto.price_amount, price_currency_value)
-                    ad.save(
-                        update_fields=[
-                            "title",
-                            "description",
-                            "price_amount",
-                            "price_currency",
-                            "price_normalized_eur",
-                            "updated_at",
-                        ]
-                    )
-                    logger.info("Ad %s edited in status %s", ad_id, ad.status)
+                result = apply_edit_payload(
+                    ad, dto, False, outcome_prefix=EditOutcome.RESUBMITTED
+                )
+
+            if result.outcome in (
+                EditOutcome.REACTIVATED,
+                EditOutcome.RESUBMITTED,
+            ):
+                if not result.moderation_failed:
+                    if result.outcome is EditOutcome.RESUBMITTED:
+                        logger.info(
+                            "Ad %s text edited, moved to ON_MODERATION", ad_id
+                        )
                     return redirect("ads:dashboard")
 
-                # Defined refusal: no field is written. Rendering the edit form
-                # with the actionable message (HTTP 200) matches the moderation
-                # failure paths above and makes the dead end explicit rather
-                # than silently rewriting content. The product rule for what a
-                # seller may do to a failed ad is Q5 and remains open (BLOCK 8B).
-                logger.info(
-                    "Ad %s edit refused in status %s", ad_id, ad.status
-                )
                 ad = Ad.objects.prefetch_related("images").get(id=ad_id)
                 return render(
                     request,
                     "ads/edit.html",
                     {
                         "ad": ad,
-                        "error": _("This ad cannot be edited in its current status."),
+                        "error": result.errors[0]
+                        if result.errors
+                        else _("Ad failed moderation checks"),
                     },
                 )
+
+            if result.outcome is EditOutcome.PRICE_UPDATED:
+                logger.info("Ad %s price edited, stays PUBLISHED", ad_id)
+                return redirect("ads:dashboard")
+
+            if result.outcome is EditOutcome.DIRECT_SAVED:
+                logger.info("Ad %s edited in status %s", ad_id, ad.status)
+                return redirect("ads:dashboard")
+
+            # Defined refusal: no field is written. Rendering the edit form
+            # with the actionable message (HTTP 200) matches the moderation
+            # failure paths above and makes the dead end explicit rather
+            # than silently rewriting content. The product rule for what a
+            # seller may do to a failed ad is Q5 and remains open (BLOCK 8B).
+            logger.info("Ad %s edit refused in status %s", ad_id, ad.status)
+            ad = Ad.objects.prefetch_related("images").get(id=ad_id)
+            return render(
+                request,
+                "ads/edit.html",
+                {
+                    "ad": ad,
+                    "error": _("This ad cannot be edited in its current status."),
+                },
+            )
     except OperationalError as exc:
         if not is_lock_timeout(exc):
             raise

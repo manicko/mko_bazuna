@@ -743,3 +743,27 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `apps/ads/tests/test_lifecycle_service.py` (per-transition happy path with timestamps + the
   `AD_PUBLISHED`/`MODERATION_APPROVED`/`MODERATION_REJECTED` analytics rows, wrong-status no-ops,
   non-owner/404 refusals, the failing-check rollback, and the gate-free delete).
+- **S4.2:** edit-flow predicate and payload application extracted — `apps/ads/services/edit_flow.py`
+  now owns `can_edit_ad(ad, user_id)` (ownership + status), the composed `can_edit_ad_by_service(ad, user)`
+  (the same predicate plus the storage-consent term, i.e. `can_create_ad`), `apply_edit_payload(ad, dto,
+  reactivate, *, outcome_prefix)` and the `EDITABLE_DIRECT_SAVE_STATUSES` / `EDIT_FORM_AVAILABLE_STATUSES`
+  sets, which moved here verbatim and are still re-exported from `apps.ads.views.edit` for the dashboard
+  and for the existing suites. The five outcome families (A5) are the `EditOutcome` members `REACTIVATED`
+  (ARCHIVED + `reactivate`), `RESUBMITTED` (PUBLISHED text/description change), `PRICE_UPDATED`
+  (PUBLISHED price-only, publish clock reset), `DIRECT_SAVED` (DRAFT / ON_MODERATION) and `REFUSED`
+  (every other status — no field is written); families 1 and 2 route through `submit_ad`, families 3 and 4
+  never do (frozen rule). `EditResult` carries `outcome`, `moderation_failed` (only when `submit_ad`
+  returns `SubmitAdOutcome.MODERATION_FAILED`) and `errors`. The HTML `ad_edit` view is a thin caller that
+  keeps the transaction + `select_for_update` lock, the prefetched re-renders, the redirects, the `error`
+  context, the log lines and the 03-DB-004 lock-timeout re-render — response bodies and redirects are
+  byte-identical (proven by the untouched `test_edit.py`, `test_edit_views_locking.py`, `test_submission.py`
+  and `apps/core/tests/test_db_lock_timeout_boundary.py`). The refusal branch is a **presentation**
+  difference only: HTML renders 200 + form, the future endpoint maps `REFUSED` to `409 not_editable`.
+  One ordering is preserved verbatim and is worth naming for S4.4: the HTML view asserts consent
+  (`_seller_may_create_ad`) **before** taking the POST row lock, so the consent gate inside `submit_ad` is
+  a second, normally unreachable check in this flow — this task neither added nor moved a gate.
+  **`telegram_bot/**` is untouched:** the bot has no edit flow (it only creates ads, and its write path is
+  `submit_ad`, which was not modified), so the plan names no bot call site to rewire.
+  Tests: new `apps/ads/tests/test_edit_flow_service.py` (predicate matrix — owner, non-owner, anonymous,
+  consent-absent, banned, wrong-status; one case per `EditOutcome` branch; the every-status-one-outcome
+  table; and refusal leaving the row byte-identical).
