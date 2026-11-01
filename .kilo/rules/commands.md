@@ -71,6 +71,8 @@ Tier summary — one marker set per CI trigger, the local commands above mirror 
 | Seed | `seed` only | `ci-seed.yml` (push, serial + `--cov=apps.seed` ≥80) | `$dc run --rm --env PYTEST_OPTS="-m seed" test` (see caveat below) |
 | Nightly | none | `ci-nightly.yml` (daily 03:00 UTC + manual dispatch) | `.\Makefile.ps1 test-all` |
 
+The nightly ↔ `.\Makefile.ps1 test-all` marker set is byte-identical, but the execution mode differs: the CI nightly runs the settings/migrations and bot portions serially and exactly once, while local `test-all` runs everything in parallel in a single invocation.
+
 The nightly workflow additionally runs the bot tree serially (`-p no:xdist`), the settings package
 serially, and the marker-parity guard (`tests/test_docs_ci_parity.py`) before the full run.
 

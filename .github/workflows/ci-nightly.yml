@@ -147,14 +147,15 @@ jobs:
         working-directory: src/backend
 
       # Full tier: no marker exclusion — `slow`, `real_images` AND `seed` all run.
-      # The two path ignores are not marker exclusions: they remove only the
-      # settings/migrations paths already executed serially above, so nothing in
-      # this workflow runs twice. `test_migrations.py` keeps its `migrations`
-      # xdist_group pin for any parallel run that does collect it.
+      # The three path ignores are not marker exclusions: they remove only what
+      # the steps above already ran (settings/migrations serially, the parity
+      # module in its own step), so nothing in this workflow runs twice.
+      # `test_migrations.py` keeps its `migrations` xdist_group pin for any
+      # parallel run that does collect it.
       - name: Run pytest (nightly full tier, no marker exclusion)
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-        run: uv run pytest --ignore=config/settings/tests --ignore=apps/core/tests/test_migrations.py --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup
+        run: uv run pytest --ignore=config/settings/tests --ignore=apps/core/tests/test_migrations.py --ignore=tests/test_docs_ci_parity.py --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup
         working-directory: src/backend

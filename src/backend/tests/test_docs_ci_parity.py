@@ -19,9 +19,10 @@ doc drift into a CI gate:
    github.event_name == 'push'`), so the workflow-level `pull_request` trigger
    does not run the ~7 min full tier on every PR (D10).
 5d. `ci-nightly.yml` runs the settings/migrations portion serially (plan §6
-   Step 6) and path-ignores exactly those two paths in the parallel full tier,
-   so every test runs exactly once while keeping the "no marker exclusion"
-   invariant (D11).
+   Step 6) and path-ignores those two paths plus `tests/test_docs_ci_parity.py`
+   (which runs in its own marker-parity step) in the parallel full tier, so every
+   test runs exactly once while keeping the "no marker exclusion" invariant
+   (D11).
 6. docs/ops: every production `docker compose` invocation — embedded in a longer
    command, prefixed by a variable assignment, or split across shell
    backslash-continuations — carries its flags, and every canonical `ghcr.io`
@@ -421,13 +422,17 @@ def test_fast_gate_marker_parity_has_discriminating_power() -> None:
 #   itself stays unguarded.
 #
 #   D11 — the nightly ran the settings package both serially and inside the
-#   parallel full tier, and never ran `test_migrations.py` serially at all.
-#   "Every test runs exactly once" is the invariant: the serial step must cover
-#   both paths and the full-tier step must path-ignore exactly them. Path
-#   ignores are not marker exclusions, so the full tier still has no `-m`.
+#   parallel full tier, and never ran `test_migrations.py` serially at all. The
+#   marker-parity module was likewise collected twice (its own step plus the
+#   full tier). "Every test runs exactly once" is the invariant: the serial /
+#   dedicated steps must cover those paths and the full-tier step must
+#   path-ignore exactly them. Path ignores are not marker exclusions, so the
+#   full tier still has no `-m`.
 
 _PUSH_ONLY_GUARD = "github.event_name == 'push'"
 _NIGHTLY_SERIAL_PATHS = ("config/settings/tests", "apps/core/tests/test_migrations.py")
+# Covered by its own "marker parity" step ahead of the full tier.
+_NIGHTLY_OWN_STEP_PATHS = ("tests/test_docs_ci_parity.py",)
 
 
 def _load_workflow(path: Path) -> dict:
@@ -529,12 +534,13 @@ def test_nightly_serial_step_covers_settings_and_migrations() -> None:
 
 
 def test_nightly_full_tier_ignores_serial_paths() -> None:
-    """The nightly full tier path-ignores exactly what the serial step covers (D11).
+    """The nightly full tier path-ignores every path another step already runs (D11).
 
     "Every test runs exactly once": without the ignores the settings and
-    migration tests are re-collected (and re-run) by the parallel tier. The
-    full tier must also keep its no-marker-exclusion property — path ignores are
-    not marker exclusions.
+    migration tests are re-collected by the parallel tier, and so is the
+    marker-parity module, which has its own step ahead of it. The full tier must
+    also keep its no-marker-exclusion property — path ignores are not marker
+    exclusions.
     """
     parallel = [command for is_serial, command in _pytest_steps() if not is_serial]
     assert len(parallel) == 1, (
@@ -542,15 +548,51 @@ def test_nightly_full_tier_ignores_serial_paths() -> None:
         f"found {parallel}"
     )
     command = parallel[0]
-    for path in _NIGHTLY_SERIAL_PATHS:
+    for path in (*_NIGHTLY_SERIAL_PATHS, *_NIGHTLY_OWN_STEP_PATHS):
         assert f"--ignore={path}" in command, (
-            f"ci-nightly.yml full tier must pass --ignore={path} so the serial "
-            f"coverage is not duplicated (D11); got: {command}"
+            f"ci-nightly.yml full tier must pass --ignore={path} so coverage "
+            f"already produced by another step is not duplicated (D11); "
+            f"got: {command}"
         )
     assert '-m "not (' not in command, (
         "ci-nightly.yml full tier must keep no marker exclusion (path ignores "
         f"are not markers); got: {command}"
     )
+
+
+def test_nightly_own_step_ignores_have_discriminating_power() -> None:
+    """The nightly ignore guard rejects a full tier missing any ignore (RED proof).
+
+    Dropping the parity module's ignore — the state before this fix — must fail,
+    and so must dropping either serial-path ignore. The same predicate the file
+    assertion uses is driven here over in-memory commands.
+    """
+    good = (
+        "uv run pytest --ignore=config/settings/tests "
+        "--ignore=apps/core/tests/test_migrations.py "
+        "--ignore=tests/test_docs_ci_parity.py --reuse-db -n auto"
+    )
+    without_parity = (
+        "uv run pytest --ignore=config/settings/tests "
+        "--ignore=apps/core/tests/test_migrations.py --reuse-db -n auto"
+    )
+    without_settings = (
+        "uv run pytest --ignore=apps/core/tests/test_migrations.py "
+        "--ignore=tests/test_docs_ci_parity.py --reuse-db -n auto"
+    )
+    marker_excluded = (
+        f'{good} -m "not (seed)"'
+    )
+
+    def assert_ignored(command: str) -> None:
+        for path in (*_NIGHTLY_SERIAL_PATHS, *_NIGHTLY_OWN_STEP_PATHS):
+            assert f"--ignore={path}" in command, f"missing --ignore={path}"
+        assert '-m "not (' not in command, "must keep no marker exclusion"
+
+    assert_ignored(good)
+    for wrong in (without_parity, without_settings, marker_excluded):
+        with pytest.raises(AssertionError):
+            assert_ignored(wrong)
 
 
 # --- DR runbook executability (12-OPS-006) ---------------------------------

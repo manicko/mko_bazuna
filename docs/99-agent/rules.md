@@ -181,6 +181,8 @@ One marker set per CI trigger; the local commands mirror each tier exactly.
 | Seed | `seed` only | `ci-seed.yml` (push to `main`/`develop`, serial, `--cov=apps.seed` ≥80) | `--env PYTEST_OPTS="-m seed"` |
 | Nightly | none | `ci-nightly.yml` (daily 03:00 UTC + `workflow_dispatch`) | `make test-all` / `.\Makefile.ps1 test-all` |
 
+The nightly ↔ `make test-all` marker set is byte-identical, but the execution mode differs: the CI nightly runs the settings/migrations and bot portions serially and exactly once, while local `test-all` runs everything in parallel in a single invocation.
+
 Measured after the tier split (pytest time, not wall clock):
 
 - Fast gate: 3961 passed, 53 + 8 deselected, **370.7 s** pytest time (baseline 581.6 s).
@@ -221,7 +223,7 @@ Test execution is split across four workflows, one per tier (see "Test tiers and
 2. **Marker-parity guard** — `pytest tests/test_docs_ci_parity.py -p no:xdist`. Routed first because it is sub-second and, if the fast-gate marker set drifts, the full-tier result is not comparable with the PR gate.
 3. **Bot serial drift control** — `pytest ../telegram_bot/tests -p no:xdist` (from `src/backend`). A parallel pass alone cannot prove the `bot_concurrent` pins are complete; only a serial control can. Kept as its own step so a serial-only failure is attributed to the bot pins.
 4. **Settings/migrations serial run** (plan §6 Step 6, the settings/migrations portion serial) — `pytest config/settings/tests apps/core/tests/test_migrations.py -p no:xdist`.
-5. **Full suite** — `pytest --ignore=config/settings/tests --ignore=apps/core/tests/test_migrations.py --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup` with **no** marker exclusion, so `slow`, `real_images` and `seed` all run. The path ignores are not marker exclusions: they remove only what step 4 already ran serially, so every test runs exactly once.
+5. **Full suite** — `pytest --ignore=config/settings/tests --ignore=apps/core/tests/test_migrations.py --ignore=tests/test_docs_ci_parity.py --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup` with **no** marker exclusion, so `slow`, `real_images` and `seed` all run. The path ignores are not marker exclusions: they remove only what steps 2 and 4 already ran, so every test runs exactly once.
 
 - The `test` and `test-full` jobs in CI run `compilemessages` **before** pytest to ensure `.mo` files are present (T-01).
 - The PR fast gate and `test-full` run **without** `--cov`; coverage is collected in `ci-seed.yml` (`--cov=apps.seed --cov-fail-under=80`, uploaded as the `seed-coverage-report` artifact).
