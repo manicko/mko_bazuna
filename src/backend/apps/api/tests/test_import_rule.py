@@ -127,6 +127,11 @@ PAIRING_TABLE: list[tuple[str, str | tuple[str, ...]]] = [
         "apps.ads.views.api.lifecycle_actions",
         ("apps.ads.views.edit", "apps.ads.views.delete"),
     ),
+    # S4.4 — edit write. The API adapter mirrors the HTML edit view
+    # (`apps.ads.views.edit.ad_edit`) and calls the exact same edit-flow stack
+    # (`can_edit_ad` + `apply_edit_payload`), so the five status branches and the
+    # frozen price-only / direct-save rules cannot drift.
+    ("apps.ads.views.api.edit", "apps.ads.views.edit"),
 ]
 
 # Modules an API view may import even though its HTML mirror does not.
