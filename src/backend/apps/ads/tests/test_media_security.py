@@ -25,6 +25,7 @@ from PIL import Image
 from PIL.ExifTags import Base as ExifBase
 
 from apps.ads.views.listings import (
+    _MEDIA_RATE_LIMIT_KEY_PATTERN,
     MEDIA_RATE_LIMIT_PERIOD,
     MEDIA_RATE_LIMIT_REQUESTS,
     _serve_image,
@@ -985,16 +986,48 @@ class TestMediaGateApplicationRateLimit:
         assert response.headers.get("Cache-Control") == "no-store"
 
     def test_independent_per_ip(self, seller, category, city):
-        """Exhausting one IP's budget does not affect a different IP."""
+        """Exhausting one IP's budget does not affect a different IP.
+
+        The exhausting IP's counter is pre-seeded directly in the shared cache
+        instead of spending ``MEDIA_RATE_LIMIT_REQUESTS + 1`` real requests
+        (which cost ~200 s and dominated the fast gate). Both responses still
+        come from real requests through the view, so the per-IP bucketing — the
+        property under test — is exercised end to end, not mocked.
+
+        The seed value is the limit itself, not ``limit + 1``: ``cache.incr``
+        then makes IP-A's next request ``limit + 1``, which is over budget.
+
+        Discriminating power: if the view keyed the window globally instead of
+        per IP, the second request would hit the same exhausted counter and be
+        refused with 429, so the ``200`` assertion below fails. If the view
+        skipped the limiter entirely, the first request would answer 200 (or
+        404) and the ``429`` assertion fails.
+        """
         key = self._published_key(seller, category, city)
         url = f"/media/{key}"
+        exhausted_ip = "203.0.113.10"
+        other_ip = "203.0.113.11"
+
+        # Mirrors the view's own key derivation (``media_gate_rl:{ip}``); the
+        # pattern is private to ``apps.ads.views.listings`` and imported here so
+        # the two cannot drift.
+        cache.set(
+            _MEDIA_RATE_LIMIT_KEY_PATTERN.format(ip=exhausted_ip),
+            MEDIA_RATE_LIMIT_REQUESTS,
+            timeout=MEDIA_RATE_LIMIT_PERIOD,
+        )
 
         with override_settings(DEBUG=False):
-            for _ in range(MEDIA_RATE_LIMIT_REQUESTS + 1):
-                Client(REMOTE_ADDR="203.0.113.10").get(url)
-            response = Client(REMOTE_ADDR="203.0.113.11").get(url)
+            exhausted_response = Client(REMOTE_ADDR=exhausted_ip).get(url)
+            other_response = Client(REMOTE_ADDR=other_ip).get(url)
 
-        assert response.status_code == 200
+        assert exhausted_response.status_code == 429
+        assert exhausted_response.headers.get("Content-Type") == "image/svg+xml"
+        assert exhausted_response.headers.get("Retry-After") == str(
+            MEDIA_RATE_LIMIT_PERIOD
+        )
+        assert "<svg" in exhausted_response.content.decode()
+        assert other_response.status_code == 200
 
     def test_fails_open_on_cache_outage(self, seller, category, city):
         """A cache outage allows the media request instead of raising.
