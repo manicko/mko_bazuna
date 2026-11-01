@@ -198,6 +198,99 @@ jobs:
         run: uv run pytest -k TestSearchResponseSLORegression -n auto --dist loadgroup --tb=short --reuse-db -v
         working-directory: src/backend
 
+  # Full pre-merge tier. The `test` job above is the fast PR gate: it excludes
+  # `slow` and `real_images` so per-PR feedback stays short (deferred, never
+  # deleted). This job restores both markers — it runs every non-seed test —
+  # so the full pre-merge signal comes from `push` to the long-lived branches.
+  # PR runs stay on the fast gate; the `seed` suite keeps its own workflow
+  # (ci-seed.yml, serial + `--cov` ≥80) and is the only marker excluded here.
+  # KEEP both invocations distinct: the PR gate's marker expression is pinned by
+  # tests/test_docs_ci_parity.py (test_ci_excludes_seed) and must not widen.
+  test-full:
+    runs-on: ubuntu-latest
+    needs: build
+    env:
+      PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
+    services:
+      db:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_DB: mko_bazuna
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    # The app's non-test database must be the DATABASE_URL service instance;
+    # keep it identical to the `test` job (postgres service on localhost:5432).
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          enable-cache: true
+
+      - name: Check lockfile freshness
+        run: uv lock --check
+        working-directory: src/backend
+
+      - name: Install dependencies
+        run: uv sync --frozen --no-install-project --group dev
+        working-directory: src/backend
+
+      - name: Wait for database
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+        run: |
+          for i in $(seq 1 30); do
+            if uv run python -c "import psycopg; psycopg.connect('postgres://postgres:postgres@localhost:5432/mko_bazuna')" 2>/dev/null; then
+              echo "Database ready"
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "ERROR: Database unavailable after 30s" >&2
+          exit 1
+        working-directory: src/backend
+
+      - name: Run migrations
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run python manage.py bootstrap_reference_data
+        working-directory: src/backend
+
+      - name: Install gettext (for compilemessages)
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends gettext
+
+      - name: Compile translations
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+        run: |
+          uv run python manage.py compilemessages \
+            --ignore=.venv --ignore=.git --ignore=.kilo --ignore=__pycache__ --ignore='*.pyc' \
+            --ignore=.mypy_cache --ignore=.ruff_cache --ignore=.pytest_cache --ignore=node_modules \
+            --ignore=.tox --ignore=.nox --ignore=__pypackages__ --ignore=.uv --ignore=.cache \
+            --ignore=.local --ignore=.playwright-mcp --ignore=.coverage --ignore=.hypothesis \
+            --locale ru --locale bs --locale en
+        working-directory: src/backend
+
+      - name: Run pytest (full pre-merge tier, restores slow + real_images)
+        env:
+          DJANGO_SETTINGS_MODULE: config.settings.test
+          DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
+          DJANGO_SECRET_KEY: test-secret-key-for-testing-only
+        run: uv run pytest -m "not (seed)" --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup
+        working-directory: src/backend
+
   lint:
     runs-on: ubuntu-latest
     env:
