@@ -42,6 +42,7 @@ pytestmark = [
     pytest.mark.django_db(transaction=True),
     pytest.mark.integration,
 ]
+pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
 # Default synthetic Telegram user_id / chat_id for mock message doubles.
 # Mirrors the bot conftest's TEST_SELLER_ID (900000100); for guard-only tests

@@ -20,6 +20,10 @@ from django.utils.translation import gettext as _
 from telegram_bot.middlewares.language import LanguageMiddleware
 
 pytestmark = [pytest.mark.unit]
+# The only DB-backed (transaction=True) class in this module is
+# ``TestLanguageMiddlewareCall``; keeping the whole file in the serial bot group
+# is the minimal placement (D3 of the test-suite performance plan).
+pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
 
 @pytest.mark.integration

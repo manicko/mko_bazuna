@@ -37,6 +37,7 @@ pytestmark = [
     pytest.mark.django_db(transaction=True),
     pytest.mark.integration,
 ]
+pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
 
 @pytest.fixture(autouse=True)

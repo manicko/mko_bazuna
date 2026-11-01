@@ -36,6 +36,7 @@ from telegram_bot.handlers.contact import (
 from telegram_bot.services.rate_limit import check_contact_start_rate_limit
 
 pytestmark = [pytest.mark.django_db(transaction=True), pytest.mark.unit]
+pytestmark.append(pytest.mark.xdist_group("bot_concurrent"))
 
 
 def _mock_message(user_id: int = 123, is_bot: bool = False) -> MagicMock:

@@ -303,6 +303,7 @@ class TestTranslateTextRetry:
 
 @pytest.mark.integration
 @pytest.mark.django_db(transaction=True)
+@pytest.mark.xdist_group("bot_concurrent")
 class TestPerUserLocaleActivation:
     """Verify that ``_resolve_user_language`` + ``translation.activate``
     renders gettext strings in the user's preferred locale.
