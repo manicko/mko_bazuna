@@ -132,7 +132,31 @@ PAIRING_TABLE: list[tuple[str, str | tuple[str, ...]]] = [
     # (`can_edit_ad` + `apply_edit_payload`), so the five status branches and the
     # frozen price-only / direct-save rules cannot drift.
     ("apps.ads.views.api.edit", "apps.ads.views.edit"),
+    # S4.5 — submit an existing DRAFT. There is no HTML submit view: the two
+    # behavioural mirrors are the bot's `/post` submit stage (the primary
+    # `submit_ad` caller, same `SubmitAdInput` field set) and the HTML edit
+    # view's `ad_reactivate`, which is the web-originated `submit_ad` caller.
+    # The mirror entry is a TUPLE (union), so the adapter's `Ad` read for the
+    # field-check inventory is validated against a mirror that already needs the
+    # model — not papered over with an allowlist entry.
+    (
+        "apps.ads.views.api.submit",
+        ("telegram_bot.handlers.ad_create.submit", "apps.ads.views.edit"),
+    ),
 ]
+
+# Mirrors that live outside ``src/backend``. A module is resolved under every
+# root below, in order, so a mirror whose behavioural twin is a bot module (not
+# an HTML view) can be paired without weakening the rule: the same AST import
+# subset is enforced, just against the real mirror file. Each entry is
+# ``(module_path_prefix, repo_relative_root)`` and is validated by
+# ``test_repo_mirror_roots_exist`` so a stale root fails loudly.
+REPO_MIRROR_ROOTS: tuple[tuple[str, str], ...] = (
+    # S4.5 — the submit endpoint mirrors the bot's `/post` submit stage; there
+    # is no HTML submit view, and the bot tree is a sibling of `src/backend`
+    # (`src/telegram_bot`).
+    ("telegram_bot.", "src/telegram_bot"),
+)
 
 # Modules an API view may import even though its HTML mirror does not.
 #
@@ -177,6 +201,18 @@ ALLOWLIST: frozenset[str] = frozenset(
         "apps.cabinet.views.api.saved_searches",
         "apps.users.services.account_state",
         "pydantic",
+        # S4.5 — `SubmittedPhoto`, the shared photo DTO of `submit_ad`'s own
+        # input (`apps.ads.services.submission.SubmitAdInput.photos`). The bot
+        # mirror builds those dicts in its FSM and never imports the class; the
+        # submit adapter converts the DRAFT's stored `AdImage` rows into the
+        # same DTO, so this is the service boundary type, not a mirror edge.
+        "apps.media.schemas",
+        # S4.5 — `FileHashService`, the digest helper `submit_ad` itself uses
+        # (`AdImageService.create_or_skip` dedups on its SHA-256). The submit
+        # adapter re-offers a stored DRAFT's photos with their digest so
+        # re-submission is a no-op; the bot mirror obtains the same digest
+        # transitively through `submit_ad`, never by importing the helper.
+        "apps.media.services.hash_service",
     }
 )
 
@@ -235,12 +271,37 @@ def _imports_of(dotted_module_path: str) -> set[str]:
     return modules
 
 
+def _repo_src_root() -> Path:
+    """Return the repository's ``src`` directory (parent of ``src/backend``)."""
+    # ``test_import_rule.py`` lives at ``src/backend/apps/api/tests/``; the
+    # ``backend_root`` below is ``src/backend``, so its parent is ``src``.
+    return Path(__file__).resolve().parents[3].parent
+
+
 def _source_path_for(dotted_module_path: str) -> Path:
-    """Map a dotted module path to its ``.py`` file under ``src/backend``."""
-    # ``test_import_rule.py`` lives at ``src/backend/apps/api/tests/``; walking
-    # three parents up from the file's directory reaches ``src/backend``.
+    """Map a dotted module path to its ``.py`` file.
+
+    Backend modules resolve under ``src/backend``; a path matching a
+    :data:`REPO_MIRROR_ROOTS` prefix resolves under that repo-relative root
+    instead (out-of-tree mirrors such as the bot handler modules).
+    """
     backend_root = Path(__file__).resolve().parents[3]
+    for prefix, repo_root in REPO_MIRROR_ROOTS:
+        if dotted_module_path.startswith(prefix):
+            # The dotted path already carries the package (``telegram_bot.…``),
+            # so it resolves relative to ``src/`` — the parent of the declared
+            # ``src/telegram_bot`` repo root (the root only asserts placement).
+            base = (_repo_src_root().parent / repo_root).parent
+            return base.joinpath(*dotted_module_path.split(".")).with_suffix(".py")
     return backend_root.joinpath(*dotted_module_path.split(".")).with_suffix(".py")
+
+
+def test_repo_mirror_roots_exist() -> None:
+    """Every ``REPO_MIRROR_ROOTS`` root exists, so no pairing silently rots."""
+    for _prefix, repo_root in REPO_MIRROR_ROOTS:
+        assert (_repo_src_root().parent / repo_root).is_dir(), (
+            f"repo mirror root does not exist: {repo_root}"
+        )
 
 
 def _resolve_relative(node: ast.ImportFrom, package_parts: list[str]) -> str:

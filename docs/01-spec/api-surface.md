@@ -69,7 +69,7 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 | 2 | FTS search | `apps/search/services/fts.py` (S1.1) | `GET /api/v1/search/?q&category&city&min_price&max_price&listing_purpose&condition&features&sort&page&all_categories` | PUB | fuzzy / did-you-mean / narrowed fields; cap semantics; 429 problem | shipped (S1.4) |
 | 3 | Ad detail | audience predicate + serialize | `GET /api/v1/ads/{id}/` | PUB | uniform 404; `AD_VIEWED` recorded | shipped (S1.5) |
 | 4 | Autocomplete | (existing) | unchanged `/api/search/autocomplete` | PUB | stance: not aliased; legacy 429 `{"error":"rate_limit"}` | covered/frozen |
-| 5 | Create/publish | `create_draft_ad` + `submit_ad` | `POST /api/v1/ads/{id}/submit/` (existing DRAFT; dialog/photo staging bot-only) | SESS (consent via outcome) | `SubmitAdOutcome` map (§Errors) | planned |
+| 5 | Create/publish | `submit_ad` (shared with the bot `/post` and the HTML edit reactivation) | `POST /api/v1/ads/{id}/submit/` (existing DRAFT; dialog/photo staging bot-only; optional `{"dry_run": true}` = O-14 field-check inventory) | SESS + owner + **consent** (403 before any transition) | `SubmitAdOutcome` map: 200 `published` / `moderation_failed`, 409 `invalid_transition` / `draft_gone` / `photo_unavailable`, 403 `consent_required`; not-ready DRAFT → 409 + `inventory` (§Errors) | shipped (S4.5) |
 | 6 | Edit | edit-flow helper (S4.2) — five branches | `POST /api/v1/ads/{id}/edit/` | SESS + owner | refusal → 409 `invalid_transition` / `not_editable` (HTML renders 200+form — deliberate machine mapping); price-only and direct-save stay distinct from `submit_ad` | shipped (S4.4) |
 | 7 | Archive | lifecycle service (S4.1) | `POST /api/v1/ads/{id}/archive/` | SESS + owner + **consent** | 403 `consent_required`; 409 `invalid_transition`; 200 post-action state | shipped (S4.3) |
 | 8 | Reactivate | lifecycle service (S4.1), same `auto_moderate` decision | `POST /api/v1/ads/{id}/reactivate/` | SESS + owner + consent | 200 `{outcome}` for both verdicts; 409 `invalid_transition`; 503 lock-timeout | shipped (S4.3) |
@@ -871,3 +871,56 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `EditOutcome` and the same resting status for the same fixture), the moderation-failure 200, the
   consent 403 + `CONSENT_REQUIRED` race mapping + API↔HTML gate equivalence, and the O-27 body
   contract).
+
+- **S4.5:** `POST /api/v1/ads/{id}/submit/` shipped (endpoint row #5 → `shipped`). New
+  `apps/ads/views/api/submit.py`, routed in `apps/ads/api_urls.py` (`<int:ad_id>/submit/` →
+  `submit`). It is the JSON sibling of the bot's `/post` submit stage
+  (`telegram_bot.handlers.ad_create.submit.process_preview`) and of the HTML edit view's
+  reactivation branch: it calls the **same** `submit_ad` service on an **existing DRAFT**, with the
+  same field set, transition (`DRAFT|ARCHIVED|PUBLISHED -> ON_MODERATION`), deferred media promotion
+  and `auto_moderate` side effects. No API-only business predicate exists here.
+  Pipeline: identity (401) → method (405 + `Allow: POST`) → rate limit (`api_write` /
+  `API_WRITE`, 429 + `Retry-After`) → body (`SubmitBody`, `extra="forbid"`, only `dry_run`) →
+  ownership (uniform 404 `not_found`, missing vs non-owned byte-identical) → consent
+  (`can_create_ad`, A14 seam; 403 `consent_required`) → field check → `submit_ad`.
+  **Dialog / photo staging stays bot-only** (the plan row's stance): text, price, category, city and
+  lookup fields come from the stored DRAFT; `photos` is the DRAFT's existing `AdImage` set, re-offered
+  with each row's stored SHA-256 so `AdImageService.create_or_skip` recognises it and re-submission is
+  a no-op instead of a duplicate row at the same `(ad, position)`.
+  **O-14 field-check inventory.** An optional body flag `dry_run: true` returns the DRAFT's
+  pre-submission readiness as structured JSON **without writing anything** (no transition, no media
+  plan, no moderation):
+  `{ad_id, status, ready, missing_fields[], over_media_sections}` where `missing_fields` is any of
+  `title` (blank), `description` (blank), `category` (null), `city` (null), `photos` (no image row),
+  and `over_media_sections` is `{ad: bool, has_over_media: bool, section_cap_info: {section,
+  photo_count, min_photos, max_photos}}` — the caps being the same cached `ModerationCriteria`
+  (`min_images`/`max_images`) `auto_moderate` enforces, exposed once as
+  `apps.ads.services.submission.media_caps`. A successful field check is a 200 (the report *is* the
+  result; nothing was asked to change). A **real** submission of a not-ready DRAFT is a 409
+  `invalid_transition` carrying the same inventory under `inventory`, before any write.
+  **Result → HTTP mapping:**
+
+  | `submit_ad` outcome | HTTP | Payload highlights |
+  |---|---|---|
+  | `PUBLISHED` | 200 | `outcome: "published"`, `status: published`, `published_at` |
+  | `MODERATION_FAILED` | 200 | `outcome: "moderation_failed"`, `status: on_moderation_failed`, `moderation_failed: true`, `errors[]` (O-2a: committed + parked) |
+  | `INVALID_TRANSITION` | 409 `invalid_transition` | no write |
+  | `DRAFT_GONE` | 409 `draft_gone` | no write (a pre-flight miss is the uniform 404) |
+  | `PHOTO_UNAVAILABLE` | 409 `photo_unavailable` | no write |
+  | `CONSENT_REQUIRED` (race) | 403 `consent_required` | consent withdrawn after the gate |
+  | lock timeout (55P03) | 503 `retryable` + `Retry-After: 30` | |
+
+  **Deliberate bot-vs-API differences (documented):** the bot types the dialog into its FSM and
+  submits the typed values; the API submits the values already stored on the DRAFT (identical DTO, so
+  identical guards/effects). On a non-content failure the bot silently replaces the draft
+  (`create_draft_ad`) and re-points its FSM; the API never creates ad rows (staging is bot-only) and
+  answers the taxonomy problem, leaving the DRAFT untouched. A lock timeout is the documented 503
+  exception for this write route.
+  Pairing row `("apps.ads.views.api.submit", ("telegram_bot.handlers.ad_create.submit",
+  "apps.ads.views.edit"))` registered in `apps/api/tests/test_import_rule.py` — a union row, because
+  there is no HTML submit view and the adapter's `Ad` read is validated against the HTML edit mirror.
+  Tests: `apps/ads/tests/test_submit_route_api.py` (401/405/422/429, uniform 404, consent 403 +
+  race + gate equivalence, the dry-run inventory matrix incl. combined missing fields and the
+  over-media section caps, not-ready 409 + inventory, the published happy path asserted **against
+  the service tier**, moderation-failure 200, and the state-machine mappings). `test_submission.py`
+  and the bot submit/copy suites are untouched and green.

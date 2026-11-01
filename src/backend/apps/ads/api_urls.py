@@ -10,6 +10,7 @@ from apps.ads.views.api.lifecycle_actions import (
     reactivate_view,
 )
 from apps.ads.views.api.listings import listings_view
+from apps.ads.views.api.submit import submit_view
 
 app_name = "ads_api"
 
@@ -22,4 +23,6 @@ urlpatterns = [
     path("<int:ad_id>/archive/", archive_view, name="archive"),
     path("<int:ad_id>/reactivate/", reactivate_view, name="reactivate"),
     path("<int:ad_id>/delete/", delete_view, name="delete"),
+    # S4.5 — submit an existing DRAFT (plan §2.4 row 5), verbatim plan URL.
+    path("<int:ad_id>/submit/", submit_view, name="submit"),
 ]

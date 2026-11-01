@@ -177,6 +177,22 @@ def _permanent_thumbnail_key(
     return permanent
 
 
+def media_caps() -> tuple[int, int]:
+    """Return the moderation media caps ``(min_images, max_images)``.
+
+    Reads the same cached ``ModerationCriteria`` tuple :func:`auto_moderate`
+    uses (see ``apps.moderation.services.auto_moderation._get_cached_criteria``;
+    ``min_images`` is index 5 and ``max_images`` index 6), so a pre-submission
+    field check and the moderation verdict can never disagree about the photo
+    budget. Request-free and pure read; it keeps the moderation package's tuple
+    layout in one place instead of in every caller.
+    """
+    from apps.moderation.services.auto_moderation import _get_cached_criteria
+
+    criteria = _get_cached_criteria()
+    return int(criteria[5]), int(criteria[6])
+
+
 def submit_ad(input: SubmitAdInput) -> SubmitAdResult:
     """Update ad with multi-language content, create images, and delegate to auto_moderate.
 
@@ -310,14 +326,24 @@ def submit_ad(input: SubmitAdInput) -> SubmitAdResult:
     # Capture the staged originals for the SHA-256 passed to AdImageService: under
     # deferred promotion the bytes are still at staging/<key>, so the digest must
     # come from the staged key captured above (03-DB-005).  The list keeps each
-    # digest aligned with ``input.photos`` by index.
+    # digest aligned with ``input.photos`` by index.  A caller that already
+    # knows the digest of the bytes it offers (``photo.sha256`` — the API
+    # submit adapter re-submitting a stored DRAFT's permanent photos) supplies
+    # it and wins.  That byte-identical case is the one the digest exists for:
+    # ``AdImageService.create_or_skip`` compares it against the ad's existing
+    # rows and returns the match, so a re-submitted DRAFT keeps its image set
+    # instead of inserting a second row at the same ``(ad, position)``.
     staged_digests: list[str | None] = [
-        FileHashService.calculate_sha256(
-            os.path.join(settings.MEDIA_ROOT, staged_key)
+        photo.sha256
+        if photo.sha256 is not None
+        else (
+            FileHashService.calculate_sha256(
+                os.path.join(settings.MEDIA_ROOT, staged_key)
+            )
+            if staged_key is not None
+            else None
         )
-        if staged_key is not None
-        else None
-        for staged_key in staged_keys
+        for photo, staged_key in zip(input.photos, staged_keys, strict=True)
     ]
 
     # DB transaction: save + images + status transition
