@@ -67,10 +67,18 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
 
 | Task | Command |
 |------|---------|
-| Test (Docker) | `make test` (fast gate) · `make test-all` (full) · `make test-recreate` (fresh schema) |
+| Test (Docker, PR tier) | `make test` — fast gate, excludes `seed`/`slow`/`real_images` |
+| Test (Docker, pre-merge tier) | `--env PYTEST_SKIP_MARKERS=seed` — excludes `seed` only (mirrors `ci.yml` `test-full`) |
+| Test (Docker, full tier) | `make test-all` — no marker exclusion (mirrors `ci-nightly.yml`) |
+| Test (fresh schema) | `make test-recreate` |
 | Lint | `uv run ruff check <path>` |
 | Type check | `uv run basedpyright <path>` |
 | Add dependency | `uv add <package>` |
+
+Test tiers are pinned to CI: `src/backend/tests/test_docs_ci_parity.py` asserts the fast-gate
+marker token is byte-identical across `Makefile`, `Makefile.ps1` and `ci.yml`. Tier semantics and
+per-tier commands are documented in [`rules.md`](rules.md#test-tiers-and-measured-cost) and
+[commands.md](../../.kilo/rules/commands.md).
 
 ## Cache Backend
 
@@ -242,13 +250,14 @@ by CI.
 | DJANGO_SECRET_KEY | `test-secret-key-for-testing-only` (step `env:`) | `test-secret-key-for-testing-only` (`env_file: .env.test`) | — |
 | All other variables | rely on `base.py` defaults (e.g. `SITE_URL`, `REDIS_URL`, `BOT_TOKEN`) | explicitly set in `.env.test` (`env_file:`) — 16+ variables | — |
 
-**CI** (`.github/workflows/ci.yml`, `.github/workflows/ci-seed.yml`) runs pytest directly with
+**CI** (`.github/workflows/ci.yml`, `.github/workflows/ci-seed.yml`,
+`.github/workflows/ci-nightly.yml`) runs pytest directly with
 `uv` against a PostgreSQL GitHub Actions **service container**:
 
 - **Database**: CI sets a single `DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna`
   as step-level `env:`. It does **not** set `POSTGRES_USER`, `POSTGRES_DB`, or
   `POSTGRES_PASSWORD` for the application process — the `POSTGRES_*` vars in the workflow
-  (`ci.yml` lines 42–45) initialize the `postgres:18-alpine` service container only. CI connects
+  (`ci.yml` `test` job `services.db`, lines 109–122) initialize the `postgres:18-alpine` service container only. CI connects
   via `localhost:5432` (the service port mapping), not the Docker-internal hostname `db`.
 - **Secrets**: CI sets `DJANGO_SECRET_KEY=test-secret-key-for-testing-only` and
   `DJANGO_SETTINGS_MODULE=config.settings.test` as step-level `env:` (lines 83–85, 94–96,

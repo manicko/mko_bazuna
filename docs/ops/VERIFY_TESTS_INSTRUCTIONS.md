@@ -113,8 +113,28 @@ docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-com
 ```
 
 That `PYTEST_SKIP_MARKERS` value is the fast-gate selection: the entrypoint expands it to
-`-m "not (seed or slow or real_images)"` — the same marker set as the `ci.yml` PR gate. Drop the
-`--env` flag to run the complete suite (`make test-all`).
+`-m "not (seed or slow or real_images)"` — the byte-identical marker set of the `ci.yml` PR gate.
+The value contains spaces, so the surrounding quotes are load-bearing: unquoted, docker receives
+only `PYTEST_SKIP_MARKERS=seed` and passes the rest as stray arguments.
+`src/backend/tests/test_docs_ci_parity.py` pins that token across `Makefile`, `Makefile.ps1` and `ci.yml`.
+
+> The commands in the tier table target the test project. `$dc` is that full prefix, abbreviated:
+> `docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml`.
+
+The remaining tiers, in order of breadth:
+
+| Tier | Command | Notes |
+|---|---|---|
+| Fast gate (PR tier) | `make test` | Skips `seed`, `slow`, `real_images`; mirrors the `ci.yml` `test` job |
+| Full pre-merge | `$dc run --rm --env PYTEST_SKIP_MARKERS=seed test` | Mirrors the `ci.yml` `test-full` job (`-m "not (seed)"`), which restores `slow` + `real_images` |
+| Seed | `$dc run --rm --env PYTEST_OPTS="-m seed" test` | Mirrors `ci-seed.yml` (serial, `--cov=apps.seed` in CI) |
+| Nightly | `make test-all` | No marker exclusion — the only local tier that runs everything, mirroring `ci-nightly.yml` |
+
+> **Serial runs (`-p no:xdist`) cannot go through this entrypoint.** `entrypoint-test.sh` appends
+> its default `-n auto --maxprocesses=4 --dist loadgroup` *after* `PYTEST_OPTS`, so the combination
+> is rejected. The nightly workflow's serial drift steps run as plain `uv run pytest ... -p no:xdist`;
+> locally the equivalent is `docker run --entrypoint ""` with the same command, which skips
+> `entrypoint-test.sh` entirely.
 
 > **Note:** `--env-file .env.test` **must** always be passed to test compose commands.
 > The base `docker-compose.yml` uses `${VAR:?}` interpolation for required variables
@@ -126,7 +146,7 @@ That `PYTEST_SKIP_MARKERS` value is the fast-gate selection: the entrypoint expa
 The one-shot `test` container will:
 1. Sync dev dependencies via `entrypoint-test.sh` (`unset UV_NO_INSTALL_PROJECT; uv sync --frozen --no-install-project --group dev`)
 2. Wait for PostgreSQL to be ready
-3. Run `pytest` (the entrypoint defaults to `uv run pytest --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup`). The test database is provisioned by pytest-django and its reference data (search triggers, exchange rates) by the session-autouse `_restore_test_schema_post_db_setup` fixture in `src/backend/conftest.py` — the container runs no `manage.py` command of its own
+3. Run `pytest` (the entrypoint defaults to `uv run pytest ${PYTEST_OPTS:-} --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup` plus, when `PYTEST_SKIP_MARKERS` is set, `-m "not <markers>"`). The test database is provisioned by pytest-django and its reference data (search triggers, exchange rates) by the session-autouse `_restore_test_schema_post_db_setup` fixture in `src/backend/conftest.py` — the container runs no `manage.py` command of its own
 4. Exit with the pytest exit code (0 = all pass, non-zero = failures)
 
 > **Stale databases:** If you see `database is being accessed by other users` or schema errors,

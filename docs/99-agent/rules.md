@@ -41,18 +41,18 @@ This file contains coding standards and rules for the Mko Bazuna project.
 ### Testing Conventions
 
 - **Framework:** pytest-django. Test classes are plain `class TestX:` — do NOT use `django.test.TestCase` or `unittest.TestCase`.
-- **Markers:** Pytest-django + pytest-asyncio. Custom markers are registered in `pyproject.toml` under `[tool.pytest.ini_options].markers`. Use `pytestmark` at module level. The fast gate (`make test`) excludes the `seed`, `slow` and `real_images` markers (`-m "not (seed or slow or real_images)"` via `PYTEST_SKIP_MARKERS="seed or slow or real_images"`). The local fast gate and the `ci.yml` PR gate use the **byte-identical** marker set, so a test deselected locally is also deselected in the PR gate. Everything excluded is deferred to the full suite (`make test-all`), never deleted.
+- **Markers:** Pytest-django + pytest-asyncio. Custom markers are registered in `pyproject.toml` under `[tool.pytest.ini_options].markers`. Use `pytestmark` at module level. The fast gate (`make test`) excludes the `seed`, `slow` and `real_images` markers (`-m "not (seed or slow or real_images)"` via `PYTEST_SKIP_MARKERS="seed or slow or real_images"`). The local fast gate and the `ci.yml` PR gate use the **byte-identical** marker set, so a test deselected locally is also deselected in the PR gate. Everything excluded is deferred to a slower tier (`test-full`, `ci-seed.yml`, `ci-nightly.yml`, `make test-all`), never deleted. The marker set is pinned across `Makefile`, `Makefile.ps1` and `ci.yml` by `src/backend/tests/test_docs_ci_parity.py`.
 
   | Marker | Scope / purpose |
   |---|---|
   | `unit` | Pure unit tests, no database — runs in the fast gate |
   | `integration` | Tests that exercise the DB / Django `Client` stack |
-  | `seed` | Separate-workflow only (`ci-seed.yml`, once per push); invokes `call_command('seed')` or `ImageGenerator`. Excluded from `make test`, included in `make test-all` |
-  | `settings` | Import-time settings validation in a subprocess (e.g. `config/settings/tests/test_settings_secrets.py`) |
+  | `seed` | Separate-workflow only (`ci-seed.yml`, once per push to `main`/`develop`); invokes `call_command('seed')` or `ImageGenerator`. Excluded from `make test` and from `test-full`; runs in `ci-nightly.yml` and `make test-all` |
+  | `settings` | Import-time settings validation in a subprocess (e.g. `config/settings/tests/test_settings_secrets.py`); re-run serially in `ci-nightly.yml` |
   | `concurrent` | Requires `transaction=True` (TRUNCATE per test) — bot tests mutating shared DB state |
-  | `slow` | Individually slow tests (>5 s); excluded from the fast gate (`make test`), run by `make test-all` |
-  | `real_images` | Opts out of the no-op `ImageGenerator` stub in `apps/seed/tests/conftest.py` to use the real pipeline; excluded from the fast gate (`make test`), run by `make test-all` |
-  | `xdist_group("name")` | Pins tests to a single xdist worker via `--dist loadgroup` (e.g. `"bot_concurrent"`) |
+  | `slow` | Individually slow tests (>5 s); excluded from the fast gate (`make test`), restored by `test-full`, `ci-nightly.yml` and `make test-all` |
+  | `real_images` | Opts out of the no-op `ImageGenerator` stub in `apps/seed/tests/conftest.py` to use the real pipeline; excluded from the fast gate (`make test`), restored by `test-full`, `ci-nightly.yml` and `make test-all` |
+  | `xdist_group("name")` | Pins tests to a single xdist worker via `--dist loadgroup`. All 29 bot transaction test files are pinned to `"bot_concurrent"`; `ci-nightly.yml` re-runs the bot tree serially as a drift control |
   | `django_db` (pytest-django) | DB-backed tests; use `transaction=True` when a test needs TRUNCATE isolation (bot tests) |
   | `asyncio` (pytest-asyncio, strict mode) | Async Telegram bot handlers |
 
@@ -167,24 +167,66 @@ Guidelines:
 
 - **`--dist loadgroup`** with `xdist_group("name")` pins tests that mutate shared DB state (e.g. bot tests with `transaction=True`) to the same worker.
 - `-n auto` auto-detects CPU cores; bot tests use `transaction=True` (TRUNCATE isolation) for correctness.
+- **Bot tree is parallel-safe:** all 29 bot transaction test files carry `xdist_group("bot_concurrent")`. Verified 456 passed in parallel, 0 failures (identical result set to the serial `-p no:xdist` control, which `ci-nightly.yml` re-runs as a drift control).
+- **Serial runs (`-p no:xdist`) do not work through `docker/entrypoint-test.sh`:** the entrypoint appends its `PYTEST_DEFAULTS` (`-n auto --maxprocesses=4 --dist loadgroup`) *after* `PYTEST_OPTS`, so passing `-p no:xdist` there is rejected. Run serial forms as a plain `uv run pytest ... -p no:xdist` invocation, or with `docker run --entrypoint ""` (which skips the entrypoint entirely).
+
+### Test tiers and measured cost
+
+One marker set per CI trigger; the local commands mirror each tier exactly.
+
+| Tier | Marker exclusion | CI trigger | Local command |
+|---|---|---|---|
+| PR / fast gate | `not (seed or slow or real_images)` | `ci.yml` `test` job (pull request + push) | `make test` / `.\Makefile.ps1 test` |
+| Full pre-merge | `not (seed)` | `ci.yml` `test-full` job (push to `main`/`develop` only) | `--env PYTEST_SKIP_MARKERS=seed` (see [commands](../../.kilo/rules/commands.md)) |
+| Seed | `seed` only | `ci-seed.yml` (push to `main`/`develop`, serial, `--cov=apps.seed` ≥80) | `--env PYTEST_OPTS="-m seed"` |
+| Nightly | none | `ci-nightly.yml` (daily 03:00 UTC + `workflow_dispatch`) | `make test-all` / `.\Makefile.ps1 test-all` |
+
+Measured after the tier split (pytest time, not wall clock):
+
+- Fast gate: 3961 passed, 53 + 8 deselected, **370.7 s** pytest time (baseline 581.6 s).
+- The ≤240 s target for the fast gate was **not met**. No individual test in the PR tier exceeds 5 s; the residual is the aggregate cost of ~3961 tests, not one outlier.
+- Full pre-merge tier: 3985 passed, **~402 s**.
 
 ## CI Workflow
 
-The CI pipeline (`.github/workflows/ci.yml`, `name: CI`) runs on `ubuntu-latest` for pushes to `main`/`develop`:
+Test execution is split across four workflows, one per tier (see "Test tiers and measured cost" above for the marker sets):
 
-| Job | Purpose | Key steps |
+| Workflow | Trigger | Tier |
 |---|---|---|
-| `build` | Docker image + test env | Checkout → Buildx → Build image → Trivy scan → Upload SARIF |
-| `test` | Unit + integration tests | DB service → `bootstrap_reference_data` → `compilemessages` → pytest with coverage |
-| `lint` | Code linting | `uv sync` → `ruff check src/` (from the repository root) |
-| `typecheck` | Type checking | `uv sync` → `basedpyright src/` (from the repository root) |
-| `lint-templates` | Template linting | `uv sync` → `djlint templates/` |
-| `i18n` | i18n completeness gate | `uv sync` → `compilemessages` → `pytest test_i18n_completeness.py test_i18n_pipeline.py -v` |
-| `security` | Vuln + secret scanning | `pip-audit` → Trivy (fs) → gitleaks → SARIF upload. Commit-time prevention is also enforced via a pre-commit hook: `.pre-commit-config.yaml` registers a `gitleaks protect --verbose` hook at the `commit` stage that scans staged changes against `.gitleaks.toml` and rejects the commit if any secret is detected — complementing the post-commit CI scan so leaks never enter history. |
-| `deploy-check` | Production deploy gate | `check --deploy --fail-level WARNING` against `config.settings.prod` with all required env vars (blocking) |
+| `.github/workflows/ci.yml` (`name: CI`) | `push` to `main`/`develop` + every `pull_request` | Fast gate (`test` job) and full pre-merge (`test-full` job, push only) |
+| `.github/workflows/ci-seed.yml` (`name: Seed Tests`) | `push` to `main`/`develop` + `workflow_dispatch` | `seed` marker only, serial, `--cov=apps.seed --cov-fail-under=80` |
+| `.github/workflows/ci-nightly.yml` (`name: CI Nightly`) | daily `cron: "0 3 * * *"` + `workflow_dispatch` | Full suite (no marker exclusion) + drift controls |
+| `.github/workflows/deploy.yml` | `workflow_dispatch` | Deployment (asserts a green `ci.yml` run for the dispatched SHA) |
 
-- The `test` job in CI runs `compilemessages` **before** pytest to ensure `.mo` files are present (T-01).
-- Coverage report is uploaded as an artifact (`src/backend/coverage.xml`, 30-day retention).
+`ci-nightly.yml` is deliberately a separate file: `ci-seed.yml` must not carry a `schedule:` / `cron:` trigger, and the fast-gate tokens in `ci.yml` are pinned by `tests/test_docs_ci_parity.py`.
+
+`ci.yml` (`name: CI`) runs on `ubuntu-latest` for pushes to `main`/`develop` and for pull requests:
+
+| Job | Runs on | Purpose | Key steps |
+|---|---|---|---|
+| `build` | push + PR | Docker image + test env | Checkout → Buildx → Build image → Trivy scan → Upload SARIF |
+| `test` | push + PR | PR fast gate | DB service → `bootstrap_reference_data` → `compilemessages` → `pytest -m "not (seed or slow or real_images)"` with `-n auto --maxprocesses=4 --dist loadgroup --reuse-db` |
+| `test-full` | push only | Full pre-merge tier | Same setup as `test`, then `pytest -m "not (seed)"` — restores `slow` + `real_images` |
+| `lint` | push + PR | Code linting | `uv sync` → `ruff check src/` (from the repository root) |
+| `typecheck` | push + PR | Type checking | `uv sync` → `basedpyright src/` (from the repository root) |
+| `lint-templates` | push + PR | Template linting | `uv sync` → `djlint templates/` |
+| `i18n` | push + PR | i18n completeness gate | `uv sync` → `compilemessages` → `pytest test_i18n_completeness.py test_i18n_pipeline.py -v` |
+| `security` | push + PR | Vuln + secret scanning | `pip-audit` → Trivy (fs) → gitleaks → SARIF upload. Commit-time prevention is also enforced via a pre-commit hook: `.pre-commit-config.yaml` registers a `gitleaks protect --verbose` hook at the `commit` stage that scans staged changes against `.gitleaks.toml` and rejects the commit if any secret is detected — complementing the post-commit CI scan so leaks never enter history. |
+| `load-test` | push + PR | Locust load test against a seeded stack | Seed 120 published ads → start web → run Locust |
+| `deploy-check` | push + PR | Production deploy gate | `check --deploy --fail-level WARNING` against `config.settings.prod` with all required env vars (blocking) |
+
+`ci-nightly.yml` (`name: CI Nightly`) runs a single `nightly` job (`timeout-minutes: 60`, target ≤45 min) with `cancel-in-progress: true` (advisory signal, always tests the default-branch tip). Steps, in order:
+
+1. Lockfile check → `uv sync` → DB wait → `bootstrap_reference_data` → `compilemessages`.
+2. **Marker-parity guard** — `pytest tests/test_docs_ci_parity.py -p no:xdist`. Routed first because it is sub-second and, if the fast-gate marker set drifts, the full-tier result is not comparable with the PR gate.
+3. **Bot serial drift control** — `pytest ../telegram_bot/tests -p no:xdist` (from `src/backend`). A parallel pass alone cannot prove the `bot_concurrent` pins are complete; only a serial control can. Kept as its own step so a serial-only failure is attributed to the bot pins.
+4. **Settings serial run** — `pytest config/settings/tests -p no:xdist`; these spawn subprocesses and are not DB-bound.
+5. **Full suite** — `pytest --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup` with **no** marker exclusion, so `slow`, `real_images` and `seed` all run.
+
+- The `test` and `test-full` jobs in CI run `compilemessages` **before** pytest to ensure `.mo` files are present (T-01).
+- The PR fast gate and `test-full` run **without** `--cov`; coverage is collected in `ci-seed.yml` (`--cov=apps.seed --cov-fail-under=80`, uploaded as the `seed-coverage-report` artifact).
+- The full pre-merge signal comes from `push` to the long-lived branches: PR runs stay on the fast gate. `test-full` is the only place `slow` + `real_images` run before a push lands on `main`/`develop`, and `seed` is the only marker it excludes.
+- `src/backend/tests/test_docs_ci_parity.py` pins the fast-gate marker expression (`-m "not (seed or slow or real_images)"`, `--dist loadgroup`, `--reuse-db`, no `--cov`) in `ci.yml`, the quoted `PYTEST_SKIP_MARKERS` value in `Makefile` and `Makefile.ps1`, and the `-m "seed"` serial form in `ci-seed.yml`. Changing any of them requires changing all of them.
 - The `lint` and `typecheck` jobs run from the **repository root** over `src/`, so both process trees
   (`src/backend` and `src/telegram_bot`) are in scope — the same scope as `make lint` /
   `make typecheck`. The gate is `src/`, **not** `.`: `ruff check .` from the root also walks
