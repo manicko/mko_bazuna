@@ -147,6 +147,12 @@ PAIRING_TABLE: list[tuple[str, str | tuple[str, ...]]] = [
     # is the only behavioural mirror and the only caller of `copy_ad`, so the
     # adapter is validated against it.
     ("apps.ads.views.api.copy", "telegram_bot.handlers.ad_copy"),
+    # S4.7 — moderation single actions (approve / reject / ban). One module
+    # whose three operations mirror the three HTML action views in
+    # `apps.moderation.views.review` (the same `admin_actions` functions, the
+    # same row lock). The mirror entry is a TUPLE because the module has
+    # several behavioural mirrors inside that one HTML module.
+    ("apps.moderation.views.api.actions", ("apps.moderation.views.review",)),
 ]
 
 # Mirrors that live outside ``src/backend``. A module is resolved under every
@@ -226,6 +232,13 @@ ALLOWLIST: frozenset[str] = frozenset(
         # the JSON write surface. The bot mirror answers the busy message
         # through its own handler boundary instead.
         "apps.core.utils.db_lock_timeout",
+        # S4.7 — `CategoryRejectReason`, the reject-reason vocabulary
+        # `apps.moderation.admin_actions` and the HTML reject form both use.
+        # The HTML `moderation.views.review` mirror parses the raw POST value
+        # into the enum inside its view body, so its AST import list never
+        # names the enum; the API body DTO declares it as a field type. This is
+        # the §2.5 taxonomy's shared vocabulary, not a mirror-specific edge.
+        "apps.core.enums.CategoryRejectReason",
     }
 )
 

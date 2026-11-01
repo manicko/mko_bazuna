@@ -77,7 +77,7 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 | 10 | Copy | `copy_ad` (`copy_service.py:39` via `_build_ad_copy:15`) — called unchanged | `POST /api/v1/ads/{id}/copy/` | SESS | 200 new-DRAFT state (supersedes `{ad_id}` — see row-10 change log) with `id`/`source_ad_id`; uniform 404; no consent/max-ads gate, exactly as the bot `/copy` (both are enforced at submit time) | shipped (S4.6) |
 | 11 | Dashboard reads | dashboard grouping (S2.2) + `SellerStats` | `GET /api/v1/dashboard/?time_range=` | SESS + consent | **403 `consent_required` when consent absent — never an empty list** (R-L1) | shipped (S2.3) |
 | 12 | Moderation queue/review | `PriorityService.get_queued_ads` / `get_priority_counts` | `GET /api/v1/moderation/queue/?priority&page`, `GET /api/v1/moderation/review/{id}/` | STAFF | 401 / 403 / 405 (problem docs) | shipped (S2.5) |
-| 13 | Single actions | `admin_actions.approve_ad/reject_ad/ban_user_for_ad` | `POST /api/v1/moderation/{approve,reject,ban}/{id}/` | STAFF | §Errors mappings | planned |
+| 13 | Single actions | `admin_actions.approve_ad/reject_ad/ban_user_for_ad` | `POST /api/v1/moderation/{approve,reject,ban}/{id}/` | STAFF | §Errors mappings (`transition_refused` / `invalid_transition` / `ban_refused`) | shipped (S4.7) |
 | 14 | Bulk | (existing) — **frozen shape** | unchanged `/moderation/api/v1/bulk-action/` | STAFF | no change | covered/frozen |
 | 15 | Favorites | extend `apps/ads/services/favorites.py` (list + toggle) | `GET /api/v1/favorites/` (shipped S2.4) · `POST /api/v1/favorites/{ad_id}/toggle/` (shipped S3.2) | SESS | 200 `{ad_id,is_favorited,favorites_count}`; uniform 404 | shipped (S2.4 + S3.2) |
 | 16 | Saved-search CRUD | `apps/search/services/saved_searches.py` (S3.1) on shared `SavedSearchInput` | `GET/POST /api/v1/saved-searches/` (GET shipped S2.7, POST shipped S3.4), `POST …/{pk}/{toggle,edit,delete}/` (shipped S3.4) | SESS | 422 `validation_failed` (create/edit body); 400 `query_too_long` (over-cap create query); uniform 404 `not_found` | shipped (S2.7 + S3.4) |
@@ -129,8 +129,9 @@ All `/api/v1/` errors are RFC 9457 problem documents with content-type
 | Edit refusal (status outside editable/affordance sets) | 409 `not_editable` | deliberate delta from HTML 200+form — documented (auditor A5) |
 | `ApproveOutcome.PUBLISHED` / `CRITERIA_REJECTED` | 200 `{outcome}` / 200 `{outcome:"criteria_rejected"}` | ad parked `ON_MODERATION_FAILED` |
 | `ApproveOutcome.TRANSITION_REFUSED` | 409 `transition_refused` | |
+| Reject against a non-rejectable status | 409 `invalid_transition` | an already-`REJECTED` ad is the service's 200 `{outcome:"already_rejected"}` no-op (S4.7) |
 | `BanResult` changed ≥ 1 | 200 counts (`changed` / `already_in_state`) | ban idempotent for agents |
-| Ban refused (self / privileged) | 403 `ban_refused` | no privileged-row count leak |
+| Ban refused (self / privileged) | 403 `ban_refused` (the RFC 9457 document's `type`; a non-standard `cause` member carries the stable `BanRefusalReason` token) | no privileged-row count leak |
 | `ConsumeOutcome` (status contract doc only) | 200 / 204 pending / 410 uniform | `not_found` / `gone` / `unbound` / `lost_race` collapse to one problem (anti-enumeration) |
 | DTO validation | 422 `validation_failed`, `errors = pydantic_errors_json(exc)` | `api_bulk` precedent |
 | 429 on `/api/v1/` (R1) | 429 `rate_limited` problem + `Retry-After` (derived from `RateLimitBudget.period` in `problem.py`) | new surface; legacy surfaces are unchanged and keep emitting NO `Retry-After` (`rate_limit_response.py` is a pure formatter; `retry_after` is caller-supplied and production never passes it) |
@@ -964,3 +965,62 @@ side effects should use the service tier or the `verify_parity` command (the pol
   leaked") and `TestCopyEndpointHappyPath` (PUBLISHED and ARCHIVED sources → new DRAFT with every
   lifecycle timestamp reset and the source untouched, field-by-field parity with a direct
   `copy_ad` call, single-draft replacement, ownership scoping).
+- **S4.7:** `POST /api/v1/moderation/{approve,reject,ban}/{id}/` shipped (endpoint row #13 → `shipped`).
+  New `apps/moderation/views/api/actions.py`, routed in `apps/moderation/api_urls.py` (`approve/<int:ad_id>/`
+  → `approve`, `reject/…` → `reject`, `ban/…` → `ban`; the S2.5 `queue/` + `review/<int:ad_id>/` routes are
+  unchanged). The action name sits on the URL and the ad id follows, matching the HTML mirror routes
+  (`apps/moderation/urls.py`).
+  **Zero service diff:** `apps/moderation/admin_actions.py` is untouched — each endpoint calls the **same**
+  `approve_ad` / `reject_ad` / `ban_user_for_ad` inside the **same** `transaction.atomic()` +
+  `select_for_update()` block the HTML action views use, so the `ModeratorActionLog` rows, the
+  `AdModerationPriority` row, the status timestamps, `published_by` / `moderated_by`, the
+  `AD_PUBLISHED` / `MODERATION_APPROVED` / `MODERATION_REJECTED` analytics events and the trust-score
+  recomputation are identical by construction.
+  **Pipeline:** `staff_required_api_problem(methods=("POST",))` (401 `unauthenticated` identity-first, 403
+  `forbidden`, 405 `method_not_allowed` + `Allow: POST`; none carries `WWW-Authenticate`) → rate limit
+  (`api_write` / `API_WRITE`, 429 `rate_limited` + `Retry-After`) → body (`BaseInputModel`,
+  `extra="forbid"` → 422 `validation_failed`) → **missing ad** = uniform 404 `not_found` for all three →
+  row lock → service call.
+  **Result → HTTP mapping:**
+
+  | Outcome | HTTP | Notes |
+  |---|---|---|
+  | `ApproveOutcome.PUBLISHED` | 200 `{outcome: "published"}` | ad published |
+  | `ApproveOutcome.CRITERIA_REJECTED` | 200 `{outcome: "criteria_rejected"}` | ad parked `ON_MODERATION_FAILED` (boundary O-2a: a state change committed) |
+  | `ApproveOutcome.TRANSITION_REFUSED` | 409 `transition_refused` | nothing committed |
+  | reject committed | 200 `{outcome: "rejected"}` | status `rejected`, `rejected_at` set |
+  | already `REJECTED` | 200 `{outcome: "already_rejected"}` | the service's documented no-op, reported instead of hidden |
+  | reject on any other status | 409 `invalid_transition` | no `-> REJECTED` edge (the HTML lookup excludes it, bulk reports it per id) |
+  | ban `changed ≥ 1` | 200 `{outcome: "banned", changed, already_in_state}` | ban idempotent for agents |
+  | already banned | 200 `{outcome: "already_banned", changed: 0, already_in_state: 1}` | no-op |
+  | ban refused (self / privileged / owner gone) | 403 `ban_refused` | **cause token only** (`cause`: `self` / `privileged` / `already_banned` / `not_in_target_set`); no skip counts, so no privileged-row count leak |
+
+  A lock timeout (`55P03`) answers 503 `retryable` + `Retry-After: 30`; an unexpected escape answers the
+  same generic 503 (never an HTML page, never exception text). **Success payload:** `{id, outcome, status,
+  title, price, currency, city, category, published_at, archived_at, moderation_failed_at, rejected_at,
+  deleted_at, updated_at}` — the post-action row re-read after the service committed (same D4 display
+  shape as the S4.3 lifecycle payload), plus `changed` / `already_in_state` on ban.
+  **Body DTOs.** `approve`: no declared field (empty body valid). `reject`: `reason_category` (a
+  `CategoryRejectReason` value — an unknown value is a 422 where the HTML view re-renders) and optional
+  `reason_text`; the audit reason is composed exactly as the HTML view composes it —
+  `"<category>"` or `"<category>: <text>"` — so `moderator_analytics.get_rejection_reasons` sees the
+  same strings. `ban`: `ban_reason`, defaulting to the HTML view's `"No reason provided"`.
+  **HTML-vs-API differences (deliberate):** the HTML approve/reject views answer `get_object_or_404`
+  restricted to `{on_moderation, on_moderation_failed}` and surface service refusals as flash messages;
+  the API answers 409 with the §2.5 token instead (`review/{id}/` already documents the same 404 policy
+  for reads). The ban HTML view resolves the ad without a status precondition and the API mirrors that
+  (the lever is the account, not the ad). The HTML ban refusal is a warning toast with a per-tier
+  sentence; the API exposes the stable `BanRefusalReason` token.
+  **Rate-limit posture.** The frozen legacy bulk endpoint (`api_bulk.py`) carries **no limiter**; per
+  R-F2 its public contract is not changed. Every new `/api/v1/` write spends the shared `api_write`
+  namespace (plan Q4), so the moderation writes are limited — a deliberate posture delta between the
+  frozen legacy surface and the new one, recorded here. `api_bulk.py` is byte-identical.
+  Pairing row `("apps.moderation.views.api.actions", ("apps.moderation.views.review",))` registered in
+  `apps/api/tests/test_import_rule.py`; allowlist gains `apps.core.enums.CategoryRejectReason` (the
+  reject vocabulary the HTML view parses inline, declared as a DTO field type here). Tests:
+  `apps/moderation/tests/test_moderation_api_actions.py` (401/403/405+`Allow` matrix with no state
+  change, uniform 404, approve published / criteria-rejected / transition-refused, reject parity
+  including the recorded reason and the already-rejected no-op, the outside-matrix 409s, ban
+  banned/already-banned/refused with no count leak, 422s, 429 + `Retry-After`). Each happy path asserts
+  its side effects **twice**: against the recorded state and against the **HTML view driven for an
+  identical fixture**, so the two surfaces cannot drift.
