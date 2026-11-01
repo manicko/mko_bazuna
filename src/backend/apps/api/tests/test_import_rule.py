@@ -143,6 +143,10 @@ PAIRING_TABLE: list[tuple[str, str | tuple[str, ...]]] = [
         "apps.ads.views.api.submit",
         ("telegram_bot.handlers.ad_create.submit", "apps.ads.views.edit"),
     ),
+    # S4.6 — copy an ad. There is no HTML copy view: the bot's `/copy` command
+    # is the only behavioural mirror and the only caller of `copy_ad`, so the
+    # adapter is validated against it.
+    ("apps.ads.views.api.copy", "telegram_bot.handlers.ad_copy"),
 ]
 
 # Mirrors that live outside ``src/backend``. A module is resolved under every
@@ -213,6 +217,15 @@ ALLOWLIST: frozenset[str] = frozenset(
         # re-submission is a no-op; the bot mirror obtains the same digest
         # transitively through `submit_ad`, never by importing the helper.
         "apps.media.services.hash_service",
+        # S4.5/S4.6 — the `RateLimitBudget` enum, the one declaration of every
+        # application-level budget (`API_WRITE` is what the `/api/v1/` writes
+        # spend). HTML/bot mirrors carry no limiter budget of their own.
+        "apps.core.enums",
+        # S4.6 — `is_lock_timeout` (SQLSTATE 55P03), the shared predicate that
+        # distinguishes transient lock contention from a real database error on
+        # the JSON write surface. The bot mirror answers the busy message
+        # through its own handler boundary instead.
+        "apps.core.utils.db_lock_timeout",
     }
 )
 

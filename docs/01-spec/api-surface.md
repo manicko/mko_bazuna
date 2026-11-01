@@ -74,7 +74,7 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 | 7 | Archive | lifecycle service (S4.1) | `POST /api/v1/ads/{id}/archive/` | SESS + owner + **consent** | 403 `consent_required`; 409 `invalid_transition`; 200 post-action state | shipped (S4.3) |
 | 8 | Reactivate | lifecycle service (S4.1), same `auto_moderate` decision | `POST /api/v1/ads/{id}/reactivate/` | SESS + owner + consent | 200 `{outcome}` for both verdicts; 409 `invalid_transition`; 503 lock-timeout | shipped (S4.3) |
 | 9 | Delete | lifecycle service (S4.1) — gate-free | `POST /api/v1/ads/{id}/delete/` | SESS + owner | 200 confirmed deleted state (supersedes the 204 note — see row-9 change log); 409 `invalid_transition` | shipped (S4.3) |
-| 10 | Copy | `copy_ad` (`copy_service.py:39` via `_build_ad_copy:15`) | `POST /api/v1/ads/{id}/copy/` | SESS | 200 `{ad_id}` — new DRAFT owned by seller; max-ads + consent predicates as in the bot flow | planned |
+| 10 | Copy | `copy_ad` (`copy_service.py:39` via `_build_ad_copy:15`) — called unchanged | `POST /api/v1/ads/{id}/copy/` | SESS | 200 new-DRAFT state (supersedes `{ad_id}` — see row-10 change log) with `id`/`source_ad_id`; uniform 404; no consent/max-ads gate, exactly as the bot `/copy` (both are enforced at submit time) | shipped (S4.6) |
 | 11 | Dashboard reads | dashboard grouping (S2.2) + `SellerStats` | `GET /api/v1/dashboard/?time_range=` | SESS + consent | **403 `consent_required` when consent absent — never an empty list** (R-L1) | shipped (S2.3) |
 | 12 | Moderation queue/review | `PriorityService.get_queued_ads` / `get_priority_counts` | `GET /api/v1/moderation/queue/?priority&page`, `GET /api/v1/moderation/review/{id}/` | STAFF | 401 / 403 / 405 (problem docs) | shipped (S2.5) |
 | 13 | Single actions | `admin_actions.approve_ad/reject_ad/ban_user_for_ad` | `POST /api/v1/moderation/{approve,reject,ban}/{id}/` | STAFF | §Errors mappings | planned |
@@ -924,3 +924,43 @@ side effects should use the service tier or the `verify_parity` command (the pol
   over-media section caps, not-ready 409 + inventory, the published happy path asserted **against
   the service tier**, moderation-failure 200, and the state-machine mappings). `test_submission.py`
   and the bot submit/copy suites are untouched and green.
+- **S4.6:** `POST /api/v1/ads/{id}/copy/` shipped (endpoint row #10 → `shipped`). New
+  `apps/ads/views/api/copy.py`, routed in `apps/ads/api_urls.py` (`<int:ad_id>/copy/` → `copy`).
+  **No service was extracted**: `copy_ad` was never inline in a view — it is already a request-free
+  service (`apps/ads/services/copy_service.py`) whose only caller is the bot's `/copy` command, and the
+  endpoint calls it **unchanged**. Pipeline: identity (401) → method (405 + `Allow: POST`) → rate limit
+  (`api_write` / `API_WRITE`, 429 + `Retry-After`) → body (`CopyBody`, no declared fields,
+  `extra="forbid"` → 422 for any key) → ownership (uniform 404 `not_found`, missing vs non-owned
+  byte-identical, CWE-209) → `copy_ad`.
+  **What a copy is** (the service's contract, unchanged): a **new `DRAFT`** owned by the caller with
+  the source's title/description in every language, `original_language`, category, city, listing
+  purpose, features and image rows (new rows, same storage keys). **Reset** by not being copied:
+  `id`, `status`, the lifecycle timestamps (`published_at`, `archived_at`, `rejected_at`,
+  `moderation_failed_at`, `deleted_at`), the price fields, the moderation/analytics history and the
+  favorites. The **single-draft policy** applies as in the bot flow: the caller's existing `DRAFT` is
+  replaced by the copy inside the service's transaction.
+  **Predicate mapping.** `copy_ad` has **no status predicate** — it copies from any status the caller
+  owns (the bot's `/copy` accepts any owned ad, including a `DRAFT`), so there is no not-copyable
+  state and therefore **no 409** on this route. The only refusals are "missing / not owned" (the
+  uniform 404) and a lock timeout (503 `retryable` + `Retry-After: 30`). A `PermissionError` /
+  `Ad.DoesNotExist` raised by the service after the ownership pre-flight (a race with a hard delete
+  or an ownership change) is mapped back onto the **same** 404 document, never a 403.
+  **Consent / max-ads (row text: "as in the bot flow").** The bot applies **neither** at copy time:
+  it requires only a logged-in `user_id`, and `copy_ad` creates the draft. Storage consent
+  (06-PII-109, inside `submit_ad`) and `max_ads_per_user` (inside `auto_moderate`) are enforced when
+  the draft is **submitted** — so a copy by a non-consented seller is created and the submit
+  endpoint then answers 403 `consent_required`. The endpoint mirrors that exactly; a stricter
+  API-only gate would break parity.
+  **Response:** `{id (new draft), source_ad_id, outcome: "copied", status, title, description, price,
+  currency, city, category, photo_count, feature_count, copied[], reset[], updated_at}`. A bare
+  `{ad_id}` (the row sketch) is **superseded** by this state shape for the same reason S4.3 gave for
+  its 204s: the created id is present (`id` + `source_ad_id`) but a client also learns what was
+  created without a second read.
+  Pairing row `("apps.ads.views.api.copy", "telegram_bot.handlers.ad_copy")` registered in
+  `apps/api/tests/test_import_rule.py` — there is no HTML copy view, so the bot `/copy` command is the
+  behavioural mirror. Tests appended to `apps/ads/tests/test_copy_ad.py` (existing `TestCopyAd`
+  methods untouched): `TestCopyEndpointPipeline` (401 on every verb, 405 + `Allow`, 422 for
+  malformed/non-object/unknown-key bodies, 429 + `Retry-After`, uniform 404 including "no copy
+  leaked") and `TestCopyEndpointHappyPath` (PUBLISHED and ARCHIVED sources → new DRAFT with every
+  lifecycle timestamp reset and the source untouched, field-by-field parity with a direct
+  `copy_ad` call, single-draft replacement, ownership scoping).

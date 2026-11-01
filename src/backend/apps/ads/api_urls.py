@@ -2,6 +2,7 @@
 
 from django.urls import path
 
+from apps.ads.views.api.copy import copy_view
 from apps.ads.views.api.detail import detail_view
 from apps.ads.views.api.edit import edit_view
 from apps.ads.views.api.lifecycle_actions import (
@@ -25,4 +26,6 @@ urlpatterns = [
     path("<int:ad_id>/delete/", delete_view, name="delete"),
     # S4.5 — submit an existing DRAFT (plan §2.4 row 5), verbatim plan URL.
     path("<int:ad_id>/submit/", submit_view, name="submit"),
+    # S4.6 — copy an ad into a fresh DRAFT (plan §2.4 row 10), verbatim URL.
+    path("<int:ad_id>/copy/", copy_view, name="copy"),
 ]
