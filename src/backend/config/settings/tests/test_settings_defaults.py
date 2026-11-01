@@ -288,6 +288,7 @@ def _probe_login_binding(env_name: str) -> dict[str, str]:
     return resolved
 
 
+@pytest.mark.slow
 def test_login_binding_host_prefix_is_enabled_in_production() -> None:
     """base.py enables the ``__Host-`` login-binding control; dev/test disable it.
 
@@ -305,6 +306,7 @@ def test_login_binding_host_prefix_is_enabled_in_production() -> None:
     assert test["prefix"] == repr(_LOGIN_BINDING_HOST_PREFIX_TEST), test
 
 
+@pytest.mark.slow
 def test_login_binding_name_and_secure_flag_agree_per_module() -> None:
     """The resolved name and ``Secure`` flag agree under every settings module.
 
@@ -412,6 +414,7 @@ def _probe_time_zone(env_name: str) -> dict[str, str]:
     return resolved
 
 
+@pytest.mark.slow
 def test_time_zone_is_the_hardcoded_ruled_value() -> None:
     """``TIME_ZONE`` is the literal Europe/Podgorica under every module (14-I18N-004).
 

@@ -55,6 +55,7 @@ _HOLD_SECONDS = 1.0
 _WAITER_DEADLINE_SECONDS = 20.0
 
 
+@pytest.mark.slow
 class TestLockWaitIsBounded:
     """A contended row lock fails within the configured bound."""
 

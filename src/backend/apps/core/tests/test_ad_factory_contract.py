@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import ast
 
+import pytest
 from django.conf import settings
 
 from apps.core.enums import AdStatus
@@ -148,6 +149,7 @@ def _is_status_grounded(
     return _declares_status(enclosing) or _dict_literal_has_status(enclosing)
 
 
+@pytest.mark.slow
 def test_no_factory_call_relies_on_a_silent_default() -> None:
     """Every factory call is status-grounded (literal or reviewable wrapper)."""
     violations: list[str] = []

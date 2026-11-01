@@ -372,6 +372,7 @@ def test_consumed_env_vars_are_allowlisted() -> None:
     )
 
 
+@pytest.mark.slow
 def test_env_read_shapes_are_all_recognised() -> None:
     """The visitor understood every env-ish call it met, and no handler is dead.
 

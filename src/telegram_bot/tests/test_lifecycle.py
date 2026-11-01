@@ -195,6 +195,7 @@ class TestOnStartupCommands:
                 await _on_startup(MagicMock(), MagicMock())
 
     @pytest.mark.asyncio
+    @pytest.mark.slow
     async def test_markers_written_when_command_registration_hangs(
         self, tmp_path: Path
     ) -> None:

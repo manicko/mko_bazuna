@@ -534,6 +534,7 @@ def test_ci_yml_has_sast_job() -> None:
 
 
 @pytest.mark.integration
+@pytest.mark.slow
 def test_sast_step_actually_scans_files() -> None:
     """Run bandit as configured and assert a non-zero scanned-file count.
 
