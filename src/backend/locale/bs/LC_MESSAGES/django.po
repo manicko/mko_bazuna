@@ -358,7 +358,7 @@ msgstr ""
 "\n"
 "Napiši pitanje — odgovorićemo što prije.\n"
 "\n"
-"Za kreiranje oglasа користи /post."
+"Za kreiranje oglasa koristi /post."
 
 msgid "Too many requests to support. Please try again later."
 msgstr "Previše zahtjeva za podrškom. Pokušaj kasnije."
@@ -1802,4 +1802,16 @@ msgstr "Metoda nije dozvoljena."
 #: src/backend/apps/ads/views/api/dashboard.py
 msgid "Storage consent is required to view the seller dashboard."
 msgstr "Za prikaz prodavčeve kontrolne table potrebna je saglasnost za čuvanje podataka."
+
+#: src/backend/apps/users/views/api/consent.py
+msgid "Consent cannot be changed for a withdrawn account."
+msgstr "Saglasnost se ne može izmijeniti za povučen račun."
+
+#: src/backend/apps/cabinet/views/api/saved_search_writes.py
+msgid "Saved search not found."
+msgstr "Sačuvana pretraga nije pronađena."
+
+#: src/backend/apps/cabinet/views/api/saved_search_writes.py
+msgid "Search query is too long."
+msgstr "Upit za pretragu je predugačak."
 

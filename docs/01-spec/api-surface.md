@@ -709,3 +709,17 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `apps/cabinet/tests/test_search_history_clear_api.py` (401 anon incl. identity-before-method, 405,
   clear → S2.7 read shows 0, idempotent re-POST, scope parity with the HTML clear / other users
   untouched, 429 budget).
+- **S3.6:** Stage S3 i18n batch applied. The three new client-visible `detail` strings the Stage S3
+  writes introduced are now cataloged as English msgids and translatable in `ru`/`bs`/`en`
+  (`apps/users/views/api/consent.py` — `"Consent cannot be changed for a withdrawn account."`;
+  `apps/cabinet/views/api/saved_search_writes.py` — `"Saved search not found."` and
+  `"Search query is too long."`). Every other Stage S3 write detail (`"Ad not found."`,
+  `"Method not allowed."`, `"Authentication required."`,
+  `"Too many requests; retry after the indicated delay."`) was already cataloged by S1.7/S2.8 and is
+  reused, not re-emitted; `type` tokens stay stable ASCII (never translated, Q6); no JSON key, status
+  code or response shape changed. Catalogs hand-applied from a safe scratch extraction
+  (`--no-location --no-obsolete`); `ru`/`bs` `msgstr` are non-empty, `en` stays empty (the English
+  msgid is the source). The `bs` batch also **fixes a mixed-script defect** in a pre-existing `bs`
+  `msgstr`: the support-greeting line `"Za kreiranje oglasa koristi /post."` had been written with
+  Cyrillic characters (`oglasа`, `користи`); the whole `bs` catalog is now free of Cyrillic
+  (`[\u0400-\u04FF]` scan → 0 hits). `apps/ads/tests/test_i18n_completeness.py` green.

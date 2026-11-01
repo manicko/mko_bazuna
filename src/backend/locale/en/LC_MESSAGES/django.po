@@ -1640,3 +1640,15 @@ msgstr ""
 msgid "Storage consent is required to view the seller dashboard."
 msgstr ""
 
+#: src/backend/apps/users/views/api/consent.py
+msgid "Consent cannot be changed for a withdrawn account."
+msgstr ""
+
+#: src/backend/apps/cabinet/views/api/saved_search_writes.py
+msgid "Saved search not found."
+msgstr ""
+
+#: src/backend/apps/cabinet/views/api/saved_search_writes.py
+msgid "Search query is too long."
+msgstr ""
+
