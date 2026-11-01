@@ -1652,3 +1652,46 @@ msgstr ""
 msgid "Search query is too long."
 msgstr ""
 
+#: src/backend/apps/ads/views/api/edit.py
+msgid "The ad cannot take that edit in its current status."
+msgstr ""
+
+#: src/backend/apps/ads/views/api/lifecycle_actions.py
+msgid "This ad cannot be archived in its current status."
+msgstr ""
+
+#: src/backend/apps/ads/views/api/lifecycle_actions.py
+msgid "This ad cannot be reactivated in its current status."
+msgstr ""
+
+#: src/backend/apps/ads/views/api/lifecycle_actions.py
+msgid "This ad is already deleted."
+msgstr ""
+
+#: src/backend/apps/ads/views/api/submit.py
+msgid "This ad cannot be submitted: the field check reports missing or over-cap content."
+msgstr ""
+
+#: src/backend/apps/ads/views/api/submit.py
+msgid "The draft no longer exists. Please start a new ad."
+msgstr ""
+
+#: src/backend/apps/ads/views/api/submit.py
+msgid "One of the photos is no longer available. Please upload it again."
+msgstr ""
+
+#: src/backend/apps/ads/views/api/submit.py
+msgid "This ad cannot be submitted in its current status."
+msgstr ""
+
+#: src/backend/apps/moderation/views/api/actions.py
+msgid "This ad cannot be published: its current status does not allow the transition to published."
+msgstr ""
+
+#: src/backend/apps/moderation/views/api/actions.py
+msgid "This ad cannot be rejected in its current status."
+msgstr ""
+
+#: src/backend/apps/moderation/views/api/actions.py
+msgid "The ban was not applied to this ad's owner."
+msgstr ""

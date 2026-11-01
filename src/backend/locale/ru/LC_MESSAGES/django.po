@@ -1834,3 +1834,46 @@ msgstr "Сохранённый поиск не найден."
 msgid "Search query is too long."
 msgstr "Поисковый запрос слишком длинный."
 
+#: src/backend/apps/ads/views/api/edit.py
+msgid "The ad cannot take that edit in its current status."
+msgstr "Объявление нельзя так отредактировать в его текущем статусе."
+
+#: src/backend/apps/ads/views/api/lifecycle_actions.py
+msgid "This ad cannot be archived in its current status."
+msgstr "Это объявление нельзя архивировать в его текущем статусе."
+
+#: src/backend/apps/ads/views/api/lifecycle_actions.py
+msgid "This ad cannot be reactivated in its current status."
+msgstr "Это объявление нельзя активировать повторно в его текущем статусе."
+
+#: src/backend/apps/ads/views/api/lifecycle_actions.py
+msgid "This ad is already deleted."
+msgstr "Это объявление уже удалено."
+
+#: src/backend/apps/ads/views/api/submit.py
+msgid "This ad cannot be submitted: the field check reports missing or over-cap content."
+msgstr "Это объявление нельзя отправить: проверка полей сообщает об отсутствующем или превышающем лимит содержимом."
+
+#: src/backend/apps/ads/views/api/submit.py
+msgid "The draft no longer exists. Please start a new ad."
+msgstr "Черновик больше не существует. Пожалуйста, создайте новое объявление."
+
+#: src/backend/apps/ads/views/api/submit.py
+msgid "One of the photos is no longer available. Please upload it again."
+msgstr "Одно из фотографий больше недоступно. Пожалуйста, загрузите его снова."
+
+#: src/backend/apps/ads/views/api/submit.py
+msgid "This ad cannot be submitted in its current status."
+msgstr "Это объявление нельзя отправить в его текущем статусе."
+
+#: src/backend/apps/moderation/views/api/actions.py
+msgid "This ad cannot be published: its current status does not allow the transition to published."
+msgstr "Это объявление нельзя опубликовать: его текущий статус не допускает переход в опубликованное."
+
+#: src/backend/apps/moderation/views/api/actions.py
+msgid "This ad cannot be rejected in its current status."
+msgstr "Это объявление нельзя отклонить в его текущем статусе."
+
+#: src/backend/apps/moderation/views/api/actions.py
+msgid "The ban was not applied to this ad's owner."
+msgstr "Бан не был применён к владельцу этого объявления."

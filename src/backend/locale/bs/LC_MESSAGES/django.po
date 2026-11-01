@@ -1815,3 +1815,46 @@ msgstr "Sačuvana pretraga nije pronađena."
 msgid "Search query is too long."
 msgstr "Upit za pretragu je predugačak."
 
+#: src/backend/apps/ads/views/api/edit.py
+msgid "The ad cannot take that edit in its current status."
+msgstr "Oglas se ne može urediti na taj način u trenutnom statusu."
+
+#: src/backend/apps/ads/views/api/lifecycle_actions.py
+msgid "This ad cannot be archived in its current status."
+msgstr "Ovaj oglas se ne može arhivirati u trenutnom statusu."
+
+#: src/backend/apps/ads/views/api/lifecycle_actions.py
+msgid "This ad cannot be reactivated in its current status."
+msgstr "Ovaj oglas se ne može ponovo aktivirati u trenutnom statusu."
+
+#: src/backend/apps/ads/views/api/lifecycle_actions.py
+msgid "This ad is already deleted."
+msgstr "Ovaj oglas je već izbrisan."
+
+#: src/backend/apps/ads/views/api/submit.py
+msgid "This ad cannot be submitted: the field check reports missing or over-cap content."
+msgstr "Ovaj oglas se ne može poslati: provjera polja prijavljuje sadržaj koji nedostaje ili prelazi ograničenje."
+
+#: src/backend/apps/ads/views/api/submit.py
+msgid "The draft no longer exists. Please start a new ad."
+msgstr "Nacrt više ne postoji. Molimo započnite novi oglas."
+
+#: src/backend/apps/ads/views/api/submit.py
+msgid "One of the photos is no longer available. Please upload it again."
+msgstr "Jedna od fotografija više nije dostupna. Molimo ponovo je prenesite."
+
+#: src/backend/apps/ads/views/api/submit.py
+msgid "This ad cannot be submitted in its current status."
+msgstr "Ovaj oglas se ne može poslati u trenutnom statusu."
+
+#: src/backend/apps/moderation/views/api/actions.py
+msgid "This ad cannot be published: its current status does not allow the transition to published."
+msgstr "Ovaj oglas se ne može objaviti: njegov trenutni status ne dozvoljava prelazak u objavljeno."
+
+#: src/backend/apps/moderation/views/api/actions.py
+msgid "This ad cannot be rejected in its current status."
+msgstr "Ovaj oglas se ne može odbiti u trenutnom statusu."
+
+#: src/backend/apps/moderation/views/api/actions.py
+msgid "The ban was not applied to this ad's owner."
+msgstr "Zabrana nije primijenjena na vlasnika ovog oglasa."

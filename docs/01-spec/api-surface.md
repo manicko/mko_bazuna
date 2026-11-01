@@ -1024,3 +1024,33 @@ side effects should use the service tier or the `verify_parity` command (the pol
   banned/already-banned/refused with no count leak, 422s, 429 + `Retry-After`). Each happy path asserts
   its side effects **twice**: against the recorded state and against the **HTML view driven for an
   identical fixture**, so the two surfaces cannot drift.
+
+- **S4.8 — M4 gate:** Stage S4 i18n batch applied. The eleven new client-visible `detail` strings the
+  Stage S4 writes introduced are now cataloged as English msgids and translatable in `ru`/`bs`/`en`:
+  `apps/ads/views/api/lifecycle_actions.py` — `"This ad cannot be archived in its current status."`,
+  `"This ad cannot be reactivated in its current status."`, `"This ad is already deleted."`;
+  `apps/ads/views/api/edit.py` — `"The ad cannot take that edit in its current status."`;
+  `apps/ads/views/api/submit.py` — `"This ad cannot be submitted: the field check reports missing or
+  over-cap content."`, `"The draft no longer exists. Please start a new ad."`, `"One of the photos is
+  no longer available. Please upload it again."`, `"This ad cannot be submitted in its current
+  status."`; `apps/moderation/views/api/actions.py` — `"This ad cannot be published: its current
+  status does not allow the transition to published."`, `"This ad cannot be rejected in its current
+  status."`, `"The ban was not applied to this ad's owner."`. Every Stage S4 view already wrapped its
+  details in `gettext_lazy` (no source change was needed); all other Stage S4 details
+  (`"Ad not found."`, `"Method not allowed."`, `"To manage ads, please accept the personal data
+  storage consent first."`, `"The server is busy processing another change. Please try again
+  shortly."`) were cataloged by S1.7/S2.8 and are reused, not re-emitted, and the two S4.1/S4.2
+  services (`lifecycle.py`, `edit_flow.py`) carry no user-visible strings of their own. `type` tokens
+  stay stable ASCII (never translated, Q6); no JSON key, status code or response shape changed.
+  Catalogs hand-applied from a safe scratch extraction (`--no-location --no-obsolete`) — the scratch
+  fuzzy-matched six msgids onto the generic edit string, so each was written individually rather than
+  copied; `ru`/`bs` `msgstr` are non-empty, `en` stays empty (the English msgid is the source). The
+  `bs` catalog remains free of Cyrillic (`[\u0400-\u04FF]` scan → 0 hits). **M4 gate verified:** fast
+  gate 4223 passed / 3 failed, the three failures being the known settings-probe subprocess
+  `Errno 12` memory flakes, all green on isolated re-run
+  (`apps/config/settings/tests/test_settings_defaults.py`: 11 passed); `test_i18n_completeness.py`
+  and `test_i18n_pipeline.py` green (37 passed); the S4 endpoint matrices green
+  (`test_lifecycle_api.py`, `test_edit_route_api.py`, `test_submit_route_api.py`, `test_copy_ad.py`,
+  `test_moderation_api_actions.py`: 198 passed); R-F2 evidence intact — `apps/moderation/views/api_bulk.py`
+  byte-identical and its suites green (139 passed across `test_moderation_api_reads.py`,
+  `test_priority_service.py`, `test_moderation_views.py`, `test_problem_response.py`).
