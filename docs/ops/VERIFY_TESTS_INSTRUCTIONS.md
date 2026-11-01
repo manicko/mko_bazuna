@@ -109,8 +109,12 @@ manually (single-line PowerShell):
 
 ```pwsh
 docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml up -d db
-docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --env PYTEST_SKIP_MARKERS=seed test
+docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --env "PYTEST_SKIP_MARKERS=seed or slow or real_images" test
 ```
+
+That `PYTEST_SKIP_MARKERS` value is the fast-gate selection: the entrypoint expands it to
+`-m "not (seed or slow or real_images)"` — the same marker set as the `ci.yml` PR gate. Drop the
+`--env` flag to run the complete suite (`make test-all`).
 
 > **Note:** `--env-file .env.test` **must** always be passed to test compose commands.
 > The base `docker-compose.yml` uses `${VAR:?}` interpolation for required variables

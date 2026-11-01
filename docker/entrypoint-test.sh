@@ -47,9 +47,13 @@ uv sync --frozen --no-install-project --group dev
 # flags only; multi-token values like -m "not seed" are fragile here because this
 # expansion is unquoted. For marker-based exclusion use PYTEST_SKIP_MARKERS instead
 # (see below).
-# PYTEST_SKIP_MARKERS="seed" appends -m "not (seed)" to pytest, excluding tests by
-# marker. This is how the dev fast-gate (`make test`) skips the ~17-min seed
-# suite while `make test-all` runs everything. Complements PYTEST_OPTS.
+# PYTEST_SKIP_MARKERS="seed or slow or real_images" appends
+# -m "not (seed or slow or real_images)" to pytest, excluding tests by marker.
+# The token is expanded as ONE quoted argument below (PYTEST_MARK_ARGS), so a
+# multi-marker "A or B or C" value is safe. This is how the dev fast gate
+# (`make test`) skips the ~17-min seed suite plus the slow and real_images
+# tests, matching the ci.yml PR gate marker set; `make test-all` runs everything.
+# Complements PYTEST_OPTS.
 # --reuse-db (default) skips test DB schema rebuild on subsequent runs; the DB
 # container persists between runs via the named postgres_data volume. Use
 # `make test-recreate` to force a fresh schema (--create-db), e.g. after

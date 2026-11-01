@@ -45,7 +45,7 @@ function Show-Help {
     Write-Host "  up             Start dev environment (web on :8000, hot-reload) + test DB on :5433"
     Write-Host "  down           Stop and remove containers"
     Write-Host "  build          Rebuild Docker images"
-    Write-Host "  test           Run fast test gate: skips 'seed' suite (~90s vs ~35min full); auto-starts test DB"
+    Write-Host "  test           Run fast test gate: skips 'seed', 'slow' and 'real_images' markers; auto-starts test DB"
     Write-Host "  test-all       Run complete suite (includes 'seed' tests, ~35min)"
     Write-Host "  test-db        Start test PostgreSQL (long-running, enables reuse-db)"
     Write-Host "  test-down      Stop test environment (preserves DB for reuse-db)"
@@ -152,15 +152,17 @@ function Invoke-TestRecreate {
 }
 
 # Run the fast test gate in the test container (auto-starts the test DB if not
-# running). Excludes the `seed` suite (~1,054s of ~1,350s) so a full dev
-# iteration runs in ~300s. For the complete suite use `test-all`; for a fresh schema
-# use `test-recreate`.
+# running). Excludes the `seed`, `slow` and `real_images` markers via the
+# entrypoint PYTEST_SKIP_MARKERS env var, which the entrypoint expands to
+# -m "not (seed or slow or real_images)" -- the byte-identical marker set of the
+# ci.yml PR gate. The value contains spaces, so it MUST stay quoted. For the
+# complete suite use `test-all`; for a fresh schema use `test-recreate`.
 function Invoke-Test {
     $env:COMPOSE_PROJECT_NAME = $TestProject
     # Ensure the long-running test DB is up (idempotent) so --reuse-db can persist.
     docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml up -d db
-    # PYTEST_SKIP_MARKERS=seed appends -m "not (seed)" in entrypoint-test.sh.
-    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --env "PYTEST_SKIP_MARKERS=seed" test
+    # PYTEST_SKIP_MARKERS appends -m "not (seed or slow or real_images)" in entrypoint-test.sh.
+    docker compose --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml run --rm --env "PYTEST_SKIP_MARKERS=seed or slow or real_images" test
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 }
 

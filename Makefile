@@ -43,7 +43,7 @@ help:
 	@echo "  build          Rebuild Docker images"
 	@echo ""
 	@echo "Test Environment:"
-	@echo "  test           Run fast gate (skips seed suite; reuses DB)"
+	@echo "  test           Run fast gate (skips seed/slow/real_images markers; reuses DB)"
 	@echo "  test-all       Run complete suite (includes seed suite; reuses DB)"
 	@echo "  test-db        Start test PostgreSQL (long-running, enables reuse-db)"
 	@echo "  test-down      Stop test environment (preserves DB; use 'down -v' to wipe)"
@@ -108,11 +108,14 @@ restart:
 
 # ====================== Code Quality ======================
 
-# `test` runs the fast gate: excludes the `seed` suite (~17-min bulk)
-# via the entrypoint PYTEST_SKIP_MARKERS=seed env var. DB persists via --reuse-db.
+# `test` runs the fast gate: excludes the `seed`, `slow` and `real_images`
+# markers via the entrypoint PYTEST_SKIP_MARKERS env var, which the entrypoint
+# expands to -m "not (seed or slow or real_images)" -- the byte-identical marker
+# set of the ci.yml PR gate. The value contains spaces, so it MUST stay quoted.
+# DB persists via --reuse-db.
 test:
 	docker compose $(COMPOSE_TEST) up -d db
-	docker compose $(COMPOSE_TEST) run --rm --env PYTEST_SKIP_MARKERS=seed test
+	docker compose $(COMPOSE_TEST) run --rm --env "PYTEST_SKIP_MARKERS=seed or slow or real_images" test
 
 # Run the complete suite INCLUDING the `seed` suite (~35min).
 test-all:

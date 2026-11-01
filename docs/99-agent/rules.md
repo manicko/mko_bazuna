@@ -41,7 +41,7 @@ This file contains coding standards and rules for the Mko Bazuna project.
 ### Testing Conventions
 
 - **Framework:** pytest-django. Test classes are plain `class TestX:` — do NOT use `django.test.TestCase` or `unittest.TestCase`.
-- **Markers:** Pytest-django + pytest-asyncio. Custom markers are registered in `pyproject.toml` under `[tool.pytest.ini_options].markers`. Use `pytestmark` at module level. The fast gate (`make test`) excludes **only** the `seed` marker (`-m "not (seed)"` via `PYTEST_SKIP_MARKERS=seed`); all other markers run in both the fast gate and the full suite (`make test-all` — the `slow` marker is **not** excluded by the fast gate).
+- **Markers:** Pytest-django + pytest-asyncio. Custom markers are registered in `pyproject.toml` under `[tool.pytest.ini_options].markers`. Use `pytestmark` at module level. The fast gate (`make test`) excludes the `seed`, `slow` and `real_images` markers (`-m "not (seed or slow or real_images)"` via `PYTEST_SKIP_MARKERS="seed or slow or real_images"`). The local fast gate and the `ci.yml` PR gate use the **byte-identical** marker set, so a test deselected locally is also deselected in the PR gate. Everything excluded is deferred to the full suite (`make test-all`), never deleted.
 
   | Marker | Scope / purpose |
   |---|---|
@@ -50,8 +50,8 @@ This file contains coding standards and rules for the Mko Bazuna project.
   | `seed` | Separate-workflow only (`ci-seed.yml`, once per push); invokes `call_command('seed')` or `ImageGenerator`. Excluded from `make test`, included in `make test-all` |
   | `settings` | Import-time settings validation in a subprocess (e.g. `config/settings/tests/test_settings_secrets.py`) |
   | `concurrent` | Requires `transaction=True` (TRUNCATE per test) — bot tests mutating shared DB state |
-  | `slow` | Individually slow tests (>5 s); **not** excluded by the fast gate |
-  | `real_images` | Opts out of the no-op `ImageGenerator` stub in `apps/seed/tests/conftest.py` to use the real pipeline |
+  | `slow` | Individually slow tests (>5 s); excluded from the fast gate (`make test`), run by `make test-all` |
+  | `real_images` | Opts out of the no-op `ImageGenerator` stub in `apps/seed/tests/conftest.py` to use the real pipeline; excluded from the fast gate (`make test`), run by `make test-all` |
   | `xdist_group("name")` | Pins tests to a single xdist worker via `--dist loadgroup` (e.g. `"bot_concurrent"`) |
   | `django_db` (pytest-django) | DB-backed tests; use `transaction=True` when a test needs TRUNCATE isolation (bot tests) |
   | `asyncio` (pytest-asyncio, strict mode) | Async Telegram bot handlers |
