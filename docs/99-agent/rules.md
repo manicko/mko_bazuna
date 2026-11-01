@@ -206,7 +206,7 @@ Test execution is split across four workflows, one per tier (see "Test tiers and
 |---|---|---|---|
 | `build` | push + PR | Docker image + test env | Checkout → Buildx → Build image → Trivy scan → Upload SARIF |
 | `test` | push + PR | PR fast gate | DB service → `bootstrap_reference_data` → `compilemessages` → `pytest -m "not (seed or slow or real_images)"` with `-n auto --maxprocesses=4 --dist loadgroup --reuse-db` |
-| `test-full` | push only | Full pre-merge tier | Same setup as `test`, then `pytest -m "not (seed)"` — restores `slow` + `real_images` |
+| `test-full` | push only (`if: github.event_name == 'push'`) | Full pre-merge tier | Same setup as `test`, then `pytest -m "not (seed)"` — restores `slow` + `real_images` |
 | `lint` | push + PR | Code linting | `uv sync` → `ruff check src/` (from the repository root) |
 | `typecheck` | push + PR | Type checking | `uv sync` → `basedpyright src/` (from the repository root) |
 | `lint-templates` | push + PR | Template linting | `uv sync` → `djlint templates/` |
@@ -220,8 +220,8 @@ Test execution is split across four workflows, one per tier (see "Test tiers and
 1. Lockfile check → `uv sync` → DB wait → `bootstrap_reference_data` → `compilemessages`.
 2. **Marker-parity guard** — `pytest tests/test_docs_ci_parity.py -p no:xdist`. Routed first because it is sub-second and, if the fast-gate marker set drifts, the full-tier result is not comparable with the PR gate.
 3. **Bot serial drift control** — `pytest ../telegram_bot/tests -p no:xdist` (from `src/backend`). A parallel pass alone cannot prove the `bot_concurrent` pins are complete; only a serial control can. Kept as its own step so a serial-only failure is attributed to the bot pins.
-4. **Settings serial run** — `pytest config/settings/tests -p no:xdist`; these spawn subprocesses and are not DB-bound.
-5. **Full suite** — `pytest --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup` with **no** marker exclusion, so `slow`, `real_images` and `seed` all run.
+4. **Settings/migrations serial run** (plan §6 Step 6, the settings/migrations portion serial) — `pytest config/settings/tests apps/core/tests/test_migrations.py -p no:xdist`.
+5. **Full suite** — `pytest --ignore=config/settings/tests --ignore=apps/core/tests/test_migrations.py --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup` with **no** marker exclusion, so `slow`, `real_images` and `seed` all run. The path ignores are not marker exclusions: they remove only what step 4 already ran serially, so every test runs exactly once.
 
 - The `test` and `test-full` jobs in CI run `compilemessages` **before** pytest to ensure `.mo` files are present (T-01).
 - The PR fast gate and `test-full` run **without** `--cov`; coverage is collected in `ci-seed.yml` (`--cov=apps.seed --cov-fail-under=80`, uploaded as the `seed-coverage-report` artifact).

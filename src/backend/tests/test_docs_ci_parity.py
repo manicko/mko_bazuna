@@ -15,6 +15,13 @@ doc drift into a CI gate:
    `ci.yml` expresses as `-m "not (seed or slow or real_images)"`. A local gate
    that silently skips a different marker set than CI is a coverage hole no
    other test can see (D9).
+5c. `ci.yml` `test-full` is guarded to `push` only (`if:
+   github.event_name == 'push'`), so the workflow-level `pull_request` trigger
+   does not run the ~7 min full tier on every PR (D10).
+5d. `ci-nightly.yml` runs the settings/migrations portion serially (plan §6
+   Step 6) and path-ignores exactly those two paths in the parallel full tier,
+   so every test runs exactly once while keeping the "no marker exclusion"
+   invariant (D11).
 6. docs/ops: every production `docker compose` invocation — embedded in a longer
    command, prefixed by a variable assignment, or split across shell
    backslash-continuations — carries its flags, and every canonical `ghcr.io`
@@ -25,6 +32,9 @@ doc drift into a CI gate:
 
 Uses stdlib only: tomllib for TOML; Path.read_text() for YAML (string-level checks).
 No PyYAML dependency — the asserted values are command-line substrings in `run:` lines.
+The one exception is the `test-full` job guard (5c), which needs the parsed job
+mapping rather than a text search: PyYAML is an application dependency
+(`yaml.safe_load`), imported inside that section only.
 Follows the test_i18n_completeness.py precedent (doc-DoD enforcement, no third-party deps).
 
 Behavioural vs structural guards (12-VAL-003)
@@ -79,6 +89,7 @@ while not (_ROOT / "pyproject.toml").exists():
 
 _CI_YML = _ROOT / ".github" / "workflows" / "ci.yml"
 _CI_SEED_YML = _ROOT / ".github" / "workflows" / "ci-seed.yml"
+_CI_NIGHTLY_YML = _ROOT / ".github" / "workflows" / "ci-nightly.yml"
 _PYPROJECT = _ROOT / "pyproject.toml"
 _ENTRYPOINT = _ROOT / "docker" / "entrypoint-test.sh"
 _MAKEFILE = _ROOT / "Makefile"
@@ -396,6 +407,150 @@ def test_fast_gate_marker_parity_has_discriminating_power() -> None:
     for wrong, label in ((unquoted, "unquoted"), (missing_slow, "missing slow")):
         with pytest.raises(AssertionError):
             _assert_skip_markers(wrong, label)
+
+
+# --- tier routing (D10 / D11) ----------------------------------------------
+# Two routing defects no existing assertion could see:
+#
+#   D10 — `ci.yml` triggers on `pull_request` at the workflow level, so a job
+#   without its own `if:` runs on every PR. `test-full` (the ~7 min full tier)
+#   relied on a comment saying it is push-only. The job *condition* is a
+#   structured YAML property, so it is asserted on the parsed mapping rather
+#   than by a substring search of the file: a search would also match the same
+#   expression anywhere else in the document (or in a comment) while the job
+#   itself stays unguarded.
+#
+#   D11 — the nightly ran the settings package both serially and inside the
+#   parallel full tier, and never ran `test_migrations.py` serially at all.
+#   "Every test runs exactly once" is the invariant: the serial step must cover
+#   both paths and the full-tier step must path-ignore exactly them. Path
+#   ignores are not marker exclusions, so the full tier still has no `-m`.
+
+_PUSH_ONLY_GUARD = "github.event_name == 'push'"
+_NIGHTLY_SERIAL_PATHS = ("config/settings/tests", "apps/core/tests/test_migrations.py")
+
+
+def _load_workflow(path: Path) -> dict:
+    """Parse a workflow file into a mapping (PyYAML is an app dependency)."""
+    import yaml  # local import: only this section needs structured parsing
+
+    return yaml.safe_load(path.read_text(encoding="utf-8"))
+
+
+def _workflow_steps(workflow: dict) -> list[tuple[str, str]]:
+    """Return ``(job_name, run_command)`` for every step that has a ``run:`` key."""
+    steps: list[tuple[str, str]] = []
+    for job_name, job in workflow.get("jobs", {}).items():
+        for step in job.get("steps", []) or []:
+            command = step.get("run")
+            if isinstance(command, str):
+                steps.append((job_name, command))
+    return steps
+
+
+def _assert_full_tier_guard(workflow: dict) -> None:
+    """Assert the ``test-full`` job is guarded to push events only (D10).
+
+    Shared with the RED proof below so the discriminating property is exercised
+    on the same predicate that guards the real file.
+    """
+    job = workflow.get("jobs", {}).get("test-full")
+    assert job is not None, "ci.yml must define the `test-full` job"
+    condition = job.get("if")
+    assert isinstance(condition, str) and _PUSH_ONLY_GUARD in condition, (
+        "ci.yml `test-full` must carry `if: github.event_name == 'push'` so the "
+        "workflow-level pull_request trigger does not run the full tier on every "
+        f"PR (D10); found if={condition!r}"
+    )
+
+
+def test_full_tier_is_push_only() -> None:
+    """`ci.yml` `test-full` must be gated to push events (D10).
+
+    Structural guard: the property is the job's own `if:` expression, a static
+    YAML value — no runtime outcome exists to observe.
+    """
+    _assert_full_tier_guard(_load_workflow(_CI_YML))
+
+
+def test_full_tier_guard_has_discriminating_power() -> None:
+    """The push-only guard rejects an unguarded or mis-guarded job (RED proof).
+
+    The pre-fix file (no `if:`) must fail, and so must a guard widened to every
+    event. Only the push-only expression passes.
+    """
+    for wrong in (
+        # Pre-fix shape: no `if:` at all.
+        {"jobs": {"test-full": {"runs-on": "ubuntu-latest"}}},
+        # Guarded to the wrong event.
+        {"jobs": {"test-full": {"if": "github.event_name == 'pull_request'"}}},
+        # A condition that is true for every event.
+        {"jobs": {"test-full": {"if": "github.event_name != 'schedule'"}}},
+    ):
+        with pytest.raises(AssertionError):
+            _assert_full_tier_guard(wrong)
+
+    _assert_full_tier_guard(
+        {"jobs": {"test-full": {"if": "github.event_name == 'push'"}}}
+    )
+
+
+def _pytest_steps() -> list[tuple[bool, str]]:
+    """Return ``(is_serial, run_command)`` for every pytest invocation in the nightly.
+
+    A pytest invocation is a ``run:`` command starting with ``uv run pytest`` —
+    ``manage.py compilemessages`` also takes ``--ignore=`` flags and must not be
+    mistaken for a test run.
+    """
+    return [
+        ("-p no:xdist" in command, command)
+        for _job, command in _workflow_steps(_load_workflow(_CI_NIGHTLY_YML))
+        if command.strip().startswith("uv run pytest")
+    ]
+
+
+def test_nightly_serial_step_covers_settings_and_migrations() -> None:
+    """The nightly serial step runs settings + migrations with `-p no:xdist` (D11).
+
+    Plan §6 Step 6: the settings/migrations portion runs serial. Both paths
+    must be named in one runnable command, and that command must disable xdist.
+    """
+    serial = [command for is_serial, command in _pytest_steps() if is_serial]
+    covering = [
+        command
+        for command in serial
+        if all(path in command for path in _NIGHTLY_SERIAL_PATHS)
+    ]
+    assert covering, (
+        "ci-nightly.yml must run one serial pytest command covering both "
+        f"{_NIGHTLY_SERIAL_PATHS} with `-p no:xdist` (plan §6 Step 6, D11); "
+        f"serial commands found: {serial}"
+    )
+
+
+def test_nightly_full_tier_ignores_serial_paths() -> None:
+    """The nightly full tier path-ignores exactly what the serial step covers (D11).
+
+    "Every test runs exactly once": without the ignores the settings and
+    migration tests are re-collected (and re-run) by the parallel tier. The
+    full tier must also keep its no-marker-exclusion property — path ignores are
+    not marker exclusions.
+    """
+    parallel = [command for is_serial, command in _pytest_steps() if not is_serial]
+    assert len(parallel) == 1, (
+        "ci-nightly.yml must have exactly one parallel pytest invocation; "
+        f"found {parallel}"
+    )
+    command = parallel[0]
+    for path in _NIGHTLY_SERIAL_PATHS:
+        assert f"--ignore={path}" in command, (
+            f"ci-nightly.yml full tier must pass --ignore={path} so the serial "
+            f"coverage is not duplicated (D11); got: {command}"
+        )
+    assert '-m "not (' not in command, (
+        "ci-nightly.yml full tier must keep no marker exclusion (path ignores "
+        f"are not markers); got: {command}"
+    )
 
 
 # --- DR runbook executability (12-OPS-006) ---------------------------------

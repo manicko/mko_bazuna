@@ -133,26 +133,28 @@ jobs:
         run: uv run pytest ../telegram_bot/tests -p no:xdist --tb=short --reuse-db
         working-directory: src/backend
 
-      # Serial settings-package run. The settings tests spawn subprocesses and
-      # are not DB-bound; running them serially keeps their per-module import
-      # and subprocess timing honest, and keeps them out of the xdist worker a
-      # `migrations` xdist_group would otherwise serialize first.
-      - name: Run settings tests serially
+      # Serial settings/migrations portion (plan §6 Step 6). The settings tests
+      # spawn subprocesses and the migration tests apply DDL against the live
+      # test database; both are re-run here with `-p no:xdist` so they are not
+      # split across workers. The full-tier step below ignores exactly these
+      # two paths, so every test still runs exactly once per nightly run.
+      - name: Run settings + migrations tests serially (plan §6 Step 6)
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-        run: uv run pytest config/settings/tests -p no:xdist --tb=short --reuse-db
+        run: uv run pytest config/settings/tests apps/core/tests/test_migrations.py -p no:xdist --tb=short --reuse-db
         working-directory: src/backend
 
       # Full tier: no marker exclusion — `slow`, `real_images` AND `seed` all run.
-      # `test_migrations.py` is held on a single worker by its `migrations`
-      # xdist_group; the two serial steps above cover the packages that are
-      # order-sensitive outside that group.
+      # The two path ignores are not marker exclusions: they remove only the
+      # settings/migrations paths already executed serially above, so nothing in
+      # this workflow runs twice. `test_migrations.py` keeps its `migrations`
+      # xdist_group pin for any parallel run that does collect it.
       - name: Run pytest (nightly full tier, no marker exclusion)
         env:
           DJANGO_SETTINGS_MODULE: config.settings.test
           DATABASE_URL: postgres://postgres:postgres@localhost:5432/mko_bazuna
           DJANGO_SECRET_KEY: test-secret-key-for-testing-only
-        run: uv run pytest --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup
+        run: uv run pytest --ignore=config/settings/tests --ignore=apps/core/tests/test_migrations.py --reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup
         working-directory: src/backend

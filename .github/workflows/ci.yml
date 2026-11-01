@@ -209,6 +209,10 @@ jobs:
   test-full:
     runs-on: ubuntu-latest
     needs: build
+    # Push only (pinned by tests/test_docs_ci_parity.py::test_full_tier_is_push_only):
+    # the workflow-level `pull_request` trigger must not pull this ~7 min job
+    # into every PR run.
+    if: github.event_name == 'push'
     env:
       PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
     services:
