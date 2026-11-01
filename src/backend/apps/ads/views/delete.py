@@ -6,19 +6,22 @@ Implements US-S6 self-delete ad flow:
     - Status set to DELETED, hidden immediately from public
     - Wrong-owner returns 403 Forbidden
     - Physical cleanup deferred to Phase 4 sweeps
+
+The transition itself lives in the shared lifecycle service (S4.1) so the
+future ``/api/v1/ads/{id}/delete/`` endpoint runs the same state mechanics.
+This flow is deliberately gate-free: no consent or audience check applies.
 """
 
 import logging
 
 from django.contrib.auth.decorators import login_required
-from django.db import transaction
+from django.core.exceptions import PermissionDenied
 from django.http import HttpRequest, HttpResponse, HttpResponseForbidden
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import redirect
 from django.utils.translation import gettext as _
 from django.views.decorators.http import require_POST
 
-from apps.ads.models import Ad
-from apps.core.enums import AdStatus
+from apps.ads.services.lifecycle import delete_ad
 
 logger = logging.getLogger(__name__)
 
@@ -39,22 +42,9 @@ def ad_delete(request: HttpRequest, ad_id: int) -> HttpResponse:
     Returns:
         Redirect to dashboard or 403 Forbidden if unauthorized
     """
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  # django-stubs not installed; Atomic lacks CM stubs
-        ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
-
-        # Authorization check: must own the ad
-        if ad.user_id != request.user.id:
-            logger.warning(
-                "User %s attempted to delete ad %s owned by %s",
-                request.user.id,
-                ad_id,
-                ad.user_id,
-            )
-            return HttpResponseForbidden(_("You do not have permission to delete this ad."))
-
-        # Transition to DELETED (transition_to handles deleted_at timestamp)
-        if ad.status != AdStatus.DELETED:
-            ad.transition_to(AdStatus.DELETED)
-            logger.info("Ad %s deleted by user %s", ad_id, request.user.id)
+    try:
+        delete_ad(ad_id, request.user.id)
+    except PermissionDenied:
+        return HttpResponseForbidden(_("You do not have permission to delete this ad."))
 
     return redirect("ads:dashboard")

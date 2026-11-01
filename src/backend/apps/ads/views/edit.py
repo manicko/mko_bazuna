@@ -21,6 +21,7 @@ from typing import TYPE_CHECKING
 
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.db import DatabaseError, OperationalError, transaction
 from django.http import Http404, HttpRequest, HttpResponse, HttpResponseForbidden
 from django.shortcuts import get_object_or_404, redirect, render
@@ -31,6 +32,11 @@ if TYPE_CHECKING:
     from apps.users.models import User
 
 from apps.ads.models import Ad
+from apps.ads.services.lifecycle import (
+    archive_ad,
+    assert_lifecycle_owner,
+    reactivate_ad,
+)
 from apps.ads.services.submission import (
     AdEditInput,
     SubmitAdInput,
@@ -141,7 +147,7 @@ def _consent_required_forbidden(user: User, ad_id: int) -> HttpResponseForbidden
 
     Uses ``HttpResponseForbidden`` with a distinct message — the same shape
     these views already use for the ownership refusal. There is no GET consent
-    page (``users/urls.py`` exposes POST-only consent endpoints), so a 403 with
+    page (``users/urls.py` exposes POST-only consent endpoints), so a 403 with
     a clear message is the honest response.
     """
     logger.warning(
@@ -154,6 +160,21 @@ def _consent_required_forbidden(user: User, ad_id: int) -> HttpResponseForbidden
             "To manage ads, please accept the personal data storage consent first."
         )
     )
+
+
+def _ownership_refused_forbidden(
+    permission_message: str, action: str, ad_id: int, user_id: int
+) -> HttpResponse:
+    """Log and build the ownership 403 of a seller lifecycle action.
+
+    ``permission_message`` is the translated text each action already returned
+    (``"You do not have permission to <action> this ad."``), passed as a whole
+    so the rendered 403 body stays byte-identical.
+    """
+    logger.warning(
+        "User %s attempted to %s ad %s without owning it", user_id, action, ad_id
+    )
+    return HttpResponseForbidden(permission_message)
 
 
 @login_required
@@ -420,6 +441,10 @@ def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
 
     Manual archive action for sellers. Does not require moderation.
 
+    Ownership, locking and the ``PUBLISHED -> ARCHIVED`` transition live in the
+    shared lifecycle service (S4.1); the consent gate is asserted here, at the
+    caller boundary, in the same order as before the extraction.
+
     Args:
         request: HTTP request (authenticated user required)
         ad_id: The ad ID to archive
@@ -428,26 +453,23 @@ def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
         Redirect to dashboard or 403 Forbidden if unauthorized
     """
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  # django-stubs not installed; Atomic lacks CM stubs
-        ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
-
-        # Authorization check
-        if ad.user_id != request.user.id:
-            logger.warning(
-                "User %s attempted to archive ad %s owned by %s",
-                request.user.id,
+        try:
+            assert_lifecycle_owner(ad_id, request.user.id)
+        except PermissionDenied:
+            return _ownership_refused_forbidden(
+                _("You do not have permission to archive this ad."),
+                "archive",
                 ad_id,
-                ad.user_id,
-            )
-            return HttpResponseForbidden(
-                _("You do not have permission to archive this ad.")
+                request.user.id,
             )
 
         if not _seller_may_create_ad(request.user):
             return _consent_required_forbidden(request.user, ad_id)
 
-        if ad.status == AdStatus.PUBLISHED:
-            ad.transition_to(AdStatus.ARCHIVED)
-            logger.info("Ad %s archived by user %s", ad_id, request.user.id)
+    try:
+        archive_ad(ad_id, request.user.id)
+    except Http404:
+        raise
 
     return redirect("ads:dashboard")
 
@@ -469,6 +491,10 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
     Database errors keep the 03-DB-004 boundary (lock timeout -> 503 via
     DbLockTimeoutMiddleware, anything else re-raised untouched).
 
+    Ownership, the ARCHIVED -> ON_MODERATION transition and the moderation
+    decision live in the shared lifecycle service (S4.1); the consent gate is
+    asserted here, at the caller boundary, in the same order as before.
+
     Args:
         request: HTTP request (authenticated user required)
         ad_id: The ad ID to reactivate
@@ -479,31 +505,20 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
     passed: bool | None = None
     try:
         with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  # django-stubs not installed; Atomic lacks CM stubs
-            ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
-
-            # Authorization check
-            if ad.user_id != request.user.id:
-                logger.warning(
-                    "User %s attempted to reactivate ad %s owned by %s",
-                    request.user.id,
+            try:
+                assert_lifecycle_owner(ad_id, request.user.id)
+            except PermissionDenied:
+                return _ownership_refused_forbidden(
+                    _("You do not have permission to reactivate this ad."),
+                    "reactivate",
                     ad_id,
-                    ad.user_id,
-                )
-                return HttpResponseForbidden(
-                    _("You do not have permission to reactivate this ad.")
+                    request.user.id,
                 )
 
             if not _seller_may_create_ad(request.user):
                 return _consent_required_forbidden(request.user, ad_id)
 
-            if ad.status == AdStatus.ARCHIVED:
-                # Update status to ON_MODERATION for re-check (transition_to clears archived_at)
-                ad.transition_to(AdStatus.ON_MODERATION)
-
-                # Run auto-moderation check
-                from apps.moderation.services.auto_moderation import auto_moderate
-
-                passed = auto_moderate(ad)
+        passed = reactivate_ad(ad_id, request.user.id).passed
     except (Http404, DatabaseError):
         # A missing ad keeps its 404; a database error keeps the 03-DB-004
         # boundary (a lock timeout becomes a 503 via DbLockTimeoutMiddleware,

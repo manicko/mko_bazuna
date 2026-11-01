@@ -723,3 +723,23 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `msgstr`: the support-greeting line `"Za kreiranje oglasa koristi /post."` had been written with
   Cyrillic characters (`oglasа`, `користи`); the whole `bs` catalog is now free of Cyrillic
   (`[\u0400-\u04FF]` scan → 0 hits). `apps/ads/tests/test_i18n_completeness.py` green.
+- **S4.1:** ad lifecycle state mechanics extracted — `apps/ads/services/lifecycle.py` now owns
+  `archive_ad(ad_id, user_id)`, `reactivate_ad(ad_id, user_id)` and `delete_ad(ad_id, user_id)`
+  (request-free; named-tuple results `ArchiveResult`, `ReactivateResult`, `DeleteResult`). The HTML
+  action views `apps/ads/views/edit.py` (`ad_archive`, `ad_reactivate`) and
+  `apps/ads/views/delete.py` (`ad_delete`) are rewired as thin callers; their redirects, 403 bodies,
+  dashboard messages, 404s and 503 lock-timeout routing are **byte-identical** (proven by the
+  untouched pre-existing suites `test_edit.py` — `TestAdArchive`, `TestAdReactivateDirect`,
+  `TestBannedSellerRelistNowRefused`, `TestSellerWebStorageConsentGate` — and `test_delete.py`).
+  **Contract:** the service carries state mechanics only (ownership, `select_for_update`,
+  `Ad.transition_to`, reactivation's `auto_moderate` decision in one atomic block); consent stays a
+  **caller-side** gate (`_seller_may_create_ad` in HTML, `can_create_ad` for the future API), and
+  delete is gate-free by design. Refusals are exceptions: `Http404` (missing ad),
+  `django.core.exceptions.PermissionDenied` (non-owner); a wrong-status call is a silent no-op
+  (`archived=False` / `attempted=False` / `deleted=False`), matching today's view behavior. Note that
+  consent is asserted **after** the transition in the HTML flows (documented current behavior, not
+  changed here). **No endpoint ships in this task** — rows #7/#8/#9 land at S4.3 on this service.
+  `telegram_bot/**` is untouched (the plan names no bot rewiring). Tests: new
+  `apps/ads/tests/test_lifecycle_service.py` (per-transition happy path with timestamps + the
+  `AD_PUBLISHED`/`MODERATION_APPROVED`/`MODERATION_REJECTED` analytics rows, wrong-status no-ops,
+  non-owner/404 refusals, the failing-check rollback, and the gate-free delete).
