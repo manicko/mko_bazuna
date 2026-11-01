@@ -1054,3 +1054,21 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `test_moderation_api_actions.py`: 198 passed); R-F2 evidence intact — `apps/moderation/views/api_bulk.py`
   byte-identical and its suites green (139 passed across `test_moderation_api_reads.py`,
   `test_priority_service.py`, `test_moderation_views.py`, `test_problem_response.py`).
+
+- **S5.1:** the parity audit shipped — `apps/core/management/commands/verify_parity.py` (+
+  `apps/core/tests/test_verify_parity.py`). It is the **poll-safe** verification tier (plan §5,
+  layer 5): a read-only command that turns this document's claims into a deterministic machine
+  check. It performs seven checks, one `OK`/`FAIL` line each: `route_reversible` (every route
+  under `/api/v1/` reverses and re-resolves to itself), `pairing_module_exists` (every R-F2 pairing
+  row names source modules that exist, `REPO_MIRROR_ROOTS` included), `route_has_pairing_row`
+  (every mounted API view module has a pairing row), `pairing_row_has_route` (every pairing row is
+  reachable from a shipped route — or, for the S2.7 saved-searches read, via the verified
+  `DELEGATING_VIEWS` dispatcher edge), `inventory_route_resolves` (every **shipped** row of the
+  *Endpoint inventory* above names a mounted URL), `inventory_route_has_pairing_row` (every shipped
+  row's view module has a pairing row) and `inventory_urls_are_mounted` (every shipped row's URL
+  resolves inside `/api/v1/`). Output is deterministic; `--json` prints one machine-readable
+  document (`status`, `summary`, `checks[]`). **Exit 0 iff every check passes, 1 otherwise.** No
+  DB access, no analytics, no writes; **never scheduled** (`HOURLY_COMMANDS`/`DAILY_COMMANDS`
+  untouched). Invocation is documented in `.kilo/rules/commands.md`. The referenced `#17` alert
+  substitute (`SavedSearchNotification.delivered_at`) is read through the shell/ORM tier,
+  deliberately not from this command (the command stays schema-free).

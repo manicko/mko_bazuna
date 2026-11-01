@@ -42,6 +42,20 @@ pins that token against the `ci.yml` PR gate.
 
 > `ruff check --fix` handles import sorting (I001). `ruff format` only reformats (line wraps, quotes) and does **NOT** sort imports — `.\Makefile.ps1 format` runs `ruff check --fix src/`, not `ruff format`.
 
+## API parity audit (rule 18)
+
+`verify_parity` is the read-only, **poll-safe** tier of the API-parity checks (plan §5, layer 5):
+it walks the live `/api/v1/` URLconf, consolidates it with the R-F2 pairing table
+(`apps/api/tests/test_import_rule.py`) and with the endpoint inventory in
+`docs/01-spec/api-surface.md`, then prints one `OK`/`FAIL` line per check plus a summary.
+**Exit 0 iff every check passes.** No DB writes, no analytics, never scheduled.
+
+| Task | Command |
+|---|---|
+| Human-readable audit | `$dev run --rm --no-deps --entrypoint "" web python src/backend/manage.py verify_parity` |
+| Machine-readable (CI/agents) | `... verify_parity --json` (one JSON document: `status`, `summary`, `checks[]`) |
+| Tests | `src/backend/apps/core/tests/test_verify_parity.py` |
+
 ## Tests (Docker only — never `uv run pytest` locally)
 
 Local `uv run pytest` fails: there is no DB on `localhost:5432`. Runs go through the `test` service of the `mko-bazuna-test` Compose project (PostgreSQL on host port 5433).
