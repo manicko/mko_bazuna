@@ -62,9 +62,10 @@ Deliberate HTML-vs-API differences (documented in
   it to a 409 ``invalid_transition`` problem, because a machine caller must not
   be told "done" for a request that committed nothing (§2.5).
 - **Consent ordering.** The HTML ``ad_archive`` / ``ad_reactivate`` views assert
-  consent **after** the transition block was reached; these endpoints assert it
-  **before** any service call, so a consent-refused request provably changes
-  nothing (§2.5 "consent BEFORE transition").
+  consent **inside** the transaction that performs the transition (ownership ->
+  consent -> action, one commit); these endpoints assert it **before** any
+  service call, so a consent-refused request provably changes nothing (§2.5
+  "consent BEFORE transition").
 - **Lock timeout.** No new handling: the service lets ``OperationalError``
   propagate and the existing ``DbLockTimeoutMiddleware`` already renders a 503
   for the lifecycle paths (it names ``ad_archive`` / ``ad_reactivate`` /

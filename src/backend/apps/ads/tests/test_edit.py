@@ -25,6 +25,7 @@ from unittest.mock import patch
 
 import pytest
 from django.core.cache import cache
+from django.core.exceptions import PermissionDenied
 from django.db.models.signals import post_save
 from django.test import Client
 from django.urls import reverse
@@ -1636,3 +1637,71 @@ class TestSellerWebStorageConsentGate:
 
         assert client.get(reverse("ads:edit", args=[ad.id])).status_code == 200
         assert client.get(reverse("ads:dashboard")).status_code == 200
+
+
+
+# ---------------------------------------------------------------------------
+# Lifecycle ownership-refusal belt: a late PermissionDenied keeps the owner 403
+# ---------------------------------------------------------------------------
+
+
+class TestLifecycleOwnershipRefusalBelt:
+    """A ``PermissionDenied`` raised by the lifecycle service keeps the owner 403.
+
+    The views' ownership precheck refuses a non-owner first, so through the real
+    path a service-side refusal is unreachable. The belt is the explicit mapping
+    for it: ``ad_archive`` must answer the owner-specific 403 instead of Django's
+    default 403 page, and ``ad_reactivate`` must not report it as an
+    auto-moderation failure. The seam is patched to raise (it does not delegate):
+    the point under test is the handler, not the service.
+    """
+
+    def test_archive_late_permission_denied_keeps_the_ownership_403(
+        self,
+        seller,
+        category,
+        city,
+        monkeypatch,
+    ) -> None:
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+        client = Client()
+        client.force_login(seller)
+
+        def refuse(*args, **kwargs):
+            raise PermissionDenied("You do not own this ad.")
+
+        monkeypatch.setattr("apps.ads.views.edit.archive_ad", refuse)
+
+        response = client.post(reverse("ads:archive", args=[ad.id]))
+
+        assert response.status_code == 403
+        assert b"You do not have permission to archive this ad." in response.content
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.PUBLISHED
+
+    def test_reactivate_late_permission_denied_is_not_a_moderation_failure(
+        self,
+        seller,
+        category,
+        city,
+        monkeypatch,
+        caplog,
+    ) -> None:
+        ad = create_test_ad(seller, category, city, status=AdStatus.ARCHIVED)
+        client = Client()
+        client.force_login(seller)
+
+        def refuse(*args, **kwargs):
+            raise PermissionDenied("You do not own this ad.")
+
+        monkeypatch.setattr("apps.ads.views.edit.reactivate_ad", refuse)
+
+        response = client.post(reverse("ads:reactivate", args=[ad.id]))
+
+        assert response.status_code == 403
+        assert b"You do not have permission to reactivate this ad." in response.content
+        assert "reactivation failed during auto-moderation" not in caplog.text
+
+        ad.refresh_from_db()
+        assert ad.status == AdStatus.ARCHIVED

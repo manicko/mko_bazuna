@@ -143,6 +143,33 @@ class TestAdReactivateLockTimeout:
         assert "busy" in response.content.decode().lower()
 
 
+class TestAdArchiveLockTimeout:
+    """``ad_archive`` keeps the middleware boundary (503 + ``Retry-After``).
+
+    The view has no error surface of its own, so a lock timeout must escape as an
+    ``OperationalError`` and never be swallowed into a redirect.
+    """
+
+    @pytest.mark.django_db
+    def test_lock_timeout_still_returns_503(self, seller, category, city) -> None:
+        from apps.ads.views import edit
+
+        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
+
+        client = Client()
+        client.force_login(seller)
+
+        with patch.object(
+            edit.Ad.objects,
+            "select_for_update",
+            side_effect=_lock_timeout_error(),
+        ):
+            response = client.post(reverse("ads:archive", args=[ad.id]))
+
+        assert response.status_code == 503
+        assert "busy" in response.content.decode().lower()
+
+
 class TestBulkLockTimeout:
     """The three bulk actions fail loudly with nothing committed."""
 

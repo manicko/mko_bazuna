@@ -14,6 +14,13 @@ row lock until the editing transaction commits, guaranteeing the row exists
 for the entire transition window. Without the lock, the sweep could delete
 the row between the fetch and ``refresh_from_db()``, causing
 ``Ad.DoesNotExist`` to propagate from ``transition_to()``.
+
+``TestLifecycleActionAtomicContinuity`` and ``TestLifecycleActionLockContinuity``
+pin the single-transaction topology of the HTML lifecycle actions: the first
+proves the service call runs inside the view's own ``atomic()`` block
+(``in_atomic_block`` at the seam), the second proves the row lock taken by the
+ownership precheck is still held at the service-call instant (a concurrent
+``select_for_update`` probe times out with SQLSTATE 55P03).
 """
 
 from __future__ import annotations
@@ -22,7 +29,9 @@ import threading
 import time
 
 import pytest
-from django.db import connection, transaction
+from django.db import OperationalError, connection, transaction
+from django.test import Client
+from django.urls import reverse
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
@@ -244,3 +253,168 @@ class TestEditViewsRowLockConcurrency:
             "Ad should have been hard-deleted by the concurrent sweep "
             "after the lock was released"
         )
+
+
+
+# ---------------------------------------------------------------------------
+# Tests: lifecycle actions share the view's one transaction and one row lock
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.parametrize(
+    ("status", "target", "service_name"),
+    [
+        (AdStatus.PUBLISHED, "ads:archive", "archive_ad"),
+        (AdStatus.ARCHIVED, "ads:reactivate", "reactivate_ad"),
+    ],
+)
+class TestLifecycleActionAtomicContinuity:
+    """The HTML lifecycle service call runs inside the view's ``atomic()`` block.
+
+    ``transaction=True`` is mandatory: under plain ``django_db`` the pytest
+    wrapper itself keeps ``in_atomic_block`` true and the observation would prove
+    nothing.
+    """
+
+    def test_html_action_runs_inside_the_view_transaction(
+        self,
+        seller,
+        category,
+        city,
+        monkeypatch,
+        permissive_criteria,
+        status: AdStatus,
+        target: str,
+        service_name: str,
+    ) -> None:
+        from apps.ads.views import edit
+
+        ad = create_test_ad(seller, category, city, status=status)
+        client = Client()
+        client.force_login(seller)
+
+        observed: list[bool] = []
+        original = getattr(edit, service_name)
+
+        def recording(*args, **kwargs):
+            # Recorded BEFORE delegating: at this instant the service has not
+            # opened its own block, so only the view's block can be open.
+            observed.append(transaction.get_connection().in_atomic_block)
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(edit, service_name, recording)
+
+        response = client.post(reverse(target, args=[ad.id]))
+
+        assert observed == [True]
+        assert response.status_code == 302
+
+
+@pytest.mark.django_db(transaction=True)
+@pytest.mark.slow
+@pytest.mark.integration
+@pytest.mark.concurrent
+@pytest.mark.xdist_group("concurrent")
+@pytest.mark.flaky(reruns=1, reruns_delay=1)
+@pytest.mark.parametrize(
+    ("status", "target", "service_name", "expected_status"),
+    [
+        (
+            AdStatus.PUBLISHED,
+            "ads:archive",
+            "archive_ad",
+            AdStatus.ARCHIVED,
+        ),
+        (
+            AdStatus.ARCHIVED,
+            "ads:reactivate",
+            "reactivate_ad",
+            AdStatus.PUBLISHED,
+        ),
+    ],
+)
+class TestLifecycleActionLockContinuity:
+    """The row lock taken by the precheck is still held at the service-call instant.
+
+    The background request parks at the view-module service seam inside the
+    view's transaction; the main thread probes the row with
+    ``select_for_update()`` under a ``500ms`` ``SET LOCAL lock_timeout`` and must
+    time out with SQLSTATE 55P03. All coordination is Event/join-bounded — no
+    ``sleep``-based rendezvous. The probe's ``atomic()`` block exits before the
+    seam is released so a regression fails on the assertion, never by hanging.
+    """
+
+    def test_view_holds_the_row_lock_until_the_action_commits(
+        self,
+        seller,
+        category,
+        city,
+        monkeypatch,
+        permissive_criteria,
+        status: AdStatus,
+        target: str,
+        service_name: str,
+        expected_status: AdStatus,
+    ) -> None:
+        from apps.ads.views import edit
+
+        ad = create_test_ad(seller, category, city, status=status)
+
+        entered = threading.Event()
+        proceed = threading.Event()
+        thread_errors: list[BaseException] = []
+        responses: list = []
+        original = getattr(edit, service_name)
+
+        def parked(*args, **kwargs):
+            entered.set()
+            assert proceed.wait(timeout=10), "test never released the seam"
+            return original(*args, **kwargs)
+
+        monkeypatch.setattr(edit, service_name, parked)
+
+        def drive() -> None:
+            try:
+                client = Client()
+                client.force_login(seller)
+                responses.append(client.post(reverse(target, args=[ad.id])))
+            except BaseException as exc:  # noqa: BLE001
+                thread_errors.append(exc)
+            finally:
+                connection.close()
+
+        thread = threading.Thread(target=drive)
+        thread.start()
+        try:
+            assert entered.wait(timeout=10), "view never reached the service call"
+
+            # Main thread, its own connection: probe the row under a bounded wait.
+            probe: dict[str, BaseException] = {}
+            try:
+                with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues] - django-stubs not installed
+                    with connection.cursor() as cursor:
+                        cursor.execute("SET LOCAL lock_timeout = '500ms'")
+                    Ad.objects.select_for_update().get(pk=ad.id)
+            except OperationalError as exc:
+                probe["exc"] = exc
+        finally:
+            # The probe's transaction must be closed before the parked request
+            # is released, otherwise a regression would block here instead of
+            # failing on the assertion below.
+            proceed.set()
+
+        thread.join(timeout=15)
+        assert not thread.is_alive(), "background request did not finish"
+        assert not thread_errors, f"background request raised: {thread_errors}"
+
+        exc = probe.get("exc")
+        assert isinstance(exc, OperationalError), (
+            "row was NOT locked when the lifecycle service call ran"
+        )
+        cause = exc.__cause__
+        assert getattr(cause, "sqlstate", None) == "55P03"
+
+        assert responses[0].status_code == 302
+        committed = Ad.objects.get(pk=ad.id)
+        assert committed.status == expected_status

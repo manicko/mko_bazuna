@@ -269,6 +269,12 @@ def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
     shared lifecycle service (S4.1); the consent gate is asserted here, at the
     caller boundary, in the same order as before the extraction.
 
+    The service call runs **inside** this view's ``transaction.atomic()`` block,
+    so the ownership check, the consent gate and the transition share one unit
+    of work and one row-lock lifetime: the service's own ``atomic()`` nests as a
+    PostgreSQL savepoint and its ``select_for_update()`` re-fetch is a
+    same-transaction self-reacquire.
+
     Args:
         request: HTTP request (authenticated user required)
         ad_id: The ad ID to archive
@@ -290,10 +296,22 @@ def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
         if not _seller_may_create_ad(request.user):
             return _consent_required_forbidden(request.user, ad_id)
 
-    try:
-        archive_ad(ad_id, request.user.id)
-    except Http404:
-        raise
+        try:
+            archive_ad(ad_id, request.user.id)
+        except Http404:
+            raise
+        except PermissionDenied:
+            # The precheck above already refused a non-owner, so this belt only
+            # maps a refusal raised by the service itself. It keeps the owner
+            # 403 (same bytes as the precheck's) instead of Django's default
+            # 403 page. It deliberately does not catch DatabaseError: a lock
+            # timeout must keep escaping to DbLockTimeoutMiddleware (503).
+            return _ownership_refused_forbidden(
+                _("You do not have permission to archive this ad."),
+                "archive",
+                ad_id,
+                request.user.id,
+            )
 
     return redirect("ads:dashboard")
 
@@ -319,6 +337,11 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
     decision live in the shared lifecycle service (S4.1); the consent gate is
     asserted here, at the caller boundary, in the same order as before.
 
+    The service call runs **inside** this view's ``transaction.atomic()`` block,
+    so the ownership check, the consent gate, the transition and the
+    auto-moderation decision share one transaction and one row-lock lifetime
+    (the service's ``atomic()`` nests as a savepoint).
+
     Args:
         request: HTTP request (authenticated user required)
         ad_id: The ad ID to reactivate
@@ -342,7 +365,18 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
             if not _seller_may_create_ad(request.user):
                 return _consent_required_forbidden(request.user, ad_id)
 
-        passed = reactivate_ad(ad_id, request.user.id).passed
+            passed = reactivate_ad(ad_id, request.user.id).passed
+    except PermissionDenied:
+        # The precheck above already refused a non-owner, so this belt only
+        # maps a refusal raised by the service itself. Ordered first so an
+        # authorization refusal can never reach the moderation-failure handler
+        # below (it returns the owner 403, same bytes as the precheck's).
+        return _ownership_refused_forbidden(
+            _("You do not have permission to reactivate this ad."),
+            "reactivate",
+            ad_id,
+            request.user.id,
+        )
     except (Http404, DatabaseError):
         # A missing ad keeps its 404; a database error keeps the 03-DB-004
         # boundary (a lock timeout becomes a 503 via DbLockTimeoutMiddleware,

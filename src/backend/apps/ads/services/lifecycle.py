@@ -95,9 +95,21 @@ class DeleteResult(NamedTuple):
 def _fetch_owned_ad(ad_id: int, user_id: int) -> Ad:
     """Lock and return the ad, refusing a missing row or a non-owner.
 
-    The row lock must run inside the caller's transaction — every public
-    function here opens its own ``transaction.atomic()`` before calling this,
-    so the lock and the subsequent write share one unit of work.
+    The row lock must run inside *some* transaction. When a caller opens a
+    lifecycle function, that function's own ``transaction.atomic()`` acquires
+    the lock and holds it to its commit, so the lock and the write share one
+    unit of work. When a boundary calls a lifecycle function **inside its own
+    open atomic block** (the HTML ``ad_archive`` / ``ad_reactivate`` views and
+    the edit view's nested ``submit_ad`` precedent), the service's ``atomic()``
+    is a PostgreSQL SAVEPOINT inside the caller's transaction: the
+    ``select_for_update()`` re-acquisition is a same-transaction self-reacquire
+    (a no-op that cannot block), and the lock and the write share the caller's
+    **one** unit of work and **one** commit.
+
+    Consequences of the savepoint nesting: ``on_commit`` callbacks fire at the
+    **outermost** commit, and a rollback to a savepoint releases only that
+    savepoint's work — **not** the row lock, which lives until the caller's
+    transaction ends.
 
     Raises:
         Http404: No ad with ``ad_id`` exists.
@@ -127,9 +139,15 @@ def assert_lifecycle_owner(ad_id: int, user_id: int) -> None:
     before their own gates (consent), reproducing the HTML action views'
     check order: ownership first, then consent, then the transition.
 
-    The row is locked for the duration of the returned transaction, so the
-    follow-up lifecycle call (which locks the same row again inside its own
-    atomic block) sees a stable row.
+    Returns ``None``; it does **not** own a long-lived lock. The
+    ``select_for_update()`` runs inside the caller's block; because this
+    function opens only a nesting ``atomic()``, the lock lives until the
+    **caller's** transaction exits, not until this function returns. The
+    caller must keep its own ``atomic()`` block open across the follow-up
+    :func:`archive_ad` / :func:`reactivate_ad` call — that is what makes the
+    check and the action one unit of work and what keeps the refusals ordered
+    ownership -> consent -> action. A caller that exits its block first releases
+    the lock and reintroduces the gap between the check and the write.
 
     Raises:
         Http404: No ad with ``ad_id`` exists.
