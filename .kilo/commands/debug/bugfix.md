@@ -1,7 +1,6 @@
 ---
 name: bugfix
 description: Execute the next bugfix safely and incrementally following project standards and architecture constraints
-agent: debug
 alwaysApply: false
 ---
 

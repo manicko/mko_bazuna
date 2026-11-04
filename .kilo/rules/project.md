@@ -53,6 +53,5 @@
     All API errors must follow RFC 9457 (`application/problem+json`). Use standard HTTP status codes, consistent error structures, and stable error types. Centralize error handling on both backend and frontend.
 
 
-18. **Agent-First / API Parity Rule**
-    Every user-facing action must be accessible programmatically via an API, CLI, or callable function, sharing the same business logic as the UI. All filters, sorting, pagination, and search must be testable without browser automation. 
-
+18. **Agent-First**
+     The architecture must enable LLM coding agents to safely modify, test, debug, and refactor the application using deterministic, reproducible, and machine-readable verification. Automated verifiability is the primary goal.
