@@ -22,7 +22,6 @@ moderator removing a single photo (apps.ads.services.ad_image_removal).
 from __future__ import annotations
 
 import logging
-from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from django.contrib import messages
@@ -49,11 +48,8 @@ from apps.ads.services.lifecycle import (
     assert_lifecycle_owner,
     reactivate_ad,
 )
-from apps.ads.services.submission import AdEditInput
-from apps.core.enums import AdStatus
+from apps.ads.services.submission import AdEditInput, SubmitAdOutcome
 from apps.core.utils.db_lock_timeout import is_lock_timeout
-from apps.currencies.enums import CurrencyCode
-from apps.currencies.services.price_normalizer import normalize_price_to_eur
 
 logger = logging.getLogger(__name__)
 
@@ -64,27 +60,6 @@ __all__ = [
     "ad_edit",
     "ad_reactivate",
 ]
-
-
-def _apply_price_change(
-    ad: Ad,
-    price_amount: Decimal,
-    price_currency: CurrencyCode | None,
-) -> Ad:
-    """Apply a price change and recompute ``price_normalized_eur``.
-
-    Sets the source-of-truth fields (``price_amount``/``price_currency``) and
-    recomputes the derived EUR-normalized value via ``normalize_price_to_eur``
-    (the shared BR-03 seam). The normalizer is resolved from *this* module's
-    namespace, which is the call-site the price-normalization parity test
-    patches. The edit flow calls the equivalent
-    ``edit_flow.apply_price_change``.
-    """
-    ad.price_amount = price_amount
-    if price_currency is not None:
-        ad.price_currency = price_currency.value
-    normalize_price_to_eur(ad, price_amount, price_currency)
-    return ad
 
 
 def _seller_may_create_ad(user: User) -> bool:
@@ -199,11 +174,6 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
         with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  # django-stubs not installed; Atomic lacks CM stubs
             ad = get_object_or_404(Ad.objects.select_for_update(), id=ad_id)
 
-            # Determine if this is a reactivation request
-            is_reactivation = ad.status == AdStatus.ARCHIVED and request.POST.get(
-                "reactivate"
-            )
-
             # Validate POST data via DTO before any ad.save() call (QLT-004).
             # AdEditInput models the web-edit path's currency-fallback-on-invalid
             # and price-fallback-to-Free semantics via field validators.
@@ -216,20 +186,19 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
 
             # Status-to-branch table and payload application live in the shared
             # edit-flow service (S4.2). This view keeps only the response shapes.
-            if is_reactivation:
-                result = apply_edit_payload(
-                    ad, dto, True, outcome_prefix=EditOutcome.REACTIVATED
-                )
-            else:
-                result = apply_edit_payload(
-                    ad, dto, False, outcome_prefix=EditOutcome.RESUBMITTED
-                )
+            # The raw ``reactivate`` flag is passed through: the ARCHIVED
+            # conjunct that makes it a reactivation lives in the service.
+            result = apply_edit_payload(ad, dto, bool(request.POST.get("reactivate")))
 
             if result.outcome in (
                 EditOutcome.REACTIVATED,
                 EditOutcome.RESUBMITTED,
             ):
-                if not result.moderation_failed:
+                # Only a PUBLISHED submission is a success (baseline rule): a
+                # moderation failure parks the ad, and every submit-time refusal
+                # (consent, draft gone, photo gone, invalid transition) leaves it
+                # untouched — all of them re-render the form with the error.
+                if result.submission_outcome is SubmitAdOutcome.PUBLISHED:
                     if result.outcome is EditOutcome.RESUBMITTED:
                         logger.info(
                             "Ad %s text edited, moved to ON_MODERATION", ad_id

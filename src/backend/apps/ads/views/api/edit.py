@@ -31,19 +31,33 @@ Pipeline (fixed order, one branch per §2.5 taxonomy member):
    whose ad cannot be edited in its status answers 409 ``not_editable`` *before*
    any write.
 8. **Transition** — ``apply_edit_payload`` under the HTML view's transaction +
-   ``select_for_update`` lock, keyed on whether the ad was ``ARCHIVED`` and the
-   body carried ``reactivate`` (the exact ``is_reactivation`` term of the HTML
-   view).
+   ``select_for_update`` lock, with the body's raw ``reactivate`` flag (the
+   service derives the ``ARCHIVED`` conjunct, exactly as the HTML view relies
+   on it).
 
-Result → HTTP mapping (documented in ``docs/01-spec/api-surface.md``):
+Result → HTTP mapping (documented in ``docs/01-spec/api-surface.md``). The
+service reports two orthogonal facts (``EditResult.outcome`` = which branch ran,
+``EditResult.submission_outcome`` = what ``submit_ad`` said); success is
+``submission_outcome is SubmitAdOutcome.PUBLISHED``, never the branch label:
 
-| ``EditResult`` (``EditOutcome``)                      | HTTP |
+| ``EditResult``                                        | HTTP |
 |---|---|
-| ``REACTIVATED`` / ``RESUBMITTED``, no moderation fail | 200 + post-edit ad state |
-| ``REACTIVATED`` / ``RESUBMITTED``, ``moderation_failed`` | 200 + state ``on_moderation_failed`` |
+| ``REACTIVATED`` / ``RESUBMITTED`` + ``PUBLISHED``     | 200 + post-edit ad state |
+| ``REACTIVATED`` / ``RESUBMITTED`` + ``MODERATION_FAILED`` | 200 + state ``on_moderation_failed`` |
+| ``REACTIVATED`` / ``RESUBMITTED`` + ``CONSENT_REQUIRED`` | 403 ``consent_required`` |
+| ``REACTIVATED`` / ``RESUBMITTED`` + ``INVALID_TRANSITION`` | 409 ``invalid_transition`` |
+| ``REACTIVATED`` / ``RESUBMITTED`` + ``DRAFT_GONE``    | 409 ``draft_gone`` |
+| ``REACTIVATED`` / ``RESUBMITTED`` + ``PHOTO_UNAVAILABLE`` | 409 ``photo_unavailable`` |
 | ``PRICE_UPDATED``                                     | 200 + post-edit ad state |
 | ``DIRECT_SAVED``                                      | 200 + post-edit ad state |
-| ``REFUSED``                                           | 409 ``invalid_transition`` |
+| ``REFUSED`` (status-set refusal, no submission)       | 409 ``invalid_transition`` |
+
+The four refusal rows reuse the ``submit_ad`` outcome tokens verbatim (declared
+locally, never imported from ``apps.ads.views.api.submit`` — that would add an
+R-F2 mirror edge). They are checked **before** the ``REFUSED`` row: the two are
+mutually exclusive in practice (``REFUSED`` never calls ``submit_ad``, and the
+submit branches always pass the affordance predicate), and the order keeps the
+honest per-outcome mapping first.
 
 ``REFUSED`` is surfaced as ``invalid_transition`` rather than ``not_editable``
 because by the time the service returns it the request's status **did** pass the
@@ -60,25 +74,24 @@ O-2a — a change *was* committed), so it is a 200 carrying the published
 Deliberate HTML-vs-API differences (documented):
 
 - **Refusal.** HTML renders the edit form with HTTP 200 and an error message
-  (auditor A5); the API answers the 409 problems described above.
+  for every non-``PUBLISHED`` submission outcome as well as for the status-set
+  refusal (auditor A5); the API answers the 403/409 problems above.
 - **Lock timeout.** HTML re-renders the form with the busy message; the API
   answers the 503 ``retryable`` problem with ``Retry-After: 30``, the documented
   exception for this route.
 - **Consent ordering.** The HTML view asserts consent before its POST row lock
   (S4.2); the API asserts it here, and additionally maps ``submit_ad``'s own
   ``CONSENT_REQUIRED`` outcome to 403 (the consent race: consent withdrawn
-  between this view's gate and ``submit_ad``'s re-read).
+  between this view's gate and ``submit_ad``'s re-read). The outcome is read
+  from the returned ``EditResult`` — no request-time patching of the service.
 
 No CSRF exemption is applied: this write uses the middleware chain as-is.
 """
 
 import logging
 from decimal import Decimal, InvalidOperation
-from functools import wraps
 from http import HTTPStatus
-from importlib import import_module
 from typing import Any, Final
-from unittest.mock import patch
 
 from django.db import DatabaseError, transaction
 from django.http import HttpRequest, JsonResponse
@@ -95,9 +108,8 @@ from apps.ads.services.edit_flow import (
 from apps.ads.services.submission import (
     AdEditInput,
     SubmitAdOutcome,
-    SubmitAdResult,
 )
-from apps.core.enums import AdStatus, RateLimitBudget
+from apps.core.enums import RateLimitBudget
 from apps.core.schemas import BaseInputModel
 from apps.core.utils.api_auth import TYPE_METHOD_NOT_ALLOWED, login_required_api
 from apps.core.utils.db_lock_timeout import is_lock_timeout
@@ -117,6 +129,8 @@ TYPE_NOT_FOUND: Final[str] = "not_found"
 TYPE_CONSENT_REQUIRED: Final[str] = "consent_required"
 TYPE_NOT_EDITABLE: Final[str] = "not_editable"
 TYPE_INVALID_TRANSITION: Final[str] = "invalid_transition"
+TYPE_DRAFT_GONE: Final[str] = "draft_gone"
+TYPE_PHOTO_UNAVAILABLE: Final[str] = "photo_unavailable"
 
 # English msgids for the detail strings (cataloged in ``ru``/``bs``/``en`` in the
 # stage i18n batch; ``gettext_lazy`` defers resolution to render time).
@@ -131,6 +145,12 @@ _DETAIL_NOT_EDITABLE: Final[str | Promise] = _(
 _DETAIL_INVALID_TRANSITION: Final[str | Promise] = _(
     "The ad cannot take that edit in its current status."
 )
+_DETAIL_DRAFT_GONE: Final[str | Promise] = _(
+    "The draft no longer exists. Please start a new ad."
+)
+_DETAIL_PHOTO_UNAVAILABLE: Final[str | Promise] = _(
+    "One of the photos is no longer available. Please upload it again."
+)
 
 # Every authenticated ``/api/v1/`` write shares one key namespace (plan Q4).
 _RATE_LIMIT_NAMESPACE: Final[str] = "api_write"
@@ -142,10 +162,6 @@ _ALLOWED_METHODS: Final[tuple[str, ...]] = ("POST",)
 # real boolean). Anything else non-falsy is truthy, as ``if request.POST.get``
 # treated it in the HTML view.
 _FALSEY_STRINGS: Final[frozenset[str]] = frozenset({"", "0", "false", "no", "off"})
-
-# The shared submission orchestrator the edit-flow families 1/2 call. The
-# endpoint observes (never replaces) its outcome to map the consent race.
-SUBMIT_AD_PATH: Final[str] = "apps.ads.services.edit_flow.submit_ad"
 
 
 class AdEditBody(BaseInputModel):
@@ -356,34 +372,17 @@ def _body_validation_problem(message: str) -> JsonResponse:
 def _apply(ad: Ad, body: AdEditBody) -> JsonResponse:
     """Lock the ad and apply the payload through the shared edit-flow service.
 
-    Mirrors ``ad_edit``'s POST block exactly: ``transaction.atomic()`` +
-    ``select_for_update()``, the same ``is_reactivation`` term and the same
-    ``outcome_prefix`` the HTML view passes (``REACTIVATED`` for an archived
-    reactivation, ``RESUBMITTED`` otherwise). A lock timeout keeps the
+    Mirrors ``ad_edit``'s POST block: ``transaction.atomic()`` +
+    ``select_for_update()`` and the body's raw ``reactivate`` flag (the service
+    derives the ``ARCHIVED`` conjunct). The typed :class:`EditResult` is read
+    directly — no request-time patching of the service. A lock timeout keeps the
     03-DB-004 boundary and is answered as the 503 ``retryable`` problem (this
     route has a JSON error surface where the HTML route re-renders a form).
     """
-    # The consent race (S4.2 drift): ``submit_ad`` re-reads the account and can
-    # answer ``CONSENT_REQUIRED`` itself if consent vanished between this view's
-    # gate and the service call. Capture that outcome so it maps to 403 instead
-    # of the generic "200 with an error" shape.
-    submitted: list[SubmitAdResult] = []
-
     try:
         with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  # django-stubs not installed; Atomic lacks CM stubs
             locked = Ad.objects.select_for_update().get(id=ad.id)
-            is_reactivation = locked.status == AdStatus.ARCHIVED and body.reactivate
-            with patch(SUBMIT_AD_PATH, _capturing(SUBMIT_AD_PATH, submitted)):
-                result = apply_edit_payload(
-                    locked,
-                    body.to_edit_input(),
-                    is_reactivation,
-                    outcome_prefix=(
-                        EditOutcome.REACTIVATED
-                        if is_reactivation
-                        else EditOutcome.RESUBMITTED
-                    ),
-                )
+            result = apply_edit_payload(locked, body.to_edit_input(), body.reactivate)
     except Ad.DoesNotExist:
         # Raced with a hard delete between the pre-flight fetch and the lock.
         return problem(HTTPStatus.NOT_FOUND, TYPE_NOT_FOUND, _DETAIL_NOT_FOUND)
@@ -393,12 +392,29 @@ def _apply(ad: Ad, body: AdEditBody) -> JsonResponse:
         logger.warning("Lock timeout editing ad %s (SQLSTATE 55P03)", ad.id)
         return _retryable_response()
 
-    if any(
-        item.outcome is SubmitAdOutcome.CONSENT_REQUIRED for item in submitted
-    ):
+    # Submit-time refusals first: the service carries ``submit_ad``'s outcome
+    # verbatim, so each one maps to its own §2.5 problem (the same table
+    # ``apps.ads.views.api.submit`` uses, spelled locally).
+    submission = result.submission_outcome
+    if submission is SubmitAdOutcome.CONSENT_REQUIRED:
+        # The consent race (S4.2 drift): ``submit_ad`` re-read the account and
+        # found consent withdrawn between this view's gate and that re-read.
         logger.warning("Ad %s edit refused: consent required at submit time", ad.id)
         return problem(
             HTTPStatus.FORBIDDEN, TYPE_CONSENT_REQUIRED, _DETAIL_CONSENT_REQUIRED
+        )
+    if submission is SubmitAdOutcome.INVALID_TRANSITION:
+        logger.info("Ad %s edit refused by submit_ad: invalid transition", ad.id)
+        return problem(
+            HTTPStatus.CONFLICT, TYPE_INVALID_TRANSITION, _DETAIL_INVALID_TRANSITION
+        )
+    if submission is SubmitAdOutcome.DRAFT_GONE:
+        logger.info("Ad %s edit refused by submit_ad: draft gone", ad.id)
+        return problem(HTTPStatus.CONFLICT, TYPE_DRAFT_GONE, _DETAIL_DRAFT_GONE)
+    if submission is SubmitAdOutcome.PHOTO_UNAVAILABLE:
+        logger.info("Ad %s edit refused by submit_ad: photo unavailable", ad.id)
+        return problem(
+            HTTPStatus.CONFLICT, TYPE_PHOTO_UNAVAILABLE, _DETAIL_PHOTO_UNAVAILABLE
         )
 
     if result.outcome is EditOutcome.REFUSED:
@@ -409,7 +425,8 @@ def _apply(ad: Ad, body: AdEditBody) -> JsonResponse:
             HTTPStatus.CONFLICT, TYPE_INVALID_TRANSITION, _DETAIL_INVALID_TRANSITION
         )
 
-    if result.moderation_failed:
+    moderation_failed = submission is SubmitAdOutcome.MODERATION_FAILED
+    if moderation_failed:
         # ``submit_ad`` committed the payload and parked the ad
         # (ON_MODERATION_FAILED); still a 200 (O-2a) — the verdict rides in the
         # state and in ``errors``.
@@ -419,30 +436,10 @@ def _apply(ad: Ad, body: AdEditBody) -> JsonResponse:
         _serialize_edit_state(
             ad.id,
             result.outcome,
-            result.moderation_failed,
+            moderation_failed,
             result.errors,
         )
     )
-
-
-def _capturing(path: str, sink: list[SubmitAdResult]) -> Any:
-    """Wrap the shared ``submit_ad`` so its outcome is recorded while it runs.
-
-    The edit-flow service calls ``submit_ad`` through its own module namespace;
-    this transient wrapper only observes the returned outcome (it never alters
-    it) so the endpoint can distinguish the ``CONSENT_REQUIRED`` race from the
-    other refusals. The service module itself is untouched.
-    """
-    module_path, attribute = path.rsplit(".", 1)
-    original = getattr(import_module(module_path), attribute)
-
-    @wraps(original)
-    def wrapper(*args: Any, **kwargs: Any) -> SubmitAdResult:
-        result = original(*args, **kwargs)
-        sink.append(result)
-        return result
-
-    return wrapper
 
 
 def _retryable_response() -> JsonResponse:
@@ -506,9 +503,11 @@ def _named(obj: Any) -> dict[str, Any] | None:
 
 __all__ = [
     "TYPE_CONSENT_REQUIRED",
+    "TYPE_DRAFT_GONE",
     "TYPE_INVALID_TRANSITION",
     "TYPE_NOT_EDITABLE",
     "TYPE_NOT_FOUND",
+    "TYPE_PHOTO_UNAVAILABLE",
     "AdEditBody",
     "edit_view",
 ]

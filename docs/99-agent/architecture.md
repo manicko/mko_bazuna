@@ -52,7 +52,7 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
   command (lock 12). The command locks each batch row with `select_for_update()` to
   prevent concurrent writes racing on `price_normalized_eur` (zone DB-001). Both
   processes read rates from the shared DB. The web edit path
-  (`ads.views.edit._apply_price_change`) and the submission path
+  (`ads.services.edit_flow.apply_price_change`) and the submission path
   (`ads.services.submission.submit_ad`) delegate to the shared
   `normalize_price_to_eur(ad, amount, currency)` free function in
   `apps/currencies/services/price_normalizer.py` — the single seam for the broad
@@ -304,7 +304,7 @@ co-located with the `PriceNormalizer` class (single responsibility: currency con
 It encapsulates the broad `except Exception` + `logger.exception` + `None`-fallback pattern that
 both the web edit path and the submission path previously duplicated:
 
-- **Web edit path** — `ads.views.edit._apply_price_change` delegates to this utility when a
+- **Web edit path** — `ads.services.edit_flow.apply_price_change` delegates to this utility when a
   PUBLISHED ad's price is edited. Edit branches are **not** routed through `submit_ad`
   (that would trigger thumbnail generation, staging-file moves, `DraftAdImage` creation,
   and the DRAFT→ON_MODERATION transition — all wrong for status-preserving edits).

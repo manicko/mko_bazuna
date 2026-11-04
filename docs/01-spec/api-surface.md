@@ -70,7 +70,7 @@ Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = `l
 | 3 | Ad detail | audience predicate + serialize | `GET /api/v1/ads/{id}/` | PUB | uniform 404; `AD_VIEWED` recorded | shipped (S1.5) |
 | 4 | Autocomplete | (existing) | unchanged `/api/search/autocomplete` | PUB | stance: not aliased; legacy 429 `{"error":"rate_limit"}` | covered/frozen |
 | 5 | Create/publish | `submit_ad` (shared with the bot `/post` and the HTML edit reactivation) | `POST /api/v1/ads/{id}/submit/` (existing DRAFT; dialog/photo staging bot-only; optional `{"dry_run": true}` = O-14 field-check inventory) | SESS + owner + **consent** (403 before any transition) | `SubmitAdOutcome` map: 200 `published` / `moderation_failed`, 409 `invalid_transition` / `draft_gone` / `photo_unavailable`, 403 `consent_required`; not-ready DRAFT → 409 + `inventory` (§Errors) | shipped (S4.5) |
-| 6 | Edit | edit-flow helper (S4.2) — five branches | `POST /api/v1/ads/{id}/edit/` | SESS + owner | refusal → 409 `invalid_transition` / `not_editable` (HTML renders 200+form — deliberate machine mapping); price-only and direct-save stay distinct from `submit_ad` | shipped (S4.4) |
+| 6 | Edit | edit-flow helper (S4.2) — five branches | `POST /api/v1/ads/{id}/edit/` | SESS + owner + **consent** (403 before any write) | status-set refusal → 409 `invalid_transition` / 409 `not_editable`; submit-time refusal family → 403 `consent_required`, 409 `invalid_transition` / `draft_gone` / `photo_unavailable` (HTML renders 200+form for every non-`published` submission — deliberate machine mapping); price-only and direct-save stay distinct from `submit_ad` | shipped (S4.4) |
 | 7 | Archive | lifecycle service (S4.1) | `POST /api/v1/ads/{id}/archive/` | SESS + owner + **consent** | 403 `consent_required`; 409 `invalid_transition`; 200 post-action state | shipped (S4.3) |
 | 8 | Reactivate | lifecycle service (S4.1), same `auto_moderate` decision | `POST /api/v1/ads/{id}/reactivate/` | SESS + owner + consent | 200 `{outcome}` for both verdicts; 409 `invalid_transition`; 503 lock-timeout | shipped (S4.3) |
 | 9 | Delete | lifecycle service (S4.1) — gate-free | `POST /api/v1/ads/{id}/delete/` | SESS + owner | 200 confirmed deleted state (supersedes the 204 note — see row-9 change log); 409 `invalid_transition` | shipped (S4.3) |
@@ -126,7 +126,9 @@ All `/api/v1/` errors are RFC 9457 problem documents with content-type
 | `SubmitAdOutcome.PUBLISHED` / `MODERATION_FAILED` | 200 `{outcome}` | boundary rule (O-2a): 4xx only when the request committed NO state change; `MODERATION_FAILED` parks the ad — a terminal, well-formed outcome (bulk precedent `api_bulk.py:116-122`) |
 | `SubmitAdOutcome.CONSENT_REQUIRED` | 403 `consent_required` | same predicate (`can_create_ad`) as the UI |
 | `INVALID_TRANSITION` / `DRAFT_GONE` / `PHOTO_UNAVAILABLE` | 409 `invalid_transition` / `draft_gone` / `photo_unavailable` | state-machine family |
-| Edit refusal (status outside editable/affordance sets) | 409 `not_editable` | deliberate delta from HTML 200+form — documented (auditor A5) |
+| Edit refusal — status outside the editable/affordance sets | 409 `not_editable` | pre-gate refusal, before any write; deliberate delta from HTML 200+form — documented (auditor A5) |
+| Edit branch-table refusal (`EditOutcome.REFUSED`) | 409 `invalid_transition` | an in-affordance status the branch table has no write for (`archived` edited without `reactivate`); a state-machine shortfall, not `not_editable` |
+| Edit submit-time refusal (`EditResult.submission_outcome`) | 403 `consent_required` / 409 `invalid_transition` / `draft_gone` / `photo_unavailable` | `submit_ad`'s own outcome, carried verbatim by `EditResult`; same family and tokens as the submit endpoint |
 | `ApproveOutcome.PUBLISHED` / `CRITERIA_REJECTED` | 200 `{outcome}` / 200 `{outcome:"criteria_rejected"}` | ad parked `ON_MODERATION_FAILED` |
 | `ApproveOutcome.TRANSITION_REFUSED` | 409 `transition_refused` | |
 | Reject against a non-rejectable status | 409 `invalid_transition` | an already-`REJECTED` ad is the service's 200 `{outcome:"already_rejected"}` no-op (S4.7) |
@@ -745,21 +747,29 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `AD_PUBLISHED`/`MODERATION_APPROVED`/`MODERATION_REJECTED` analytics rows, wrong-status no-ops,
   non-owner/404 refusals, the failing-check rollback, and the gate-free delete).
 - **S4.2:** edit-flow predicate and payload application extracted — `apps/ads/services/edit_flow.py`
-  now owns `can_edit_ad(ad, user_id)` (ownership + status), the composed `can_edit_ad_by_service(ad, user)`
-  (the same predicate plus the storage-consent term, i.e. `can_create_ad`), `apply_edit_payload(ad, dto,
-  reactivate, *, outcome_prefix)` and the `EDITABLE_DIRECT_SAVE_STATUSES` / `EDIT_FORM_AVAILABLE_STATUSES`
-  sets, which moved here verbatim and are still re-exported from `apps.ads.views.edit` for the dashboard
-  and for the existing suites. The five outcome families (A5) are the `EditOutcome` members `REACTIVATED`
+  now owns `can_edit_ad(ad, user_id)` (ownership + status), `apply_edit_payload(ad, dto,
+  reactivate)` (the branch label is derived inside the service from `ad.status`, `reactivate` and
+  `text_fields_changed`, never supplied by a caller) and the `EDITABLE_DIRECT_SAVE_STATUSES` /
+  `EDIT_FORM_AVAILABLE_STATUSES` sets, which moved here verbatim and are still re-exported from
+  `apps.ads.views.edit` for the dashboard and for the existing suites. The storage-consent gate is
+  composed by each caller (the HTML view's `_seller_may_create_ad`, the API's `can_create_ad`), not
+  by the service. The five outcome families (A5) are the `EditOutcome` members `REACTIVATED`
   (ARCHIVED + `reactivate`), `RESUBMITTED` (PUBLISHED text/description change), `PRICE_UPDATED`
   (PUBLISHED price-only, publish clock reset), `DIRECT_SAVED` (DRAFT / ON_MODERATION) and `REFUSED`
-  (every other status — no field is written); families 1 and 2 route through `submit_ad`, families 3 and 4
-  never do (frozen rule). `EditResult` carries `outcome`, `moderation_failed` (only when `submit_ad`
-  returns `SubmitAdOutcome.MODERATION_FAILED`) and `errors`. The HTML `ad_edit` view is a thin caller that
-  keeps the transaction + `select_for_update` lock, the prefetched re-renders, the redirects, the `error`
-  context, the log lines and the 03-DB-004 lock-timeout re-render — response bodies and redirects are
-  byte-identical (proven by the untouched `test_edit.py`, `test_edit_views_locking.py`, `test_submission.py`
-  and `apps/core/tests/test_db_lock_timeout_boundary.py`). The refusal branch is a **presentation**
-  difference only: HTML renders 200 + form, the future endpoint maps `REFUSED` to `409 not_editable`.
+  (every other status — no field is written); families 1 and 2 route through `submit_ad`, families 3
+  and 4 never do (frozen rule). `EditResult` carries the branch `outcome` and, for the two submit
+  families, `submission_outcome` (the orchestrator's own `SubmitAdOutcome`) plus its `errors`;
+  `submission_outcome` is `None` for `PRICE_UPDATED`, `DIRECT_SAVED` and the status-set `REFUSED`,
+  and "moderation failed" is derived (`submission_outcome is SubmitAdOutcome.MODERATION_FAILED`),
+  never stored. The HTML `ad_edit` view is a thin caller that
+  keeps the transaction + `select_for_update` lock, the prefetched re-renders, the redirects, the
+  `error` context, the log lines and the 03-DB-004 lock-timeout re-render — response bodies and
+  redirects are byte-identical (proven by the untouched `test_edit.py`, `test_edit_views_locking.py`,
+  `test_submission.py` and `apps/core/tests/test_db_lock_timeout_boundary.py`). Only a `PUBLISHED`
+  submission redirects; every other submit outcome (the four refusals and `moderation_failed`)
+  re-renders the form with `errors[0]` or the fallback message. The refusal branch is a
+  **presentation** difference only: HTML renders 200 + form, the endpoint maps `REFUSED` to
+  `409 invalid_transition` and the submission refusals to their §2.5 tokens.
   One ordering is preserved verbatim and is worth naming for S4.4: the HTML view asserts consent
   (`_seller_may_create_ad`) **before** taking the POST row lock, so the consent gate inside `submit_ad` is
   a second, normally unreachable check in this flow — this task neither added nor moved a gate.
@@ -833,23 +843,30 @@ side effects should use the service tier or the `verify_parity` command (the pol
 
   | `EditResult` | HTTP | Payload highlights |
   |---|---|---|
-  | `REACTIVATED` / `RESUBMITTED`, no moderation failure | 200 | `outcome`, post-edit `status` (`published` / `on_moderation`) |
-  | `REACTIVATED` / `RESUBMITTED`, `moderation_failed=True` | 200 | `outcome`, `status=on_moderation_failed`, `moderation_failed: true`, `errors[]` |
+  | `REACTIVATED` / `RESUBMITTED` + `submission_outcome` `published` | 200 | `outcome`, post-edit `status` (`published`) |
+  | `REACTIVATED` / `RESUBMITTED` + `moderation_failed` | 200 | `outcome`, `status=on_moderation_failed`, `moderation_failed: true`, `errors[]` |
+  | `REACTIVATED` / `RESUBMITTED` + `consent_required` | 403 `consent_required` | consent withdrawn between the gate and `submit_ad` |
+  | `REACTIVATED` / `RESUBMITTED` + `invalid_transition` | 409 `invalid_transition` | `submit_ad`'s state-machine refusal |
+  | `REACTIVATED` / `RESUBMITTED` + `draft_gone` | 409 `draft_gone` | the locked row vanished under `submit_ad` |
+  | `REACTIVATED` / `RESUBMITTED` + `photo_unavailable` | 409 `photo_unavailable` | a staged photo was reaped |
   | `PRICE_UPDATED` | 200 | `status=published`, new price, reset `published_at` |
   | `DIRECT_SAVED` | 200 | `status` unchanged (`draft` / `on_moderation`) |
-  | `REFUSED` | 409 `invalid_transition` | no write — the branch table had no branch for the status |
+  | `REFUSED` (status-set, `submission_outcome` is `None`) | 409 `invalid_transition` | no write — the branch table had no branch for the status |
 
   A **missing** or **non-owned** ad is the identical uniform 404 (CWE-209); an owner whose ad is
   outside `EDIT_FORM_AVAILABLE_STATUSES` (`on_moderation_failed` / `rejected` / `deleted`) is 409
   `not_editable` before any write; `REFUSED` (an `ARCHIVED` ad edited **without** `reactivate` — it
   passes the affordance set but not the branch table) is 409 `invalid_transition`, the taxonomy's
-  state-machine token. A moderation failure is **not** an error: the payload was committed and the ad
-  parked (`ON_MODERATION_FAILED`), so it is a 200 (boundary O-2a). A lock timeout (`55P03`) answers
-  the 503 `retryable` problem with `Retry-After: 30` (HTML re-renders the form — documented).
+  state-machine token. An edit whose submit branch was refused answers the refusal family above
+  (403 `consent_required`; 409 `invalid_transition` / `draft_gone` / `photo_unavailable`) — never a
+  200 claiming an edit that did not commit. A moderation failure is **not** an error: the payload was
+  committed and the ad parked (`ON_MODERATION_FAILED`), so it is a 200 (boundary O-2a). A lock
+  timeout (`55P03`) answers the 503 `retryable` problem with `Retry-After: 30` (HTML re-renders the
+  form — documented).
   **Consent:** asserted through the shared `can_create_ad` seam (A14) before any write, and
   `submit_ad`'s own `CONSENT_REQUIRED` outcome — when consent vanishes between the gate and the
-  service call — is also mapped to 403 `consent_required` (the endpoint observes the shared
-  orchestrator's result; `edit_flow.py` and `submission.py` are untouched).
+  service call — is also mapped to 403 `consent_required`. The endpoint reads that outcome from the
+  returned `EditResult.submission_outcome`; no request-time patching of the service is involved.
   **O-27 body DTO.** `AdEditBody` (`BaseInputModel`, `extra="forbid"`, snake_case) takes
   `title`, `description`, `price_amount`, `price_currency`, `reactivate` — the **same field set**
   `AdEditInput` accepts — and `to_edit_input()` builds that shared DTO, so the API body and the HTML
@@ -868,6 +885,8 @@ side effects should use the service tier or the `verify_parity` command (the pol
   `apps/api/tests/test_import_rule.py`. Tests: `apps/ads/tests/test_edit_route_api.py` (401/405/422
   (malformed / non-object / unknown key / negative price / unknown currency) / 404 (missing vs
   non-owned byte-identical) / 409 `not_editable` / 409 `invalid_transition` / 429 matrices, the four
+  submit-time refusal rows (`consent_required` 403; `invalid_transition` / `draft_gone` /
+  `photo_unavailable` 409, each leaving the row untouched), the four
   successful outcomes parametrized **against the service tier** (`apply_edit_payload` returns the same
   `EditOutcome` and the same resting status for the same fixture), the moderation-failure 200, the
   consent 403 + `CONSENT_REQUIRED` race mapping + API↔HTML gate equivalence, and the O-27 body

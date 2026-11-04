@@ -368,7 +368,7 @@ class TestRecomputeRowLockConcurrency:
             """Background thread: a web/bot price edit on the same ad.
 
             Acquires the same ``FOR UPDATE`` row lock (mirroring
-            ``edit._apply_price_change``), then changes the price and its
+            ``edit_flow.apply_price_change``), then changes the price and its
             normalized value. Must block until recompute's transaction
             releases the lock.
             """

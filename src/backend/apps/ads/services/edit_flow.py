@@ -39,9 +39,13 @@ The five outcome families (auditor A5) — every one of them is a member of
    caller re-renders the form with HTTP 200 (a deliberate mapping); the API
    caller maps this to ``409 not_editable``.
 
-A moderation failure on families 1/2 is reported through the same
-``REFUSED``-adjacent shape the view already had — see
-:class:`EditResult.moderation_failed` and ``errors``.
+Families 1/2 always route through ``submit_ad`` and their result is reported
+honestly: :class:`EditResult.submission_outcome` carries the orchestrator's own
+:class:`~apps.ads.services.submission.SubmitAdOutcome` (``PUBLISHED``,
+``MODERATION_FAILED``, or one of the four refusals) and ``errors`` carries its
+``str()``-ified messages. Families 3/4 and the status-set ``REFUSED`` never call
+``submit_ad``, so their ``submission_outcome`` is ``None``. Success is a
+property of the submission outcome, never of a caller-supplied label.
 
 A lock timeout is **not** an outcome: ``OperationalError`` propagates to the
 caller's boundary (03-DB-004), exactly as before.
@@ -52,7 +56,7 @@ from __future__ import annotations
 import logging
 from decimal import Decimal
 from enum import StrEnum
-from typing import TYPE_CHECKING, NamedTuple
+from typing import NamedTuple
 
 from apps.ads.models import Ad
 from apps.ads.services.submission import (
@@ -64,9 +68,6 @@ from apps.ads.services.submission import (
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
 from apps.currencies.services.price_normalizer import normalize_price_to_eur
-
-if TYPE_CHECKING:
-    from apps.users.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -118,19 +119,27 @@ class EditOutcome(StrEnum):
 class EditResult(NamedTuple):
     """Outcome of :func:`apply_edit_payload`.
 
-    ``moderation_failed`` distinguishes the two failure shapes of families 1/2
-    (``REACTIVATED`` / ``RESUBMITTED``): the payload was committed by
-    ``submit_ad`` but the content check did not pass (``True``), versus any
-    other ``submit_ad`` refusal (``False``). Both re-render the HTML edit form
-    with an error; the flag exists so a caller can tell them apart without
-    string-matching ``errors``.
+    Two orthogonal typed facts, mirroring the
+    :class:`~apps.ads.services.submission.SubmitAdResult` convention:
 
-    ``errors`` carries the user-facing strings ``submit_ad`` produced (already
-    translated, ``str()``-able); it is empty for every non-moderation outcome.
+    - ``outcome`` names the **branch** that ran (``EditOutcome``);
+    - ``submission_outcome`` — for the two ``submit_ad`` families
+      (``REACTIVATED`` / ``RESUBMITTED``) — is the orchestrator's own
+      :class:`~apps.ads.services.submission.SubmitAdOutcome`. It is ``None``
+      for the two non-submission branches (``PRICE_UPDATED``, ``DIRECT_SAVED``)
+      and for the status-set ``REFUSED``.
+
+    A moderation failure is therefore **derived**, never stored:
+    ``submission_outcome is SubmitAdOutcome.MODERATION_FAILED``. Nothing in
+    this result can claim success for a submission that was refused.
+
+    ``errors`` carries the submission's user-facing strings (already
+    translated, ``str()``-ified); it is empty for ``PUBLISHED``,
+    ``PRICE_UPDATED``, ``DIRECT_SAVED`` and the status-set ``REFUSED``.
     """
 
     outcome: EditOutcome
-    moderation_failed: bool = False
+    submission_outcome: SubmitAdOutcome | None = None
     errors: tuple[str, ...] = ()
 
 
@@ -152,27 +161,14 @@ def can_edit_ad(ad: Ad, user_id: int | None) -> bool:
     not_editable``.
 
     The storage-consent gate is deliberately **not** part of this predicate:
-    it is a property of the account, not of the ad, and stays caller-side
-    (``can_create_ad`` — see :func:`can_edit_ad_by_service`, which composes it).
+    it is a property of the account, not of the ad, and stays caller-side —
+    both callers compose it themselves (the HTML view's
+    ``_seller_may_create_ad``, the API's ``can_create_ad`` call), so this
+    predicate stays a pure "ownership + status" term.
     """
     if user_id is None or ad.user_id != user_id:
         return False
     return ad.status in EDIT_FORM_AVAILABLE_STATUSES
-
-
-def can_edit_ad_by_service(ad: Ad, user: User) -> bool:
-    """Whether *user* may edit *ad*: ownership + status + storage consent.
-
-    The composed predicate every seller write surface consults: it layers the
-    create-time storage-consent gate (06-PII-109) on top of
-    :func:`can_edit_ad`. ``can_create_ad`` is imported lazily so the service
-    module carries no import-time dependency on ``apps.users`` beyond typing.
-    """
-    from apps.users.services.account_state import can_create_ad
-
-    if not can_create_ad(user):
-        return False
-    return can_edit_ad(ad, user.id)
 
 
 def text_fields_changed(dto: AdEditInput, ad: Ad) -> bool:
@@ -233,7 +229,14 @@ def resolve_edit_currency(dto: AdEditInput, ad: Ad) -> CurrencyCode | None:
 def _submit_like(
     ad: Ad, dto: AdEditInput, price_currency: CurrencyCode | None
 ) -> EditResult:
-    """Route the payload through the shared submission orchestrator."""
+    """Route the payload through the shared submission orchestrator.
+
+    The orchestrator's outcome is carried verbatim — every one of its six
+    members survives, so the caller can decide what counts as success (only
+    ``PUBLISHED`` commits and publishes) and the API can map each refusal.
+    The branch label is supplied by the caller, which is the only code that
+    knows which of the two submit families it took.
+    """
     result = submit_ad(
         SubmitAdInput(
             ad_id=ad.id,
@@ -248,27 +251,14 @@ def _submit_like(
             listing_condition_id=ad.listing_condition_id,
         )
     )
-
-    if result.outcome is SubmitAdOutcome.PUBLISHED:
-        return EditResult(EditOutcome.REACTIVATED)
     return EditResult(
         EditOutcome.REACTIVATED,
-        # ``submit_ad`` reports MODERATION_FAILED when the content check ran and
-        # rejected the ad; every other outcome (DRAFT_GONE, PHOTO_UNAVAILABLE,
-        # INVALID_TRANSITION, CONSENT_REQUIRED) is a refusal, which the HTML
-        # caller has always rendered through the same form.
-        moderation_failed=result.outcome is SubmitAdOutcome.MODERATION_FAILED,
+        submission_outcome=result.outcome,
         errors=tuple(str(error) for error in result.errors),
     )
 
 
-def apply_edit_payload(
-    ad: Ad,
-    dto: AdEditInput,
-    reactivate: bool,
-    *,
-    outcome_prefix: EditOutcome = EditOutcome.REACTIVATED,
-) -> EditResult:
+def apply_edit_payload(ad: Ad, dto: AdEditInput, reactivate: bool) -> EditResult:
     """Apply a validated edit payload to a **locked** ad (five outcome families).
 
     The caller must hold the row lock (``select_for_update``) inside an open
@@ -276,35 +266,36 @@ def apply_edit_payload(
     re-fetches the row; the caller's lock guarantees a stable read) and
     families 3/4 write the instance in place.
 
+    The branch label is derived here from the same inputs the caller passes —
+    ``ad.status``, ``reactivate`` and :func:`text_fields_changed` — so no
+    caller-supplied label can misreport which branch ran.
+
     Args:
         ad: The ad, already fetched under a row lock by the caller.
         dto: Validated edit input (``AdEditInput``).
         reactivate: Whether the POST carried a truthy ``reactivate`` flag; only
-            meaningful for an ``ARCHIVED`` ad, exactly as before.
-        outcome_prefix: The outcome reported for the ``submit_ad`` families;
-            the HTML caller passes ``REACTIVATED`` for the ARCHIVED branch and
-            ``RESUBMITTED`` for the PUBLISHED text branch. Ignored otherwise.
+            meaningful for an ``ARCHIVED`` ad. Callers pass the raw request
+            flag — the ``ARCHIVED`` conjunct lives here.
 
     Returns:
-        :class:`EditResult` naming the branch that ran.
+        :class:`EditResult` naming the branch that ran and, for the two submit
+        families, the orchestrator's outcome and errors.
 
     Raises:
         OperationalError: Propagated untouched (lock timeout — 03-DB-004).
     """
     is_reactivation = ad.status == AdStatus.ARCHIVED and reactivate
+    is_text_resubmit = ad.status == AdStatus.PUBLISHED and text_fields_changed(dto, ad)
 
-    if is_reactivation or (
-        ad.status == AdStatus.PUBLISHED and text_fields_changed(dto, ad)
-    ):
+    if is_reactivation or is_text_resubmit:
+        branch = EditOutcome.REACTIVATED if is_reactivation else EditOutcome.RESUBMITTED
         price_currency = resolve_edit_currency(dto, ad)
-        result = _submit_like(ad, dto, price_currency)
-        if result.moderation_failed:
-            return EditResult(
-                outcome_prefix,
-                moderation_failed=True,
-                errors=result.errors,
-            )
-        return EditResult(outcome_prefix)
+        submitted = _submit_like(ad, dto, price_currency)
+        return EditResult(
+            branch,
+            submission_outcome=submitted.submission_outcome,
+            errors=submitted.errors,
+        )
 
     if ad.status == AdStatus.PUBLISHED:
         # Price-only edit: stays published; recompute normalized price and

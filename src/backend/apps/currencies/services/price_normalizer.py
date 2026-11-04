@@ -132,8 +132,8 @@ def normalize_price_to_eur(
 ) -> None:
     """Set ``ad.price_normalized_eur`` from ``amount``/``currency`` (BR-03).
 
-    Shared seam used by ``edit._apply_price_change`` and ``submit_ad`` to avoid
-    duplicating the broad ``except Exception`` + ``None``-fallback pattern.
+    Shared seam used by ``edit_flow.apply_price_change`` and ``submit_ad`` to
+    avoid duplicating the broad ``except Exception`` + ``None``-fallback pattern.
 
     Instantiates ``PriceNormalizer()`` per call to preserve the instance-local
     ``_rate_cache`` semantics identical to the two original call sites — no

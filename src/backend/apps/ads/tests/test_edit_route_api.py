@@ -11,7 +11,12 @@ five-branch ``EditOutcome`` matrix (auditor A5):
 - **409 ``not_editable``** — an owner whose ad is outside the edit affordance
   set (``ON_MODERATION_FAILED``, ``REJECTED``, ``DELETED``).
 - **409 ``invalid_transition``** — the service's ``REFUSED`` outcome (an
-  ``ARCHIVED`` ad edited without ``reactivate``).
+  ``ARCHIVED`` ad edited without ``reactivate``) **and** ``submit_ad``'s own
+  ``INVALID_TRANSITION`` outcome.
+- **submit-time refusal family** — ``CONSENT_REQUIRED`` → 403
+  ``consent_required``; ``DRAFT_GONE`` / ``PHOTO_UNAVAILABLE`` /
+  ``INVALID_TRANSITION`` → 409 with their own ``type``, each leaving the row
+  untouched (the honest mapping; these were a dishonest 200 before P0).
 - **happy paths** — parametrized over the four successful outcomes
   (``REACTIVATED`` / ``RESUBMITTED`` / ``PRICE_UPDATED`` / ``DIRECT_SAVED``),
   each asserted against the **service tier** for the same fixtures.
@@ -413,16 +418,90 @@ class TestInvalidTransition:
             ad,
             AdEditInput(title="Changed", description=ad.description),
             False,
-            outcome_prefix=EditOutcome.RESUBMITTED,
         )
 
         assert result.outcome is EditOutcome.REFUSED
+        assert result.submission_outcome is None
+
+
+# ---------------------------------------------------------------------------
+# Submit-time refusal family — honest 403/409 mapping, no mock machinery
+# ---------------------------------------------------------------------------
+
+
+class TestSubmitOutcomeRefusalMapping:
+    """``submit_ad``'s refusal outcomes map to their own §2.5 problems.
+
+    Injected at ``apps.ads.services.edit_flow.submit_ad`` (the real seam, the
+    same one the consent-race test uses) because none of the four is reachable
+    through this endpoint: ``photos=[]`` rules out ``PHOTO_UNAVAILABLE``; the
+    row lock plus ``submit_ad``'s locked re-fetch make ``DRAFT_GONE`` and
+    ``INVALID_TRANSITION`` races; ``CONSENT_REQUIRED`` needs consent withdrawn
+    mid-request. The endpoint reads the typed ``EditResult.submission_outcome``
+    directly — no ``unittest.mock.patch`` of a production symbol.
+    """
+
+    @pytest.mark.parametrize(
+        ("outcome", "status", "token", "reactivate"),
+        [
+            (SubmitAdOutcome.CONSENT_REQUIRED, 403, "consent_required", False),
+            (SubmitAdOutcome.INVALID_TRANSITION, 409, "invalid_transition", False),
+            (SubmitAdOutcome.DRAFT_GONE, 409, "draft_gone", False),
+            (SubmitAdOutcome.PHOTO_UNAVAILABLE, 409, "photo_unavailable", False),
+            (SubmitAdOutcome.CONSENT_REQUIRED, 403, "consent_required", True),
+            (SubmitAdOutcome.DRAFT_GONE, 409, "draft_gone", True),
+        ],
+        ids=[
+            "resubmit_consent",
+            "resubmit_invalid_transition",
+            "resubmit_draft_gone",
+            "resubmit_photo_unavailable",
+            "reactivate_consent",
+            "reactivate_draft_gone",
+        ],
+    )
+    def test_refusal_maps_to_problem_and_leaves_row_untouched(
+        self,
+        monkeypatch,
+        client_,
+        seller,
+        category,
+        city,
+        outcome,
+        status,
+        token,
+        reactivate,
+    ) -> None:
+        from apps.ads.services.submission import SubmitAdResult
+
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED, price=100, title="Old"
+        )
+        if reactivate:
+            _force_archived(ad)
+        before = Ad.objects.get(pk=ad.pk)
+
+        def _refuse(*args: Any, **kwargs: Any) -> SubmitAdResult:
+            return SubmitAdResult(outcome=outcome, errors=["refused"])
+
+        monkeypatch.setattr("apps.ads.services.edit_flow.submit_ad", _refuse)
+
+        body = _full_body(ad, title="New title")
+        if reactivate:
+            body["reactivate"] = True
+        response = _post(ad.id, body, client_)
+
+        assert response.status_code == status
+        assert response.headers.get("Content-Type") == PROBLEM_CONTENT_TYPE
+        assert response.json()["type"] == token
+        after = Ad.objects.get(pk=ad.pk)
+        assert (after.title, after.status) == (before.title, before.status)
+        assert after.updated_at == before.updated_at
 
 
 # ---------------------------------------------------------------------------
 # Happy paths — parametrized over the four successful outcomes
 # ---------------------------------------------------------------------------
-
 
 class TestEditOutcomeMatrix:
     """Each successful ``EditOutcome`` branch, asserted against the service tier."""
@@ -606,11 +685,6 @@ class TestEditOutcomeMatrix:
                 locked,
                 service_dto,
                 bool(change.get("reactivate")),
-                outcome_prefix=(
-                    EditOutcome.REACTIVATED
-                    if status is AdStatus.ARCHIVED
-                    else EditOutcome.RESUBMITTED
-                ),
             )
 
         api_owner = make_user(914005001, consent_given_at=timezone.now())

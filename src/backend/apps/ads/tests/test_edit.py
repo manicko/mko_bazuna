@@ -20,6 +20,7 @@ from __future__ import annotations
 
 from datetime import timedelta
 from decimal import Decimal
+from typing import Any
 from unittest.mock import patch
 
 import pytest
@@ -30,10 +31,11 @@ from django.urls import reverse
 from django.utils import timezone
 
 from apps.ads.models import Ad, AdImage
+from apps.ads.services.edit_flow import apply_price_change
+from apps.ads.services.submission import SubmitAdOutcome, SubmitAdResult
 from apps.ads.views.edit import (
     EDIT_FORM_AVAILABLE_STATUSES,
     EDITABLE_DIRECT_SAVE_STATUSES,
-    _apply_price_change,
 )
 from apps.core.enums import AdStatus
 from apps.currencies.enums import CurrencyCode
@@ -686,19 +688,20 @@ class TestPublishedTextEdit:
 
 
 # ---------------------------------------------------------------------------
-# Parity test: _apply_price_change delegates to the shared utility
+# Parity test: edit_flow.apply_price_change delegates to the shared utility
 # (10-QLT-001 DRY invariant — closes V-09 test gap)
 # ---------------------------------------------------------------------------
 
 
 class TestApplyPriceChangeDelegation:
-    """Verify ``_apply_price_change`` delegates price normalization to the
-    shared ``normalize_price_to_eur`` utility.
+    """Verify ``edit_flow.apply_price_change`` delegates price normalization to
+    the shared ``normalize_price_to_eur`` utility.
 
     The DRY invariant (10-QLT-001) requires both the edit path and the
-    ``submit_ad`` path to call the **same** shared utility.  These tests patch
-    the utility at the call-site namespace (``apps.ads.views.edit``) — not the
-    definition site — to verify delegation without invoking real conversion.
+    ``submit_ad`` path to call the **same** shared utility. These tests patch
+    the utility at the real call-site namespace
+    (``apps.ads.services.edit_flow``) — not the definition site — to verify
+    delegation without invoking real conversion.
     """
 
     def test_apply_price_change_delegates_to_shared_utility(
@@ -712,15 +715,145 @@ class TestApplyPriceChangeDelegation:
             seller, category, city, status=AdStatus.PUBLISHED, price=100
         )
 
-        with patch("apps.ads.views.edit.normalize_price_to_eur") as mock_normalizer:
+        with patch(
+            "apps.ads.services.edit_flow.normalize_price_to_eur"
+        ) as mock_normalizer:
             # Currency present (success path)
-            _apply_price_change(ad, Decimal("200"), CurrencyCode.BAM)
+            apply_price_change(ad, Decimal("200"), CurrencyCode.BAM)
             mock_normalizer.assert_called_with(ad, Decimal("200"), CurrencyCode.BAM)
             mock_normalizer.reset_mock()
 
             # Currency None (→ None path — utility clears the value)
-            _apply_price_change(ad, Decimal("0"), None)
+            apply_price_change(ad, Decimal("0"), None)
             mock_normalizer.assert_called_with(ad, Decimal("0"), None)
+
+
+# ---------------------------------------------------------------------------
+# Submit-time refusals: no redirect, the form is re-rendered with the error
+# ---------------------------------------------------------------------------
+
+
+class _RecordingSubmit:
+    """Stand-in for ``edit_flow.submit_ad`` that records and returns *outcome*."""
+
+    def __init__(self, outcome: SubmitAdOutcome, errors: list[str]):
+        self.outcome = outcome
+        self.errors = errors
+        self.calls = 0
+
+    def __call__(self, *args, **kwargs) -> SubmitAdResult:
+        self.calls += 1
+        return SubmitAdResult(outcome=self.outcome, errors=self.errors)
+
+
+def _post_edit(client: Client, ad: Ad, **overrides: str):
+    """POST the full edit form for *ad* with field overrides."""
+    data: dict[str, Any] = {
+        "title": ad.title,
+        "description": ad.description,
+        "price_amount": str(ad.price_amount),
+        "price_currency": CurrencyCode.EUR.value,
+    }
+    data.update(overrides)
+    return client.post(reverse("ads:edit", args=[ad.id]), data=data)
+
+
+class TestEditSubmissionRefusalsRender:
+    """A refused submission never redirects — it re-renders ``ads/edit.html``.
+
+    This is the P0 regression surface (G1): before the fix, ``ad_edit``
+    redirected to the dashboard for ``CONSENT_REQUIRED`` / ``DRAFT_GONE`` /
+    ``PHOTO_UNAVAILABLE`` / ``INVALID_TRANSITION``, silently claiming an edit
+    that ``submit_ad`` never applied. The baseline (57966ea0) rendered the form
+    with ``result.errors[0]`` (or the moderation fallback) instead.
+
+    The four outcomes are injected at ``apps.ads.services.edit_flow.submit_ad``
+    because they are races/impossible through this seam; ``PUBLISHED`` → 302 and
+    ``MODERATION_FAILED`` → 200 are pinned by the auto-moderation suites above.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _seed_eur_rate(self) -> None:
+        cache.clear()
+        ExchangeRate.objects.update_or_create(
+            currency=CurrencyCode.EUR.value,
+            defaults={
+                "rate_to_eur": "1.0",
+                "effective_date": "2026-08-22",
+                "source": "manual_seed",
+                "is_current": True,
+            },
+        )
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [
+            SubmitAdOutcome.CONSENT_REQUIRED,
+            SubmitAdOutcome.DRAFT_GONE,
+            SubmitAdOutcome.PHOTO_UNAVAILABLE,
+            SubmitAdOutcome.INVALID_TRANSITION,
+        ],
+        ids=["consent_required", "draft_gone", "photo_unavailable", "invalid_transition"],
+    )
+    def test_published_text_edit_refusal_renders_form(
+        self, monkeypatch, client_, seller, category, city, outcome
+    ) -> None:
+        """RESUBMITTED branch: the refusal re-renders with its own error text."""
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED, price=100
+        )
+        before = Ad.objects.get(pk=ad.pk)
+        recorder = _RecordingSubmit(outcome, ["Refused by the submission check."])
+        monkeypatch.setattr("apps.ads.services.edit_flow.submit_ad", recorder)
+
+        response = _post_edit(client_, ad, title="A brand new title")
+
+        assert recorder.calls == 1
+        assert response.status_code == 200
+        assert "Location" not in response.headers
+        assert "ads/edit.html" in [t.name for t in response.templates]
+        assert response.context["error"] == "Refused by the submission check."
+        after = Ad.objects.get(pk=ad.pk)
+        assert after.title == before.title
+        assert after.status == before.status
+
+    @pytest.mark.parametrize(
+        "outcome",
+        [SubmitAdOutcome.CONSENT_REQUIRED, SubmitAdOutcome.DRAFT_GONE],
+        ids=["consent_required", "draft_gone"],
+    )
+    def test_reactivation_refusal_renders_form(
+        self, monkeypatch, archived_ad, client_, outcome
+    ) -> None:
+        """REACTIVATED branch: an ARCHIVED reactivation refusal renders the form."""
+        recorder = _RecordingSubmit(outcome, ["Reactivation was refused."])
+        monkeypatch.setattr("apps.ads.services.edit_flow.submit_ad", recorder)
+
+        response = _post_edit(client_, archived_ad, reactivate="1")
+
+        assert recorder.calls == 1
+        assert response.status_code == 200
+        assert "Location" not in response.headers
+        assert "ads/edit.html" in [t.name for t in response.templates]
+        assert response.context["error"] == "Reactivation was refused."
+        refreshed = Ad.objects.get(pk=archived_ad.pk)
+        assert refreshed.status == AdStatus.ARCHIVED
+
+    def test_refusal_without_errors_uses_moderation_fallback(
+        self, monkeypatch, client_, seller, category, city
+    ) -> None:
+        """An empty-errors refusal falls back to the existing baseline msgid."""
+        ad = create_test_ad(
+            seller, category, city, status=AdStatus.PUBLISHED, price=100
+        )
+        recorder = _RecordingSubmit(SubmitAdOutcome.INVALID_TRANSITION, [])
+        monkeypatch.setattr("apps.ads.services.edit_flow.submit_ad", recorder)
+
+        response = _post_edit(client_, ad, title="A brand new title")
+
+        assert response.status_code == 200
+        assert "Location" not in response.headers
+        assert response.context["error"] == "Ad failed moderation checks"
 
 
 # ---------------------------------------------------------------------------

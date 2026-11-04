@@ -239,6 +239,12 @@ ALLOWLIST: frozenset[str] = frozenset(
         # names the enum; the API body DTO declares it as a field type. This is
         # the §2.5 taxonomy's shared vocabulary, not a mirror-specific edge.
         "apps.core.enums.CategoryRejectReason",
+        # P0 — `CurrencyCode`, the editor's currency vocabulary. The HTML edit
+        # mirror reached it only through the duplicate price helper that P0
+        # deleted (the currency now travels through the shared edit DTO); the
+        # JSON body DTO still names it in its conversion from the posted code.
+        # Both surfaces resolve one shared enum, never a duplicated list.
+        "apps.currencies.enums",
     }
 )
 
