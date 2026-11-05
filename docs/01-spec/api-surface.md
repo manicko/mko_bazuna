@@ -34,8 +34,7 @@ media).
   the ordinary root includes — there is no root aggregator and no `api/` app.
 - **Writes:** POST-only where an endpoint writes.
 - **Errors:** the legacy shapes are frozen and per-endpoint (bare 429, `{"error":"rate_limit"}`,
-  the moderation bulk report document); the RFC 9457 `problem.py` helper is used only by the
-  moderation bulk endpoint's 422 shape.
+  the moderation bulk report document).
 - **Audience parity:** public reads reuse the same `account_state_q` predicate as the HTML
   surface, so visibility matches by construction.
 

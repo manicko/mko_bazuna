@@ -44,13 +44,6 @@ class RateLimitBudget(StrEnum):
         security-sensitive, so it is the tightest budget.
     MEDIA_GATE: 240 requests / 60 s. Anonymous DB-backed media serving; protects
         the database from an over-budget client (09-API-005).
-    API_PUBLIC_READ: 60 requests / 60 s. Anonymous ``/api/v1/`` read endpoints.
-        Each read route keeps an independent key namespace (``api_listings``,
-        ``api_search``, ``api_detail``, ``api_categories``, ``api_cities``), so
-        exhausting one route's counter never throttles another.
-    API_WRITE: 30 requests / 60 s. Authenticated ``/api/v1/`` write endpoints,
-        which mutate state; the tighter budget bounds them against abuse. All
-        writes share one key namespace (``api_write``).
     """
 
     SEARCH_PAGE = "search_page"
@@ -58,8 +51,6 @@ class RateLimitBudget(StrEnum):
     DEEP_LINK_RENDER = "deep_link_render"
     LOGIN_ISSUE = "login_issue"
     MEDIA_GATE = "media_gate"
-    API_PUBLIC_READ = "api_public_read"
-    API_WRITE = "api_write"
 
     @property
     def requests(self) -> int:
@@ -70,8 +61,6 @@ class RateLimitBudget(StrEnum):
             RateLimitBudget.DEEP_LINK_RENDER: 60,
             RateLimitBudget.LOGIN_ISSUE: 10,
             RateLimitBudget.MEDIA_GATE: 240,
-            RateLimitBudget.API_PUBLIC_READ: 60,
-            RateLimitBudget.API_WRITE: 30,
         }[self]
 
     @property
@@ -83,8 +72,6 @@ class RateLimitBudget(StrEnum):
             RateLimitBudget.DEEP_LINK_RENDER: 600,
             RateLimitBudget.LOGIN_ISSUE: 60,
             RateLimitBudget.MEDIA_GATE: 60,
-            RateLimitBudget.API_PUBLIC_READ: 60,
-            RateLimitBudget.API_WRITE: 60,
         }[self]
 
 

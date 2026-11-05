@@ -45,13 +45,6 @@ class SubmittedPhoto(BaseInputModel):
     thumbnail_small: str | None = None
     thumbnail_medium: str | None = None
     thumbnail_large: str | None = None
-    # Pre-computed SHA-256 of the photo bytes. Callers whose bytes are already
-    # known (the API submit adapter re-submits a stored DRAFT's permanent
-    # photos) supply it so ``submit_ad`` can dedup against the existing
-    # ``AdImage`` row instead of re-reading and re-inserting. ``None`` — the
-    # bot's staged-upload path — keeps the existing "hash the staged bytes"
-    # behaviour.
-    sha256: str | None = None
 
     def storage_keys(self) -> list[str]:
         """Return this photo's non-empty storage keys.

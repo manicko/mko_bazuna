@@ -82,18 +82,6 @@ class TestRateLimitBudgetTable:
         assert (RateLimitBudget.LOGIN_ISSUE.requests, RateLimitBudget.LOGIN_ISSUE.period) == (10, 60)
         assert (RateLimitBudget.MEDIA_GATE.requests, RateLimitBudget.MEDIA_GATE.period) == (240, 60)
 
-    def test_api_public_read_budget_is_the_reviewed_value(self) -> None:
-        """The /api/v1/ public-read budget is 60 requests / 60 s (S0.5)."""
-        budget = RateLimitBudget.API_PUBLIC_READ
-        assert budget.value == "api_public_read"
-        assert (budget.requests, budget.period) == (60, 60)
-
-    def test_api_write_budget_is_the_reviewed_value(self) -> None:
-        """The /api/v1/ write budget is 30 requests / 60 s (S0.5)."""
-        budget = RateLimitBudget.API_WRITE
-        assert budget.value == "api_write"
-        assert (budget.requests, budget.period) == (30, 60)
-
 
 class TestOneResponseShape:
     """All JSON refusals use the literal ``{"error": "rate_limit"}``."""
