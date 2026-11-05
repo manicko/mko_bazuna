@@ -157,16 +157,15 @@ docs by zone ID.
 
 ## API surface
 
-The `/api/v1/` JSON API surface is a **multi-consumer, machine-readable** contract (rule 18 /
-Agent-First parity) — plain Django JSON views + Pydantic DTOs (no DRF). Its authoritative
-endpoint inventory, auth categories (PUB/SESS/STAFF), RFC 9457 error taxonomy and rate-limit
-budgets live in [`api-surface.md`](api-surface.md); the layout and import rule are in
-[`architecture-structure.md`](architecture-structure.md#api-surface-contract).
+The site is HTMX/MPA and ad posting is bot-first. The JSON surface is limited to the retained
+legacy routes (moderation bulk-action, search autocomplete, preferred-city, the login token
+protocol) plus the operational endpoints — there is no general-purpose `/api/v1/` mirror. Their
+contracts, auth and error shapes live in [`api-surface.md`](api-surface.md).
 
 ## Deferred to post-MVP
 
-Celery/Redis, django-storages/boto3, Telethon group-scraping. (The JSON API surface is **not**
-deferred: `/api/v1/` is now the ratified multi-consumer surface — see [`api-surface.md`](api-surface.md).)
+Celery/Redis, django-storages/boto3, Telethon group-scraping. (A general-purpose JSON API is also
+deferred — only the retained legacy JSON routes exist, see [`api-surface.md`](api-surface.md).)
 
 ## Phase 2 Features
 

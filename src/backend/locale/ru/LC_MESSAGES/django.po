@@ -1749,10 +1749,6 @@ msgstr "Объявление #%(ad_id)s не прошло модерацию и 
 msgid "Ad #%(ad_id)s not found."
 msgstr "Объявление #%(ad_id)s не найдено."
 
-#: src/backend/apps/ads/views/api/detail.py
-msgid "Ad not found."
-msgstr "Объявление не найдено."
-
 #: src/backend/apps/core/utils/api_auth.py
 msgid "Authentication required."
 msgstr "Требуется аутентификация."
@@ -1817,63 +1813,3 @@ msgstr "Требуется доступ для персонала."
 #: src/backend/apps/analytics/views/api/seller.py
 msgid "Method not allowed."
 msgstr "Метод не поддерживается."
-
-#: src/backend/apps/ads/views/api/dashboard.py
-msgid "Storage consent is required to view the seller dashboard."
-msgstr "Для просмотра панели продавца требуется согласие на хранение данных."
-
-#: src/backend/apps/users/views/api/consent.py
-msgid "Consent cannot be changed for a withdrawn account."
-msgstr "Согласие нельзя изменить для отозванного аккаунта."
-
-#: src/backend/apps/cabinet/views/api/saved_search_writes.py
-msgid "Saved search not found."
-msgstr "Сохранённый поиск не найден."
-
-#: src/backend/apps/cabinet/views/api/saved_search_writes.py
-msgid "Search query is too long."
-msgstr "Поисковый запрос слишком длинный."
-
-#: src/backend/apps/ads/views/api/edit.py
-msgid "The ad cannot take that edit in its current status."
-msgstr "Объявление нельзя так отредактировать в его текущем статусе."
-
-#: src/backend/apps/ads/views/api/lifecycle_actions.py
-msgid "This ad cannot be archived in its current status."
-msgstr "Это объявление нельзя архивировать в его текущем статусе."
-
-#: src/backend/apps/ads/views/api/lifecycle_actions.py
-msgid "This ad cannot be reactivated in its current status."
-msgstr "Это объявление нельзя активировать повторно в его текущем статусе."
-
-#: src/backend/apps/ads/views/api/lifecycle_actions.py
-msgid "This ad is already deleted."
-msgstr "Это объявление уже удалено."
-
-#: src/backend/apps/ads/views/api/submit.py
-msgid "This ad cannot be submitted: the field check reports missing or over-cap content."
-msgstr "Это объявление нельзя отправить: проверка полей сообщает об отсутствующем или превышающем лимит содержимом."
-
-#: src/backend/apps/ads/views/api/submit.py
-msgid "The draft no longer exists. Please start a new ad."
-msgstr "Черновик больше не существует. Пожалуйста, создайте новое объявление."
-
-#: src/backend/apps/ads/views/api/submit.py
-msgid "One of the photos is no longer available. Please upload it again."
-msgstr "Одно из фотографий больше недоступно. Пожалуйста, загрузите его снова."
-
-#: src/backend/apps/ads/views/api/submit.py
-msgid "This ad cannot be submitted in its current status."
-msgstr "Это объявление нельзя отправить в его текущем статусе."
-
-#: src/backend/apps/moderation/views/api/actions.py
-msgid "This ad cannot be published: its current status does not allow the transition to published."
-msgstr "Это объявление нельзя опубликовать: его текущий статус не допускает переход в опубликованное."
-
-#: src/backend/apps/moderation/views/api/actions.py
-msgid "This ad cannot be rejected in its current status."
-msgstr "Это объявление нельзя отклонить в его текущем статусе."
-
-#: src/backend/apps/moderation/views/api/actions.py
-msgid "The ban was not applied to this ad's owner."
-msgstr "Бан не был применён к владельцу этого объявления."

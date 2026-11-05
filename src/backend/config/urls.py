@@ -12,15 +12,12 @@ from django.http import HttpRequest, HttpResponse
 from django.urls import include, path
 from django_prometheus.exports import ExportToDjangoView
 
-# `/api/v1/` is the JSON API surface: a multi-consumer, machine-readable
-# contract (D1/D2 of the API-parity program). It is mounted through the
-# URL-only aggregator `apps.api.urls`, whose per-app `api_urls.py` modules route
-# to plain Django JSON views backed by Pydantic `BaseInputModel` DTOs (422
-# problem on validation errors, `@require_POST` for writes). Errors are RFC 9457
-# problem documents built by `apps/core/utils/problem.py`. The HTMX/MPA site
-# remains the interactive consumer of the same services; there is no DRF. See
-# docs/01-spec/api-surface.md (single source of truth) and
-# docs/01-spec/architecture-structure.md.
+# URL surface: the HTMX/MPA site (bot-first ad posting through the
+# Telegram bot) plus the retained legacy JSON routes —
+# /moderation/api/v1/bulk-action/ (moderation bulk actions),
+# /api/search/autocomplete, /api/preferred-city/, and the /login/
+# token protocol — and operational endpoints (health, metrics, admin,
+# media). See docs/01-spec/api-surface.md for the retained contracts.
 
 
 def _metrics_gate(request: HttpRequest) -> HttpResponse:
@@ -58,7 +55,6 @@ urlpatterns = [
     path("metrics", _metrics_gate, name="prometheus-django-metrics"),
     path("", include("django_prometheus.urls")),
     path("admin/", admin.site.urls),
-    path("api/v1/", include("apps.api.urls")),
     path("moderation/", include("apps.moderation.urls")),
     path("analytics/", include("apps.analytics.urls")),
     path("cabinet/", include("apps.cabinet.urls")),
