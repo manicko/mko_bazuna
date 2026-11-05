@@ -1,10 +1,10 @@
 """
-Service-tier tests for the saved-search mutator service (S3.1).
+Service-tier tests for the saved-search mutator service.
 
 These pin the extracted ``apps.search.services.saved_searches`` contract that
-the HTML callers and the future ``/api/v1/`` write endpoints both share. They
-exercise the service directly (no HTTP), so they prove the shared stack that
-the untouched HTML-flow suites (``test_saved_search_create.py``,
+the HTML callers (the create modal and the cabinet management views) share.
+They exercise the service directly (no HTTP), so they prove the shared stack
+that the untouched HTML-flow suites (``test_saved_search_create.py``,
 ``test_cabinet_sections.py``, ``test_saved_search_input_boundary.py``) already
 cover end-to-end is the *same* behavior:
 

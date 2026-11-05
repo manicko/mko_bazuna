@@ -286,11 +286,11 @@ class ListingsQuery:
         rows twice or omit another across pages. ``-id`` is unique per ad, so it
         makes every ordering total and every page deterministic (plan R2).
 
-        This is the single approved ordering delta of the API-parity program and
-        it lives in the shared service, so the HTML listings surface and the
-        ``/api/v1/ads/`` JSON surface both gain it from one place (R2: HTML ==
-        JSON). The FTS path in ``apps.search.services.fts`` carries its own
-        ``-id`` tiebreaker and is unaffected by this change.
+        The ``-id`` tiebreaker lives in the shared service, so every listings
+        surface that sorts through ``ListingsQuery.build_queryset`` gains the
+        same total ordering from one place. The FTS path in
+        ``apps.search.services.fts`` carries its own ``-id`` tiebreaker and is
+        unaffected by this ordering.
         """
         if sort == AdSort.DATE_OLD:
             return queryset.order_by("published_at", "-id")

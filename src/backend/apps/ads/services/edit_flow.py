@@ -1,11 +1,11 @@
 """
-Edit-flow predicate and payload application — the five-branch edit stack (S4.2).
+Edit-flow predicate and payload application — the five-branch edit stack.
 
-Extracted verbatim from the seller HTML edit view so that the HTML surface and
-the future ``POST /api/v1/ads/{id}/edit/`` endpoint share **one** status-to-
-branch table and **one** payload writer instead of two hand-written copies.
+Extracted verbatim from the seller HTML edit view so that the status-to-branch
+table and the payload writer live in **one** place instead of being hand-written
+inside the view.
 
-Scope split (plan S4.2):
+Scope split:
 
 - **This module carries the edit predicate and the payload stages** — the
   ownership / consent / status predicate (``can_edit_ad``) and the staged
@@ -35,9 +35,8 @@ The five outcome families (auditor A5) — every one of them is a member of
 4. ``DIRECT_SAVED`` — a ``DRAFT``/``ON_MODERATION`` ad
    (``EDITABLE_DIRECT_SAVE_STATUSES``): saved directly, status unchanged.
    **Never** funnelled through ``submit_ad`` (frozen rule).
-5. ``REFUSED`` — every other status: no field is written at all. The HTML
-   caller re-renders the form with HTTP 200 (a deliberate mapping); the API
-   caller maps this to ``409 not_editable``.
+5. ``REFUSED`` — every other status: no field is written at all. The caller
+   re-renders the form with HTTP 200.
 
 Families 1/2 always route through ``submit_ad`` and their result is reported
 honestly: :class:`EditResult.submission_outcome` carries the orchestrator's own
@@ -157,13 +156,12 @@ def can_edit_ad(ad: Ad, user_id: int | None) -> bool:
     The wrong-status check is a **pure** short-circuit here; the view keeps its
     own refusal branch (which renders the actionable message) so the rendered
     response is unchanged. An ad that cannot be edited because of its status is
-    also refused here, which is what the future API maps to ``409
-    not_editable``.
+    also refused here, so the predicate answers the same question the view's
+    refusal branch does.
 
     The storage-consent gate is deliberately **not** part of this predicate:
     it is a property of the account, not of the ad, and stays caller-side —
-    both callers compose it themselves (the HTML view's
-    ``_seller_may_create_ad``, the API's ``can_create_ad`` call), so this
+    the HTML view composes it itself (``_seller_may_create_ad``), so this
     predicate stays a pure "ownership + status" term.
     """
     if user_id is None or ad.user_id != user_id:

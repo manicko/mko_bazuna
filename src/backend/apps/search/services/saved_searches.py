@@ -1,11 +1,10 @@
 """
-Saved-search mutator service (shared by the HTML callers and the future API).
+Saved-search mutator service (shared by the HTML callers).
 
 Extracted from the two HTML mutator stacks so that one request-free service
 owns every ``SavedSearch`` write: the create modal
 (``apps.search.views.save_search``) and the cabinet management views
-(``apps.cabinet.views.saved_searches``) become thin callers, and the
-``/api/v1/`` saved-search write endpoints reuse exactly this stack.
+(``apps.cabinet.views.saved_searches``) become thin callers.
 
 All four operations are **request-free** (the project's service contract):
 callers pass a ``User`` and a ``SavedSearchInput`` DTO, never an ``HttpRequest``.
@@ -16,7 +15,7 @@ filters through (10-CQ-004).
 Ownership: every row-scoped operation is scoped to the caller and raises
 ``SavedSearch.DoesNotExist`` when the row is missing or owned by another user.
 Each caller maps that to its own response shape (the HTML views raise
-``Http404``; the API returns a uniform 404 problem) — the same contract
+``Http404``) — the same contract
 ``apps.ads.services.favorites.toggle_favorite`` uses.
 
 Token semantics: the opaque ``unsubscribe_token`` is generated once, by
@@ -48,8 +47,8 @@ class QueryTooLongError(ValueError):
     """Raised by :func:`create_saved_search` when the redacted query is over cap.
 
     Carries the offending length so the caller can log and map it to its own
-    refusal shape (the HTML view returns ``400``; the API returns a 422/400
-    problem). Nothing is persisted when this is raised (08-SRCH-011).
+    refusal shape (the HTML view returns ``400``). Nothing is persisted when
+    this is raised (08-SRCH-011).
     """
 
     def __init__(self, length: int) -> None:

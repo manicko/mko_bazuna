@@ -1,4 +1,4 @@
-"""Service-tier coverage for ``apps.ads.services.edit_flow`` (S4.2).
+"""Service-tier coverage for ``apps.ads.services.edit_flow``.
 
 Covers the extracted predicate (``can_edit_ad``) and the five-branch payload
 application (``apply_edit_payload`` + ``EditOutcome``) directly, without going

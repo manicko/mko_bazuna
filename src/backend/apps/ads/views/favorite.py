@@ -6,8 +6,8 @@ check so an anonymous tap returns the ``login_prompt`` fragment (HTTP 200,
 no 302) that htmx swaps in place, instead of following a redirect blindly
 (R7 / F10 / C4). ``@login_required`` is deliberately NOT used here.
 
-The toggle mechanics live in ``apps.ads.services.favorites`` (S2.1) so the
-HTML fragment and the future ``/api/v1/`` toggle endpoint share one stack.
+The toggle mechanics live in ``apps.ads.services.favorites`` so the view stays
+thin and the heart fragment and the badge count read one shared stack.
 """
 
 import logging

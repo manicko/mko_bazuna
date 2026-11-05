@@ -23,11 +23,11 @@ logger = logging.getLogger(__name__)
 def favorites_list(request: HttpRequest) -> HttpResponse:
     """Render the authenticated user's favorited ads.
 
-    The list queryset is built by ``apps.ads.services.favorites`` (S2.1) —
+    The list queryset is built by ``apps.ads.services.favorites`` —
     PUBLISHED ads whose seller still passes the shared account-state predicate
     (``account_state_q("user__")``, 06-PII-104 / 08-SRCH-008), ordered
-    most-recently-favorited first, so the cabinet HTML list and the future
-    ``GET /api/v1/favorites/`` endpoint share one stack.
+    most-recently-favorited first, so the cabinet list renders the same
+    favorites stack the toggle maintains.
     """
     ads = favorites_queryset(request.user)
 

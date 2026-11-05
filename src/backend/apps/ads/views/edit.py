@@ -8,8 +8,8 @@ Implements US-S5/S7 edit flow with zone C2 hide-on-text-edit behavior:
     - Reactivate (ARCHIVED -> PUBLISHED): text re-checked, hidden until pass
 
 The status-to-branch table and the payload stages live in the shared
-edit-flow service (``apps.ads.services.edit_flow``, S4.2) so the HTML view and
-the future ``/api/v1/ads/{id}/edit/`` endpoint cannot drift. This module keeps
+edit-flow service (``apps.ads.services.edit_flow``) so the view cannot drift
+from the single definition of the edit rules. This module keeps
 what is view-shaped: the transaction + row lock, the rendered form, the
 redirects, the log lines and the 03-DB-004 lock-timeout re-render.
 
@@ -180,7 +180,7 @@ def ad_edit(request: HttpRequest, ad_id: int) -> HttpResponse:
             )
 
             # Status-to-branch table and payload application live in the shared
-            # edit-flow service (S4.2). This view keeps only the response shapes.
+            # edit-flow service. This view keeps only the response shapes.
             # The raw ``reactivate`` flag is passed through: the ARCHIVED
             # conjunct that makes it a reactivation lives in the service.
             result = apply_edit_payload(ad, dto, bool(request.POST.get("reactivate")))
@@ -263,7 +263,7 @@ def ad_archive(request: HttpRequest, ad_id: int) -> HttpResponse:
     This view owns the transaction, the row lock and the authorization: it
     fetches the ad under ``select_for_update()``, refuses a non-owner, then
     asserts the consent gate at the caller boundary, and the shared lifecycle
-    service (S4.1) applies the ``PUBLISHED -> ARCHIVED`` transition to that
+    service applies the ``PUBLISHED -> ARCHIVED`` transition to that
     locked instance. The service call is the last statement inside the block,
     so the fetch, the ownership check, the consent gate and the transition
     share one unit of work and one row-lock lifetime (the service's own
@@ -315,7 +315,7 @@ def ad_reactivate(request: HttpRequest, ad_id: int) -> HttpResponse:
     This view owns the transaction, the row lock and the authorization: it
     fetches the ad under ``select_for_update()``, refuses a non-owner, then
     asserts the consent gate at the caller boundary, and the shared lifecycle
-    service (S4.1) applies the ``ARCHIVED -> ON_MODERATION`` transition and
+    service applies the ``ARCHIVED -> ON_MODERATION`` transition and
     the moderation decision to that locked instance. The service call is the
     last statement inside the block, so the fetch, the ownership check, the
     consent gate, the transition and the auto-moderation decision share one

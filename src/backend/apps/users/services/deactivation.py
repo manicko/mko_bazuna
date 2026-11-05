@@ -42,9 +42,9 @@ The product decision is *"superusers and moderators"*, and the restriction is
 deactivate staff/superusers/other moderators."* This is expressed as an
 **actor scope** (who may run the action) plus a **target scope** (which rows
 the action may touch). The target scope lives **here**, not in the admin view,
-so that no caller — a view, a shell, a future API — can bypass it. Django's
-``permissions=`` mechanism can express only the actor scope; enforcing the
-target scope in a view would leave every other entry point ungated.
+so that no caller — a view, a shell, a management command — can bypass it.
+Django's ``permissions=`` mechanism can express only the actor scope; enforcing
+the target scope in a view would leave every other entry point ungated.
 
 Self-exclusion is unconditional and applies to a superuser too: the operator's
 own row is always removed from the target set. ``18-D4`` (whether the three
@@ -55,10 +55,10 @@ resolved here.
 scope (which rows may be written). The **actor** scope — *who may run the action
 at all* — lives only in ``UserAdmin.has_deactivate_permission``
 (``is_staff or is_superuser``). A direct caller that bypasses the admin (a view,
-a shell, a future API) still gets the target scope but not the actor gate. That
-is acceptable because shell/DB access is already total compromise, but it is a
-deliberate split, not an oversight: the actor gate belongs to the permission
-layer, the row scope belongs to the write layer.
+a shell, a management command) still gets the target scope but not the actor
+gate. That is acceptable because shell/DB access is already total compromise,
+but it is a deliberate split, not an oversight: the actor gate belongs to the
+permission layer, the row scope belongs to the write layer.
 
 Why no row lock
 ---------------

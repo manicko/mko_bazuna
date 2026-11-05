@@ -5,10 +5,9 @@ Ad favorites service — favorite state annotation, listing and toggle.
 (10-QLT-005) so that the shared listings query service can depend on this
 annotation without inverting the layering (service -> views).
 
-The list + toggle operations were hoisted here in the API-parity program
-(S2.1) so that the HTML favorite surfaces (``apps.ads.views.favorite`` and
-``apps.cabinet.views.favorites``) and the future ``/api/v1/`` favorites
-endpoints share **one** favorites stack instead of two hand-built queries.
+The list + toggle operations are hoisted here so that the HTML favorite
+surfaces (``apps.ads.views.favorite`` and ``apps.cabinet.views.favorites``)
+share **one** favorites stack instead of two hand-built queries.
 
 Contract: request-free, returns ORM objects (the project's service contract).
 ``annotate_favorites`` stays a pure queryset annotation; the new functions add
@@ -27,8 +26,8 @@ from apps.users.services.account_state import account_state_q
 
 logger = logging.getLogger(__name__)
 
-# Ad cards shown per favorites page (CAB-002). Kept here so the HTML view and
-# any future API adapter paginate the same list identically.
+# Ad cards shown per favorites page (CAB-002). Kept here so the HTML view
+# paginates the shared list with the page size the service owns.
 PER_PAGE = 24
 
 
@@ -77,7 +76,7 @@ def favorites_queryset(user: User) -> QuerySet[Ad]:
     Ordering is most-recently-favorited first (``-favorites__created_at``) and
     the ``is_favorited`` annotation is applied so cards render their initial
     heart state. The queryset is the single shared stack for the cabinet HTML
-    list and the future ``GET /api/v1/favorites/`` endpoint.
+    list and the favorites badge count.
     """
     ads = (
         Ad.objects.filter(
@@ -102,8 +101,7 @@ def toggle_favorite(user: User, ad_id: int) -> FavoriteToggleResult:
 
     Raises:
         Ad.DoesNotExist: If the ad does not exist or is not PUBLISHED. The
-            caller (HTML or API) maps this to its own response (the HTML view
-            raises ``Http404``; the API returns a uniform 404 problem).
+            HTML view maps this to ``Http404``.
     """
     ad = Ad.objects.get(id=ad_id, status=AdStatus.PUBLISHED)
 

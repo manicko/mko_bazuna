@@ -9,7 +9,7 @@ Implements US-S6 self-delete ad flow:
 
 This view owns the transaction, the row lock and the authorization: it opens
 ``transaction.atomic()``, fetches the ad under ``select_for_update()`` and
-refuses a non-owner, and the shared lifecycle service (S4.1) applies the
+refuses a non-owner, and the shared lifecycle service applies the
 ``-> DELETED`` transition to that locked row. This flow is deliberately
 gate-free: no consent or audience check applies.
 """

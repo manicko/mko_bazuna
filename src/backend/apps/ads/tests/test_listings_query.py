@@ -1,7 +1,7 @@
-"""Service-tier ports of the retiring listings API matrix (block B3).
+"""Service-tier coverage of the listings filter, sort and page matrix.
 
-This module is the retained home of the business invariants that were asserted
-only through the dying ``GET /api/v1/ads/`` JSON mirror
+This module is the retained home of the listings business invariants that were
+previously asserted only through the JSON listings surface
 (``test_listings_api.py::TestExhaustiveFilterSortPageMatrix`` and
 ``::TestAudienceParity``). Every test drives
 ``ListingsQuery.build_queryset`` directly — the single pipeline the retained
@@ -18,8 +18,8 @@ Covers:
 - for every sort the union of pages 1-3 at ``per_page=10`` equals the full
   25-ad set exactly once.
 
-D28 fix: unlike the retiring test, the page-union test carries NO outer
-``@pytest.mark.parametrize("page", ...)`` — the unused parametrization made the
+D28 fix: the page-union test carries NO outer
+``@pytest.mark.parametrize("page", ...)`` — the unused parametrization would make
 three-page loop re-run once per page value. Here it is one collected test per
 sort, each looping pages 1-3 exactly once (4 collected rows).
 """
@@ -80,7 +80,7 @@ class TestListingsQueryCategoryFilter:
     def test_unknown_category_slug_applies_no_filter(
         self, seller, category, city
     ) -> None:
-        """An unresolvable slug (retiring shape ``does-not-exist``) filters nothing."""
+        """An unresolvable slug (``does-not-exist``) filters nothing."""
         seeded = {
             create_test_ad(seller, category, city, status=AdStatus.PUBLISHED).id
             for _ in range(2)
@@ -98,7 +98,7 @@ class TestListingsQueryPriceBounds:
 
     @pytest.fixture
     def price_matrix(self, seller, category, city) -> dict[str, Ad]:
-        """Seed the retiring matrix shape: 50 / 150 / 300 in city, 150 elsewhere."""
+        """Seed the price matrix shape: 50 / 150 / 300 in city, 150 elsewhere."""
         other_city = City.objects.create(
             country_code="ME",
             name="Другиград",
@@ -219,9 +219,9 @@ class TestListingsQueryPageUnion:
         "sort",
         [AdSort.DATE_NEW, AdSort.DATE_OLD, AdSort.PRICE_LOW, AdSort.PRICE_HIGH],
     )
-    # D28 fix: the retiring test ALSO had an unused outer
-    # @pytest.mark.parametrize("page", [1, 2, 3]). It is deliberately NOT
-    # carried over: one collected test per sort, each looping pages 1-3 once.
+    # D28 fix: an outer
+    # @pytest.mark.parametrize("page", [1, 2, 3]) is deliberately NOT used:
+    # one collected test per sort, each looping pages 1-3 once.
     def test_three_page_union_no_duplicates_per_sort(
         self, seller, category, city, sort: AdSort
     ) -> None:

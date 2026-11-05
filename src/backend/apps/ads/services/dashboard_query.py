@@ -1,17 +1,16 @@
 """
 Seller dashboard grouping queries.
 
-Extracted verbatim from ``apps.ads.views.dashboard`` (API-parity S2.2) so that
-the HTML dashboard and the future ``GET /api/v1/dashboard/`` endpoint consume
-one shared, request-free grouping stack instead of two hand-built queries.
+Extracted verbatim from ``apps.ads.views.dashboard`` so the HTML dashboard
+consumes a request-free grouping stack instead of hand-built queries inline in
+the view.
 
 Contract: request-free, returns ORM objects (the project's service contract).
 The function takes the seller id and returns the grouped querysets the view
 iterates; it carries no view/HTTP coupling and no consent logic. The
 create-time storage-consent gate (``_seller_may_create_ad``) deliberately
 stays in the view (auditor A14): this module never imports it, and never
-imports ``apps.users.services.account_state.can_create_ad`` — the later S2.3
-endpoint re-asserts consent through that shared seam at its own boundary.
+imports ``apps.users.services.account_state.can_create_ad``.
 """
 
 import logging

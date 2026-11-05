@@ -6,9 +6,8 @@ Per-search list with enable/disable, edit, and delete. Disable only flips
 no longer fires alerts.
 
 The write semantics live in ``apps.search.services.saved_searches`` so these
-views and the future ``/api/v1/`` endpoints share one mutator stack (S3.1);
-these views keep only the HTTP-shaped concerns (405 gate, form re-render,
-redirect).
+views stay thin callers; they keep only the HTTP-shaped concerns (405 gate,
+form re-render, redirect).
 """
 
 import logging

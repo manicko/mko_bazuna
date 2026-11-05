@@ -1,5 +1,5 @@
 """
-Service-tier tests for ``apps.ads.services.lifecycle`` (S4.1).
+Service-tier tests for ``apps.ads.services.lifecycle``.
 
 The service acts on a row the caller fetched, locked and authorized, so this
 module proves the service's **state mechanics on a caller-fetched row**:

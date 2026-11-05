@@ -1,5 +1,5 @@
 """
-Ad lifecycle state mechanics — archive / reactivate / delete (S4.1).
+Ad lifecycle state mechanics — archive / reactivate / delete.
 
 This module carries **state mechanics only** — the status precondition,
 ``Ad.transition_to`` and (for reactivation) the ``auto_moderate`` decision —

@@ -14,8 +14,7 @@ with the root count (measured 10 for 5 non-leaf roots x 2 render sites);
 after, it is bounded by a small constant.
 
 The file also pins the ``root_categories`` CONTENT contract (active-only,
-name-ordered roots) at the end, ported here in block B3 from the retiring
-categories API parity test.
+name-ordered roots) at the end.
 """
 
 from __future__ import annotations
@@ -91,7 +90,7 @@ class TestHeaderChildExistenceQueryCount:
 class TestHeaderRootCategoriesContent:
     """root_categories renders active roots only, in name order.
 
-    Previously pinned only by the retiring categories API parity test: dropping
+    Previously pinned only by a dropped categories JSON-surface test: dropping
     ``.filter(is_active=True)`` would expose an inactive root to every anonymous
     visitor on every page, and dropping ``.order_by("name")`` would render the
     roots in encoding-dependent order.

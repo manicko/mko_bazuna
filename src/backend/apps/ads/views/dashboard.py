@@ -66,8 +66,8 @@ def dashboard(request: HttpRequest) -> HttpResponse:
         if ad_id is not None:
             per_ad_stats_dict[ad_id] = row
 
-    # Fetch all ads for the current user, grouped by status (shared service,
-    # S2.2). The create-time storage-consent gate above stays view-side (A14).
+    # Fetch all ads for the current user, grouped by status (shared service).
+    # The create-time storage-consent gate above stays view-side (A14).
     ads_by_status = ads_by_status_querysets(request.user.id)
 
     context = {

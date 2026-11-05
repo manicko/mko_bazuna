@@ -7,9 +7,9 @@ current query + optional city/category/price filters, creates an active
 returns an HTMX success fragment.
 
 The persistence semantics live in
-``apps.search.services.saved_searches.create_saved_search`` so the modal and the
-future ``/api/v1/`` create endpoint share one mutator stack (S3.1); this view
-keeps only the HTTP-shaped concerns (method gate, 400 refusal, modal re-render).
+``apps.search.services.saved_searches.create_saved_search`` so this view stays a
+thin caller and keeps only the HTTP-shaped concerns (method gate, 400 refusal,
+modal re-render).
 """
 
 import logging
