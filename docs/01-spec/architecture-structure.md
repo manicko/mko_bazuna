@@ -427,24 +427,27 @@ The production nginx configuration (`docker/nginx/nginx.conf`) implements:
 - **Proxy header contract:** every proxying `location` (including `/static/`) sets `Host`, `X-Real-IP $remote_addr`, `X-Forwarded-For $proxy_add_x_forwarded_for`, `X-Forwarded-Proto $scheme`, and `X-Forwarded-Host $host`. `X-Forwarded-Host` is set because Django trusts `USE_X_FORWARDED_HOST`; omitting it would leave that trust depending on a header nobody sets or clears.
 - **`/metrics` is controlled twice (`09-API-014`):** nginx restricts `= /metrics` to `allow 127.0.0.1; deny all;`, **and** `config/urls.py` wraps the exporter in a gate view keyed on the socket peer `REMOTE_ADDR` (loopback allowed, anything else 403). nginx alone does not cover a caller reaching the `web` container directly across the Docker bridge (a sibling container, or dev's published `8000:8000`). The gate is a plain `urls.py` view, not middleware, so the 15-entry `MIDDLEWARE` list is untouched. **New coupling:** a Prometheus scrape *through nginx* now 403s at Django (already true at the nginx layer), so an operator centralising Prometheus must widen this deliberately.
 
-## Retained JSON Surfaces
+## Retained URL surface
 
-The HTTP interface is the HTMX/MPA site plus the Telegram bot; there is **no general-purpose
-`/api/v1/` JSON mirror** and no separate API app or per-app API view layer. What remains is a small
-set of retained legacy JSON routes, mounted by their regular per-app URLconfs (not by a root
-aggregator):
+The root URLconf (`config/urls.py`) mounts the ordinary per-app includes — `moderation/`,
+`analytics/`, `cabinet/`, then the flat includes for `users`, `ads`, `categories`, `locations`,
+`search`, `core` — plus `admin/` and the Prometheus exporter. There is **no general-purpose JSON
+API**, no `/api/v1/` mirror, no separate API app and no per-app API view layer. The HTTP interface
+is:
 
-- **`POST /moderation/api/v1/bulk-action/`** (`moderation:bulk_action`, declared in
-  `apps/moderation/urls.py`, served by `apps/moderation/views/api_bulk.py`).
-- **`/api/search/autocomplete`** and **`/api/preferred-city/`** (legacy 429 `{"error":"rate_limit"}`
-  shape; preferred-city has no rate limiter).
-- **`/login/issue/`** and **`/login/status/`** (the login token protocol).
-- Operational endpoints: health/readiness (`core:health*`), `/metrics` (loopback-gated in
-  `config/urls.py`), the Django admin, and the media gate.
+- **HTML / HTMX pages** — the product surface; server-rendered, with HTMX partial swaps.
+- **Legacy JSON routes** (frozen shapes, each declared in its own app's `urls.py`):
+  - `POST /moderation/api/v1/bulk-action/` (`moderation:bulk_action`,
+    `apps/moderation/views/api_bulk.py`, decorated `@staff_required_api`).
+  - `GET /api/search/autocomplete` and `POST /api/preferred-city/` (`apps/search/urls.py`).
+  - `/login/issue/` and `POST /login/status/` (`apps/users/urls.py`) — the login token protocol.
+- **Operational endpoints** — health/readiness (`/health/`, `/health/live/`, `/health/ready/` in
+  `apps/core/urls.py`), `/metrics` (loopback-gated in `config/urls.py`), `/csp-report/`, the Django
+  admin, and the media gate (`ads:media_gate`, `/media/<key>`).
+- **Telegram bot** — a separate process, not an HTTP surface of the web app.
 
-They are plain Django JSON endpoints — **no DRF, no django-ninja** — and there is no import-subset
-rule, pairing harness or parity CLI for them. Each retained route's contract is specified in
-[`api-surface.md`](api-surface.md).
+They are plain Django views — **no DRF, no django-ninja** — and no import-subset rule or parity CLI
+exists. Each route's contract is specified in [`api-surface.md`](api-surface.md).
 
 ### Auth and errors
 
@@ -455,9 +458,24 @@ rule, pairing harness or parity CLI for them. Each retained route's contract is 
 | **STAFF** | staff session required, enforced by `staff_required_api` |
 
 The legacy JSON writes are POST-only; the Django session cookie is the **only** credential (no new
-auth scheme, no CSRF exemption, no bearer token). Frozen legacy 429 shapes (bare 429 for
-listings/detail, `{"error":"rate_limit"}` for autocomplete, the media gate's own variant) are
-specified in [`api-surface.md`](api-surface.md).
+auth scheme, no CSRF exemption, no bearer token). Frozen legacy error shapes (bare 429 for
+listings/detail, `{"error":"rate_limit"}` for autocomplete, the moderation bulk report document,
+the media gate's own variant) are specified in [`api-surface.md`](api-surface.md).
+
+## Ad lifecycle convention (single locked-ad shape)
+
+Archive, reactivate and delete each cross two layers with a fixed division of responsibility:
+
+| Layer | Owns |
+|---|---|
+| **HTML view** (`apps/ads/views/edit.py`, `apps/ads/views/delete.py`) | the transaction (`transaction.atomic`), the row lock (`select_for_update`), ownership (`403`), and the consent gate (archive/reactivate; **delete is deliberately gate-free**) |
+| **Service** (`apps/ads/services/lifecycle.py`: `archive_ad` / `reactivate_ad` / `delete_ad`) | state mechanics + moderation on the **locked `Ad` instance** it is handed; its own `atomic()` block is a savepoint inside the caller's transaction |
+
+The service takes a locked `Ad`, never an id: every caller must enter through the same view-side
+lock, so there is one locking path, not one per caller. Lock timeout (`PostgreSQL 55P03`) surfaces
+as `503` through `DbLockTimeoutMiddleware`. The edit path follows the same ownership rule and
+returns an `EditResult` (`outcome: EditOutcome`, `submission_outcome: SubmitAdOutcome | None`,
+`errors`); the view redirects only when the outcome is `PUBLISHED`.
 
 ## Audit Zone References
 

@@ -57,7 +57,7 @@ $dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f doc
 |---|---|---|
 | Start DB | `$dc up -d db` | Once per session (persistent volume → `--reuse-db` caching) |
 | Fast gate (PR tier) | `$dc run --rm --env "PYTEST_SKIP_MARKERS=seed or slow or real_images" test` | Default dev iteration (skips `seed`, `slow`, `real_images` — byte-identical marker set to the `ci.yml` `test` job) |
-| Full pre-merge tier | `$dc run --rm --env PYTEST_SKIP_MARKERS=seed test` | Before pushing to `main`/`develop`: same set as the `test-full` job (`-m "not (seed)"`) |
+| Full tier without `seed` | `$dc run --rm --env PYTEST_SKIP_MARKERS=seed test` | Before merging to `main`/`develop`. Mirrors the `test-full` job (`-m "not (seed)"`), which CI runs **after a push to `main`/`develop`** — it is not a pull-request signal, so run it locally before merging |
 | Full suite (nightly tier) | `$dc run --rm test` | Changes touch seeding/images; the only tier with **no** marker exclusion |
 | Fresh schema | `$dc run --rm --env PYTEST_OPTS="--create-db --tb=short -n auto --maxprocesses=4 --dist loadgroup" test` | After migration changes or interrupted run |
 | Stop | `$dc down` | Done (preserves named volume) |
@@ -81,7 +81,7 @@ serially, and the marker-parity guard (`tests/test_docs_ci_parity.py`) before th
 $dc run --rm -e PYTEST_OPTS="-k test_name" test
 $dc run --rm -e PYTEST_OPTS="src/backend/apps/ads/tests/test_edit.py src/backend/apps/ads/tests/test_submission.py --tb=short" test
 ```
-Two caveats (verified): the `PYTEST_OPTS` value is **unquoted** in `docker/entrypoint-test.sh`, so each token is word-split on spaces — `-k test_name` and bare file paths work, but quoted multi-token values (e.g. `-k "a b"`) do **not**. (Marker exclusion does not use `PYTEST_OPTS`: `PYTEST_SKIP_MARKERS` is expanded as one quoted `-m "not (...)"` argument, so `"seed or slow or real_images"` is safe there.) Setting `PYTEST_OPTS` also **replaces** the defaults (`--reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup`), so targeted runs lose xdist parallelism and DB reuse. Never use `--override-ini=addopts=` — it strips `--import-mode=importlib` (set in `pyproject.toml`).
+Two caveats (verified). First, the `PYTEST_OPTS` value is **unquoted** in `docker/entrypoint-test.sh`, so each token is word-split on spaces — `-k test_name` and bare file paths work, but quoted multi-token values (e.g. `-k "a b"`) do **not**. (Marker exclusion does not use `PYTEST_OPTS`: `PYTEST_SKIP_MARKERS` is expanded as one quoted `-m "not (...)"` argument, so `"seed or slow or real_images"` is safe there.) Second, `PYTEST_OPTS` **adds to, and never replaces,** the fixed defaults: the entrypoint runs `pytest ${PYTEST_OPTS:-} ${PYTEST_DEFAULTS} ...`, i.e. `PYTEST_OPTS` is expanded **before** `PYTEST_DEFAULTS` (`--reuse-db --tb=short --durations=10 -n auto --maxprocesses=4 --dist loadgroup`), which are therefore always present. A targeted run keeps xdist parallelism and `--reuse-db`. Redis and DB containers still need to be up for a targeted run. Never use `--override-ini=addopts=` — it strips `--import-mode=importlib` (set in `pyproject.toml`).
 
 **Serial runs (`-p no:xdist`) cannot go through the entrypoint.** `PYTEST_DEFAULTS` appends
 `-n auto --maxprocesses=4 --dist loadgroup` **after** `PYTEST_OPTS`, so `-p no:xdist` (the form the

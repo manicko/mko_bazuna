@@ -157,10 +157,19 @@ docs by zone ID.
 
 ## API surface
 
-The site is HTMX/MPA and ad posting is bot-first. The JSON surface is limited to the retained
-legacy routes (moderation bulk-action, search autocomplete, preferred-city, the login token
-protocol) plus the operational endpoints — there is no general-purpose `/api/v1/` mirror. Their
-contracts, auth and error shapes live in [`api-surface.md`](api-surface.md).
+The site is HTMX/MPA and ad posting is bot-first, so the HTTP interface is almost entirely
+server-rendered HTML. Alongside the pages, the bot and the admin, the application retains:
+
+- **Legacy JSON routes** (frozen shapes): `POST /moderation/api/v1/bulk-action/` (staff),
+  `GET /api/search/autocomplete`, `POST /api/preferred-city/`, and the login token protocol
+  `/login/issue/` + `POST /login/status/`.
+- **Operational endpoints:** health/readiness (`/health/`, `/health/live/`, `/health/ready/`),
+  loopback-gated `/metrics`, and the media delivery gate (`/media/<key>`).
+
+There is no general-purpose JSON API and no `/api/v1/` mirror. Contracts, auth and error shapes:
+[`api-surface.md`](api-surface.md). Verification is browserless via Django `Client()` under pytest
+(exit status is the verdict) — see
+[`../99-agent/architecture.md`](../99-agent/architecture.md#task--service--tests-map).
 
 ## Deferred to post-MVP
 
@@ -213,13 +222,13 @@ Analytical specifications for identified bugs and gaps. Full details in `.ai/pro
 
 | Task | Command |
 |------|---------|
-| Tests | `make test` |
+| Tests (fast gate) | `make test` (or `.\Makefile.ps1 test`) — skips `seed`/`slow`/`real_images` |
 | Full suite (incl. seed) | `make test-all` |
 | Fresh schema | `make test-recreate` |
 | Clean stale test DBs | `make test-clean-db` |
 | Lint | `uv run ruff check <path>` |
 | Lint templates | `.\Makefile.ps1 lint-templates` (or `$env:PYTHONPATH='src/backend'; uv run djlint src/backend/templates/`) |
 | Type check | `uv run basedpyright <path>` |
-| i18n extract | `make makemessages` |
-| i18n compile | `make compilemessages` |
+| i18n extract | `.\Makefile.ps1 extract-messages` (safe scratch recipe — never in place) |
+| i18n compile | in-container `compilemessages` — see [`.kilo/rules/commands.md`](../../.kilo/rules/commands.md) § i18n |
 | Add dep | `uv add <package>` |

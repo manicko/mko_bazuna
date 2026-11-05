@@ -67,9 +67,9 @@ This file contains architecture guidelines and patterns for the Mko Bazuna proje
 
 | Task | Command |
 |------|---------|
-| Test (Docker, PR tier) | `make test` — fast gate, excludes `seed`/`slow`/`real_images` |
-| Test (Docker, pre-merge tier) | `--env PYTEST_SKIP_MARKERS=seed` — excludes `seed` only (mirrors `ci.yml` `test-full`) |
-| Test (Docker, full tier) | `make test-all` — no marker exclusion (mirrors `ci-nightly.yml`) |
+| Test (Docker, fast gate / PR tier) | `make test` (or `.\Makefile.ps1 test`) — excludes `seed`/`slow`/`real_images` |
+| Test (Docker, full tier without `seed`) | `--env PYTEST_SKIP_MARKERS=seed` — excludes `seed` only (mirrors `ci.yml` `test-full`, which runs on a push to `main`/`develop`, not on a PR) |
+| Test (Docker, full suite) | `make test-all` — no marker exclusion (mirrors `ci-nightly.yml`) |
 | Test (fresh schema) | `make test-recreate` |
 | Lint | `uv run ruff check <path>` |
 | Type check | `uv run basedpyright <path>` |
@@ -79,6 +79,36 @@ Test tiers are pinned to CI: `src/backend/tests/test_docs_ci_parity.py` asserts 
 marker token is byte-identical across `Makefile`, `Makefile.ps1` and `ci.yml`. Tier semantics and
 per-tier commands are documented in [`rules.md`](rules.md#test-tiers-and-measured-cost) and
 [commands.md](../../.kilo/rules/commands.md).
+
+## Task → service → tests map
+
+Where each product task lives, and the suite that pins it. All commands run in Docker through the
+`test` service — never `uv run pytest` on the host.
+
+| Task | HTTP surface | Service / seam | Tests |
+|---|---|---|---|
+| Browse listings, filters, sort, pagination | `ads:listings`, `ads:listings_category`, `ads:listings_city` | `apps/ads/services/listings_query.py::ListingsQuery` / `ListingsQueryParams` | `apps/ads/tests/test_listings_query.py`, `test_listings_context.py`, `test_listings_sort.py`, `test_price_sort.py`, `test_fts_sort_order.py`, `test_relevance_tiebreaker.py`, `test_filter_*.py`, `test_listing_purpose_filter.py`, `test_listing_condition_filter.py`, `test_features_filter.py` |
+| FTS search, fuzzy, autocomplete | `search:*`, `GET /api/search/autocomplete` | `apps/search/services/fts.py`, `entity_suggestions`, `popular_search`, `search_history` | `apps/search/tests/test_fts_service.py`, `test_search_view.py`, `test_search_fuzzy.py`, `test_search_rank_page.py`, `test_search_cache.py`, `test_autocomplete.py`, `test_autocomplete_template.py`, `test_city_suggestions.py` |
+| Edit an ad (incl. price-only) | `ads:edit` (`POST`) | `apps/ads/services/edit_flow.py::apply_edit_payload` / `apply_price_change` → `EditResult` | `apps/ads/tests/test_edit.py`, `test_edit_flow_service.py`, `test_edit_views_locking.py` |
+| Lifecycle: archive / reactivate / delete | `ads:archive`, `ads:reactivate`, `ads:delete` (`POST`) | `apps/ads/services/lifecycle.py::archive_ad` / `reactivate_ad` / `delete_ad` (locked `Ad` in, view owns lock) | `apps/ads/tests/test_lifecycle_service.py`, `test_ad_lifecycle.py`, `test_delete.py`, `test_ad_detail_queries.py` |
+| Publish a draft (bot write path) | Telegram bot dialog | `apps/ads/services/submission.py::submit_ad` | `apps/ads/tests/test_submission.py`, `test_ad_consent_gate.py`; `src/telegram_bot/tests/` |
+| Favorites (toggle + list + badge) | `ads:favorite_toggle`, `cabinet:favorites`, `cabinet:favorites_count` | `apps/ads/services/favorites.py::toggle_favorite` | `apps/ads/tests/test_favorites.py`, `apps/cabinet/tests/test_favorites_badge.py`, `test_favorites_visibility.py` |
+| Seller dashboard stats | `ads:dashboard`, `analytics:*` | `apps/analytics/services/seller_stats.py`, `rollup_daily_metrics` | `apps/ads/tests/test_dashboard_stats.py`, `apps/analytics/tests/test_seller_stats.py`, `test_rollup_daily_metrics.py` |
+| Saved searches + alerts | `cabinet:*`, `search:*` | `apps/search/services/saved_searches.py`, `alert_query.py`, `send_alerts`, `immediate_alerts` | `apps/search/tests/test_saved_search_service.py`, `test_saved_search_create.py`, `test_alert_query.py`, `test_alert_delivery.py`, `test_send_alerts.py`, `test_immediate_alerts.py` |
+| Moderation queue + actions (incl. bulk) | `moderation:*`, `POST /moderation/api/v1/bulk-action/` | `apps/moderation/services/{priority_calculator,auto_moderation,moderation_log}.py`, `admin_actions.py` | `apps/moderation/tests/test_priority_service.py`, `test_admin_actions.py`, `test_moderation_views.py`, `test_auto_moderation.py` |
+| Login token protocol | `/login/issue/`, `POST /login/status/`, bot `login_*` | `apps/users/services/login_token.py` | `apps/users/tests/test_login_token.py`, `test_login.py`, `src/telegram_bot/tests/` |
+
+Run one row's suite (extra args go through `PYTEST_OPTS`, which **adds to** the fixed defaults):
+
+```powershell
+$dc = 'docker compose --project-name mko-bazuna-test --env-file .env.test -f docker-compose.yml -f docker-compose.test.yml'
+$dc run --rm -e PYTEST_OPTS="src/backend/apps/ads/tests/test_edit.py src/backend/apps/ads/tests/test_lifecycle_service.py --tb=short" test
+```
+
+The verdict is the pytest **exit status** (JUnit XML optional via `PYTEST_OPTS="--junitxml=..."`);
+every row is reachable browserlessly through Django `Client()` or the service tier — no HTTP parity
+harness or CLI is needed or present. See
+[`.kilo/rules/commands.md`](../../.kilo/rules/commands.md) for the Compose alias and caveats.
 
 ## Cache Backend
 

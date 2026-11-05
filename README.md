@@ -96,7 +96,7 @@ Uses transaction-mode pooling with `edoburu/pgbouncer:1.25.2`. Enable in product
 | `docs/01-spec/technical-specification.md` | Product & domain spec (decisions A–L) |
 | `docs/05-owner-decisions/index.md` | Owner decisions O1–O5 (plain, owner-readable) |
 | `docs/01-spec/architecture-structure.md` | Source layout & Docker deployment |
-| `docs/01-spec/api-surface.md` | Legacy JSON surfaces & operational contracts |
+| `docs/01-spec/api-surface.md` | Retained HTTP interface inventory & legacy contracts |
 | `docs/02-database/db-schema.md` | Tables, columns, relationships, enums reference |
 | `docs/02-database/db-indexes.md` | Indexes & `search_vector` trigger SQL |
 | `docs/02-database/db-enums.md` | `StrEnum` types (AdStatus, EventType, etc.) |
@@ -141,10 +141,13 @@ docs/
 
 **Deferred (post-MVP):** Celery/Redis, S3/R2 storage, Telethon scraping, EAV attributes, tags, multi-currency.
 
-**JSON API:** there is no general-purpose `/api/v1/` JSON mirror — posting is bot-first (the
-Telegram bot is the write path) and the site is HTMX/MPA. The retained JSON interfaces are the
-legacy routes only: `/moderation/api/v1/bulk-action/` (moderation bulk actions),
-`/api/search/autocomplete`, `/api/preferred-city/`, and the `/login/issue/` + `/login/status/`
-token protocol — alongside the operational endpoints (health, metrics, admin, media). Their
-contracts and error taxonomy: [`docs/01-spec/api-surface.md`](docs/01-spec/api-surface.md).
-Browserless verification uses Django `Client()` under pytest, not a separate HTTP client.
+**Interfaces:** the site is HTMX/MPA (server-rendered pages with partial swaps) and posting is
+bot-first — the Telegram bot is the ad-creation write path. There is no general-purpose JSON API
+and no `/api/v1/` mirror. Alongside the pages, the bot and the admin, the application retains a
+small set of frozen **legacy JSON routes** — `/moderation/api/v1/bulk-action/` (staff bulk
+moderation), `/api/search/autocomplete`, `/api/preferred-city/`, and the `/login/issue/` +
+`/login/status/` token protocol — plus the operational endpoints (health/readiness, loopback-gated
+`/metrics`, media delivery). Contracts and error shapes:
+[`docs/01-spec/api-surface.md`](docs/01-spec/api-surface.md).
+Browserless verification uses Django `Client()` under pytest (exit status is the verdict), not a
+separate HTTP client or parity harness.

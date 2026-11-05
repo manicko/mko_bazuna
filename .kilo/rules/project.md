@@ -50,8 +50,7 @@
     Before creating any file, ask: 1) Is there an exact place for this in the task or module architecture? 2) Is it needed for project operation and future maintenance? If both are no — write only to `.ai/tmp`.
 
 18. **RFC 9457 for API Errors**  
-    All API errors must follow RFC 9457 (`application/problem+json`). Use standard HTTP status codes, consistent error structures, and stable error types. Centralize error handling on both backend and frontend.
+    Maintained APIs (new or reworked JSON endpoints and any future public API) must return errors as RFC 9457 problem documents (`application/problem+json`): standard HTTP status codes, a consistent error structure, and stable `type` tokens. Centralize error handling on both backend and frontend. The frozen legacy JSON routes (`/moderation/api/v1/bulk-action/`, `/api/search/autocomplete`, `/api/preferred-city/`, `/login/issue/` + `/login/status/`) keep their documented legacy shapes and are not retrofitted — see [`docs/01-spec/api-surface.md`](../../docs/01-spec/api-surface.md).
 
-
-18. **Agent-First**
+19. **Agent-First**
      The architecture must enable LLM coding agents to safely modify, test, debug, and refactor the application using deterministic, reproducible, and machine-readable verification. Automated verifiability is the primary goal.

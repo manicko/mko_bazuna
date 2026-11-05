@@ -9,133 +9,161 @@ related:
   - architecture-structure
   - spec-index
   - technical-specification
+  - architecture
 ---
-
-# Mko Bazuna — Retained JSON Surfaces
-
-> **Contract reference for the retained JSON routes.** The site is HTMX/MPA and ad posting is
-> bot-first; there is no general-purpose `/api/v1/` JSON mirror. This file documents the legacy
-> JSON interfaces that remain, their auth, error and rate-limit behaviour, and the operational
-> endpoints. OpenAPI is deliberately not produced — this document is the contract. Source layout
-> is stated in [`architecture-structure.md`](architecture-structure.md).
 
 ## Purpose
 
-Specify the JSON interfaces the application still exposes alongside the HTMX/MPA site and the
-Telegram bot: the frozen legacy routes (moderation bulk-action, search autocomplete,
-preferred-city, the login token protocol) and the operational endpoints (health, metrics, admin,
+The authoritative contract for every HTTP interface the application exposes today. The site is an
+HTMX/MPA application and ad posting is bot-first, so the overwhelming majority of user-visible
+behavior is server-rendered HTML. Alongside it the application exposes a small set of **frozen
+legacy JSON routes** and a set of **operational endpoints** (health, readiness, metrics, admin,
 media).
+
+There is **no general-purpose JSON API** and no `/api/v1/` per-app mirror. This document is the
+contract; no OpenAPI schema is produced. Source layout and deployment topology are in
+[`architecture-structure.md`](architecture-structure.md); the browserless verification model is in
+[`../99-agent/architecture.md`](../99-agent/architecture.md#task--service--tests-map).
 
 ## Main Concepts
 
-- **Style:** plain Django JSON views; **no DRF, no django-ninja.** The moderation bulk endpoint is
-  the reference precedent.
-- **Mounting:** every retained JSON route is declared in its own app's `urls.py` and mounted by
-  the ordinary root includes — there is no root aggregator and no `api/` app.
-- **Writes:** POST-only where an endpoint writes.
-- **Errors:** the legacy shapes are frozen and per-endpoint (bare 429, `{"error":"rate_limit"}`,
-  the moderation bulk report document).
-- **Audience parity:** public reads reuse the same `account_state_q` predicate as the HTML
-  surface, so visibility matches by construction.
+- **Style:** plain Django views. **No DRF, no django-ninja.**
+- **Mounting:** every route is declared in its own app's `urls.py` and mounted by the ordinary root
+  URLconf includes — there is no root aggregator and no separate API app.
+- **Writes:** POST-only (`@require_POST` / `@staff_required_api`) where an endpoint writes.
+- **Errors:** legacy shapes are frozen and per-endpoint (bare 429, `{"error":"rate_limit"}`, the
+  moderation bulk report document). They are **not** retrofitted to RFC 9457 — see rule 18 in
+  [`.kilo/rules/project.md`](../../.kilo/rules/project.md).
+- **Audience:** public reads reuse the same `account_state_q` predicate as the HTML surface, so
+  visibility matches by construction.
 
-## Status legend
+## Retained interface inventory
 
-- **covered/frozen** — behavior exists today and its shape is **frozen** (not to be changed).
-
-## Endpoint inventory
-
-Auth categories: **PUB** = anonymous + `account_state_q` audience; **SESS** = session cookie;
-**STAFF** = staff session. Only the retained routes below exist:
-
-| # | Action | Service | Endpoint · Method | Auth | Error notes | Status |
-|---|---|---|---|---|---|---|
-| 4 | Autocomplete | (existing) | unchanged `/api/search/autocomplete` | PUB | legacy 429 `{"error":"rate_limit"}` | covered/frozen |
-| 14 | Bulk | (existing) — **frozen shape** | unchanged `/moderation/api/v1/bulk-action/` | STAFF | per-id errors report; no limiter | covered/frozen |
-| 17 | Alert delivery | `send_alerts` + services | unchanged (bot digest + scheduler) | — | stance: no HTTP endpoint; agent-visible substitute is `SavedSearchNotification.delivered_at` (read via the shell/ORM tier) | covered/frozen |
-| 19 | Preferred-city | (existing) | unchanged `/api/preferred-city/` | anon + consent cookie | **no rate limiter exists** | covered/frozen |
-| 21 | Login issue/status | `issue/consume_token` (predicates frozen) | `/login/issue/` + `/login/status/` (200/204/410) | anon | uniform 410, anti-enumeration | covered/frozen |
-| 23 | Contact seller | bot-only by design | deep-link protocol — detail payload carries the `t.me` link | — | stance: no HTTP endpoint | covered/frozen |
-| 24 | Support ticket | bot writer only (06-PII-101) | in-process callable; no HTTP intake | — | stance: bot-only support intake | covered/frozen |
-| 26 | Media | `media_gate` | unchanged; **URLs only** in payloads | — | binary protocol | covered/frozen |
-| 27 | Ops/metrics | `core/views` | health/readiness + `/metrics` (loopback-gated) | — | — | covered/frozen |
-| 28 | Admin actions | `admin_actions` | unchanged staff-web | — | — | covered/frozen |
+| Interface | Location | Auth | Notes |
+|---|---|---|---|
+| HTML / HTMX pages | `ads`, `search`, `categories`, `locations`, `cabinet`, `analytics`, `moderation`, `users` URLconfs | PUB / SESS / STAFF | The product: listings, search, detail, dashboards, cabinet, moderation review |
+| Telegram bot | `src/telegram_bot/` (aiogram) | Telegram identity | The ad-creation write path; FSM drafts persist as `Ad(DRAFT)` rows |
+| Admin | `admin/` | STAFF | Django admin: catalog, lookups, users, `SiteConfig` |
+| `POST /moderation/api/v1/bulk-action/` | `moderation:bulk_action` (`apps/moderation/views/api_bulk.py`) | STAFF | Frozen legacy bulk-moderation contract |
+| `GET /api/search/autocomplete` | `search:autocomplete` (`apps/search/views/autocomplete.py`) | PUB | Frozen legacy autocomplete |
+| `POST /api/preferred-city/` | `search:preferred_city` (`apps/search/views/preferred_city.py`) | anon + consent cookie | No rate limiter |
+| `/login/issue/` + `POST /login/status/` | `users:login_issue`, `users:login_status` (`apps/users/views/consent.py`) | anon | Login token protocol |
+| Health / readiness | `core:health`, `core:health_live`, `core:health_ready` | — | `/health/`, `/health/live/`, `/health/ready/` |
+| Metrics | `prometheus-django-metrics` (`config/urls.py`) | loopback only | `/metrics`, gated in nginx **and** Django |
+| Media delivery | `ads:media_gate` (`apps/ads/views/listings.py`) | — | Binary `X-Accel`-gated protocol, URLs only |
 
 ## Auth model
 
 | Category | Enforcement | Notes |
 |---|---|---|
-| **PUB** | anonymous allowed; audience predicate `account_state_q` applied | visibility identical to the HTML surface (withdrawn/banned sellers invisible) |
-| **SESS** | Django session cookie (`@login_required` on the HTML views) | — |
-| **STAFF** | `staff_required_api` (`apps/moderation/views/decorators.py`) | plain `{"error": …}` body; identity checked before the method |
+| **PUB** | anonymous allowed; audience predicate `account_state_q` applied | Visibility identical to the HTML surface (withdrawn/banned/declined sellers invisible) |
+| **SESS** | Django session cookie (`@login_required` on the HTML views) | Protected by CSRF on writes |
+| **STAFF** | `staff_required_api` (`apps/moderation/views/decorators.py`) | Identity is checked **before** the method; plain `{"error": …}` body |
 
-- **Sessions are the only credential.** No new auth scheme; the Django session cookie is the sole
-  credential.
-- **Browserless testing:** headless verification rides Django `Client()` (CSRF disabled in
-  pytest), never a new auth scheme.
+- **Sessions are the only credential.** No new auth scheme, no CSRF exemption, no bearer token.
+  `/login/status/` establishes the session through the Telegram-mediated token handshake.
 
-## Errors (retained shapes)
+## Legacy route contracts
 
-The legacy JSON routes keep their frozen shapes:
+### Bulk moderation — `POST /moderation/api/v1/bulk-action/`
 
-| Route | Shape | Notes |
-|---|---|---|
-| Moderation bulk-action | 200 report document with per-id `errors`; 403/405 plain `{"error": …}` | `api_bulk.py`; validation errors rendered `422` with `errors = pydantic_errors_json(exc)` (`apps/core/utils/sanitize.py`) |
-| Autocomplete (429) | `{"error":"rate_limit"}` | frozen legacy 429 shape |
-| Listings / detail HTML 429 | bare `429` (`json=False`) | frozen |
-| Media gate 429 | its own variant | frozen |
-| Preferred-city | — | no rate limiter at all |
-| Login status | 200 issued / 204 pending / 410 uniform | `not_found` / `gone` / `unbound` / `lost_race` collapse to one response (anti-enumeration) |
-| Lock timeout (PostgreSQL `55P03`) | 503 via `DbLockTimeoutMiddleware` | HTML shape, unchanged |
+Staff-only. Accepts one request body describing the action and the ad ids; returns a **report
+document**, never per-id HTTP statuses:
 
-Legacy 429s carry **no** `Retry-After` (`rate_limit_response.py` is a pure formatter and production never supplies `retry_after`).
+```json
+{
+  "completed": 1,
+  "errors": [{"id": 5, "error": "Invalid transition"}]
+}
+```
+
+- `200` — report document. `completed` counts ids that were transitioned; `errors` lists each
+  failed id with its refusal reason. A happy response carries exactly
+  `{"completed": <n>, "errors": []}`.
+- `422` — `{"error": "Invalid request body", "errors": pydantic_errors_json(exc)}` (validation of
+  the request DTO; `apps/core/utils/sanitize.py`).
+- `400` / `401` / `403` / `405` — plain `{"error": …}` body.
+- No rate limiter on this route; lock-timeout (`PostgreSQL 55P03`) is handled by
+  `DbLockTimeoutMiddleware` → `503`.
+
+### Search autocomplete — `GET /api/search/autocomplete`
+
+Anonymous. Returns ranked suggestions for a query prefix. Over budget it returns the frozen legacy
+429 shape `{"error": "rate_limit"}` with **no** `Retry-After`.
+
+### Preferred city — `POST /api/preferred-city/`
+
+Anonymous, consent-cookie backed. Returns `{"ok": true}` on success and
+`{"error": "invalid_city"}` with `400` for an unknown slug. **No rate limiter** — the one JSON
+route that has none.
+
+### Login token protocol — `/login/issue/` and `POST /login/status/`
+
+- `POST`-free issuance: `GET /login/issue/` renders the deep-link page and issues a token
+  (`login_rate_limit_check`, `check_deep_link_render_rate_limit` → `429`).
+- `POST /login/status/` is `@require_POST` and reads the raw token from the request body (never from
+  the URL — no `Referer` leak). Responses:
+  - `200` — token consumed, session established (session cookie set).
+  - `204` — pending; the bot has not claimed the token yet.
+  - `410` — **uniform** for `not_found` / `gone` / `unbound` / `lost_race` (anti-enumeration).
+- Lifecycle and predicates: see
+  [`../99-agent/architecture.md`](../99-agent/architecture.md#login-token-lifecycle-seam-ent-005).
+
+## Operational endpoints
+
+- **Health:** `/health/` (Icinga-style check), `/health/live/` (liveness), `/health/ready/`
+  (readiness — includes the optional bot-liveness dimension gated by `BOT_HEALTH_CHECK_ENABLED`,
+  which defaults off). `/health/v1/` is an alias of readiness.
+- **Metrics:** `/metrics` is restricted **twice** — nginx `allow 127.0.0.1; deny all;` and a
+  Django gate keyed on the socket peer `REMOTE_ADDR` (loopback allowed, everything else `403`), so
+  a caller reaching the `web` container directly across the Docker bridge is still refused.
+- **Admin:** `admin/` — staff/superuser session; all catalog and `SiteConfig` editing happens here.
+- **Media gate (`ads:media_gate`, `/media/<key>`)**: binary delivery, not JSON. Payloads anywhere
+  else in the application carry media **URLs only**, never bytes. `200` only for images attached to
+  `PUBLISHED` ads owned by non-banned, non-declined sellers; `403`/`404` otherwise; `X-Accel-Redirect`
+  to an nginx `internal` location. Production `200` responses carry `Cache-Control: public,
+  max-age=86400` and `Vary: Cookie`; `429` responses carry `no-store`. Storage keys are unguessable
+  `<uuid4>.jpg` with no `ad_id`. Operator details:
+  [`../ops/media-store-operations.md`](../ops/media-store-operations.md).
 
 ## Rate-limit budgets
 
 Budgets are `RateLimitBudget` StrEnum members (`apps/core/enums.py`); the numbers live in the enum
-property dicts, never in environment variables. The shared `rate_limit_check` + `RateLimitBudget`
-mechanism remains the single enforcement point. The budgets exercised by retained routes:
+properties, never in environment variables. `rate_limit_check` + `RateLimitBudget` is the single
+application-level enforcement point:
 
-| Budget | Limit | Notes |
+| Budget | Limit | Used by |
 |---|---|---|
-| `AUTOCOMPLETE` | per the enum | `/api/search/autocomplete` |
-| `LOGIN_ISSUE` | per the enum | `/login/issue/` |
-| `MEDIA_GATE` | per the enum | media delivery gate |
-| `SEARCH_PAGE`, `DEEP_LINK_RENDER` | per the enum | HTML listings/search and the contact deep link |
+| `SEARCH_PAGE` | 30 / 60 s | Anonymous HTML search rendering |
+| `AUTOCOMPLETE` | 30 / 60 s | `/api/search/autocomplete` (independent key namespace) |
+| `DEEP_LINK_RENDER` | 60 / 600 s | Anonymous browse pages that render Telegram contact deep-links |
+| `LOGIN_ISSUE` | 10 / 60 s | `/login/issue/` |
+| `MEDIA_GATE` | 240 / 60 s | Media delivery gate |
+
+nginx adds a separate per-IP edge layer; see
+[`architecture-structure.md`](architecture-structure.md#nginx-hardening-zone-r8).
 
 ## i18n
 
-Locale is resolved via the **shared middleware chain** — `?lang` > `lang_pref` cookie >
-`Accept-Language` — with **no per-view locale code**, identically for HTML and the retained JSON
-routes.
+Locale is resolved by the **shared middleware chain** — `?lang` > `lang_pref` cookie >
+`Accept-Language` — with no per-view locale code, identically for HTML and the retained JSON routes.
 
-## Stances
+## Bot-only and non-HTTP surfaces
 
-- **#4 autocomplete — not aliased.** The existing `/api/search/autocomplete` endpoint stays as-is.
-- **#14 bulk — frozen shape.** `/moderation/api/v1/bulk-action/` keeps its contract, including the
-  per-id error report; it carries no rate limiter.
-- **#17 alert delivery — bot + scheduler only, no HTTP endpoint.** The agent-visible substitute is
-  the delivery receipt `SavedSearchNotification.delivered_at`, read via the shell/ORM tier.
-- **#19 preferred-city — the one JSON route with no rate limiter.**
-- **#21 login — token protocol, no extra endpoint.** `/login/issue/` issues, `/login/status/` reports
-  (200 issued / 204 pending / 410 uniform).
-- **#23 contact seller — deep-link protocol.** Bot-only by design (seller anonymity); the ad-detail
-  payload carries the `t.me` deep link, and there is no HTTP contact endpoint.
-- **#24 support ticket — bot-only intake.** The bot handler is the only writer (06-PII-101 signed
-  identity).
-- **#26 media — URLs only.** Media access stays the binary nginx `X-Accel`-gated protocol; payloads
-  carry media URLs only, never bytes.
-- **#27 ops/metrics — health/readiness and loopback-gated `/metrics`.** No JSON index endpoint.
-- **#28 admin actions — unchanged staff-web.**
+These product actions deliberately have no HTTP endpoint:
 
-## Analytics side effects (agent-visible)
+- **Contact seller** — Telegram deep-link protocol (`t.me/<bot>?start=contact_<ad_id>`); the ad
+  detail payload carries the link. No contact endpoint exists (seller anonymity).
+- **Support ticket** — the bot handler is the only writer (`ContactUsState` → `SupportTicket`).
+- **Alert delivery** — bot digest + scheduler only. The agent-visible delivery receipt is
+  `SavedSearchNotification.delivered_at`, readable through the ORM/shell tier.
+- **Ad creation** — the bot dialog is the write path (drafts are `Ad(DRAFT)` rows); the web owns
+  edit, archive, reactivate and delete.
 
-HTML reads record analytics (`AD_VIEWED`, `SEARCH_PERFORMED` plus popular-search and search-history
-entries). Verification loops that must avoid side effects should use the service tier or the
-shell/ORM tier on the test database.
+## Verification model
 
-## Change log
-
-- **Retirement (P4).** The unused `/api/v1/` JSON mirror surface was retired: its root mount, the
-  aggregator package, per-app API route/view modules, API adapters, the parity CLI and the related
-  tests were removed. Only the retained legacy routes and operational endpoints documented above
-  remain. Historical stage entries (S0–S5) are recorded in the architecture plan.
+Every retained route above is exercised browserlessly by Django `Client()` under pytest, with the
+exit status as the machine-readable verdict (JUnit XML optional). There is no separate HTTP
+consumer, parity CLI or route-pairing harness: a real HTTP parity check would need a real client
+surface that does not exist. The per-feature map is
+[`../99-agent/architecture.md`](../99-agent/architecture.md#task--service--tests-map).
