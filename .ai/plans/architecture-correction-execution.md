@@ -64,12 +64,20 @@ manifest, coverage ledger, and verification gates.
 - G7 No infrastructure/data rollback: **PASS** — no migration/settings/dependency/lockfile delta;
   `submission.py` and `media/schemas.py` byte-identical to `d2f6df33^`; `RateLimitBudget` back to
   five members.
-- G8 Coverage and measured feedback: **CONCERN (environment)** — all 7 deletion blockers have
-  named retained tests. Local `test-all` (single parallel invocation, seed included) fails with
-  mass fixture `UniqueViolation`s on seeded reference data across untouched suites; the same
-  suites pass in isolation. This is a pre-existing test-DB concurrency/contamination issue
-  (`transaction=True` tests + xdist + shared `--reuse-db` DB), not a regression. Valid tier
-  evidence is produced with a fresh schema and separated tiers, mirroring CI.
+- G8 Coverage and measured feedback: **PASS (tier-separated evidence)** — all 7 deletion blockers
+  have named retained tests; the coverage ledger has no unexplained loss. Measured at HEAD
+  `a0e09be1` (2026-11-05, warm Docker test DB, xdist 4-worker loadgroup unless noted):
+  fast gate `.\Makefile.ps1 test` = **3778 passed, 3 warnings**; full non-seed tier on a fresh
+  schema (`--create-db`, `PYTEST_SKIP_MARKERS=seed`) = **3804 passed, 3 warnings in 364.31 s**;
+  seed tier (`-m seed`) = **37 passed, 43 warnings in 59.45 s**. The 26-test fast-gate gap is the
+  `slow` + `real_images` deselection; it includes the `slow`-marked G2 lock-continuity proof,
+  which ran green in the full tier. Local single-invocation `test-all` is **not** valid evidence
+  in this environment: it mixes `transaction=True` and seed-marked tests on one shared
+  `--reuse-db` database across xdist workers, producing fixture `UniqueViolation`s on seeded
+  reference data (`categories_slug_key='transport'`, `lookup_groups_code_key='listing_feature'`,
+  `cities_slug_key='podgorica'`) in suites untouched by this change; those suites pass in
+  isolation and the tier-separated runs mirroring CI are green. Pre-existing test-infrastructure
+  issue, out of scope (D29–D31 KEEP; "do not redesign CI in this correction").
 
 ## B0 audit findings
 
