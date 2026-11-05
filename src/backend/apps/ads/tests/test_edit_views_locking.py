@@ -19,7 +19,7 @@ the row between the fetch and ``refresh_from_db()``, causing
 pin the single-transaction topology of the HTML lifecycle actions: the first
 proves the service call runs inside the view's own ``atomic()`` block
 (``in_atomic_block`` at the seam), the second proves the row lock taken by the
-ownership precheck is still held at the service-call instant (a concurrent
+view's locked fetch is still held at the service-call instant (a concurrent
 ``select_for_update`` probe times out with SQLSTATE 55P03).
 """
 
@@ -335,7 +335,7 @@ class TestLifecycleActionAtomicContinuity:
     ],
 )
 class TestLifecycleActionLockContinuity:
-    """The row lock taken by the precheck is still held at the service-call instant.
+    """The row lock taken by the view's locked fetch is still held at the service-call instant.
 
     The background request parks at the view-module service seam inside the
     view's transaction; the main thread probes the row with

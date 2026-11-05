@@ -1,26 +1,35 @@
 """
 Ad lifecycle state mechanics — archive / reactivate / delete (S4.1).
 
-Extracted verbatim from the seller HTML action views so that the HTML
-surfaces and the future ``/api/v1/ads/{id}/{archive,reactivate,delete}/``
-endpoints share **one** transition stack instead of two hand-written copies.
+This module carries **state mechanics only** — the status precondition,
+``Ad.transition_to`` and (for reactivation) the ``auto_moderate`` decision —
+applied to a row the caller fetched, locked and authorized.
 
-Scope split (plan S4.1):
+The lifecycle convention (R04):
 
-- **This module carries state mechanics only** — ownership, ``select_for_update``
-  locking, the status precondition, ``Ad.transition_to`` and (for reactivation)
-  the ``auto_moderate`` decision.
+- **The caller owns the transaction, the row lock and the authorization.**
+  The HTML action views open ``transaction.atomic()``, fetch the ad with
+  ``get_object_or_404(Ad.objects.select_for_update(), ...)`` (a missing ad is
+  a 404 from the fetch), refuse a non-owner with the boundary's own 403, and
+  only then hand the locked instance to one of the functions below.
+- **This module never re-fetches and never re-checks ownership.** It acts on
+  the instance it is handed, so a request path checks ownership exactly once.
 - **Consent / audience gates stay caller-side.** ``can_create_ad`` is asserted
-  by each boundary (the HTML views behind the archived reactivation path and
-  the API views), never by this module. The delete flow is gate-free by design.
+  by the HTML views behind the archive/reactivate paths, never by this module.
+  The delete flow is gate-free by design.
 - **Messages and logging stay caller-side.** Reactivation's dashboard feedback
-  depends on the outcome; the HTML view emits it, the API will map outcomes to
-  its own shapes.
+  depends on the outcome; the HTML view emits it.
 
-Contract: request-free — an ``Ad`` (already fetched by the caller) plus the
-acting ``user_id``; results are returned as named tuples so no caller has to
-re-read the row to decide its response, and no caller needs a second
-``transition_to`` attempt against a now-stale local copy.
+Results are returned as named tuples so the caller decides its response from
+the outcome without re-reading the row. Every function keeps its own
+``transaction.atomic()``: nested inside the caller's block it is a savepoint
+(what makes the reactivation rollback real), standalone it is the whole
+transaction.
+
+Honesty clause (R04): a single ad-row transaction does not by itself solve
+concurrent account-consent changes — the consent gate is consulted at the
+boundary, before the action, and a consent withdrawal racing the action is not
+serialized by the row lock.
 
 Every function issues exactly the persisted state change its HTML predecessor
 issued:
@@ -32,11 +41,6 @@ issued:
   and the content check run inside one atomic block, so a failure of the check
   itself rolls the transition back (the ad stays ARCHIVED).
 - :func:`delete_ad` — ``any -> DELETED``; an already-DELETED ad is a no-op.
-
-Refusals use the exceptions the project already speaks: :class:`Http404` for a
-missing ad (what ``get_object_or_404`` produced at every call site),
-:class:`~django.core.exceptions.PermissionDenied` for a non-owner, and
-``Ad.DoesNotExist`` when the row disappears between fetch and transition.
 """
 
 from __future__ import annotations
@@ -44,9 +48,7 @@ from __future__ import annotations
 import logging
 from typing import NamedTuple
 
-from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.http import Http404
 
 from apps.ads.models import Ad
 from apps.core.enums import AdStatus
@@ -92,107 +94,39 @@ class DeleteResult(NamedTuple):
     deleted: bool
 
 
-def _fetch_owned_ad(ad_id: int, user_id: int) -> Ad:
-    """Lock and return the ad, refusing a missing row or a non-owner.
+def archive_ad(ad: Ad) -> ArchiveResult:
+    """Archive a row the caller fetched, locked and authorized.
 
-    The row lock must run inside *some* transaction. When a caller opens a
-    lifecycle function, that function's own ``transaction.atomic()`` acquires
-    the lock and holds it to its commit, so the lock and the write share one
-    unit of work. When a boundary calls a lifecycle function **inside its own
-    open atomic block** (the HTML ``ad_archive`` / ``ad_reactivate`` views and
-    the edit view's nested ``submit_ad`` precedent), the service's ``atomic()``
-    is a PostgreSQL SAVEPOINT inside the caller's transaction: the
-    ``select_for_update()`` re-acquisition is a same-transaction self-reacquire
-    (a no-op that cannot block), and the lock and the write share the caller's
-    **one** unit of work and **one** commit.
-
-    Consequences of the savepoint nesting: ``on_commit`` callbacks fire at the
-    **outermost** commit, and a rollback to a savepoint releases only that
-    savepoint's work — **not** the row lock, which lives until the caller's
-    transaction ends.
-
-    Raises:
-        Http404: No ad with ``ad_id`` exists.
-        PermissionDenied: ``user_id`` does not own the ad.
-    """
-    try:
-        ad = Ad.objects.select_for_update().get(id=ad_id)
-    except Ad.DoesNotExist:
-        raise Http404(f"No Ad matches the given query: id={ad_id}") from None
-
-    if ad.user_id != user_id:
-        logger.warning(
-            "User %s attempted a lifecycle action on ad %s owned by %s",
-            user_id,
-            ad_id,
-            ad.user_id,
-        )
-        raise PermissionDenied("You do not own this ad.")
-
-    return ad
-
-
-def assert_lifecycle_owner(ad_id: int, user_id: int) -> None:
-    """Assert that *user_id* owns *ad_id*, opening the caller's transaction.
-
-    Used by boundaries that must refuse a non-owner **before** any write and
-    before their own gates (consent), reproducing the HTML action views'
-    check order: ownership first, then consent, then the transition.
-
-    Returns ``None``; it does **not** own a long-lived lock. The
-    ``select_for_update()`` runs inside the caller's block; because this
-    function opens only a nesting ``atomic()``, the lock lives until the
-    **caller's** transaction exits, not until this function returns. The
-    caller must keep its own ``atomic()`` block open across the follow-up
-    :func:`archive_ad` / :func:`reactivate_ad` call — that is what makes the
-    check and the action one unit of work and what keeps the refusals ordered
-    ownership -> consent -> action. A caller that exits its block first releases
-    the lock and reintroduces the gap between the check and the write.
-
-    Raises:
-        Http404: No ad with ``ad_id`` exists.
-        PermissionDenied: ``user_id`` does not own the ad.
-    """
-    with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  # django-stubs not installed; Atomic lacks CM stubs
-        _fetch_owned_ad(ad_id, user_id)
-
-
-def archive_ad(ad_id: int, user_id: int) -> ArchiveResult:
-    """Archive the caller's own ad (``PUBLISHED -> ARCHIVED``).
-
-    Manual seller archive; no moderation. Non-PUBLISHED rows are untouched.
+    ``PUBLISHED -> ARCHIVED`` only; manual seller archive, no moderation.
+    Non-PUBLISHED rows are untouched.
 
     Args:
-        ad_id: The ad to archive.
-        user_id: The acting seller's user ID (ownership predicate).
+        ad: The caller's locked ad instance (ownership already verified by
+            the caller).
 
     Returns:
         :class:`ArchiveResult` describing whether the transition ran.
 
     Raises:
-        Http404: The ad does not exist.
-        PermissionDenied: The ad is owned by another user.
         ValueError: Propagated from ``Ad.transition_to`` if the matrix rejects
             the target (unreachable for the PUBLISHED precondition).
     """
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  # django-stubs not installed; Atomic lacks CM stubs
-        ad = _fetch_owned_ad(ad_id, user_id)
-
         if ad.status == AdStatus.PUBLISHED:
             ad.transition_to(AdStatus.ARCHIVED)
-            logger.info("Ad %s archived by user %s", ad_id, user_id)
+            logger.info("Ad %s archived by user %s", ad.id, ad.user_id)
             return ArchiveResult(archived=True)
 
     return ArchiveResult(archived=False)
 
 
-def reactivate_ad(ad_id: int, user_id: int) -> ReactivateResult:
-    """Reactivate the caller's own archived ad (``ARCHIVED -> ...``).
+def reactivate_ad(ad: Ad) -> ReactivateResult:
+    """Reactivate a row the caller fetched, locked and authorized.
 
-    ``ARCHIVED -> ON_MODERATION`` then ``auto_moderate``, exactly the decision
-    the HTML view made: a pass publishes the ad, a fail commits it as
-    ``ON_MODERATION_FAILED``. The transition clears ``archived_at`` and the
-    moderation outcome writes the timestamps + analytics event.
+    ``ARCHIVED -> ON_MODERATION`` then ``auto_moderate``: a pass publishes the
+    ad, a fail commits it as ``ON_MODERATION_FAILED``. The transition clears
+    ``archived_at`` and the moderation outcome writes the timestamps +
+    analytics event.
 
     A non-ARCHIVED ad is a silent no-op (nothing is written, the check is not
     run).
@@ -203,20 +137,16 @@ def reactivate_ad(ad_id: int, user_id: int) -> ReactivateResult:
     caller decides how to report it.
 
     Args:
-        ad_id: The ad to reactivate.
-        user_id: The acting seller's user ID (ownership predicate).
+        ad: The caller's locked ad instance (ownership already verified by
+            the caller).
 
     Returns:
         :class:`ReactivateResult` with the moderation verdict.
 
     Raises:
-        Http404: The ad does not exist.
-        PermissionDenied: The ad is owned by another user.
         Exception: Anything ``auto_moderate`` raises (after rollback).
     """
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  # django-stubs not installed; Atomic lacks CM stubs
-        ad = _fetch_owned_ad(ad_id, user_id)
-
         if ad.status != AdStatus.ARCHIVED:
             return ReactivateResult(attempted=False, passed=None)
 
@@ -229,30 +159,25 @@ def reactivate_ad(ad_id: int, user_id: int) -> ReactivateResult:
     return ReactivateResult(attempted=True, passed=passed)
 
 
-def delete_ad(ad_id: int, user_id: int) -> DeleteResult:
-    """Soft-delete the caller's own ad (``any -> DELETED``).
+def delete_ad(ad: Ad) -> DeleteResult:
+    """Soft-delete a row the caller fetched, locked and authorized.
 
     The ad is hidden from public listings immediately; physical cleanup stays
-    with the later sweeps. An already-DELETED ad is a no-op.
+    with the later sweeps. An already-DELETED ad is a no-op. Gate-free by
+    design: no consent check applies to delete.
 
     Args:
-        ad_id: The ad to delete.
-        user_id: The acting seller's user ID (ownership predicate).
+        ad: The caller's locked ad instance (ownership already verified by
+            the caller).
 
     Returns:
         :class:`DeleteResult` describing whether the transition ran.
-
-    Raises:
-        Http404: The ad does not exist.
-        PermissionDenied: The ad is owned by another user.
     """
     with transaction.atomic():  # pyright: ignore[reportGeneralTypeIssues]  # django-stubs not installed; Atomic lacks CM stubs
-        ad = _fetch_owned_ad(ad_id, user_id)
-
         if ad.status == AdStatus.DELETED:
             return DeleteResult(deleted=False)
 
         # transition_to sets deleted_at and refreshes updated_at.
         ad.transition_to(AdStatus.DELETED)
-        logger.info("Ad %s deleted by user %s", ad_id, user_id)
+        logger.info("Ad %s deleted by user %s", ad.id, ad.user_id)
         return DeleteResult(deleted=True)

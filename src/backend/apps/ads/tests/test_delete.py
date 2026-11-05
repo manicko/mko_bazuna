@@ -5,6 +5,7 @@ Covers:
 - Wrong-owner POST returns 403 Forbidden, ad status unchanged.
 - Owner POST transitions ad to DELETED and redirects to dashboard.
 - Re-deleting an already-DELETED ad is a safe no-op (redirect, status unchanged).
+- POST to a non-existent ad returns 404 from the view's locked fetch.
 """
 
 from __future__ import annotations
@@ -36,9 +37,21 @@ class TestAdDelete:
 
         response = client.post(reverse("ads:delete", args=[ad.id]))
         assert response.status_code == 403
+        assert b"You do not have permission to delete this ad." in response.content
 
         ad.refresh_from_db()
         assert ad.status != AdStatus.DELETED
+
+    def test_delete_missing_ad_returns_404(
+        self,
+        seller,
+    ) -> None:
+        """POST to a non-existent ad returns 404 from the view's locked fetch."""
+        client = Client()
+        client.force_login(seller)
+
+        response = client.post(reverse("ads:delete", args=[999_999_999]))
+        assert response.status_code == 404
 
     def test_delete_owner_transitions_to_deleted(
         self,

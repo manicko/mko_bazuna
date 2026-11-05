@@ -1,21 +1,21 @@
 """
 Service-tier tests for ``apps.ads.services.lifecycle`` (S4.1).
 
-The HTML action flows (``ad_archive`` / ``ad_reactivate`` / ``ad_delete``) are
-proven byte-identical by the untouched pre-existing suites
-(``apps/ads/tests/test_edit.py`` — ``TestAdArchive``,
-``TestAdReactivateDirect``, ``TestBannedSellerRelistNowRefused``,
-``TestSellerWebStorageConsentGate`` — and ``apps/ads/tests/test_delete.py``).
-This module covers the service itself, so a future API caller inherits the
-same proofs:
+The service acts on a row the caller fetched, locked and authorized, so this
+module proves the service's **state mechanics on a caller-fetched row**:
 
 - happy path per transition: resulting status, the timestamps
   ``Ad.transition_to`` / ``auto_moderate`` set, and the analytics rows the
   moderation pipeline records,
-- precondition refusals: missing ad (``Http404``), non-owner
-  (``PermissionDenied``), wrong status (silent no-op, row untouched),
+- wrong status (silent no-op, row untouched),
 - the reactivation rollback: a failing check leaves the ad ARCHIVED,
 - the consent boundary: the service is gate-free (the gate is caller-side).
+
+The HTML boundary suites own the fetch/refusal coverage — the missing-ad 404s
+and the wrong-owner 403s live in ``apps/ads/tests/test_edit.py``
+(``TestAdArchive``, ``TestAdReactivateDirect``, ``TestLifecycleOwnershipRefusal``)
+and ``apps/ads/tests/test_delete.py`` (``TestAdDelete``), relocated there from
+this tier by B6.
 """
 
 from __future__ import annotations
@@ -23,8 +23,6 @@ from __future__ import annotations
 from unittest.mock import patch
 
 import pytest
-from django.core.exceptions import PermissionDenied
-from django.http import Http404
 
 from apps.ads.models import Ad
 from apps.ads.services.lifecycle import (
@@ -57,14 +55,14 @@ def _event_types(ad: Ad) -> list[str]:
 
 
 class TestArchiveAd:
-    """``archive_ad`` — ``PUBLISHED -> ARCHIVED`` with ownership + lock."""
+    """``archive_ad`` — ``PUBLISHED -> ARCHIVED`` on a caller-fetched row."""
 
     def test_published_ad_is_archived_with_archived_at(
         self, seller, category, city
     ) -> None:
         ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
 
-        result = archive_ad(ad.id, seller.id)
+        result = archive_ad(ad)
 
         assert result == ArchiveResult(archived=True)
         ad.refresh_from_db()
@@ -78,7 +76,7 @@ class TestArchiveAd:
         """Archiving is a bare transition — it emits no analytics row."""
         ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
 
-        archive_ad(ad.id, seller.id)
+        archive_ad(ad)
 
         assert _event_types(ad) == []
 
@@ -98,40 +96,24 @@ class TestArchiveAd:
     ) -> None:
         ad = create_test_ad(seller, category, city, status=status)
 
-        result = archive_ad(ad.id, seller.id)
+        result = archive_ad(ad)
 
         assert result == ArchiveResult(archived=False)
         ad.refresh_from_db()
         assert ad.status == status
 
-    def test_non_owner_is_refused_and_ad_unchanged(
-        self, seller, category, city
-    ) -> None:
-        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
-        other = make_user(910000101)
-
-        with pytest.raises(PermissionDenied):
-            archive_ad(ad.id, other.id)
-
-        ad.refresh_from_db()
-        assert ad.status == AdStatus.PUBLISHED
-        assert ad.archived_at is None
-
-    def test_missing_ad_raises_http404(self, seller) -> None:
-        with pytest.raises(Http404):
-            archive_ad(999_999_999, seller.id)
 
     def test_consent_gate_is_caller_side(self, category, city) -> None:
         """The service never reads consent: a never-consented owner succeeds.
 
         The HTML view refuses such an owner before calling in
         (``TestSellerWebStorageConsentGate``); the service must not duplicate
-        the gate, so API callers assert theirs at their own boundary.
+        the gate, so each boundary asserts its own.
         """
         owner = make_user(910000102, consent_given_at=None)
         ad = create_test_ad(owner, category, city, status=AdStatus.PUBLISHED)
 
-        result = archive_ad(ad.id, owner.id)
+        result = archive_ad(ad)
 
         assert result.archived is True
         ad.refresh_from_db()
@@ -157,7 +139,7 @@ class TestReactivateAd:
     def test_passing_check_publishes_and_records_events(
         self, seller, archived_ad, permissive_criteria
     ) -> None:
-        result = reactivate_ad(archived_ad.id, seller.id)
+        result = reactivate_ad(archived_ad)
 
         assert result == ReactivateResult(attempted=True, passed=True)
         archived_ad.refresh_from_db()
@@ -175,7 +157,7 @@ class TestReactivateAd:
     ) -> None:
         Ad.objects.filter(pk=archived_ad.pk).update(title="spam offer")
 
-        result = reactivate_ad(archived_ad.id, seller.id)
+        result = reactivate_ad(archived_ad)
 
         assert result == ReactivateResult(attempted=True, passed=False)
         archived_ad.refresh_from_db()
@@ -195,7 +177,7 @@ class TestReactivateAd:
             ),
             pytest.raises(RuntimeError),
         ):
-            reactivate_ad(archived_ad.id, seller.id)
+            reactivate_ad(archived_ad)
 
         archived_ad.refresh_from_db()
         assert archived_ad.status == AdStatus.ARCHIVED
@@ -217,28 +199,13 @@ class TestReactivateAd:
     ) -> None:
         ad = create_test_ad(seller, category, city, status=status)
 
-        result = reactivate_ad(ad.id, seller.id)
+        result = reactivate_ad(ad)
 
         assert result == ReactivateResult(attempted=False, passed=None)
         ad.refresh_from_db()
         assert ad.status == status
         assert _event_types(ad) == []
 
-    def test_non_owner_is_refused_and_ad_unchanged(
-        self, seller, archived_ad, permissive_criteria
-    ) -> None:
-        other = make_user(910000103)
-
-        with pytest.raises(PermissionDenied):
-            reactivate_ad(archived_ad.id, other.id)
-
-        archived_ad.refresh_from_db()
-        assert archived_ad.status == AdStatus.ARCHIVED
-        assert _event_types(archived_ad) == []
-
-    def test_missing_ad_raises_http404(self, seller) -> None:
-        with pytest.raises(Http404):
-            reactivate_ad(999_999_999, seller.id)
 
 
 # ---------------------------------------------------------------------------
@@ -264,7 +231,7 @@ class TestDeleteAd:
     ) -> None:
         ad = create_test_ad(seller, category, city, status=status)
 
-        result = delete_ad(ad.id, seller.id)
+        result = delete_ad(ad)
 
         assert result == DeleteResult(deleted=True)
         ad.refresh_from_db()
@@ -275,36 +242,20 @@ class TestDeleteAd:
         ad = create_test_ad(seller, category, city, status=AdStatus.DELETED)
         deleted_at_before = ad.deleted_at
 
-        result = delete_ad(ad.id, seller.id)
+        result = delete_ad(ad)
 
         assert result == DeleteResult(deleted=False)
         ad.refresh_from_db()
         assert ad.status == AdStatus.DELETED
         assert ad.deleted_at == deleted_at_before
 
-    def test_non_owner_is_refused_and_ad_unchanged(
-        self, seller, category, city
-    ) -> None:
-        ad = create_test_ad(seller, category, city, status=AdStatus.PUBLISHED)
-        other = make_user(910000104)
-
-        with pytest.raises(PermissionDenied):
-            delete_ad(ad.id, other.id)
-
-        ad.refresh_from_db()
-        assert ad.status == AdStatus.PUBLISHED
-        assert ad.deleted_at is None
-
-    def test_missing_ad_raises_http404(self, seller) -> None:
-        with pytest.raises(Http404):
-            delete_ad(999_999_999, seller.id)
 
     def test_consent_gate_is_caller_side(self, category, city) -> None:
         """Delete is gate-free: a never-consented owner may delete its ad."""
         owner = make_user(910000105, consent_given_at=None)
         ad = create_test_ad(owner, category, city, status=AdStatus.PUBLISHED)
 
-        result = delete_ad(ad.id, owner.id)
+        result = delete_ad(ad)
 
         assert result.deleted is True
         ad.refresh_from_db()
