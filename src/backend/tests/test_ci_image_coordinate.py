@@ -122,6 +122,9 @@ def test_no_non_canonical_ghcr_coordinate_anywhere() -> None:
                 if not parts:
                     continue
                 repo = parts.split()[0]
+                # A digest-qualified reference (`repo@sha256:<hex>`) names the
+                # same repository; strip the qualifier before comparing.
+                repo = repo.split("@", 1)[0]
                 if repo == "${{":
                     continue  # env.IMAGE_REPOSITORY indirection, asserted above
                 if repo != _CANONICAL_REPOSITORY:

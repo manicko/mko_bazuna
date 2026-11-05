@@ -300,7 +300,8 @@ The `make restore-test` target:
    - **Schema list:** `\dn`
 8. Optionally runs `migrate --plan --check` against the restored DB using the
    production app image (when `APP_IMAGE` is provided) — verifies Django ORM-level
-   migration compatibility against the restored schema
+   migration compatibility against the restored schema. In CI `APP_IMAGE` is an
+   immutable digest of a published known-good `main` image.
 9. Tears down all isolated resources (container, volume, network) via an `EXIT` trap
 
 ### What the drill proves, and what it does NOT (12-OPS-004)
@@ -326,16 +327,28 @@ unmet.
 
 ### Migrate --plan --check (optional)
 
-`manage.py migrate --plan --check` is run when `APP_IMAGE` is provided (via the
-`APP_IMAGE` Makefile variable). The step launches a one-shot container from the
-production app image on the isolated network (hostname `restore-db`), connecting
+`manage.py migrate --plan --check` is run when `APP_IMAGE` is provided via the
+`APP_IMAGE` Makefile variable, a bare image reference — so a `repo@sha256:…`
+digest pin passes through unchanged. The step launches a one-shot container from
+the production app image on the isolated network (hostname `restore-db`), connecting
 to the restored DB with `DJANGO_BUILD=1` and `DJANGO_SETTINGS_MODULE=config.settings.prod`
 to bypass secret-validation guards. The `--check` flag causes a non-zero exit if
 pending migrations exist — the CI backup is generated from a fully-migrated DB
 (after `bootstrap_reference_data`), so the plan is empty and the step succeeds.
-CI provides a **recorded known-good** image automatically (the concrete
-`RESTORE_APP_IMAGE_TAG` pinned in `.github/workflows/restore-test.yml`, not a
-moving `github.sha`); manual runs skip this step unless `APP_IMAGE` is set
+CI provides a **recorded known-good** image automatically: the `RESTORE_APP_IMAGE`
+variable in `.github/workflows/restore-test.yml` is an **immutable digest** of a
+published known-good `main` image (`ghcr.io/manicko/mko_bazuna@sha256:…`), never a
+moving `github.sha` or a mutable tag. The source commit of the pinned digest is
+recorded in a comment beside the pin. A **preflight step verifies that the pin
+resolves** (`docker manifest inspect`) and fails loudly, with the re-pin
+instruction, if it does not — before any restore work starts. The pin is
+**re-pinned when a newer known-good image ships**.
+
+Pinning an image **older** than `HEAD` is correct by design: the drill asks
+whether the pinned image can operate against a database migrated by the
+checked-out tree. Pinning `HEAD` would make the check trivially green and defeat
+its purpose; a schema newer than the pinned image is precisely the drift the
+check exists to surface. Manual runs skip this step unless `APP_IMAGE` is set
 explicitly.
 
 ## Troubleshooting

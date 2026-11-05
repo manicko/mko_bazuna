@@ -23,18 +23,33 @@ jobs:
     runs-on: ubuntu-latest
     env:
       PYTHONPATH: ${{ github.workspace }}/src:${{ github.workspace }}/src/backend
-      # Recorded known-good application image for the migrate --plan --check step
-      # (12-OPS-004). On a `schedule` trigger the commit-SHA expression is the
-      # default-branch tip at fire time, which may have no pushed image, so the
-      # monthly drill could fail at `docker pull` for a reason unrelated to backup
-      # integrity. This tag is deliberately a RECORDED, CONCRETE release tag, not a
-      # moving pointer: bump it when a new known-good release is published. The
-      # guard test_restore_test_workflow.py::test_restore_test_pins_a_recorded_app_image
-      # fails if this line regresses to a commit-SHA expression.
-      RESTORE_APP_IMAGE_TAG: "2026.10.03"
-    # B4 dependency: ci.yml build job pushes a SHA-tagged image to GHCR.
+      # Pinned application image for the migrate --plan --check step (12-OPS-004).
+      #
+      # Why a DIGEST, not a tag (12-OPS-008): a tag is a mutable label, not an
+      # identity. The previous pin (2026.10.03) was a placeholder copied from
+      # .env.prod.example that never resolved in GHCR, so the monthly drill failed
+      # at `docker pull` for a reason unrelated to backup integrity. Even a
+      # commit-SHA *tag* was observed non-deterministic here (one SHA's tag was
+      # listed while its manifest returned 404, while a sibling SHA resolved
+      # deterministically), because tag->manifest resolution races availability.
+      # A digest names the immutable artifact directly and does not depend on it.
+      #
+      # This value is a RECORDED, verified-published artifact identity — never a
+      # run-time commit-SHA expression — and must be bumped when a new known-good
+      # image is published.
+      #
+      # Why an OLDER pin is correct: the drill asks whether THIS image can operate
+      # against a DB migrated by the checked-out HEAD tree. Pinning HEAD would make
+      # the check trivially green and defeat its purpose; a schema newer than the
+      # pinned image is exactly the drift the check exists to surface.
+      #
+      # Guard: src/backend/tests/test_restore_test_workflow.py::
+      #   test_restore_test_pins_a_digest_of_a_published_image
+      # source-commit: 57966ea0e6f8c5f41c3bdf20a98ba3e31a9204a8 (2026-10-15)
+      RESTORE_APP_IMAGE: "ghcr.io/manicko/mko_bazuna@sha256:87cf5756a2e3ca57127d2f5ecaaa9fb02ab389a413fbb3ab9a9c04543a05fa70"
+    # B4 dependency: ci.yml build job pushes an immutable SHA-tagged image to GHCR.
     # This job restores a real artifact and checks migration compatibility of
-    # the RESTORE_APP_IMAGE_TAG image against the restored schema.
+    # the digest-pinned RESTORE_APP_IMAGE against the restored schema.
     services:
       db:
         image: postgres:18-alpine
@@ -119,8 +134,27 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Verify pinned app image resolves
+        # Fail-fast preflight (12-OPS-004): a stale or mistyped pin must fail
+        # LOUDLY and actionably BEFORE any restore work, never as a cryptic pull
+        # error unrelated to backup integrity.
+        #
+        # The pinned handle is an OCI index (multi-arch). `docker manifest inspect`
+        # proves the handle RESOLVES; it is not the authoritative existence/auth
+        # proof — the `docker pull` step below remains authoritative for both.
+        # Do NOT "fix" this to a platform-specific manifest: the index is the
+        # published identity and that is what the pin names.
+        #
+        # The `|| { ...; exit 1; }` form is intentional and self-contained: this
+        # step does not rely on `set -e` to propagate the failure.
+        run: |
+          docker manifest inspect "$RESTORE_APP_IMAGE" >/dev/null || {
+            echo "::error::pinned restore-test image $RESTORE_APP_IMAGE does not resolve in GHCR — re-pin a known-good main commit's digest (12-OPS-004)"
+            exit 1
+          }
+
       - name: Pull recorded known-good app image
-        run: docker pull ghcr.io/manicko/mko_bazuna:${{ env.RESTORE_APP_IMAGE_TAG }}
+        run: docker pull "$RESTORE_APP_IMAGE"
 
       - name: Run restore-test with migrate --plan --check
-        run: make restore-test BACKUP_FILE=backups/test_backup.dump APP_IMAGE=ghcr.io/manicko/mko_bazuna:${{ env.RESTORE_APP_IMAGE_TAG }}
+        run: make restore-test BACKUP_FILE=backups/test_backup.dump APP_IMAGE=${{ env.RESTORE_APP_IMAGE }}

@@ -768,6 +768,7 @@ _DOCS_OPS_FILES_WITH_PRODUCTION_INVOCATIONS = frozenset(
 _DOCS_OPS_FILES_WITH_REGISTRY_COORDINATES = frozenset(
     {
         "docker-deployment.md",
+        "restore.md",
         "rollback.md",
     }
 )
