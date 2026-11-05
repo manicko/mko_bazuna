@@ -11,6 +11,8 @@ Verifies the ad-duplication contract (Spec: ad re-listing):
     - An existing DRAFT owned by the seller is replaced by the copy, so the
       seller ends with exactly one DRAFT (single-draft policy shared with
       ``create_draft_ad``).
+    - A copy resets every publication-history timestamp to None and leaves the
+      source row (its status and status timestamp) untouched.
 
 The source ad must be in a non-DRAFT status so a copy from it is
 unambiguous, though ``copy_ad`` itself does not require this: if the seller
@@ -223,6 +225,39 @@ class TestCopyAd:
         assert set(new_ad.features.values_list("id", flat=True)) == set(
             source.features.values_list("id", flat=True)
         )
+
+    @pytest.mark.parametrize(
+        "source_status", [AdStatus.PUBLISHED, AdStatus.ARCHIVED]
+    )
+    def test_copy_resets_publication_history(
+        self, seller, category, city, source_status: AdStatus
+    ) -> None:
+        """The new DRAFT carries no publication history; the source is untouched."""
+        source = create_test_ad(seller, category, city, status=source_status)
+
+        new_ad = copy_ad(source.id, seller.id)
+        new_ad.refresh_from_db()
+
+        assert new_ad.pk != source.pk
+        assert new_ad.status == AdStatus.DRAFT
+        # A stale publication timestamp would make the copy clock-visible.
+        for field in (
+            "published_at",
+            "archived_at",
+            "rejected_at",
+            "moderation_failed_at",
+            "deleted_at",
+        ):
+            assert getattr(new_ad, field) is None
+
+        # The source keeps its status and its status-specific timestamp.
+        source.refresh_from_db()
+        assert source.status == source_status
+        status_timestamp = {
+            AdStatus.PUBLISHED: "published_at",
+            AdStatus.ARCHIVED: "archived_at",
+        }[source_status]
+        assert getattr(source, status_timestamp) is not None
 
 
 # ---------------------------------------------------------------------------

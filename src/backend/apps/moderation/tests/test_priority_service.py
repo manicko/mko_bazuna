@@ -2,7 +2,8 @@
 Integration tests for PriorityService, signal, queue view, and bulk API.
 
 Tests cover:
-- PriorityService: calculate_and_save, get_queued_ads, get_priority_counts
+- PriorityService: calculate_and_save, get_queued_ads (incl. the base_score
+  DESC triage ordering), get_priority_counts
 - Signal: automatic priority calculation on Ad post_save
 - Queue view: authentication, filtering, empty state
 - Bulk API: authentication, actions, error handling
@@ -232,6 +233,30 @@ class TestPriorityService:
 
         assert high_ad in qs
         assert low_ad in qs
+
+    def test_get_queued_ads_orders_by_base_score_desc(self, category, city) -> None:
+        """get_queued_ads lists the highest base_score first (triage order)."""
+        user = make_user(990030010)
+        # Created low-first so insertion order opposes the expected output,
+        # proving the ordering comes from base_score DESC.
+        low = create_test_ad(
+            user, category, city, title="Low", status=AdStatus.ON_MODERATION
+        )
+        high = create_test_ad(
+            user, category, city, title="High", status=AdStatus.ON_MODERATION
+        )
+        AdModerationPriority.objects.update_or_create(
+            ad=low,
+            defaults={"base_score": 10, "priority_level": AdPriorityLevel.LOW.value},
+        )
+        AdModerationPriority.objects.update_or_create(
+            ad=high,
+            defaults={"base_score": 99, "priority_level": AdPriorityLevel.HIGH.value},
+        )
+
+        ids = list(PriorityService().get_queued_ads().values_list("id", flat=True))
+
+        assert ids == [high.id, low.id]
 
     def test_get_priority_counts_returns_zero_for_empty(self) -> None:
         """get_priority_counts returns all zeros when no priorities exist."""

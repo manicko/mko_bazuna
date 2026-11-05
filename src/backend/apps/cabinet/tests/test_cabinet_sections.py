@@ -3,8 +3,10 @@ Tests for the cabinet sections (CAB-001..CAB-004).
 
 Covers:
 - /cabinet/ hub renders with section nav + "Мои объявления" -> /dashboard/.
-- Saved-search management: create (disable keeps it, D9), toggle, edit, delete.
-- Search-history list + clear.
+- Saved-search management: create (disable keeps it, D9), toggle, edit, delete,
+  and the list read scoped to the owner (another user's search never renders).
+- Search-history list + clear, including clear idempotency (Q8) and the
+  per-owner scope of the HTML clear route.
 - Settings page renders as a stub.
 """
 
@@ -133,6 +135,23 @@ class TestSavedSearchesManagement:
             == 404
         )
 
+    def test_saved_searches_list_is_scoped_to_the_owner(
+        self, buyer_client: Client, buyer: User
+    ) -> None:
+        """The list read renders only the caller's rows (read-leg scoping)."""
+        other = make_user(940000502)
+        SavedSearch.objects.create(user=buyer, query="велосипед")
+        SavedSearch.objects.create(user=other, query="чужой")
+
+        resp = buyer_client.get("/cabinet/saved-searches/")
+
+        assert resp.status_code == 200
+        content = resp.content.decode()
+        assert "велосипед" in content
+        # Another user's query terms (PII) must never render in my list.
+        assert "чужой" not in content
+        assert SavedSearch.objects.filter(user=other).count() == 1
+
 
 # ---------------------------------------------------------------------------
 # Search history (CAB-004)
@@ -161,6 +180,29 @@ class TestSearchHistorySection:
 
         resp = buyer_client.get("/cabinet/search-history/?lang=ru")
         assert "Нет истории поиска" in resp.content.decode()
+
+    def test_clear_is_idempotent_and_scoped_to_the_owner(
+        self, buyer_client: Client, buyer: User
+    ) -> None:
+        """Re-clearing an empty history succeeds; other users keep theirs."""
+        other = make_user(940000501)
+        SearchHistory.objects.create(
+            user=buyer, query="мой", query_normalized="мой"
+        )
+        SearchHistory.objects.create(
+            user=other, query="чужой", query_normalized="чужой"
+        )
+
+        first = buyer_client.post("/cabinet/search-history/clear/")
+        assert first.status_code == 302
+        assert SearchHistory.objects.filter(user=buyer).count() == 0
+
+        # Q8 idempotency: a second POST on the already-empty history is still a
+        # successful no-op, and the other user's rows are untouched.
+        second = buyer_client.post("/cabinet/search-history/clear/")
+        assert second.status_code == 302
+        assert SearchHistory.objects.filter(user=buyer).count() == 0
+        assert SearchHistory.objects.filter(user=other).count() == 1
 
 
 # ---------------------------------------------------------------------------

@@ -10,6 +10,11 @@ Covers:
 - ad object is in context
 - breadcrumb_category is the ad's category
 - select_related + prefetch_related include user__trust_score (no N+1)
+- a successful HTML detail GET records exactly one AD_VIEWED analytics event
+  with the SELLER's attribution; a missing-id GET records none
+- every non-PUBLISHED ad status answers 404 on the HTML detail route
+- is_favorited is False for a viewer without a favorite and True once they
+  favorite the ad
 """
 
 from __future__ import annotations
@@ -23,8 +28,10 @@ from django.test import Client
 from django.test.utils import CaptureQueriesContext
 from django.urls import reverse
 
+from apps.ads.models import AdFavorite
+from apps.analytics.models import AnalyticsEvent
 from apps.categories.models import Category
-from apps.core.enums import AdStatus
+from apps.core.enums import AdStatus, AnalyticsEventType
 from apps.core.services.site_config import get_bot_username
 from conftest import create_test_ad
 
@@ -107,15 +114,95 @@ class TestAdDetailContext:
         )
 
     def test_detail_context_contains_is_favorited_for_authenticated(
-        self, published_ad, seller, category, city
+        self, published_ad, seller, user, category, city
     ) -> None:
-        """is_favorited is False for an authenticated user who hasn't favorited."""
+        """is_favorited mirrors the viewer: False without a favorite, True with one."""
+        # False leg: an authenticated viewer who has not favorited the ad.
         client = Client()
         client.force_login(seller)
         response = client.get(reverse("ads:detail", args=[published_ad.id]))
 
         assert response.status_code == 200
         assert response.context["is_favorited"] is False
+
+        # True leg: a distinct viewer favorites the ad, then sees True.
+        AdFavorite.objects.create(ad=published_ad, user=user)
+        client = Client()
+        client.force_login(user)
+        response = client.get(reverse("ads:detail", args=[published_ad.id]))
+
+        assert response.status_code == 200
+        assert response.context["is_favorited"] is True
+
+
+class TestAdDetailViewEvent:
+    """A successful HTML detail GET records exactly one AD_VIEWED event.
+
+    The event is attributed to the SELLER (``ad.user_id``), never the viewer:
+    ``apps/analytics`` aggregates AD_VIEWED through the seller's ads for the
+    seller dashboard, so a viewer-attributed event would corrupt those stats.
+    """
+
+    def test_detail_get_records_exactly_one_ad_viewed_with_seller_attribution(
+        self, published_ad, seller
+    ) -> None:
+        """One GET -> one event, attributed to the seller."""
+        response = Client().get(reverse("ads:detail", args=[published_ad.id]))
+
+        assert response.status_code == 200
+        events = AnalyticsEvent.objects.filter(
+            event_type=AnalyticsEventType.AD_VIEWED,
+            ad_id=published_ad.id,
+        )
+        assert events.count() == 1
+        assert events.get().user_id == seller.id
+
+    def test_missing_ad_detail_get_records_no_ad_viewed_event(self) -> None:
+        """A 404 detail GET records no view event (no ad to attribute it to)."""
+        before = AnalyticsEvent.objects.filter(
+            event_type=AnalyticsEventType.AD_VIEWED
+        ).count()
+
+        response = Client().get(reverse("ads:detail", args=[999999]))
+
+        assert response.status_code == 404
+        assert (
+            AnalyticsEvent.objects.filter(
+                event_type=AnalyticsEventType.AD_VIEWED
+            ).count()
+            == before
+        )
+
+
+class TestAdDetailAudienceStatuses:
+    """Every non-PUBLISHED status answers 404 on the HTML detail route.
+
+    Only media-gate drafts and the consent / decline / ban account states are
+    covered elsewhere; this class is the only guard over the status dimension
+    of the direct ``/ads/<id>/`` URL (no existence leak for queued, rejected,
+    archived, failed-moderation or deleted ads).
+    """
+
+    @pytest.mark.parametrize(
+        "status",
+        [
+            AdStatus.DRAFT,
+            AdStatus.ON_MODERATION,
+            AdStatus.REJECTED,
+            AdStatus.DELETED,
+            AdStatus.ON_MODERATION_FAILED,
+            AdStatus.ARCHIVED,
+        ],
+    )
+    def test_non_published_status_returns_404_on_detail(
+        self, seller, category, city, status: AdStatus
+    ) -> None:
+        """A non-PUBLISHED ad is unreachable through its direct detail URL."""
+        ad = create_test_ad(seller, category, city, status=status)
+
+        response = Client().get(reverse("ads:detail", args=[ad.id]))
+
+        assert response.status_code == 404
 
     def test_detail_context_contains_display_features(
         self, published_ad, seller, category, city

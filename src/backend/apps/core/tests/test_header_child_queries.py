@@ -12,6 +12,10 @@ This is the tripwire: it renders the real header at a multi-root fixture and
 counts the child-existence SELECTs.  Before the annotation the count scaled
 with the root count (measured 10 for 5 non-leaf roots x 2 render sites);
 after, it is bounded by a small constant.
+
+The file also pins the ``root_categories`` CONTENT contract (active-only,
+name-ordered roots) at the end, ported here in block B3 from the retiring
+categories API parity test.
 """
 
 from __future__ import annotations
@@ -82,3 +86,27 @@ class TestHeaderChildExistenceQueryCount:
         large = _child_existence_queries(large_ctx.captured_queries)
 
         assert large <= small
+
+
+class TestHeaderRootCategoriesContent:
+    """root_categories renders active roots only, in name order.
+
+    Previously pinned only by the retiring categories API parity test: dropping
+    ``.filter(is_active=True)`` would expose an inactive root to every anonymous
+    visitor on every page, and dropping ``.order_by("name")`` would render the
+    roots in encoding-dependent order.
+    """
+
+    def test_root_categories_active_only_and_name_ordered(self) -> None:
+        """Only active roots are listed, ordered by name."""
+        Category.objects.create(name="Beta Root", slug="hdr-beta-root")
+        Category.objects.create(name="Alpha Root", slug="hdr-alpha-root")
+        Category.objects.create(
+            name="Retired Root", slug="hdr-retired-root", is_active=False
+        )
+
+        response = Client().get(reverse("ads:listings"))
+
+        assert response.status_code == 200
+        roots = response.context["root_categories"]
+        assert [c.slug for c in roots] == ["hdr-alpha-root", "hdr-beta-root"]
