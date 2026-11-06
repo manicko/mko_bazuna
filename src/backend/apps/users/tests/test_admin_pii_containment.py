@@ -19,17 +19,32 @@ a data subject's, so a token ban would false-positive on correct code.
 from __future__ import annotations
 
 import inspect
+import re
 
 import pytest
+from django import forms
 from django.contrib import admin
 from django.contrib.admin.utils import flatten_fieldsets
+from django.contrib.auth.forms import (
+    ReadOnlyPasswordHashField,
+    ReadOnlyPasswordHashWidget,
+)
 from django.contrib.messages.storage.cookie import CookieStorage
+from django.forms import Field
 from django.test import RequestFactory
 
 from apps.users.admin import LoginTokenAdmin, UserAdmin
 from apps.users.models import User
 
 pytestmark = [pytest.mark.unit]
+
+# A known raw password whose hash is stored on the change-form target. The
+# PBKDF2 hash is long and recognisable, so a leak into the rendered field is
+# detectable even by a substring.
+_KNOWN_RAW_PASSWORD = "correct horse battery staple"
+# Minimum hash-segment length treated as a leak. A segment shorter than this
+# (e.g. the ``pbkdf2_sha256`` algorithm name) is not credential material.
+_MIN_LEAK_SEGMENT = 8
 
 
 def _assert_no_raw_telegram_id(source: str) -> None:
@@ -130,6 +145,61 @@ def staff_user() -> User:
     )
 
 
+def _read_only_password_violations(field: Field, rendered: str) -> list[str]:
+    """Return violations for the change form's ``password`` field; ``[]`` is compliant.
+
+    The invariant (04-AUT-005): the field is a disabled ``ReadOnlyPasswordHashField``
+    whose ``ReadOnlyPasswordHashWidget`` renders a masked summary — the stored
+    hash is never emitted as a ``value`` and no text input can write it.
+
+    Split out from the guard so the negative-control test can prove the
+    predicate detects an editable field instead of only passing today's Django
+    widget. ``rendered`` is the widget's HTML for the stored ``initial`` value;
+    pass ``""`` to check the field contract alone.
+    """
+    violations: list[str] = []
+    if not isinstance(field, ReadOnlyPasswordHashField):
+        violations.append(
+            f"password must be a ReadOnlyPasswordHashField, got {type(field).__name__}"
+        )
+    if not isinstance(field.widget, ReadOnlyPasswordHashWidget):
+        violations.append(
+            "password widget must be a ReadOnlyPasswordHashWidget, got "
+            f"{type(field.widget).__name__}"
+        )
+    if field.disabled is not True:
+        violations.append(f"password must be disabled, got disabled={field.disabled!r}")
+    if not rendered:
+        return violations
+
+    if _KNOWN_RAW_PASSWORD in rendered:
+        violations.append("the raw password appears in the rendered field")
+    if _hash_leaked(field.initial, rendered):
+        violations.append("the stored password hash appears in the rendered field")
+    if re.search(r'name="password"[^>]*value=', rendered):
+        violations.append(
+            'a name="password" input carries a value= attribute (hash disclosure)'
+        )
+    return violations
+
+
+def _hash_leaked(stored: object, rendered: str) -> bool:
+    """Return ``True`` if ``stored`` (the password hash) leaks into ``rendered``.
+
+    A hash is ``<algorithm>$<params>$<salt>$<digest>``; any segment longer than
+    ``_MIN_LEAK_SEGMENT`` is credential material and must never be rendered.
+    """
+    if not isinstance(stored, str) or not stored:
+        return False
+    if stored in rendered:
+        return True
+    return any(
+        segment in rendered
+        for segment in stored.split("$")
+        if len(segment) > _MIN_LEAK_SEGMENT
+    )
+
+
 @pytest.mark.django_db
 def test_change_form_has_no_writable_privilege_field(staff_user: User) -> None:
     """``is_superuser`` / ``is_staff`` / ``groups`` / ``user_permissions`` are not writable."""
@@ -156,16 +226,41 @@ def test_change_form_has_no_writable_account_state_field(staff_user: User) -> No
 
 @pytest.mark.django_db
 def test_change_form_password_is_never_a_writable_field(staff_user: User) -> None:
-    """``password`` is either absent or a disabled, non-editable read-only field."""
+    """``password`` is never a writable field and never renders the stored hash.
+
+    Behavioural, not attribute-introspective (04-AUT-005): an earlier revision
+    asserted the undocumented ``Widget.read_only`` attribute, which Django 6.x
+    removed. The invariant is asserted through the ``ReadOnlyPasswordHashField``
+    contract plus the rendered output, which holds across Django versions.
+    """
+    target = User(telegram_id=930000002, chat_id=930000002, username="target")
+    target.set_password(_KNOWN_RAW_PASSWORD)
     user_admin = UserAdmin(User, admin.site)
-    obj = User(telegram_id=930000002, chat_id=930000002, username="target")
-    form = user_admin.get_form(_admin_request(staff_user), obj, change=True)
-    if "password" in form.base_fields:
-        field = form.base_fields["password"]
-        assert field.disabled is True, "password must be disabled (04-AUT-005)"
-        assert field.widget.read_only is True, (
-            "password widget must be non-editable (04-AUT-005)"
-        )
+    form = user_admin.get_form(_admin_request(staff_user), target, change=True)
+    assert "password" in form.base_fields, (
+        "the change form must expose password as a read-only field (04-AUT-005)"
+    )
+    field = form.base_fields["password"]
+    rendered = field.widget.render("password", field.initial, attrs={"id": "id_password"})
+    violations = _read_only_password_violations(field, rendered)
+    assert not violations, (
+        "password must be a non-editable, non-disclosing field (04-AUT-005): "
+        + "; ".join(violations)
+    )
+
+
+def test_password_read_only_predicate_detects_a_writable_field() -> None:
+    """The predicate reports a plain writable text input (negative control).
+
+    A guard that only passes today's Django field is not a guard: if the
+    ``ReadOnlyPasswordHashField`` were ever swapped for an editable field, this
+    predicate must go red.
+    """
+    writable = forms.CharField(widget=forms.TextInput, disabled=False)
+    violations = _read_only_password_violations(writable, "")
+    assert violations
+    assert any("ReadOnlyPasswordHashField" in v for v in violations), violations
+    assert any("disabled" in v for v in violations), violations
 
 
 @pytest.mark.django_db

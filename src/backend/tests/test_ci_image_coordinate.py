@@ -1,22 +1,29 @@
 """
-One image coordinate and workflow concurrency (12-OPS-009).
+One image coordinate, the build cache backend and workflow concurrency
+(12-OPS-009).
 
-Before this guard there were four live ``ghcr.io/<owner>/<repo>`` strings and the
-build cache was silently split: ``ci.yml``'s ``cache-from`` named
-``ghcr.io/manicko/mko_bazuna:buildcache`` while its ``cache-to`` named
-``ghcr.io/mko-bazuna:buildcache`` (missing the repo path). Worse, the coordinate
-was later unified to ``mko-bazuna/mko_bazuna`` — a namespace that does not exist
-as a GitHub account, so GHCR rejects every push with
-``denied: not_found: owner not found``.
+Invariant now guarded: the build cache is the GitHub Actions backend
+(``type=gha``) with **one** stable ``scope`` shared by ``cache-from`` and
+``cache-to``, and no branch-derived string may reach a Docker reference. A
+``type=registry`` cache ref interpolated ``github.ref_name`` — for a
+``pull_request`` event that is ``<pr_number>/merge``, and ``/`` is not a legal
+Docker tag character, so every PR build aborted with ``invalid reference
+format``.
 
-The repository is owned by ``manicko`` and lives at ``manicko/mko_bazuna`` on
-GitHub. GHCR namespaces packages by the owning GitHub account, so the canonical
-coordinate is ``ghcr.io/manicko/mko_bazuna`` — GHCR has no concept of a separate
-"container-registry namespace" distinct from the GitHub owner.
+Historical context (short): before this guard there were four live
+``ghcr.io/<owner>/<repo>`` strings and the registry build cache was silently
+split (``cache-from`` named one repo, ``cache-to`` another). The coordinate was
+then briefly unified to ``mko-bazuna/mko_bazuna`` — a namespace no GitHub
+account owns, so GHCR rejected every push with ``denied: not_found: owner not
+found``. The canonical coordinate is ``ghcr.io/manicko/mko_bazuna``: GHCR has
+no container-registry namespace distinct from the GitHub owner.
 
-These are structural tests (string-level reads of the workflow files and the
-compose/env templates), following the ``test_docs_ci_parity.py`` precedent: no
-PyYAML dependency. They do **not** execute any workflow.
+These are structural tests over the workflow files and the compose/env
+templates, following the ``test_docs_ci_parity.py`` precedent. The build-cache
+guards parse ``ci.yml`` with ``yaml.safe_load`` (PyYAML is an application
+dependency) so they read the real job config rather than substring-matching
+the file; the coordinate and concurrency guards stay string-level. They do
+**not** execute any workflow.
 """
 
 from __future__ import annotations
@@ -56,50 +63,205 @@ def _read(path: Path) -> str:
 
 
 # --- cache parity ----------------------------------------------------------
+# The guards below are pure predicates over the build job's parsed ``with:``
+# mapping, in the style of ``apps/core/tests/test_ci_security.py``. A predicate
+# plus negative controls can go red; a literal pin on today's cache string can
+# only fail when someone edits the file, and cannot tell a safe alternative from
+# a broken one.
+
+# Tokens that make a build-cache spec branch-derived. Interpolated into a Docker
+# reference they produce `<pr_number>/merge` for a pull request, which is not a
+# legal tag, so the exporter aborts. Flagged anywhere in either spec.
+_BRANCH_DERIVED_TOKENS = ("github.ref_name", "github.head_ref", "buildcache-")
 
 
-def test_build_cache_from_and_to_name_the_same_reference() -> None:
-    """``cache-from`` and ``cache-to`` must name the same registry reference.
+def _parse_cache_spec(spec: str) -> dict[str, str]:
+    """Parse a buildx cache spec like ``type=gha,scope=x,mode=max`` into a dict.
 
-    A split cache reference degrades every CI build to a cold cache: the layer
-    cache written under one name is never read back under the other.
+    Keys and values are stripped; empty segments are skipped. A segment without
+    ``=`` is recorded under its own (stripped) text as the key, so garbage input
+    cannot silently parse into an empty-or-compliant dict — the predicate sees
+    the unknown key and flags it.
     """
-    text = _read(_CI_YML)
-    from_ref: str | None = None
-    to_ref: str | None = None
-    for line in text.splitlines():
-        stripped = line.strip()
-        if stripped.startswith("cache-from:"):
-            ref_parts = stripped.split("ref=", 1)
-            if len(ref_parts) < 2:
-                continue  # Line doesn't use ref= syntax
-            from_ref = ref_parts[1].split(",", 1)[0]
-        elif stripped.startswith("cache-to:"):
-            ref_parts = stripped.split("ref=", 1)
-            if len(ref_parts) < 2:
-                continue  # Line doesn't use ref= syntax
-            to_ref = ref_parts[1].split(",", 1)[0]
-    assert from_ref, "ci.yml must declare a cache-from registry reference"
-    assert to_ref, "ci.yml must declare a cache-to registry reference"
-    assert from_ref == to_ref, (
-        "ci.yml cache-from and cache-to must name the same reference; "
-        f"got cache-from={from_ref!r} cache-to={to_ref!r}"
+    parsed: dict[str, str] = {}
+    for segment in spec.split(","):
+        segment = segment.strip()
+        if not segment:
+            continue
+        key, sep, value = segment.partition("=")
+        if not sep:
+            parsed[key] = ""
+            continue
+        parsed[key.strip()] = value.strip()
+    return parsed
+
+
+def _build_cache_violations(cache_from: str | None, cache_to: str | None) -> list[str]:
+    """Return policy violations for the build job's cache pair; ``[]`` means compliant.
+
+    Flagged: a missing/empty side; a backend other than ``gha`` (which is what
+    keeps the ``type=registry`` + ``github.ref_name`` hazard out); a missing or
+    empty ``scope`` on either side; differing scopes (a split cache is
+    permanently cold); ``cache-to`` without ``mode=max`` (silent speed
+    regression); and any branch-derived token in either spec.
+    """
+    violations: list[str] = []
+    for label, spec in (("cache-from", cache_from), ("cache-to", cache_to)):
+        if not spec or not spec.strip():
+            violations.append(f"{label} must be set")
+        else:
+            for token in _BRANCH_DERIVED_TOKENS:
+                if token in spec:
+                    violations.append(
+                        f"{label} is branch-derived ({token!r} is not legal in a "
+                        "Docker reference)"
+                    )
+
+    if not cache_from or not cache_to:
+        return violations
+
+    from_parsed = _parse_cache_spec(cache_from)
+    to_parsed = _parse_cache_spec(cache_to)
+
+    for label, parsed in (("cache-from", from_parsed), ("cache-to", to_parsed)):
+        if parsed.get("type") != "gha":
+            violations.append(
+                f"{label} must use type=gha, got {parsed.get('type')!r}"
+            )
+        if not parsed.get("scope"):
+            violations.append(f"{label} must declare a non-empty scope")
+
+    from_scope = from_parsed.get("scope")
+    to_scope = to_parsed.get("scope")
+    if from_scope and to_scope and from_scope != to_scope:
+        violations.append(
+            f"cache-from and cache-to must share one scope; got "
+            f"{from_scope!r} vs {to_scope!r} (a split cache is permanently cold)"
+        )
+
+    if "max" not in to_parsed.get("mode", "").split(";"):
+        violations.append(
+            f"cache-to must set mode=max, got {to_parsed.get('mode')!r}"
+        )
+
+    return violations
+
+
+def _build_job() -> dict:
+    """Return the parsed ``jobs.build`` mapping from ci.yml."""
+    import yaml
+
+    document = yaml.safe_load(_read(_CI_YML))
+    assert isinstance(document, dict), "ci.yml must parse to a mapping"
+    jobs = document.get("jobs")
+    assert isinstance(jobs, dict), "ci.yml 'jobs' must be a mapping"
+    job = jobs.get("build")
+    assert isinstance(job, dict), "ci.yml has no 'build' job"
+    return job
+
+
+def _build_cache_specs() -> tuple[str | None, str | None]:
+    """Return the build job's ``(cache-from, cache-to)`` values as written."""
+    job = _build_job()
+    steps = job.get("steps")
+    assert isinstance(steps, list), "ci.yml 'build.steps' must be a list"
+    for step in steps:
+        if isinstance(step, dict) and step.get("name") == "Build and push Docker image":
+            config = step.get("with")
+            assert isinstance(config, dict), (
+                "the 'Build and push Docker image' step must declare a with: mapping"
+            )
+            return config.get("cache-from"), config.get("cache-to")
+    raise AssertionError("ci.yml build job has no 'Build and push Docker image' step")
+
+
+def _step_by_name(step_name: str) -> dict:
+    """Return the build job's step mapping by display name."""
+    steps = _build_job().get("steps", [])
+    for step in steps:
+        if isinstance(step, dict) and step.get("name") == step_name:
+            return step
+    raise AssertionError(f"ci.yml build job has no step named {step_name!r}")
+
+
+def test_parse_cache_spec_reads_keys_and_values() -> None:
+    """``_parse_cache_spec`` yields the mapping the predicates rely on."""
+    assert _parse_cache_spec("type=gha,scope=mko-bazuna") == {
+        "type": "gha",
+        "scope": "mko-bazuna",
+    }
+    assert _parse_cache_spec("type=gha,scope=x,mode=max") == {
+        "type": "gha",
+        "scope": "x",
+        "mode": "max",
+    }
+    # Garbage never silently becomes a compliant dict.
+    garbage = "not a cache spec"
+    assert _parse_cache_spec(garbage) == {garbage: ""}
+    assert _build_cache_violations(garbage, garbage)
+
+
+def test_build_cache_uses_the_gha_backend_with_one_scope() -> None:
+    """The build job's cache pair is the GHA backend with one stable scope."""
+    cache_from, cache_to = _build_cache_specs()
+    violations = _build_cache_violations(cache_from, cache_to)
+    assert not violations, (
+        "ci.yml build cache violates the cache policy (12-OPS-009): "
+        + "; ".join(violations)
     )
 
 
-def test_cache_reference_uses_the_canonical_coordinate() -> None:
-    """The shared cache reference must resolve to the canonical coordinate.
+def test_build_cache_guard_detects_a_branch_derived_registry_ref() -> None:
+    """The guard fails on the old ``type=registry`` + ``github.ref_name`` form.
 
-    ``ci.yml`` declares ``IMAGE_REPOSITORY`` once in the build job's ``env:``
-    and consumes it for both cache refs, so the value lives in exactly one place.
+    That is the shape that broke CI: ``github.ref_name`` is ``<pr>/merge`` for a
+    pull request, and ``/`` is not a legal Docker tag character.
+    """
+    violations = _build_cache_violations(
+        "type=registry,ref=ghcr.io/x/y:buildcache-${{ github.ref_name }}",
+        "type=registry,ref=ghcr.io/x/y:buildcache-${{ github.ref_name }},mode=max",
+    )
+    assert violations
+    assert any("type=gha" in v for v in violations), violations
+    assert any("github.ref_name" in v for v in violations), violations
+
+
+def test_build_cache_guard_detects_a_split_scope() -> None:
+    """The guard fails when cache-from and cache-to use different scopes."""
+    violations = _build_cache_violations(
+        "type=gha,scope=a",
+        "type=gha,scope=b,mode=max",
+    )
+    assert any("scope" in v for v in violations), violations
+
+
+def test_build_cache_guard_detects_a_missing_max_mode() -> None:
+    """The guard fails when cache-to drops ``mode=max``."""
+    violations = _build_cache_violations(
+        "type=gha,scope=x,mode=max",
+        "type=gha,scope=x",
+    )
+    assert any("mode=max" in v for v in violations), violations
+
+
+def test_build_cache_never_derives_a_ref_from_a_branch_name() -> None:
+    """The canonical coordinate is defined once and the cache refs are branch-free.
+
+    ``ci.yml`` declares ``IMAGE_REPOSITORY`` once in the build job's ``env:``, so
+    the coordinate lives in exactly one place; the build cache must not
+    reintroduce a branch-derived Docker reference.
     """
     text = _read(_CI_YML)
     assert f"IMAGE_REPOSITORY: {_CANONICAL_REPOSITORY}" in text, (
         "ci.yml must define IMAGE_REPOSITORY to the canonical coordinate"
     )
-    assert "type=registry,ref=ghcr.io/${{ env.IMAGE_REPOSITORY }}:buildcache-${{ github.ref_name }}" in text, (
-        "ci.yml build-cache reference must consume env.IMAGE_REPOSITORY and be branch-scoped"
-    )
+    cache_from, cache_to = _build_cache_specs()
+    assert cache_from and cache_to, "ci.yml build job must declare both cache refs"
+    for spec in (cache_from, cache_to):
+        for token in ("github.ref_name", "github.head_ref", "buildcache-"):
+            assert token not in spec, (
+                f"ci.yml build-cache spec must not be branch-derived: {spec!r}"
+            )
 
 
 # --- one coordinate across the workflow files ------------------------------

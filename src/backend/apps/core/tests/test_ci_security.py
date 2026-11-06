@@ -396,6 +396,105 @@ def test_trivy_sarif_gate_guard_detects_a_missing_flag() -> None:
     )
 
 
+# ---------------------------------------------------------------------------
+# Trivy image-scan reachability (12-OPS-013)
+# ---------------------------------------------------------------------------
+# The image scan ran under `if: always()` against the mutable `:ci` tag. When
+# the build failed, the step scanned a *previously pushed* `:ci` image and
+# reported a CRITICAL/HIGH verdict for CVEs that did not belong to the run — the
+# incident signature in CI run 42190885870. The scan must run only after a
+# successful build, and must scan the digest this run pushed (the immutable
+# identity of the built image), never the mutable `:ci` tag.
+
+# `:<tag>` suffix on a registry reference (outside an `@sha256:` digest), e.g.
+# `ghcr.io/o/r:ci`. Only the final path segment can carry a tag.
+_REGISTRY_TAG_SUFFIX_RE = re.compile(r":[A-Za-z0-9_][A-Za-z0-9_.-]*$")
+
+
+def _image_scan_reachability_violations(scan_step: dict, build_step: dict) -> list[str]:
+    """Return policy violations for the build job's Trivy image scan step.
+
+    An empty list means the scan is reachable only after a successful build and
+    addresses the digest that build pushed. Split out from the guard so the
+    negative-control tests can prove the predicate detects an ``always()`` gate
+    and a mutable ``:ci`` reference instead of only passing today's ci.yml.
+    """
+    violations: list[str] = []
+
+    condition = scan_step.get("if")
+    if condition is not None:
+        gate = str(condition).strip()
+        if "always()" in gate or "!cancelled()" in gate or gate.startswith("!"):
+            violations.append(
+                f"the scan must not run when the build did not succeed; got if: {gate!r}"
+            )
+    if scan_step.get("continue-on-error") is True:
+        violations.append("continue-on-error must not be true")
+
+    build_id = build_step.get("id")
+    image_ref = str(scan_step.get("with", {}).get("image-ref", ""))
+    if not build_id:
+        violations.append("the build step must declare an id to expose its digest")
+    elif f"steps.{build_id}.outputs.digest" not in image_ref:
+        violations.append(
+            "image-ref must address steps.<build id>.outputs.digest so the scan "
+            f"sees the image this run built; got {image_ref!r}"
+        )
+
+    if "@" not in image_ref:
+        violations.append(
+            f"image-ref must be pinned to a digest (@sha256:...), got {image_ref!r}"
+        )
+    if _REGISTRY_TAG_SUFFIX_RE.search(image_ref.split("@", 1)[0]):
+        violations.append(
+            f"image-ref must not carry a mutable tag suffix, got {image_ref!r}"
+        )
+    return violations
+
+
+@pytest.mark.unit
+def test_trivy_image_scan_runs_only_after_a_successful_build() -> None:
+    """The image scan is gated on a successful build and scans the pushed digest.
+
+    Under the default ``success()`` gate a failed build has no digest, so the
+    step is skipped instead of scanning a stale ``:ci`` image (12-OPS-013).
+    """
+    scan_step = _build_step("Scan Docker image for vulnerabilities")
+    build_step = _build_step("Build and push Docker image")
+    violations = _image_scan_reachability_violations(scan_step, build_step)
+    assert not violations, (
+        "ci.yml build job image scan violates the reachability policy "
+        "(12-OPS-013): " + "; ".join(violations)
+    )
+
+
+@pytest.mark.unit
+def test_image_scan_reachability_guard_detects_an_always_gated_step() -> None:
+    """The guard fails on an ``always()`` gate over a mutable ``:ci`` reference."""
+    violations = _image_scan_reachability_violations(
+        {
+            "name": "synthetic",
+            "if": "always()",
+            "with": {"image-ref": "ghcr.io/x/y:ci"},
+        },
+        {"id": "build_image"},
+    )
+    assert any("did not succeed" in v for v in violations), violations
+    assert any(":ci" in v for v in violations), violations
+
+
+@pytest.mark.unit
+def test_image_scan_reachability_guard_detects_a_mutable_tag_ref() -> None:
+    """The guard fails a correct gate that scans the mutable ``:ci`` tag."""
+    violations = _image_scan_reachability_violations(
+        {"name": "synthetic", "with": {"image-ref": "ghcr.io/x/y:ci"}},
+        {"id": "build_image"},
+    )
+    assert violations
+    assert any("digest" in v for v in violations), violations
+    assert any("tag suffix" in v for v in violations), violations
+
+
 @pytest.mark.unit
 def test_build_job_summarises_trivy_findings_after_upload() -> None:
     """A read-only step pretty-prints the SARIF right after it is uploaded.
@@ -474,14 +573,15 @@ def test_dockerfile_has_no_dead_cache_bust_arg() -> None:
 
     A previous revision declared ``ARG CACHEBUST=1`` but never referenced it
     in a subsequent ``COPY`` — the variable had no effect on cache invalidation.
-    Stale BuildKit registry cache is instead mitigated by the branch-scoped
-    cache refs in ci.yml (see test_cache_reference_uses_the_canonical_coordinate
-    in test_ci_image_coordinate.py). Dead CACHEBUST args must not be reintroduced.
+    Stale BuildKit cache is instead mitigated by the GHA build-cache backend
+    with one stable scope in ci.yml (see
+    test_build_cache_uses_the_gha_backend_with_one_scope in
+    test_ci_image_coordinate.py). Dead CACHEBUST args must not be reintroduced.
     """
     content = _read("docker", "Dockerfile")
     assert "ARG CACHEBUST" not in content, (
         "Dockerfile must not declare a dead CACHEBUST ARG — "
-        "cache invalidation is handled by branch-scoped BuildKit cache refs in ci.yml"
+        "cache invalidation is handled by the BuildKit build cache in ci.yml"
     )
 
 

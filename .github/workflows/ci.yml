@@ -12,8 +12,8 @@ on:
 # Do NOT cancel in progress (12-OPS-009): a cancelled run reports `cancelled`,
 # never `success`, so it can never be mistaken for a green gate — but a required
 # status check that is cancelled turns into a permanently pending check on the
-# branch. The branch-scoped buildcache reference is written by this workflow, so
-# two overlapping pushes on the same branch would otherwise race the same cache target.
+# branch, which never resolves without a manual re-run. Keeping the earlier run
+# lets it finish and publish a terminal conclusion either way.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: false
@@ -31,6 +31,11 @@ jobs:
     # from REGISTRY/REPOSITORY in .env.prod instead (see docker-compose.prod.yml).
     env:
       IMAGE_REPOSITORY: manicko/mko_bazuna
+      # Job-level `env:` values are evaluated with the same expression syntax,
+      # so this indirection resolves once for the whole job. A step's `with:`
+      # cannot nest `${{ env.IMAGE_REPOSITORY }}` inside another expression, so
+      # the Trivy scan reads IMAGE_REF instead.
+      IMAGE_REF: ghcr.io/${{ env.IMAGE_REPOSITORY }}
     outputs:
       image_tag: ${{ github.sha }}
     steps:
@@ -64,11 +69,24 @@ jobs:
           tags: |
             ghcr.io/${{ env.IMAGE_REPOSITORY }}:ci
             ghcr.io/${{ env.IMAGE_REPOSITORY }}:${{ github.sha }}
-          cache-from: type=registry,ref=ghcr.io/${{ env.IMAGE_REPOSITORY }}:buildcache-${{ github.ref_name }}
-          cache-to: type=registry,ref=ghcr.io/${{ env.IMAGE_REPOSITORY }}:buildcache-${{ github.ref_name }},mode=max
+          # The build cache uses the GitHub Actions backend, not a registry
+          # cache (12-OPS-009). A `type=registry,ref=...` cache interpolated
+          # `github.ref_name`, which for a `pull_request` event is
+          # `<pr_number>/merge`; `/` is not a legal Docker tag character, so
+          # the exporter aborted every PR build with "invalid reference format".
+          # The GHA backend has no tag grammar to violate and grants PRs read
+          # access to the default/base branch cache. One stable scope on both
+          # sides keeps the cache warm; `ignore-error` stops a cache export
+          # outage from failing an otherwise green build.
+          cache-from: type=gha,scope=mko-bazuna
+          cache-to: type=gha,scope=mko-bazuna,mode=max,ignore-error=true
 
+      # Scans the digest this run just pushed (the immutable identity of the
+      # built image), never the mutable `:ci` tag. Under the default `success()`
+      # gate a failed build has no digest, so the step is skipped instead of
+      # scanning a previously-pushed `:ci` image and reporting CVEs that do not
+      # belong to this run (12-OPS-013).
       - name: Scan Docker image for vulnerabilities
-        if: always()
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
         env:
           # Trivy v0.56+ defaults to mirror.gcr.io/aquasec/trivy-db:2 (tried first),
@@ -79,7 +97,7 @@ jobs:
           # satisfies the 12-OPS-009 canonical-coordinate guard (test_ci_image_coordinate.py).
           TRIVY_DB_REPOSITORY: public.ecr.aws/aquasecurity/trivy-db:2
         with:
-          image-ref: ghcr.io/${{ env.IMAGE_REPOSITORY }}:ci
+          image-ref: ${{ env.IMAGE_REF }}@${{ steps.build_image.outputs.digest }}
           exit-code: 1
           format: sarif
           output: trivy-image-results.sarif
@@ -112,9 +130,11 @@ jobs:
       # image scan is self-diagnosing in the job log. Without this, `exit-code: 1`
       # fails the job with zero finding lines (the scan logs only "Detecting
       # vulnerabilities" and the SARIF reaches code scanning but never the log),
-      # which is the 12-OPS-013 incident signature. A separate second scan step is
-      # deliberately NOT used: a duplicate upload-artifact `name:` would 409
-      # (overwrite: false) and turn a green build red, and the composite action
+      # which is the 12-OPS-013 incident signature. The scan itself runs only
+      # under the default `success()` gate; this summary keeps `always()` so it
+      # still reports that the scan was skipped when an earlier step failed.
+      # A separate second scan step is deliberately NOT used: a duplicate
+      # upload-artifact `name:` would 409      # (overwrite: false) and turn a green build red, and the composite action
       # leaks TRIVY_* between steps via trivy_envs.txt. Always exits 0 — it exists
       # for deterministic, machine-readable agent verification (project rule 19)
       # of *which* CVE failed the gate, not to change the gate's outcome. That
