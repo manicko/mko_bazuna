@@ -206,14 +206,14 @@ Test execution is split across four workflows, one per tier (see "Test tiers and
 
 | Job | Runs on | Purpose | Key steps |
 |---|---|---|---|
-| `build` | push + PR | Docker image + test env | Checkout → Buildx → Build image → Trivy scan → Upload SARIF |
+| `build` | push + PR | Docker image + test env | Checkout → Buildx → Build image → Trivy scan (`limit-severities-for-sarif`, CRITICAL/HIGH only) → Upload SARIF → Summarise Trivy image findings (read-only, logs the SARIF findings) |
 | `test` | push + PR | PR fast gate | DB service → `bootstrap_reference_data` → `compilemessages` → `pytest -m "not (seed or slow or real_images)"` with `-n auto --maxprocesses=4 --dist loadgroup --reuse-db` |
 | `test-full` | push only (`if: github.event_name == 'push'`) | Full pre-merge tier | Same setup as `test`, then `pytest -m "not (seed)"` — restores `slow` + `real_images` |
 | `lint` | push + PR | Code linting | `uv sync` → `ruff check src/` (from the repository root) |
 | `typecheck` | push + PR | Type checking | `uv sync` → `basedpyright src/` (from the repository root) |
 | `lint-templates` | push + PR | Template linting | `uv sync` → `djlint templates/` |
 | `i18n` | push + PR | i18n completeness gate | `uv sync` → `compilemessages` → `pytest test_i18n_completeness.py test_i18n_pipeline.py -v` |
-| `security` | push + PR | Vuln + secret scanning | `pip-audit` → Trivy (fs) → gitleaks → SARIF upload. Commit-time prevention is also enforced via a pre-commit hook: `.pre-commit-config.yaml` registers a `gitleaks protect --verbose` hook at the `commit` stage that scans staged changes against `.gitleaks.toml` and rejects the commit if any secret is detected — complementing the post-commit CI scan so leaks never enter history. |
+| `security` | push + PR | Vuln + secret scanning | `pip-audit` → Trivy (fs, `limit-severities-for-sarif`, CRITICAL/HIGH only) → gitleaks → SARIF upload. Both Trivy steps keep `exit-code: 1`, so a CRITICAL/HIGH finding with a fix blocks. Commit-time prevention is also enforced via a pre-commit hook: `.pre-commit-config.yaml` registers a `gitleaks protect --verbose` hook at the `commit` stage that scans staged changes against `.gitleaks.toml` and rejects the commit if any secret is detected — complementing the post-commit CI scan so leaks never enter history. |
 | `load-test` | push + PR | Locust load test against a seeded stack | Seed 120 published ads → start web → run Locust |
 | `deploy-check` | push + PR | Production deploy gate | `check --deploy --fail-level WARNING` against `config.settings.prod` with all required env vars (blocking) |
 

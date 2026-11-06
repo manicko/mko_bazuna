@@ -97,12 +97,20 @@ services:
       # entrypoint's .env existence check (CR3 safety)
       - SKIP_ENV_CHECK=1
     # Bind-mount source + entrypoint scripts for hot-reload; cache uv downloads.
+    # The cache volume must mount at /app/.cache/uv, NOT /root/.cache/uv: the
+    # image runs as the `app` user whose HOME is /app, so `uv` resolves its cache
+    # to /app/.cache/uv. Mounting it under /root left the volume unused and made
+    # uv write into the Windows bind mount at ./.cache/uv, where PackNGo rejects
+    # the atomic rename of an extracted wheel into archive-v0 with EPERM
+    # (`failed to rename file from /app/.cache/uv/.tmp… Permission denied`), so
+    # any lockfile bump could not be synced locally. This also shadows the
+    # image's baked cache, which is stale by definition once uv.lock changes.
     volumes:
       - .:/app
       - ./.env.test:/app/src/.env:ro
       - ./docker/entrypoint.sh:/app/entrypoint.sh
       - ./docker/entrypoint-test.sh:/app/entrypoint-test.sh
-      - uv_cache:/root/.cache/uv
+      - uv_cache:/app/.cache/uv
     # One-shot service: exits with pytest exit code
     profiles: ["test"]
 

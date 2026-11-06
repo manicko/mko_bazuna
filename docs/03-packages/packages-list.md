@@ -45,7 +45,7 @@ django-mptt>=0.18.0               # Hierarchical categories. First Django 5.2-co
 django-filter>=26.1               # List filters. Requires Django>=5.2.
 django-tailwind>=4.4.0            # Tailwind standalone CLI (NO Node.js). daisyUI EXCLUDED (project choice).
 django-htmx>=1.19.0               # HTMX for the MPA.
-pillow>=10.4.0                    # Image handling + strict JPEG validation (zone R8). REQUIRED phase 1.
+pillow>=10.4.0,<14.0              # Image handling + strict JPEG validation (zone R8). REQUIRED phase 1. <N+1.0 cap (DEP-003).
 aiogram>=3.15.0                   # Bot API bot (login/contact/publish). NO built-in PG FSM storage — draft Ad stored via ORM.
 httpx>=0.28.0                     # Google Cloud Translation API v2 Basic (httpx, `GOOGLE_TRANSLATE_API_KEY`) at ad publication time. NOT used for search queries (search is per-language FTS, no query-time translation).
 requests>=2.34.2                  # Retained for non-translation uses (seed photo downloads); NOT used for translation egress.

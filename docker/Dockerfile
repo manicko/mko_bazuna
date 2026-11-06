@@ -131,7 +131,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 # python:3.14-slim ships pip (which vendors stale urllib3@2.7.0 and
 # msgpack@1.1.2), setuptools@70.3.0, wheel, and ensurepip bundled wheels.
 # Trivy flags these as HIGH CVEs. The venv at /opt/venv contains the correct
-# versions (urllib3@2.8.0, msgpack@1.2.2 per uv.lock). Combined into one RUN
+# versions (urllib3@2.8.0, msgpack@1.2.4 per uv.lock). Combined into one RUN
 # so deletions collapse into a single layer. Filesystem deletion is used
 # because pip's metadata does not track the base image's system-level
 # installation.

@@ -68,13 +68,17 @@ def _job_by_name(job_name: str) -> dict:
     return job
 
 
-def _build_step(step_name: str) -> dict:
-    """Return a parsed step by its display name from the ``build`` job."""
-    steps = _job_steps("build")
-    for step in steps:
+def _step_by_name(job_name: str, step_name: str) -> dict:
+    """Return a parsed step by its display name from ``jobs.<job_name>``."""
+    for step in _job_steps(job_name):
         if isinstance(step, dict) and step.get("name") == step_name:
             return step
-    raise AssertionError(f"ci.yml build job has no step named {step_name!r}")
+    raise AssertionError(f"ci.yml {job_name} job has no step named {step_name!r}")
+
+
+def _build_step(step_name: str) -> dict:
+    """Return a parsed step by its display name from the ``build`` job."""
+    return _step_by_name("build", step_name)
 
 
 @pytest.mark.unit
@@ -305,6 +309,121 @@ def test_trivy_image_scan_ignores_unfixed() -> None:
         "the Trivy image scan in the build job must set ignore-unfixed: true "
         "to match the fs-mode scan policy (12-OPS-013)"
     )
+
+
+# ---------------------------------------------------------------------------
+# Trivy SARIF severity gate (12-OPS-013)
+# ---------------------------------------------------------------------------
+# `aquasecurity/trivy-action` unsets TRIVY_SEVERITY when `format: sarif` unless
+# `limit-severities-for-sarif: true` is also set, so the `severity:
+# CRITICAL,HIGH` argument is silently inert on both SARIF steps: the gate failed
+# on *any* severity with a fix while the job log recorded no CVE. The flag makes
+# the CRITICAL/HIGH filter effective (a relaxation for LOW/MEDIUM findings) and
+# keeps `exit-code: 1` as the blocker.
+
+
+def _sarif_severity_gate_violations(step: dict) -> list[str]:
+    """Return a list of policy violations for one Trivy SARIF step's ``with:``.
+
+    An empty list means the step is compliant. Split out from the guard so the
+    negative-control test can prove the predicate detects a missing
+    ``limit-severities-for-sarif`` instead of only passing today's ci.yml.
+    """
+    config = step.get("with", {})
+    violations: list[str] = []
+    if config.get("format") != "sarif":
+        violations.append(f"format must be 'sarif', got {config.get('format')!r}")
+    if config.get("limit-severities-for-sarif") is not True:
+        violations.append(
+            "limit-severities-for-sarif must be true so `severity` is honoured "
+            f"in SARIF mode, got {config.get('limit-severities-for-sarif')!r}"
+        )
+    if config.get("exit-code") != 1:
+        violations.append(f"exit-code must be 1, got {config.get('exit-code')!r}")
+    if step.get("continue-on-error") is True:
+        violations.append("continue-on-error must not be true")
+    return violations
+
+
+@pytest.mark.unit
+def test_trivy_sarif_steps_limit_severities_and_stay_blocking() -> None:
+    """Both Trivy SARIF steps honour CRITICAL/HIGH and remain blocking.
+
+    The security job's loop in ``test_security_steps_are_blocking`` only guards
+    ``continue-on-error``; the build job's image scan is otherwise unguarded, so
+    the per-step policy is asserted here by explicit step name (12-OPS-013).
+    """
+    targets = (
+        ("build", "Scan Docker image for vulnerabilities"),
+        ("security", "Run Trivy vulnerability scanner in fs mode"),
+    )
+    for job_name, step_name in targets:
+        violations = _sarif_severity_gate_violations(_step_by_name(job_name, step_name))
+        assert not violations, (
+            f"ci.yml {job_name}/{step_name} violates the Trivy SARIF gate policy "
+            f"(12-OPS-013): " + "; ".join(violations)
+        )
+
+
+@pytest.mark.unit
+def test_trivy_sarif_gate_guard_detects_a_missing_flag() -> None:
+    """The SARIF gate predicate fails when ``limit-severities-for-sarif`` is absent.
+
+    A guard that only passes today's file is not a guard. This feeds the same
+    predicate a representative-but-broken step mapping and asserts every
+    violation class is detected, so removing the flag (or the blocking
+    ``exit-code: 1``) from either named step turns the guard red.
+    """
+    config = {
+        "format": "sarif",
+        "output": "trivy-image-results.sarif",
+        "exit-code": 1,
+    }
+    violations = _sarif_severity_gate_violations({"name": "synthetic", "with": config})
+    assert any("limit-severities-for-sarif" in v for v in violations), (
+        "the predicate must detect a missing limit-severities-for-sarif flag"
+    )
+
+    relaxed = {**config, "limit-severities-for-sarif": False, "format": "table"}
+    assert _sarif_severity_gate_violations({"with": relaxed})
+    assert _sarif_severity_gate_violations(
+        {"continue-on-error": True, "with": {**config, "limit-severities-for-sarif": True}}
+    )
+
+    # The compliant mapping is clean — the predicate is not vacuously true.
+    assert not _sarif_severity_gate_violations(
+        {"with": {**config, "limit-severities-for-sarif": True}}
+    )
+
+
+@pytest.mark.unit
+def test_build_job_summarises_trivy_findings_after_upload() -> None:
+    """A read-only step pretty-prints the SARIF right after it is uploaded.
+
+    Without it a failing image scan reports only ``Process completed with exit
+    code 1`` with no finding lines, so the job is not self-diagnosing
+    (12-OPS-013). The summary must (a) follow ``Upload Docker image scan
+    results``, (b) never fail the job itself, and (c) not re-scan, which would
+    duplicate the upload-artifact name and 409 on ``overwrite: false``.
+    """
+    names = [
+        step.get("name") for step in _job_steps("build") if isinstance(step, dict)
+    ]
+    assert "Upload Docker image scan results" in names, (
+        "the build job must still upload trivy-image-results SARIF"
+    )
+    assert "Summarise Trivy image findings" in names, (
+        "the build job must summarise the Trivy SARIF into the job log (12-OPS-013)"
+    )
+    assert names.index("Summarise Trivy image findings") == (
+        names.index("Upload Docker image scan results") + 1
+    ), "the summary must run immediately after the SARIF upload"
+    summary = _step_by_name("build", "Summarise Trivy image findings")
+    assert "uses" not in summary, (
+        "the summary must not invoke an action or a second Trivy scan"
+    )
+    assert summary.get("continue-on-error") is not True
+    assert "trivy-image-results.sarif" in summary.get("run", "")
 
 
 @pytest.mark.unit

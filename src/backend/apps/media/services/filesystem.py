@@ -339,7 +339,7 @@ def _record_deletion_error(storage_key: str, exc: OSError) -> None:
 # Quality of the stored original, made explicit.
 #
 # ``strip_photo_exif`` previously passed no ``quality=`` and silently inherited
-# Pillow's implicit default (measured at 75 against the pinned pillow 12.3.0
+# Pillow's implicit default (measured at 75 against the pinned pillow 13.0.0
 # wheel).  Naming it here means the number the store actually uses is recorded
 # at the call site instead of being an undocumented property of Pillow.
 #

@@ -83,7 +83,13 @@ jobs:
           exit-code: 1
           format: sarif
           output: trivy-image-results.sarif
+          # SARIF mode ignores the severity argument: trivy-action unsets
+          # TRIVY_SEVERITY before invoking Trivy unless
+          # `limit-severities-for-sarif: true` is set, so without it the gate
+          # fails on *any* severity that has a fix. Setting the flag makes
+          # `severity` effective and narrows the gate to CRITICAL/HIGH.
           severity: CRITICAL,HIGH
+          limit-severities-for-sarif: true
           ignore-unfixed: true
           cache: false
 
@@ -101,6 +107,39 @@ jobs:
         with:
           sarif_file: trivy-image-results.sarif
           category: trivy-image
+
+      # Read-only: pretty-prints the SARIF produced by the step above so a failing
+      # image scan is self-diagnosing in the job log. Without this, `exit-code: 1`
+      # fails the job with zero finding lines (the scan logs only "Detecting
+      # vulnerabilities" and the SARIF reaches code scanning but never the log),
+      # which is the 12-OPS-013 incident signature. A separate second scan step is
+      # deliberately NOT used: a duplicate upload-artifact `name:` would 409
+      # (overwrite: false) and turn a green build red, and the composite action
+      # leaks TRIVY_* between steps via trivy_envs.txt. Always exits 0 — it exists
+      # for deterministic, machine-readable agent verification (project rule 19)
+      # of *which* CVE failed the gate, not to change the gate's outcome. That
+      # guarantee covers a truncated or non-JSON SARIF too (a scan that crashed
+      # mid-write), so a parse failure is reported and swallowed instead of
+      # turning this diagnostic step into a second, confusing gate.
+      - name: Summarise Trivy image findings
+        if: always()
+        shell: bash
+        run: |
+          if [ ! -s trivy-image-results.sarif ]; then echo "no SARIF produced"; exit 0; fi
+          python - <<'PY'
+          import json
+          import sys
+
+          try:
+              document = json.load(open("trivy-image-results.sarif", encoding="utf-8"))
+          except (OSError, ValueError) as exc:
+              print(f"could not parse trivy-image-results.sarif: {exc}")
+              sys.exit(0)
+          for run in document.get("runs", []):
+              for result in run.get("results", []):
+                  message = result.get("message", {}).get("text", "")
+                  print(result.get("level", "?"), result.get("ruleId", "?"), message)
+          PY
 
   test:
     runs-on: ubuntu-latest
@@ -492,7 +531,13 @@ jobs:
           output: trivy-results.sarif
           exit-code: 1
           ignore-unfixed: true
+          # SARIF mode ignores the severity argument: trivy-action unsets
+          # TRIVY_SEVERITY before invoking Trivy unless
+          # `limit-severities-for-sarif: true` is set, so without it the gate
+          # fails on *any* severity that has a fix. Setting the flag makes
+          # `severity` effective and narrows the gate to CRITICAL/HIGH.
           severity: CRITICAL,HIGH
+          limit-severities-for-sarif: true
 
       # --- Secret scanning ---
       # Runs independently of the Trivy step so a Trivy crash does not skip secret scanning.

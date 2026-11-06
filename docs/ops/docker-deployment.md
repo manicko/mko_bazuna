@@ -620,6 +620,21 @@ Deployment configuration is validated via Django's `manage.py check --deploy`:
 > absent files, so bandit aborted with exit 2 and scanned zero files. This
 > complements the existing `pip-audit`, Trivy filesystem scan, and Gitleaks
 > secret scan that also run in the `security` job.
+>
+> **Trivy SARIF gate (12-OPS-013, plan 04):** both Trivy steps (the `build` job's
+> image scan and the `security` job's fs scan) emit SARIF, where
+> `aquasecurity/trivy-action` unsets `TRIVY_SEVERITY` unless
+> `limit-severities-for-sarif: true` is set — so `severity: CRITICAL,HIGH` was
+> silently inert and the gate failed on *any* severity with a fix. Both steps now
+> set the flag (a relaxation: LOW/MEDIUM-with-fix findings no longer block) and
+> both keep `exit-code: 1`, so CRITICAL/HIGH findings with a fix still fail the
+> job. Because a failing image scan previously logged no finding lines at all,
+> the `build` job now runs a read-only `Summarise Trivy image findings` step
+> immediately after `Upload Docker image scan results` that pretty-prints
+> `trivy-image-results.sarif` into the job log (and exits 0, including when the
+> SARIF is absent or unparseable). It does not re-scan — a second upload-artifact
+> `name:` would 409 on `overwrite: false`. The `trivy-image-results` artifact and
+> the code scanning upload are unchanged.
 
 ### Image tag policy
 
