@@ -11,6 +11,8 @@ not on running security tools.
 from __future__ import annotations
 
 import re
+import tomllib
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
@@ -123,13 +125,34 @@ def test_dependabot_config_exists() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Dependabot configuration — PR #7 / PR #8 prevention
+# Dependabot configuration — PR #7 / PR #8 / PR #16 prevention
 # ---------------------------------------------------------------------------
-# PR #7 proposed major-version GitHub Action upgrades (actions/checkout v4→v7,
-# astral-sh/setup-uv v5→v10) as auto-filed Dependabot PRs. PR #8 proposed
-# Django 5→6 and django-prometheus 2.5.0→2.6.0.dev22. The dependabot.yml must
-# gate these behind manual review by restricting update types per ecosystem
-# and entry.
+# PR #7 proposed major-version GitHub Action upgrades (actions/checkout v4->v7,
+# astral-sh/setup-uv v5->v10) as auto-filed Dependabot PRs. PR #8 proposed
+# Django 5->6 and django-prometheus 2.5.0->2.6.0.dev22; PR #16 proposed
+# django 5.2.17->6.1.2 against the declared ``django<6.0``.
+#
+# The dependabot.yml must gate these behind manual review. The schema key is
+# ``update-types`` (plural, a list); the former singular ``update-type`` is not
+# part of the schema and — because an ``allow`` rule without ``update-types``
+# permits EVERY update type — it left the restriction inert.
+#
+# ``update-types`` never applies to security updates, so the binding guarantee
+# that the locked dependency set stays inside the pyproject.toml bounds is a
+# test over ``uv.lock`` (see section "Declared dependency bounds" below). It
+# runs in the CI ``test`` job, so no extra ci.yml step is needed.
+
+# Valid Dependabot ``update-types`` values used by this repository.
+_UPDATE_TYPE_MINOR = "version-update:semver-minor"
+_UPDATE_TYPE_PATCH = "version-update:semver-patch"
+_UPDATE_TYPE_MAJOR = "version-update:semver-major"
+
+# PEP 503: collapse runs of ``-``, ``_`` and ``.`` into a single ``-``.
+_DISTRIBUTION_NAME_SEPARATOR_RE = re.compile(r"[-_.]+")
+
+# A PEP 440-ish version token as it appears in uv.lock (``5.2.17``, ``1.0``).
+_RELEASE_SEGMENT_RE = re.compile(r"^\d+(?:\.\d+)*$")
+
 
 def _find_dependabot_entry(ecosystem: str, group_name: str | None = None) -> dict | None:
     """Locate a dependabot update entry by ecosystem, optionally by group name.
@@ -163,49 +186,118 @@ def _find_dependabot_entry(ecosystem: str, group_name: str | None = None) -> dic
     return None
 
 
+def _flatten_update_types(rule_entries: list) -> set[str]:
+    """Return every value in the ``update-types`` lists of Dependabot rule entries."""
+    flattened: set[str] = set()
+    for item in rule_entries:
+        if isinstance(item, dict):
+            flattened.update(item.get("update-types", []))
+    return flattened
+
+
+def _assert_no_singular_update_type_key(
+    rule_entries: list, *, where: str
+) -> None:
+    """Fail if any rule entry uses the invalid singular ``update-type`` key.
+
+    Dependabot's schema key is ``update-types`` (plural, a list). A singular key
+    is silently ignored, and because an ``allow`` rule that omits ``update-types``
+    permits ALL update types, a restriction written that way is inert — a major
+    bump is then auto-filed (PR #16). The comment on the whitelist covers a
+    whole-file scan, which reports every offending ``dependency-name``.
+    """
+    singular = [item for item in rule_entries if isinstance(item, dict) and "update-type" in item]
+    assert not singular, (
+        f"{where} uses the invalid singular `update-type` key. Dependabot's schema "
+        "key is `update-types` (a list); when `update-types` is omitted from an "
+        "`allow` rule Dependabot allows ALL update types, so this restriction "
+        f"is inert. Offending entries: {singular}"  # noqa: E501
+    )
+
+
+def _assert_allow_is_minor_patch_only(entry: dict, *, where: str) -> None:
+    """Assert an entry's ``allow`` rules flatten to minor+patch and never major."""
+    allow = entry.get("allow", [])
+    assert allow, f"{where} must specify an `allow` list"
+    _assert_no_singular_update_type_key(allow, where=f"{where} `allow`")
+    update_types = _flatten_update_types(allow)
+    assert _UPDATE_TYPE_MAJOR not in update_types, (
+        f"{where} must not allow major-version updates"
+    )
+    assert _UPDATE_TYPE_MINOR in update_types, (
+        f"{where} must allow semver-minor updates"
+    )
+    assert _UPDATE_TYPE_PATCH in update_types, (
+        f"{where} must allow semver-patch updates"
+    )
+
+
+def _find_ignore_entry(entry: dict, dependency_name: str) -> list[dict]:
+    """Return the ``ignore`` rules of a Dependabot entry for one dependency."""
+    ignore_list = entry.get("ignore", [])
+    assert isinstance(ignore_list, list), "Dependabot `ignore` must be a list"
+    return [
+        item
+        for item in ignore_list
+        if isinstance(item, dict) and item.get("dependency-name") == dependency_name
+    ]
+
+
+@pytest.mark.unit
+def test_dependabot_uses_plural_update_types_everywhere() -> None:
+    """No dependabot.yml rule uses the invalid singular ``update-type`` key."""
+    from ruamel.yaml import YAML
+
+    text = _read(".github", "dependabot.yml")
+    document = YAML(typ="safe").load(text)
+    violations: list[str] = []
+    for index, entry in enumerate(document.get("updates", [])):
+        if not isinstance(entry, dict):
+            continue
+        label = f"updates[{index}] ({entry.get('package-ecosystem')})"
+        for section in ("allow", "ignore"):
+            rules = entry.get(section, [])
+            if not isinstance(rules, list):
+                continue
+            for rule in rules:
+                if isinstance(rule, dict) and "update-type" in rule:
+                    violations.append(f"{label}.{section}: {rule}")
+    assert not violations, (
+        "`update-type` is not a Dependabot schema key — use `update-types` (a "
+        "list). An `allow` rule without `update-types` allows all update types, "
+        "so the restriction is inert and majors get auto-filed:\n"
+        + "\n".join(violations)
+    )
+    # Load-bearing for the comment above: the scan would pass vacuously.
+    broken = {"updates": [{"allow": [{"dependency-name": "x", "update-type": "y"}]}]}
+    assert any("update-type" in rule for rule in broken["updates"][0]["allow"])
+
+
 @pytest.mark.unit
 def test_dependabot_uv_restricted_to_semver_minor_patch() -> None:
     """The uv ecosystem only allows semver-minor and semver-patch updates.
 
-    Blocks major-version bumps (e.g., Django 5→6) and pre-release/dev versions
-    (e.g., django-prometheus 2.5.0→2.6.0.dev22) from being auto-filed —
-    the root cause of PR #8.
+    Blocks major-version bumps (e.g., Django 5->6) from being auto-filed — the
+    root cause of PR #8 and PR #16. Security updates are not subject to
+    ``update-types``; their bound is enforced by the uv.lock guard below.
     """
     entry = _find_dependabot_entry("uv")
     assert entry is not None, "uv ecosystem entry not found in dependabot.yml"
-    allow = entry.get("allow", [])
-    assert allow, "uv ecosystem must specify an `allow` list"
-    update_types = {item.get("update-type") for item in allow if isinstance(item, dict)}
-    assert "version-update:semver-major" not in update_types, (
-        "uv ecosystem must not allow major-version updates"
-    )
-    assert "version-update:semver-minor" in update_types, (
-        "uv ecosystem must allow semver-minor updates"
-    )
-    assert "version-update:semver-patch" in update_types, (
-        "uv ecosystem must allow semver-patch updates"
-    )
+    _assert_allow_is_minor_patch_only(entry, where="uv ecosystem")
 
 
 @pytest.mark.unit
 def test_dependabot_django_prometheus_prerelease_ignored() -> None:
     """The uv ecosystem ignores pre-release updates for django-prometheus.
 
-    Belt-and-suspenders alongside the `allow` restriction: even if a pre-release
-    version type slips through the allow filter, this `ignore` entry blocks it.
+    Even if a pre-release version type slips through the (security-update
+    exempt) allow filter, this `ignore` entry blocks it.
     """
     entry = _find_dependabot_entry("uv")
     assert entry is not None
-    ignore_list = entry.get("ignore", [])
-    prometheus_ignores = [
-        i
-        for i in ignore_list
-        if isinstance(i, dict) and i.get("dependency-name") == "django-prometheus"
-    ]
+    prometheus_ignores = _find_ignore_entry(entry, "django-prometheus")
     assert prometheus_ignores, "django-prometheus must appear in the uv ignore list"
-    all_update_types: set[str] = set()
-    for ign in prometheus_ignores:
-        all_update_types.update(ign.get("update-types", []))
+    all_update_types = _flatten_update_types(prometheus_ignores)
     assert "version-update:semver-prerelease" in all_update_types, (
         "django-prometheus must ignore pre-release updates"
     )
@@ -215,37 +307,310 @@ def test_dependabot_django_prometheus_prerelease_ignored() -> None:
 def test_dependabot_build_actions_restricted_to_minor_patch() -> None:
     """The build-actions entry only allows semver-minor and semver-patch.
 
-    Major-version action upgrades (actions/checkout v4→v7, astral-sh/setup-uv
-    v5→v10) require manual review (12-OPS-017) — root cause of PR #7.
+    Major-version action upgrades (actions/checkout v4->v7, astral-sh/setup-uv
+    v5->v10) require manual review (12-OPS-017) — root cause of PR #7.
     """
     entry = _find_dependabot_entry("github-actions", "build-actions")
     assert entry is not None, "build-actions github-actions entry not found"
-    allow = entry.get("allow", [])
-    assert allow, "build-actions entry must specify an `allow` list"
-    update_types = {
-        item.get("update-type", "any") for item in allow if isinstance(item, dict)
-    }
-    assert "version-update:semver-major" not in update_types, (
-        "build-actions entry must not allow major-version updates"
+    _assert_allow_is_minor_patch_only(entry, where="build-actions entry")
+
+
+# ---------------------------------------------------------------------------
+# Declared dependency bounds (DEP-003) — defence in depth for Dependabot
+# ---------------------------------------------------------------------------
+# Dependabot documents that ``update-types`` never applies to security updates,
+# so dependabot.yml cannot guarantee that a proposed bump stays inside the
+# pyproject.toml upper bound. Two guards below close that gap:
+#   * every bounded dependency has an explicit major pin in the uv `ignore` list
+#     (so the dependabot.yml intent is visible per dependency), and
+#   * the resolved uv.lock stays inside every declared bound (the enforceable
+#     guarantee — this is what PR #16's lock violated).
+
+
+def _normalise_distribution_name(name: str) -> str:
+    """Normalise a requirement name to its PEP 503 form (extras stripped)."""
+    base = name.partition("[")[0]
+    return _DISTRIBUTION_NAME_SEPARATOR_RE.sub("-", base).lower().strip("-")
+
+
+def _lower_bound(requirement: str) -> str | None:
+    """Return the version of the first ``>=`` clause in a requirement."""
+    match = re.search(r">=\s*([0-9][0-9.]*)", requirement)
+    return match.group(1) if match else None
+
+
+def _upper_bound(requirement: str) -> str | None:
+    """Return the version of the first ``<`` clause in a requirement."""
+    match = re.search(r"<\s*([0-9][0-9.]*)", requirement)
+    return match.group(1) if match else None
+
+
+def _is_next_major_bound(requirement: str) -> bool:
+    """Return ``True`` when ``<N.0`` excludes the next major above ``>=M``.
+
+    ``>=5.2.16,<6.0`` is the typical next-major convention, and so is the
+    ``>=10.4.0,<14.0`` form whose lower bound starts several majors below the
+    ceiling (majors 10-13 are inside; 14 is excluded). ``<0.20`` / ``<0.19``
+    only exclude a 0.x line, never a major.
+    """
+    upper = _upper_bound(requirement)
+    if upper is None:
+        return False
+    parts = [int(part) for part in upper.split(".")]
+    if len(parts) != 2 or parts[1] != 0 or parts[0] < 1:
+        return False
+    lower = _lower_bound(requirement)
+    lower_release = _release_segments(lower) if lower is not None else None
+    if lower_release is None:
+        return parts[0] >= 2
+    return lower_release[0] <= parts[0] - 1
+
+
+@dataclass(frozen=True)
+class _BoundedDependency:
+    """A direct dependency bound by a PEP 440 upper (``<``) bound."""
+
+    name: str
+    requirement: str
+
+    @property
+    def pins_major(self) -> bool:
+        """Return ``True`` when the upper bound excludes a major version."""
+        return _is_next_major_bound(self.requirement)
+
+
+def _pyproject_document() -> dict:
+    """Parse pyproject.toml from the repository root."""
+    document = tomllib.loads(_read("pyproject.toml"))
+    assert isinstance(document, dict), "pyproject.toml must parse to a mapping"
+    return document
+
+
+def _declared_requirements() -> list[str]:
+    """Return ``[project].dependencies`` + ``[dependency-groups].dev`` strings."""
+    document = _pyproject_document()
+    project_requirements = list(document.get("project", {}).get("dependencies", []))
+    dev_requirements = list(
+        document.get("dependency-groups", {}).get("dev", [])
     )
-    assert "version-update:semver-minor" in update_types
-    assert "version-update:semver-patch" in update_types
+    return project_requirements + dev_requirements
+
+
+def _split_requirement(requirement: str) -> tuple[str, str]:
+    """Split a PEP 508 requirement into ``(normalised name, specifier text)``."""
+    match = re.match(r"\s*([A-Za-z0-9][A-Za-z0-9._-]*(?:\[[^\]]*\])?)\s*(.*)$", requirement)
+    assert match is not None, f"unparseable requirement: {requirement!r}"
+    return _normalise_distribution_name(match.group(1)), match.group(2)
+
+
+def _bounded_dependencies() -> dict[str, _BoundedDependency]:
+    """Return every declared dependency that carries an upper bound, by name."""
+    bounded: dict[str, _BoundedDependency] = {}
+    for requirement in _declared_requirements():
+        name, specifier = _split_requirement(requirement)
+        if _upper_bound(specifier) is not None:
+            bounded[name] = _BoundedDependency(name=name, requirement=requirement)
+    return bounded
+
+
+def _lock_versions(lock_text: str) -> dict[str, str]:
+    """Return ``{normalised name: version}`` for every package in uv.lock."""
+    lock = tomllib.loads(lock_text)
+    versions: dict[str, str] = {}
+    for package in lock.get("package", []):
+        if isinstance(package, dict) and "name" in package and "version" in package:
+            versions[_normalise_distribution_name(package["name"])] = package["version"]
+    return versions
+
+
+def _release_segments(version: str) -> tuple[int, ...] | None:
+    """Return the numeric release tuple of a version, or ``None`` if not numeric.
+
+    uv.lock pins registry releases, so pre-release suffixes are unexpected; a
+    non-numeric version makes the bound check inconclusive rather than wrong.
+    """
+    match = re.match(r"^([0-9]+(?:\.[0-9]+)*)", version)
+    if match is None:
+        return None
+    return tuple(int(part) for part in match.group(1).split("."))
+
+
+def _bound_violation(name: str, version: str, requirement: str) -> str | None:
+    """Return a description of the first violated bound, or ``None`` if compliant."""
+    release = _release_segments(version)
+    if release is None:
+        return None
+    lower = _lower_bound(requirement)
+    if lower is not None:
+        lower_release = _release_segments(lower)
+        assert lower_release is not None, f"unparseable lower bound in {requirement!r}"
+        if release < lower_release:
+            return f"{version} is below the declared >= {lower} bound"
+    upper = _upper_bound(requirement)
+    if upper is not None:
+        upper_release = _release_segments(upper)
+        assert upper_release is not None, f"unparseable upper bound in {requirement!r}"
+        if not release < upper_release:
+            return f"{version} is outside the declared < {upper} bound"
+    return None
+
+
+def _lock_bound_violations(
+    lock_text: str, bounded: dict[str, _BoundedDependency]
+) -> list[str]:
+    """Return one message per bounded dependency the lock resolves out of bounds.
+
+    Dependencies absent from the lock are skipped: this guard covers the
+    resolved set only, and a missing declaration is a `uv lock` error already.
+    """
+    versions = _lock_versions(lock_text)
+    violations: list[str] = []
+    for name, dependency in sorted(bounded.items()):
+        version = versions.get(name)
+        if version is None:
+            continue
+        violation = _bound_violation(name, version, dependency.requirement)
+        if violation is not None:
+            violations.append(
+                f"{name}: {violation} (pyproject.toml: {dependency.requirement})"
+            )
+    return violations
+
+
+@pytest.mark.unit
+def test_dependabot_uv_pins_major_for_bounded_dependencies() -> None:
+    """Every dependency bounded below a major in pyproject.toml is major-pinned.
+
+    Derived from ``[project].dependencies`` + ``[dependency-groups].dev``: each
+    requirement with a ``<N.0`` upper bound (``django>=5.2.16,<6.0``) and each
+    dependency whose bound spans the current major (``pillow>=10.4.0,<14.0``)
+    must appear in the uv entry's ``ignore`` list with ``semver-major``.
+    Removing the ignore entry for a bounded dependency turns this red.
+    """
+    entry = _find_dependabot_entry("uv")
+    assert entry is not None, "uv ecosystem entry not found in dependabot.yml"
+    ignore_list = entry.get("ignore", [])
+    assert isinstance(ignore_list, list), "uv `ignore` must be a list"
+    _assert_no_singular_update_type_key(ignore_list, where="uv `ignore`")
+
+    major_bounded = {
+        name: dependency
+        for name, dependency in _bounded_dependencies().items()
+        if dependency.pins_major
+    }
+    assert major_bounded, "pyproject.toml declares no next-major upper bounds"
+
+    pinned_names = {
+        _normalise_distribution_name(item["dependency-name"])
+        for item in ignore_list
+        if isinstance(item, dict) and "dependency-name" in item
+    }
+    unpinned = sorted(name for name in major_bounded if name not in pinned_names)
+    assert not unpinned, (
+        "these pyproject.toml dependencies declare a next-major upper bound but "
+        "have no pin in the uv `ignore` list (Dependabot's `allow`/`update-types` "
+        "does not apply to security updates, so the pin is the defence-in-depth "
+        f"layer): {unpinned}"
+    )
+
+    # Every derived pin enforces semver-major.
+    missing_major: list[str] = []
+    for name in major_bounded:
+        rules = _find_ignore_entry(entry, name)
+        if _UPDATE_TYPE_MAJOR not in _flatten_update_types(rules):
+            missing_major.append(name)
+    assert not missing_major, (
+        "these next-major-bounded dependencies have an `ignore` entry without "
+        f"`{_UPDATE_TYPE_MAJOR}`: {missing_major}"
+    )
+
+
+@pytest.mark.unit
+def test_major_bound_derivation_contract() -> None:
+    """Pin the derivation contract behind the per-dependency major pins.
+
+    ``>=10.4.0,<14.0`` spans majors 10-13, so major 14 is excluded (pin it).
+    ``>=5.2.16,<6.0`` is the plain next-major case. ``<0.20`` excludes a 0.x
+    line, not a major; a requirement without an upper bound is not bounded.
+    """
+    assert _BoundedDependency("pillow", "pillow>=10.4.0,<14.0").pins_major
+    assert _BoundedDependency("django", "django>=5.2.16,<6.0").pins_major
+    assert not _BoundedDependency("ruamel-yaml", "ruamel.yaml>=0.19.1,<0.20").pins_major
+    assert not _BoundedDependency("ruff", "ruff>=0.16.10").pins_major
+
+    bounded = _bounded_dependencies()
+    assert "pillow" in bounded, "pillow must be derived as a bounded dependency"
+    assert "django" in bounded
+    assert "psycopg" in bounded, "psycopg[binary] must normalise to psycopg"
+    assert "bandit" in bounded, "dev-group bounds must be derived too"
+    # Unbounded dev tools must not be derived (they keep receiving majors via
+    # the corrected global `allow`; no per-dependency pin is expected).
+    for unbounded in ("ruff", "pytest", "basedpyright", "djlint", "pip-audit"):
+        assert unbounded not in bounded, f"{unbounded} must not be derived as bounded"
+
+
+@pytest.mark.unit
+def test_dependency_bounds_are_respected_by_uv_lock() -> None:
+    """Every declared upper bound is satisfied by the resolved uv.lock.
+
+    This is the enforceable "never ship Django 6 while declaring ``django<6.0``"
+    guarantee: it runs in the CI ``test`` job on every PR, so a Dependabot
+    update (security or version) that resolves outside a bound fails the run.
+    ``uv lock --check`` alone only proves the lock is up to date with the
+    requirements; it does not re-assert the bound on a Dependabot-authored lock.
+    """
+    violations = _lock_bound_violations(_read("uv.lock"), _bounded_dependencies())
+    assert not violations, (
+        "uv.lock resolves outside the pyproject.toml upper bounds — the lock "
+        "violates the dependency policy that blocked PR #16:\n"
+        + "\n".join(violations)
+    )
+
+
+@pytest.mark.unit
+def test_lock_bound_guard_detects_an_out_of_policy_lock() -> None:
+    """The lock-bound predicate fails on a lock that resolves inside another major.
+
+    A guard that only passes today's lock is not a guard. This feeds the same
+    predicate the PR #16 shape (``django 6.1.2`` against ``django>=5.2.16,<6.0``)
+    so the documented failure mode is proven detectable.
+    """
+    bounded = _bounded_dependencies()
+    pr_16_lock = (
+        '[[package]]\nname = "django"\nversion = "6.1.2"\n'
+        '[[package]]\nname = "django-mptt"\nversion = "0.18.0"\n'
+    )
+    violations = _lock_bound_violations(pr_16_lock, bounded)
+    assert any(v.startswith("django: ") for v in violations), violations
+    assert not any(v.startswith("django-mptt: ") for v in violations), violations
+    assert any("< 6.0" in v for v in violations), violations
+
+    lower_violations = _lock_bound_violations(
+        '[[package]]\nname = "django"\nversion = "5.1.0"\n', bounded
+    )
+    assert any(">= 5.2.16" in v for v in lower_violations), lower_violations
+
+    compliant = '[[package]]\nname = "django"\nversion = "5.2.17"\n'
+    assert not _lock_bound_violations(compliant, bounded)
 
 
 @pytest.mark.unit
 def test_dependabot_security_actions_allows_all_types() -> None:
     """The security-actions entry allows all update types (incl. majors).
 
-    trivy-action and codeql upload-sarif need timely major-version upgrades
-    for CVE coverage.
+    trivy-action and codeql upload-sarif need timely major-version upgrades for
+    CVE coverage. Its ``allow`` entries carry only ``dependency-name``: no
+    ``update-types`` (plural) and no invalid singular ``update-type``, which
+    means every update type is allowed.
     """
     entry = _find_dependabot_entry("github-actions", "security-actions")
     assert entry is not None, "security-actions github-actions entry not found"
     allow = entry.get("allow", [])
     assert allow, "security-actions entry must specify an `allow` list"
+    _assert_no_singular_update_type_key(allow, where="security-actions `allow`")
     for item in allow:
-        assert "update-type" not in item, (
-            f"security-actions allow entry must not restrict update-type: {item}"
+        assert "update-types" not in item, (
+            f"security-actions allow entry must not restrict update types: {item}"
         )
 
 
