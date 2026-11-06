@@ -194,9 +194,9 @@ docker run --rm -d \
     -e POSTGRES_HOST_AUTH_METHOD=trust \
     postgres:18.6-alpine
 
-# 4. Wait for readiness, then restore
-docker exec restore-db pg_isready -U restore_user -d bazuna_restore
-docker exec restore-db pg_restore --clean --if-exists -U restore_user -d bazuna_restore -F c /backups/dump_FILE.dump
+# 4. Wait for readiness (the TARGET DB answers a query), then restore
+until docker exec restore-db psql -U restore_user -d bazuna_restore -tAc "SELECT 1" >/dev/null 2>&1; do sleep 1; done
+docker exec restore-db pg_restore --clean --if-exists --exit-on-error -U restore_user -d bazuna_restore -F c /backups/dump_FILE.dump
 
 # 5. Smoke test
 docker exec restore-db psql -U restore_user -d bazuna_restore -c "\dt"
@@ -218,6 +218,15 @@ docker network rm mko-bazuna-restore-net
   isolated network with no published ports.
 - **No `--no-sync` on `pg_restore`** — `pg_restore` has no `--no-sync` flag. The `--no-sync` flag
   is only valid for `pg_dump` (where it is already used in `make backup` and the prod backup service).
+- **Readiness is a query, not `pg_isready`** — `pg_isready` is a *liveness* probe: it can report
+  *"accepting connections"* for a server that has never verified the requested role or database, and
+  the `postgres` image entrypoint creates the target database (`CREATE DATABASE`) before the real
+  postmaster exists. `psql -tAc "SELECT 1"` against `bazuna_restore` is the only probe that proves
+  the database and role exist (Restore Test run 42202769195).
+- **`--exit-on-error`** — a per-object restore error fails the restore instead of being counted and
+  ignored (the target then reports `pg_restore` as the failing step). `-1`/`--single-transaction` is
+  deliberately **not** used: the dump inventory includes `django_migrations`, which is created before
+  the data restore, so a single transaction would abort before the smoke checks could inspect it.
 - **The automated `make restore-test` target** wraps this pattern with cleanup-on-exit via a trap
   (see [Restore-Test Procedure](#restore-test-procedure) below).
 
@@ -253,7 +262,7 @@ docker network rm mko-bazuna-restore-net
 - **Target RTO ≈ 4 hours.** This is a target, not an SLA. Actual time depends on backup size and
   host I/O throughput.
   - Backup retrieval / copy to restore host: ~30 min
-  - `pg_restore --clean --if-exists` (multi-GB custom-format dump): ~60–90 min
+  - `pg_restore --clean --if-exists --exit-on-error` (multi-GB custom-format dump): ~60–90 min
   - `manage.py migrate --plan` (verify pending migrations): ~5 min
   - Smoke tests (connectivity, schema, data, schema list): ~10 min
 - **DB-size dependent.** The restore target (`pg_restore`) is I/O bound. A 10 GB database may
@@ -289,11 +298,16 @@ The `make restore-test` target:
 3. Creates an isolated network (`mko-bazuna-restore-net-<timestamp>`)
 4. Starts the `restore-test` target's postgres image with `POSTGRES_HOST_AUTH_METHOD=trust` and an isolated DB
    (`bazuna_restore`, user: `restore_user`)
-5. Waits up to 30 s for `pg_isready` (connectivity check)
-6. Runs `pg_restore --clean --if-exists -F c` into the isolated DB
+5. Waits up to 60 s for the target database `bazuna_restore` to answer a real query
+   (`psql -tAc "SELECT 1"`), i.e. readiness means the database **exists**, not merely that a
+   postmaster accepts connections, and fails with the last observed error if it never does
+6. Runs `pg_restore --clean --if-exists --exit-on-error -F c` into the isolated DB, naming
+   `pg_restore` as the failing step if it exits non-zero
 7. Runs five smoke checks that **assert**, not merely print (an empty or partial
    restore fails the target with a non-zero exit):
-   - **Connectivity:** `pg_isready`
+   - **Connectivity:** `pg_isready` — a post-restore probe, run only after the DB is known
+     to exist (readiness, step 5, proves existence with a query). Each numeric check also
+     fails when the query returns no number, so a broken connection is never reported as `0`.
    - **Schema (table count):** `SELECT count(*) FROM information_schema.tables WHERE table_schema='public'` — must be `> 0`
    - **Migrations:** `SELECT count(*) FROM django_migrations` — the table must exist and be non-empty, proving the dump is a migrated database rather than a bare restore
    - **Data (row count):** `SELECT count(*) FROM ads_ad` — must be `> 0`

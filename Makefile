@@ -272,6 +272,16 @@ restore:
 # restore-test: Restore a backup into a fully isolated PostgreSQL instance (separate
 # volume, separate network, separate DB) so the live production database is never
 # touched. Uses `docker run` directly (not `docker compose`) for complete isolation.
+#
+# Recipe rules (keep, they are load-bearing):
+# - ONE shell invocation: every physical line of the recipe body ends with `\`.
+#   Make otherwise runs each line in its own shell and the variables are lost.
+# - Readiness is a REAL QUERY against the target DB, never `pg_isready`. The
+#   postgres image entrypoint runs `CREATE DATABASE` against a temporary socket-only
+#   server that answers `pg_isready`, so a liveness ping can pass while the database
+#   still does not exist (Restore Test run 42202769195).
+# - Statement separators (`;`) abort the chain under `set -e`; each line joins the
+#   chain with `&&` so the first failure stops the target.
 restore-test:
 	@if [ -z "$(BACKUP_FILE)" ]; then \
 		echo "Error: BACKUP_FILE not specified"; \
@@ -283,10 +293,12 @@ restore-test:
 		exit 1; \
 	fi
 	@set -e; \
-	RESTORE_TS=$$(date +%Y%m%d_%H%M%S) && \
-	RESTORE_VOL="mko-bazuna-restore-$$RESTORE_TS" && \
-	RESTORE_NET="mko-bazuna-restore-net-$$RESTORE_TS" && \
-	BACKUP_NAME=$$(basename "$(BACKUP_FILE)") && \
+	RESTORE_DB=bazuna_restore; \
+	RESTORE_USER=restore_user; \
+	RESTORE_TS=$$(date +%Y%m%d_%H%M%S); \
+	RESTORE_VOL="mko-bazuna-restore-$$RESTORE_TS"; \
+	RESTORE_NET="mko-bazuna-restore-net-$$RESTORE_TS"; \
+	BACKUP_NAME=$$(basename "$(BACKUP_FILE)"); \
 	cleanup() { \
 		echo "→ Tearing down isolated resources..."; \
 		docker stop restore-db 2>/dev/null || true; \
@@ -296,61 +308,74 @@ restore-test:
 		echo "✓ Isolated restore-test environment cleaned up"; \
 	}; \
 	trap cleanup EXIT; \
-	echo "→ Creating isolated restore volume: $$RESTORE_VOL" && \
-	docker volume create $$RESTORE_VOL && \
-	echo "→ Creating isolated network: $$RESTORE_NET" && \
-	docker network create $$RESTORE_NET && \
-	echo "→ Starting isolated postgres:18-alpine (db=bazuna_restore, user=restore_user)" && \
+	wait_for_db() { \
+		_attempt=0; \
+		_last_error=""; \
+		until _last_error=$$(docker exec restore-db psql -U $$RESTORE_USER -d $$RESTORE_DB -tAc 'SELECT 1' 2>&1); do \
+			_attempt=$$((_attempt + 1)); \
+			if [ $$_attempt -ge 60 ]; then \
+				echo "✗ FAIL: $$RESTORE_DB not ready after 60s — last error: $$_last_error" >&2; \
+				return 1; \
+			fi; \
+			sleep 1; \
+		done; \
+	}; \
+	require_count() { \
+		_query="$$1"; \
+		_label="$$2"; \
+		_failure="$$3"; \
+		_value=$$(docker exec restore-db psql -U $$RESTORE_USER -d $$RESTORE_DB -t -A -c "$$_query" 2>&1) || _value=""; \
+		case "$$_value" in \
+			''|*[!0-9]*) echo "✗ FAIL: $$_label query returned no numeric result ($$_value)" >&2; return 1;; \
+		esac; \
+		echo "  $$_label: $$_value"; \
+		if ! test "$$_value" -gt 0; then echo "  ✗ FAIL: $$_failure" >&2; return 1; fi; \
+	}; \
+	echo "→ Creating isolated restore volume: $$RESTORE_VOL"; \
+	docker volume create $$RESTORE_VOL >/dev/null; \
+	echo "→ Creating isolated network: $$RESTORE_NET"; \
+	docker network create $$RESTORE_NET >/dev/null; \
+	echo "→ Starting isolated postgres:18-alpine (db=$$RESTORE_DB, user=$$RESTORE_USER)"; \
 	docker run --rm -d \
 		--name restore-db \
 		--network $$RESTORE_NET \
 		-v $$RESTORE_VOL:/var/lib/postgresql \
 		-v $(CURDIR)/backups:/backups:ro \
-		-e POSTGRES_DB=bazuna_restore \
-		-e POSTGRES_USER=restore_user \
+		-e POSTGRES_DB=$$RESTORE_DB \
+		-e POSTGRES_USER=$$RESTORE_USER \
 		-e POSTGRES_PASSWORD=restore_pass \
 		-e POSTGRES_HOST_AUTH_METHOD=trust \
-		postgres:18-alpine && \
-	echo "→ Waiting for postgres readiness..." && \
-	_i=0; until docker exec restore-db pg_isready -U restore_user -d bazuna_restore; do \
-		sleep 1; _i=$$((_i + 1)); \
-		if [ $$_i -ge 30 ]; then echo "Error: postgres did not become ready in 30s"; exit 1; fi; \
-	done && \
-	echo "→ Restoring backup into isolated DB: $(BACKUP_FILE)" && \
-	docker exec restore-db pg_restore --clean --if-exists -U restore_user -d bazuna_restore -F c /backups/$$BACKUP_NAME && \
-	echo "→ Smoke test 1/5: pg_isready (connectivity)" && \
-	docker exec restore-db pg_isready -U restore_user -d bazuna_restore && \
-	echo "  ✓ Connectivity OK" && \
-	echo "→ Smoke test 2/5: schema present (table count > 0)" && \
-	RESTORE_TABLES=$$(docker exec restore-db psql -U restore_user -d bazuna_restore -t -A -c \
-		"SELECT count(*) FROM information_schema.tables WHERE table_schema='public';") && \
-	echo "  Tables: $$RESTORE_TABLES" && \
-	test "$$RESTORE_TABLES" -gt 0 || { echo "  ✗ FAIL: restore produced no tables — empty or partial dump"; exit 1; } && \
-	echo "→ Smoke test 3/5: django_migrations present (schema is migrated, not a bare restore)" && \
-	RESTORE_MIGRATIONS=$$(docker exec restore-db psql -U restore_user -d bazuna_restore -t -A -c \
-		"SELECT count(*) FROM django_migrations;") && \
-	echo "  django_migrations rows: $$RESTORE_MIGRATIONS" && \
-	test "$$RESTORE_MIGRATIONS" -gt 0 || { echo "  ✗ FAIL: django_migrations is absent or empty — the dump is not a migrated database"; exit 1; } && \
-	echo "→ Smoke test 4/5: ads_ad has plausible rows" && \
-	RESTORE_ADS=$$(docker exec restore-db psql -U restore_user -d bazuna_restore -t -A -c \
-		"SELECT count(*) FROM ads_ad;") && \
-	echo "  ads_ad rows: $$RESTORE_ADS" && \
-	test "$$RESTORE_ADS" -gt 0 || { echo "  ✗ FAIL: ads_ad is empty — the dump restored no data"; exit 1; } && \
-	echo "→ Smoke test 5/5: schema list" && \
-	docker exec restore-db psql -U restore_user -d bazuna_restore -c "\dn" && \
+		postgres:18-alpine >/dev/null; \
+	echo "→ Waiting for $$RESTORE_DB to answer a query (existence, not liveness)..."; \
+	wait_for_db || exit 1; \
+	echo "  ✓ Readiness OK"; \
+	echo "→ Restoring backup into isolated DB: $(BACKUP_FILE)"; \
+	docker exec restore-db pg_restore --clean --if-exists --exit-on-error -U $$RESTORE_USER -d $$RESTORE_DB -F c /backups/$$BACKUP_NAME || { echo "✗ FAIL: pg_restore failed for /backups/$$BACKUP_NAME" >&2; exit 1; }; \
+	echo "→ Smoke test 1/5: pg_isready (connectivity)"; \
+	docker exec restore-db pg_isready -U $$RESTORE_USER -d $$RESTORE_DB || { echo "  ✗ FAIL: post-restore connectivity probe failed" >&2; exit 1; }; \
+	echo "  ✓ Connectivity OK"; \
+	echo "→ Smoke test 2/5: schema present (table count > 0)"; \
+	require_count "SELECT count(*) FROM information_schema.tables WHERE table_schema='public';" "Tables" "restore produced no tables — empty or partial dump" || exit 1; \
+	echo "→ Smoke test 3/5: django_migrations present (schema is migrated, not a bare restore)"; \
+	require_count "SELECT count(*) FROM django_migrations;" "django_migrations rows" "django_migrations is absent or empty — the dump is not a migrated database" || exit 1; \
+	echo "→ Smoke test 4/5: ads_ad has plausible rows"; \
+	require_count "SELECT count(*) FROM ads_ad;" "ads_ad rows" "ads_ad is empty — the dump restored no data" || exit 1; \
+	echo "→ Smoke test 5/5: schema list"; \
+	docker exec restore-db psql -U $$RESTORE_USER -d $$RESTORE_DB -c "\dn" || { echo "  ✗ FAIL: schema listing failed" >&2; exit 1; }; \
 	if [ -z "$(APP_IMAGE)" ]; then \
 		echo "→ Skipping migrate --plan --check (APP_IMAGE not set)"; \
 	else \
-		echo "→ Running migrate --plan --check against restored DB" && \
+		echo "→ Running migrate --plan --check against restored DB"; \
 		docker run --rm --network $$RESTORE_NET \
 			-e DJANGO_SETTINGS_MODULE=config.settings.prod \
 			-e DJANGO_BUILD=1 \
-			-e DATABASE_URL=postgres://restore_user:restore_pass@restore-db:5432/bazuna_restore \
+			-e DATABASE_URL=postgres://$$RESTORE_USER:restore_pass@restore-db:5432/$$RESTORE_DB \
 			-e ALLOWED_HOSTS='*' \
 			-e SKIP_ENV_CHECK=1 \
 			$(APP_IMAGE) \
-			python src/backend/manage.py migrate --plan --check; \
-	fi && \
+			python src/backend/manage.py migrate --plan --check \
+			|| { echo "✗ FAIL: migrate --plan --check against $$RESTORE_DB exited non-zero" >&2; exit 1; }; \
+	fi; \
 	echo "✓ Restore-test completed successfully from $(BACKUP_FILE)"
 
 prune-backups:

@@ -8,6 +8,17 @@ migrate --plan --check step.
 Follows the same pattern as test_docs_ci_parity.py and test_deploy_workflow.py:
 string-level checks via Path.read_text(), no PyYAML dependency, repo-root
 resolution by searching upward for pyproject.toml.
+
+The 12-OPS-004 guards cover three classes of defect the existence checks cannot
+see:
+
+- readiness: the target waits for the DRILL DATABASE to answer a real query
+  (``psql -tAc "SELECT 1"``), bounded; a ``pg_isready``-only loop is a liveness
+  ping and is rejected (Restore Test run 42202769195, commit a6cc2b99);
+- fail-on-empty: the target asserts ``django_migrations`` and ``ads_ad`` counts
+  are ``> 0`` instead of echoing them;
+- pg_restore strictness: ``--exit-on-error`` present, ``-1`` absent, and a
+  ``pg_restore``-specific failure message rather than a catch-all diagnostic.
 """
 
 from __future__ import annotations
@@ -159,6 +170,98 @@ def _pin_violations(text: str) -> list[str]:
     return violations
 
 
+# --- Readiness gate: existence, not liveness (run 42202769195, a6cc2b99) ----
+# The old gate was `until docker exec restore-db pg_isready ...`. `pg_isready` is
+# a LIVENESS ping: the postgres entrypoint runs `CREATE DATABASE` against a
+# temporary socket-only server, which reports "accepting connections" before
+# `bazuna_restore` exists, and upstream does not require a wrong -U/-d to fail.
+# The gate must therefore be a bounded loop whose condition runs a real query
+# against the drill DB. The post-restore smoke step legitimately keeps
+# `pg_isready`, so the checks below are scoped to the readiness loop — its
+# `until` condition and its body up to `done`; the smoke step is never inspected.
+
+# The `until` condition: everything after the `until` keyword up to the end of
+# its physical line. The keyword is matched anywhere on the line because the
+# recipe joins chain links with `;` (e.g. `_attempt=0; until …`).
+_READINESS_CONDITION_RE = re.compile(r"\buntil\b(?P<condition>[^\n]*)")
+# The rest of the loop body, from its `do` up to the terminating `done`. The
+# terminator is a `done` followed only by `;`, `&&`, or the line ending, so an
+# indented `done` (the recipe indents every physical line with a tab) matches.
+_READINESS_BODY_RE = re.compile(r"\bdo\b(?P<body>.*?)\bdone\b[^\S\n]*(?:&&|;|$)", re.DOTALL)
+# A real query: psql in tuple-only/unaligned mode, selected value `1`, against
+# the drill DB named literally or via the `$$RESTORE_DB` shell variable (the
+# Makefile reads the name once into `RESTORE_DB`, so either spelling is valid).
+_READINESS_QUERY_RE = re.compile(r"\bpsql\b.*?\s-tAc\s+['\"]?SELECT 1\b", re.IGNORECASE)
+_READINESS_TARGET_RE = re.compile(r"\s-d\s+['\"]?(?:\$\$RESTORE_DB\b|bazuna_restore\b)")
+# A bounded retry: an attempt counter with a numeric ceiling, or a deadline.
+_READINESS_BOUND_RES = (
+    re.compile(r"-ge\s+[0-9]+"),
+    re.compile(r"\bdeadline\b", re.IGNORECASE),
+)
+
+
+def _readiness_region(target_block: str) -> tuple[str, str]:
+    """Split the readiness loop into ``(until condition, loop body)``.
+
+    Both parts are empty when the block has no ``until … do … done`` loop, so
+    every rule below reports a violation for a target without a bounded gate.
+    """
+    condition = _READINESS_CONDITION_RE.search(target_block)
+    body = _READINESS_BODY_RE.search(target_block)
+    return (
+        condition.group("condition") if condition else "",
+        body.group("body") if body else "",
+    )
+
+
+def _readiness_violations(target_block: str) -> list[str]:
+    """Return readiness-gate violations for a ``restore-test`` target (empty ⇒ valid).
+
+    Single source of truth for both the file guard and the RED proof. Rules:
+
+    (a) the loop's ``until`` condition must not use ``pg_isready`` (a liveness
+        ping that passes before ``CREATE DATABASE`` runs — run 42202769195);
+    (b) it must run a real query: ``psql … -tAc … SELECT 1``;
+    (c) the query must target the drill DB, named literally
+        (``bazuna_restore``) or through the ``$$RESTORE_DB`` shell variable —
+        accepted because the Makefile defines the name once and reuses the
+        variable, so a renamed DB cannot leave a stale literal behind;
+    (d) the loop must be bounded (an ``-ge <n>`` attempt ceiling or a
+        ``deadline``) so a never-ready server fails the monthly drill instead
+        of hanging it.
+
+    The ``pg_isready`` in the post-restore smoke step is allowed: only the
+    ``until`` condition is judged.
+    """
+    condition, body = _readiness_region(target_block)
+    if not condition:
+        return ["restore-test must wait for readiness in an `until … do … done` loop"]
+
+    violations: list[str] = []
+    if "pg_isready" in condition:
+        violations.append(
+            "restore-test readiness must not be pg_isready-only: it is a liveness "
+            "ping that the entrypoint's temporary server answers before "
+            "CREATE DATABASE runs (Restore Test run 42202769195, a6cc2b99)"
+        )
+    if not _READINESS_QUERY_RE.search(condition):
+        violations.append(
+            'restore-test readiness must run a real query: psql -tAc "SELECT 1" '
+            "in the until condition, not a connectivity probe"
+        )
+    elif not _READINESS_TARGET_RE.search(condition):
+        violations.append(
+            "restore-test readiness query must target the drill DB "
+            "(bazuna_restore or $$RESTORE_DB)"
+        )
+    if not any(bound.search(condition) or bound.search(body) for bound in _READINESS_BOUND_RES):
+        violations.append(
+            "restore-test readiness loop must be bounded (an `-ge <n>` attempt "
+            "ceiling or a deadline) so a never-ready server cannot hang the drill"
+        )
+    return violations
+
+
 def _restore_test_target_block() -> str:
     """Return the Makefile's ``restore-test`` target body, bounded to the target.
 
@@ -291,19 +394,124 @@ def test_restore_target_fails_on_an_empty_restore() -> None:
     asserted: the target queries ``django_migrations`` (a migrated database,
     not a bare restore), and it asserts a count is greater than zero rather
     than only printing it. Echoing a count is the exact defect 12-OPS-004 names.
+
+    The ``> 0`` assertion lives in the target's ``require_count`` helper, so the
+    path is checked at both ends: each count step must invoke the helper with
+    its exact query and must gate the chain on the helper's status, and the
+    helper itself must validate the value is numeric and assert it is positive.
+    (The single-line ``test "$$RESTORE_MIGRATIONS" -gt 0`` form was folded into
+    that helper; asserting the literal alone would now pass only a dead string.)
     """
     block = _restore_test_target_block()
     assert "django_migrations" in block, (
         "restore-test must assert django_migrations is present in the restored "
         "database (12-OPS-004)"
     )
-    assert 'test "$$RESTORE_MIGRATIONS" -gt 0' in block, (
-        "restore-test must fail when django_migrations is empty, not echo the "
-        "count (12-OPS-004)"
+    for query, label in (
+        ("SELECT count(*) FROM django_migrations;", "django_migrations rows"),
+        ("SELECT count(*) FROM ads_ad;", "ads_ad rows"),
+    ):
+        invocation = f'require_count "{query}" "{label}"'
+        assert invocation in block, (
+            f"restore-test must assert {label} is non-empty through "
+            f'{invocation!r}, not echo the count (12-OPS-004)'
+        )
+        step = block.split(invocation, 1)[1].split("\n", 1)[0]
+        assert step.rstrip().endswith("|| exit 1; \\"), (
+            f"the {label} count step must fail the target when the assertion "
+            "fails, not record the count and continue"
+        )
+    helper = block.split("require_count() {", 1)[-1].split("};", 1)[0]
+    assert 'test "$$_value" -gt 0' in helper, (
+        "restore-test must fail when a count is zero (a positive-count "
+        "assertion), not echo the count (12-OPS-004)"
     )
-    assert 'test "$$RESTORE_ADS" -gt 0' in block, (
-        "restore-test must fail when ads_ad has no rows, not echo the count "
-        "(12-OPS-004)"
+    assert "''|*[!0-9]*)" in helper, (
+        "restore-test must reject a non-numeric count result so a failed query "
+        "is never reported as 0 (12-OPS-004)"
+    )
+    assert "--exit-on-error" in block, (
+        "restore-test pg_restore must carry --exit-on-error so a per-object error "
+        "fails the drill instead of being silently skipped"
+    )
+    assert "--single-transaction" not in block, (
+        "restore-test must NOT use --single-transaction: django_migrations is "
+        "created before the data restore, so one transaction would abort before "
+        "the smoke checks can inspect it"
+    )
+    assert re.search(r"(?<![\w-])-1(?![\w-])", block) is None, (
+        "restore-test must NOT use the short form of --single-transaction (-1); "
+        "the check is a bare-token match so `-ge 1` does not trip it"
+    )
+    assert "pg_restore failed" in block, (
+        "a pg_restore failure must print a pg_restore-specific message; the "
+        "'empty or partial dump' diagnostic must stay scoped to the table-count "
+        "assertion, never act as the catch-all for an earlier failure"
+    )
+
+
+def test_restore_test_readiness_proves_the_database_exists() -> None:
+    """Readiness must prove DB EXISTENCE, not liveness (run 42202769195).
+
+    The target's readiness gate must be a real query against the drill database.
+    A ``pg_isready``-only ``until`` loop let the drill reach ``pg_restore``
+    before ``bazuna_restore`` existed, so the restore aborted with
+    ``FATAL: database "bazuna_restore" does not exist`` (commit a6cc2b99).
+    """
+    block = _restore_test_target_block()
+    violations = _readiness_violations(block)
+    assert not violations, "\n".join(violations)
+
+
+def test_readiness_predicate_rejects_liveness_only_and_accepts_the_real_file() -> None:
+    """The readiness predicate rejects liveness gates (RED proof) and accepts the file.
+
+    A guard that only passes today's file is not a guard. The same
+    ``_readiness_violations`` predicate the file guard uses is driven over
+    representative wrong gates — the exact OLD gate (which also carries the
+    legitimate post-restore ``pg_isready`` smoke step: the gate is judged, not
+    the smoke step), a loop with no query, a query against the wrong database,
+    and an unbounded loop — plus the real-query form, which must pass.
+    """
+    old_gate = (
+        "echo \"→ Smoke test 1/5: pg_isready (connectivity)\"; \\\n"
+        "docker exec restore-db pg_isready -U restore_user -d bazuna_restore; \\\n"
+        "_i=0; until docker exec restore-db pg_isready -U restore_user -d bazuna_restore; do\n"
+        " sleep 1; _i=$$((_i + 1));\n"
+        ' if [ $$_i -ge 30 ]; then echo "Error: postgres did not become ready in 30s"; exit 1; fi;\n'
+        "done"
+    )
+    no_query = "_i=0; until docker exec restore-db true; do sleep 1; _i=$$((_i + 1)); done"
+    wrong_db = (
+        '_i=0; until docker exec restore-db psql -U restore_user -d postgres '
+        '-tAc "SELECT 1" >/dev/null 2>&1; do\n sleep 1; _i=$$((_i + 1));\n'
+        " if [ $$_i -ge 60 ]; then exit 1; fi;\ndone"
+    )
+    unbounded = (
+        "until docker exec restore-db psql -U restore_user -d bazuna_restore "
+        '-tAc "SELECT 1" >/dev/null 2>&1; do sleep 1; done'
+    )
+    real_gate = (
+        "_attempt=0; until docker exec restore-db psql -U restore_user -d $$RESTORE_DB "
+        "-tAc 'SELECT 1' 2>&1; do\n _attempt=$$((_attempt + 1));\n"
+        " if [ $$_attempt -ge 60 ]; then return 1; fi;\n done"
+    )
+    wrong_gates = {
+        "the old pg_isready-only gate": old_gate,
+        "a loop without a real query": no_query,
+        "a query against the wrong DB": wrong_db,
+        "an unbounded readiness loop": unbounded,
+    }
+    for label, gate_text in wrong_gates.items():
+        assert _readiness_violations(gate_text), (
+            f"_readiness_violations must reject {label}: {gate_text!r}"
+        )
+
+    assert _readiness_violations(real_gate) == [], (
+        "the real-query readiness gate must satisfy every rule"
+    )
+    assert _readiness_violations(_restore_test_target_block()) == [], (
+        "the real Makefile readiness gate must satisfy every rule"
     )
 
 
