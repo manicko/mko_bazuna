@@ -572,16 +572,16 @@ def test_dockerfile_has_no_dead_cache_bust_arg() -> None:
     """The builder stage has no dead CACHEBUST ARG.
 
     A previous revision declared ``ARG CACHEBUST=1`` but never referenced it
-    in a subsequent ``COPY`` — the variable had no effect on cache invalidation.
-    Stale BuildKit cache is instead mitigated by the GHA build-cache backend
-    with one stable scope in ci.yml (see
-    test_build_cache_uses_the_gha_backend_with_one_scope in
-    test_ci_image_coordinate.py). Dead CACHEBUST args must not be reintroduced.
+    in a subsequent ``COPY``: a dead cache-bust argument has no effect on cache
+    invalidation, and must not be reintroduced. BuildKit's content-addressed
+    layer cache needs no manual cache-bust argument at all — correct input
+    hashing invalidates the affected layers automatically. See
+    ``test_ci_image_coordinate.py`` for the build-cache backend policy.
     """
     content = _read("docker", "Dockerfile")
     assert "ARG CACHEBUST" not in content, (
-        "Dockerfile must not declare a dead CACHEBUST ARG — "
-        "cache invalidation is handled by the BuildKit build cache in ci.yml"
+        "Dockerfile must not declare a dead CACHEBUST ARG — BuildKit's "
+        "content-addressed layer cache needs no manual cache-bust argument"
     )
 
 

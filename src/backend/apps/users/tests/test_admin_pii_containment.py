@@ -31,6 +31,7 @@ from django.contrib.auth.forms import (
 )
 from django.contrib.messages.storage.cookie import CookieStorage
 from django.forms import Field
+from django.forms.boundfield import BoundField
 from django.test import RequestFactory
 
 from apps.users.admin import LoginTokenAdmin, UserAdmin
@@ -145,17 +146,20 @@ def staff_user() -> User:
     )
 
 
-def _read_only_password_violations(field: Field, rendered: str) -> list[str]:
+def _read_only_password_violations(
+    field: Field, rendered: str, stored_hash: str
+) -> list[str]:
     """Return violations for the change form's ``password`` field; ``[]`` is compliant.
 
     The invariant (04-AUT-005): the field is a disabled ``ReadOnlyPasswordHashField``
     whose ``ReadOnlyPasswordHashWidget`` renders a masked summary — the stored
     hash is never emitted as a ``value`` and no text input can write it.
 
-    Split out from the guard so the negative-control test can prove the
-    predicate detects an editable field instead of only passing today's Django
-    widget. ``rendered`` is the widget's HTML for the stored ``initial`` value;
-    pass ``""`` to check the field contract alone.
+    Split out from the guard so the negative-control tests can prove the
+    predicate detects both an editable field and a leaking render. ``rendered``
+    is the HTML a visitor receives and ``stored_hash`` is the credential that
+    must not appear in it; ``Field.initial`` is deliberately not consulted
+    because it is class-level, not per-instance.
     """
     violations: list[str] = []
     if not isinstance(field, ReadOnlyPasswordHashField):
@@ -174,7 +178,7 @@ def _read_only_password_violations(field: Field, rendered: str) -> list[str]:
 
     if _KNOWN_RAW_PASSWORD in rendered:
         violations.append("the raw password appears in the rendered field")
-    if _hash_leaked(field.initial, rendered):
+    if _hash_leaked(stored_hash, rendered):
         violations.append("the stored password hash appears in the rendered field")
     if re.search(r'name="password"[^>]*value=', rendered):
         violations.append(
@@ -232,17 +236,34 @@ def test_change_form_password_is_never_a_writable_field(staff_user: User) -> Non
     asserted the undocumented ``Widget.read_only`` attribute, which Django 6.x
     removed. The invariant is asserted through the ``ReadOnlyPasswordHashField``
     contract plus the rendered output, which holds across Django versions.
+
+    The form is instantiated with ``instance=target`` — as Django's change view
+    does — because an unbound form class carries no per-instance initial, and
+    rendering ``None`` makes the hash-leak check vacuous. ``BoundField`` is what
+    the admin template renders, so ``str(bound)`` is the real output.
     """
     target = User(telegram_id=930000002, chat_id=930000002, username="target")
     target.set_password(_KNOWN_RAW_PASSWORD)
+    target.save()
+    stored_hash = User.objects.get(pk=target.pk).password
     user_admin = UserAdmin(User, admin.site)
-    form = user_admin.get_form(_admin_request(staff_user), target, change=True)
-    assert "password" in form.base_fields, (
+    form_class = user_admin.get_form(_admin_request(staff_user), target, change=True)
+    form = form_class(instance=target)
+    assert "password" in form.fields, (
         "the change form must expose password as a read-only field (04-AUT-005)"
     )
-    field = form.base_fields["password"]
-    rendered = field.widget.render("password", field.initial, attrs={"id": "id_password"})
-    violations = _read_only_password_violations(field, rendered)
+    field = form.fields["password"]
+    bound = BoundField(form, field, "password")
+    initial = bound.initial
+    assert isinstance(initial, str) and initial, (
+        "the bound change form must carry the stored hash as the field initial "
+        "(otherwise the leak check below is vacuous)"
+    )
+    assert initial == stored_hash, (
+        "the rendered initial must be the stored hash, not a placeholder"
+    )
+    rendered = str(bound)
+    violations = _read_only_password_violations(field, rendered, initial)
     assert not violations, (
         "password must be a non-editable, non-disclosing field (04-AUT-005): "
         + "; ".join(violations)
@@ -257,10 +278,28 @@ def test_password_read_only_predicate_detects_a_writable_field() -> None:
     predicate must go red.
     """
     writable = forms.CharField(widget=forms.TextInput, disabled=False)
-    violations = _read_only_password_violations(writable, "")
+    violations = _read_only_password_violations(writable, "", "")
     assert violations
     assert any("ReadOnlyPasswordHashField" in v for v in violations), violations
     assert any("disabled" in v for v in violations), violations
+
+
+def test_password_read_only_predicate_detects_a_leaked_hash() -> None:
+    """The predicate reports a rendered field that discloses the stored hash.
+
+    Covers the leak path itself, which the field-contract checks cannot reach:
+    a read-only-looking field that still emits the hash as an input ``value``
+    must fail.
+    """
+    stored_hash = "pbkdf2_sha256$1200000$abcdefgh$ijklmnopqrstuvwx"
+    field = forms.CharField(widget=forms.TextInput, disabled=True)
+    leaked = (
+        '<input type="text" name="password" '
+        f'value="{stored_hash}">'
+    )
+    violations = _read_only_password_violations(field, leaked, stored_hash)
+    assert any("hash appears in the rendered field" in v for v in violations), violations
+    assert any("carries a value= attribute" in v for v in violations), violations
 
 
 @pytest.mark.django_db

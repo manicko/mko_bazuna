@@ -134,7 +134,8 @@ jobs:
       # under the default `success()` gate; this summary keeps `always()` so it
       # still reports that the scan was skipped when an earlier step failed.
       # A separate second scan step is deliberately NOT used: a duplicate
-      # upload-artifact `name:` would 409      # (overwrite: false) and turn a green build red, and the composite action
+      # upload-artifact `name:` would 409 (overwrite: false) and turn a green
+      # build red, and the composite action
       # leaks TRIVY_* between steps via trivy_envs.txt. Always exits 0 — it exists
       # for deterministic, machine-readable agent verification (project rule 19)
       # of *which* CVE failed the gate, not to change the gate's outcome. That
