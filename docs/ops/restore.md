@@ -341,8 +341,17 @@ published known-good `main` image (`ghcr.io/manicko/mko_bazuna@sha256:…`), nev
 moving `github.sha` or a mutable tag. The source commit of the pinned digest is
 recorded in a comment beside the pin. A **preflight step verifies that the pin
 resolves** (`docker manifest inspect`) and fails loudly, with the re-pin
-instruction, if it does not — before any restore work starts. The pin is
-**re-pinned when a newer known-good image ships**.
+instruction, **when the pinned handle does not resolve** — before any restore
+work starts. The preflight only covers that case; `docker pull` remains
+authoritative for authentication, platform resolution, and rate-limit failures.
+
+The pin is bumped **manually**, by an operator, when they decide a newer
+known-good image is needed. **No automatic staleness check exists** — the pin is
+allowed to age, and nothing at PR time flags it as stale. A bump must update
+**both** the `RESTORE_APP_IMAGE` digest **and** the `source-commit:` comment in
+`.github/workflows/restore-test.yml` together: no guard can detect a mismatch
+between them, because verifying that a commit corresponds to a digest requires
+network access to the registry.
 
 Pinning an image **older** than `HEAD` is correct by design: the drill asks
 whether the pinned image can operate against a database migrated by the

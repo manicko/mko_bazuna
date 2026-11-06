@@ -12,9 +12,9 @@ COMPOSE_TEST := --env-file .env.test -f docker-compose.yml -f docker-compose.tes
 ENV_PROD := --env-file .env.prod
 COMPOSE_PROD := $(ENV_PROD) -f docker-compose.yml -f docker-compose.prod.yml
 
-# App image reference (GHCR SHA-tagged) for the migrate --plan --check step in
+# App image reference (digest-pinned) for the migrate --plan --check step in
 # restore-test. Empty by default — manual restore-test runs skip the migrate
-# check. CI provides the SHA-tagged image via APP_IMAGE.
+# check. CI provides the digest-pinned image via APP_IMAGE.
 APP_IMAGE ?=
 
 # Isolated Compose project names so `make up` (dev) and `make test` can run

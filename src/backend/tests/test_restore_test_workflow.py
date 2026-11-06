@@ -185,10 +185,12 @@ def test_restore_test_pins_a_digest_of_a_published_image() -> None:
 
     A tag is a mutable label, not an identity (12-OPS-008), and the previous pin
     was a placeholder that never resolved, so the monthly drill failed at
-    `docker pull` for a reason unrelated to backup integrity (12-OPS-004). The
-    pin must therefore be a recorded, digest-qualified reference at the canonical
-    GHCR coordinate — never a `${{ github.sha }}` expression, never `:latest` —
-    with its source commit SHA recorded next to it.
+    `docker pull` for a reason unrelated to backup integrity (12-OPS-004). An
+    unauthenticated tag->manifest probe was additionally observed to be
+    unreliable (401/404 under rate limiting), so the pin names the immutable
+    digest directly. The pin must therefore be a recorded, digest-qualified
+    reference at the canonical GHCR coordinate — never a `${{ github.sha }}`
+    expression, never `:latest` — with its source commit SHA recorded next to it.
     """
     text = _RESTORE_YML.read_text()
     assert _GITHUB_SHA_EXPR not in text, (

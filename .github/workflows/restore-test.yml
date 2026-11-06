@@ -28,15 +28,16 @@ jobs:
       # Why a DIGEST, not a tag (12-OPS-008): a tag is a mutable label, not an
       # identity. The previous pin (2026.10.03) was a placeholder copied from
       # .env.prod.example that never resolved in GHCR, so the monthly drill failed
-      # at `docker pull` for a reason unrelated to backup integrity. Even a
-      # commit-SHA *tag* was observed non-deterministic here (one SHA's tag was
-      # listed while its manifest returned 404, while a sibling SHA resolved
-      # deterministically), because tag->manifest resolution races availability.
-      # A digest names the immutable artifact directly and does not depend on it.
+      # at `docker pull` for a reason unrelated to backup integrity. An
+      # unauthenticated tag->manifest probe was observed to be unreliable (401/404
+      # under rate limiting), so the pin names the immutable digest directly
+      # instead of depending on that resolution path.
       #
       # This value is a RECORDED, verified-published artifact identity — never a
-      # run-time commit-SHA expression — and must be bumped when a new known-good
-      # image is published.
+      # run-time commit-SHA expression. It is bumped MANUALLY by an operator when
+      # they decide a newer known-good image is needed; no automatic staleness
+      # check exists, and a bump must update BOTH this digest and the
+      # `source-commit:` comment below together.
       #
       # Why an OLDER pin is correct: the drill asks whether THIS image can operate
       # against a DB migrated by the checked-out HEAD tree. Pinning HEAD would make
