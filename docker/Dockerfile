@@ -5,7 +5,7 @@
 ################################################################################
 # STAGE 1: Builder — install deps, build Tailwind, collectstatic
 ################################################################################
-FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170 AS builder
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928 AS builder
 
 # Install build dependencies for curl (for Tailwind CLI download in standalone mode)
 # Note: gcc and libpq-dev removed - psycopg[binary] provides pre-compiled PostgreSQL driver
@@ -105,7 +105,7 @@ RUN --mount=type=cache,target=/root/.cache/syft \
 ################################################################################
 # STAGE 2: Production Runtime — non-root user, no build tools
 ################################################################################
-FROM python:3.14-slim@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170 AS runtime
+FROM python:3.15-slim@sha256:65a65fc7b30b06cb6df4930fd4650697cb23f4c2698ab81fc87e4b031bc36928 AS runtime
 
 # Install runtime library for psycopg3, curl (for health checks), and gettext (for compilemessages)
 # apt-get upgrade patches the Debian base image's OS packages to the latest available
